@@ -46,11 +46,6 @@ const formatAsa = (value) => {
   return '> 60 min'
 }
 
-const formatHours = (value) => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '0.00'
-  return value.toFixed(2)
-}
-
 const integerFormatter = new Intl.NumberFormat()
 
 const formatCount = (value) => {
@@ -247,6 +242,27 @@ const niceCeiling = (value) => {
   return 10 * magnitude
 }
 
+const averageFinite = (values) => {
+  const finiteValues = values.filter((value) => Number.isFinite(value))
+  if (!finiteValues.length) return 0
+  return finiteValues.reduce((total, value) => total + value, 0) / finiteValues.length
+}
+
+const bulkMetricSummary = computed(() => {
+  const rows = results.value
+  const avgAsaFromRows = averageFinite(rows.map((row) => row.asaSeconds))
+
+  return {
+    requiredAgents: summary.value?.peakStaffNet ?? 0,
+    requiredHeadcount: summary.value?.peakStaffGross ?? 0,
+    serviceLevel: summary.value?.avgServiceLevel ?? 0,
+    averageSpeedOfAnswer: summary.value?.avgAsaSeconds ?? avgAsaFromRows,
+    answeredImmediately: averageFinite(rows.map((row) => row.percentAnsweredImmediately)),
+    expectedOccupancy: averageFinite(rows.map((row) => row.expectedOccupancy)),
+    callerAbandonment: averageFinite(rows.map((row) => row.abandonPercent))
+  }
+})
+
 const trendRows = computed(() =>
   results.value
     .map((row) => {
@@ -403,13 +419,13 @@ const exportProcessedResults = () => {
   if (!results.value.length) return
 
   const calculatedHeaders = [
-    'Agents',
+    'Required Agents',
     'Required Headcount',
     'Service Level',
-    'ASA',
+    'Average Speed of Answer',
     'Answered Immediately',
     'Expected Occupancy',
-    'Abandonment'
+    'Caller Abandonment'
   ]
 
   const headers = [...parsedHeaders.value, ...calculatedHeaders]
@@ -492,34 +508,39 @@ const exportProcessedResults = () => {
 
           <div class="results-metrics">
             <article class="metric-card">
-              <p class="metric-label">Avg Service Level</p>
-              <p class="metric-value">{{ formatPercent(summary?.avgServiceLevel) }}</p>
-              <p class="metric-meta">across successful rows</p>
+              <p class="metric-label">Required Agents</p>
+              <p class="metric-value">{{ bulkMetricSummary.requiredAgents }}</p>
+              <p class="metric-meta">peak interval requirement</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Avg ASA</p>
-              <p class="metric-value">{{ formatAsa(summary?.avgAsaSeconds) }}</p>
-              <p class="metric-meta">across successful rows</p>
+              <p class="metric-label">Required Headcount</p>
+              <p class="metric-value">{{ bulkMetricSummary.requiredHeadcount }}</p>
+              <p class="metric-meta">peak with shrinkage add-on</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Total Net Hours</p>
-              <p class="metric-value">{{ formatHours(summary?.totalRequiredStaffHoursNet) }}</p>
-              <p class="metric-meta">required labor net</p>
+              <p class="metric-label">Service Level</p>
+              <p class="metric-value">{{ formatPercent(bulkMetricSummary.serviceLevel) }}</p>
+              <p class="metric-meta">average across intervals</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Total Gross Hours</p>
-              <p class="metric-value">{{ formatHours(summary?.totalRequiredStaffHoursGross) }}</p>
-              <p class="metric-meta">required labor gross</p>
+              <p class="metric-label">Average Speed of Answer</p>
+              <p class="metric-value">{{ formatAsa(bulkMetricSummary.averageSpeedOfAnswer) }}</p>
+              <p class="metric-meta">average across intervals</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Peak Net Staff</p>
-              <p class="metric-value">{{ summary?.peakStaffNet ?? 0 }}</p>
-              <p class="metric-meta">highest interval requirement</p>
+              <p class="metric-label">Answered Immediately</p>
+              <p class="metric-value">{{ formatPercent(bulkMetricSummary.answeredImmediately) }}</p>
+              <p class="metric-meta">average across intervals</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Peak Gross Staff</p>
-              <p class="metric-value">{{ summary?.peakStaffGross ?? 0 }}</p>
-              <p class="metric-meta">after shrinkage</p>
+              <p class="metric-label">Expected Occupancy</p>
+              <p class="metric-value">{{ formatPercent(bulkMetricSummary.expectedOccupancy) }}</p>
+              <p class="metric-meta">average across intervals</p>
+            </article>
+            <article class="metric-card">
+              <p class="metric-label">Caller Abandonment</p>
+              <p class="metric-value">{{ formatPercent(bulkMetricSummary.callerAbandonment) }}</p>
+              <p class="metric-meta">average across intervals</p>
             </article>
           </div>
 
@@ -532,7 +553,7 @@ const exportProcessedResults = () => {
           <div v-if="trendChart" class="results-detail">
             <h4>Interval Trend</h4>
             <p class="helper-text">
-              Stacked bars show required staff split into net staff and shrinkage add-on (right axis).
+              Stacked bars show required agents split into net agents and shrinkage add-on (right axis).
               The line shows interval call volume (left axis).
             </p>
 
@@ -661,7 +682,7 @@ const exportProcessedResults = () => {
                   @focus="setActivePoint(point.index)"
                 >
                   <title>
-                    {{ point.intervalLabel }} | Calls Offered: {{ formatCount(point.callsOffered) }} | Required Staff
+                    {{ point.intervalLabel }} | Calls Offered: {{ formatCount(point.callsOffered) }} | Required Agents
                     (Net): {{ formatCount(point.requiredStaffNet) }} | Shrinkage Add-On:
                     {{ formatCount(point.additionalStaff) }} | Required Headcount:
                     {{ formatCount(point.requiredStaffGross) }}
@@ -685,7 +706,7 @@ const exportProcessedResults = () => {
                     Calls Offered: {{ activeTooltip.callsOffered }}
                   </text>
                   <text :x="activeTooltip.x + 10" :y="activeTooltip.y + 62" class="trend-tooltip-text">
-                    Required Staff (Net): {{ activeTooltip.requiredStaffNet }}
+                    Required Agents (Net): {{ activeTooltip.requiredStaffNet }}
                   </text>
                   <text :x="activeTooltip.x + 10" :y="activeTooltip.y + 80" class="trend-tooltip-text">
                     Shrinkage Add-On: {{ activeTooltip.additionalStaff }}
@@ -710,7 +731,7 @@ const exportProcessedResults = () => {
                   text-anchor="middle"
                   :transform="`rotate(90 ${trendChart.width - 18} ${trendChart.height / 2})`"
                 >
-                  Required Staff
+                  Required Agents / Headcount
                 </text>
               </svg>
             </div>
@@ -723,11 +744,11 @@ const exportProcessedResults = () => {
               </span>
               <span class="trend-legend-item">
                 <span class="trend-key trend-key-staff-base"></span>
-                Required Staff (Net)
+                Required Agents
               </span>
               <span class="trend-legend-item">
                 <span class="trend-key trend-key-staff-addon"></span>
-                Shrinkage Add-On to Gross
+                Required Headcount
               </span>
             </div>
           </div>
