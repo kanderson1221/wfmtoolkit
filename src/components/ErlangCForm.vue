@@ -8,7 +8,8 @@ const form = reactive({
   averageCustomerPatience: '',
   serviceLevelGoal: 80,
   serviceLevelThreshold: 20,
-  maxOccupancy: 85
+  maxOccupancy: 85,
+  shrinkageAssumption: 30
 })
 
 const hasSubmitted = ref(false)
@@ -16,11 +17,13 @@ const isLoading = ref(false)
 const submitError = ref('')
 const submittedTargets = ref({
   serviceLevelGoal: 80,
-  serviceLevelThreshold: 20
+  serviceLevelThreshold: 20,
+  shrinkageAssumption: 30
 })
 const results = ref({
   summary: {
     requiredAgents: '',
+    requiredHeadcount: '',
     serviceLevel: '',
     expectedAsa: '',
     percentAnsweredImmediately: '',
@@ -36,7 +39,8 @@ const handleSubmit = async () => {
   isLoading.value = true
   submittedTargets.value = {
     serviceLevelGoal: form.serviceLevelGoal,
-    serviceLevelThreshold: form.serviceLevelThreshold
+    serviceLevelThreshold: form.serviceLevelThreshold,
+    shrinkageAssumption: form.shrinkageAssumption
   }
 
   try {
@@ -182,6 +186,22 @@ const handleSubmit = async () => {
               />
               <p class="helper-text">Maximum target occupancy percent.</p>
             </div>
+
+            <div class="field-group">
+              <label for="shrinkageAssumption">Shrinkage Assumption</label>
+              <input
+                id="shrinkageAssumption"
+                v-model.number="form.shrinkageAssumption"
+                type="number"
+                min="0"
+                max="99.9"
+                step="0.1"
+                inputmode="decimal"
+                placeholder="e.g. 30"
+                required
+              />
+              <p class="helper-text">Percent to convert staffed agents to required headcount.</p>
+            </div>
           </div>
 
           <button type="submit" class="submit-btn" :disabled="isLoading">
@@ -205,35 +225,41 @@ const handleSubmit = async () => {
 
           <div class="results-metrics">
             <article class="metric-card">
-              <p class="metric-label">Required Agents</p>
+              <p class="metric-label">Required<br />Agents</p>
               <p class="metric-value">{{ results.summary.requiredAgents }}</p>
               <p class="metric-meta">
-                for a {{ submittedTargets.serviceLevelGoal }}% in
-                {{ submittedTargets.serviceLevelThreshold }}s service goal
+                frontline staff needed after shrinkage/loss assumptions
               </p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Service Level</p>
+              <p class="metric-label">Required<br />Headcount</p>
+              <p class="metric-value">{{ results.summary.requiredHeadcount }}</p>
+              <p class="metric-meta">
+                with {{ submittedTargets.shrinkageAssumption }}% shrinkage
+              </p>
+            </article>
+            <article class="metric-card">
+              <p class="metric-label">Service<br />Level</p>
               <p class="metric-value">{{ results.summary.serviceLevel }}</p>
               <p class="metric-meta">at recommended staffing</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">ASA</p>
+              <p class="metric-label">Average<br />Speed of Answer</p>
               <p class="metric-value">{{ results.summary.expectedAsa }}</p>
               <p class="metric-meta">average speed of answer</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Answered Immediately</p>
+              <p class="metric-label">Answered<br />Immediately</p>
               <p class="metric-value">{{ results.summary.percentAnsweredImmediately }}</p>
               <p class="metric-meta">at recommended staffing</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Expected Occupancy</p>
+              <p class="metric-label">Expected<br />Occupancy</p>
               <p class="metric-value">{{ results.summary.estimatedOccupancy }}</p>
               <p class="metric-meta">at recommended staffing</p>
             </article>
             <article class="metric-card">
-              <p class="metric-label">Abandon Percent</p>
+              <p class="metric-label">Caller<br />Abandonment</p>
               <p class="metric-value">{{ results.summary.abandonPercent }}</p>
               <p class="metric-meta">estimated caller abandonment</p>
             </article>
@@ -244,6 +270,7 @@ const handleSubmit = async () => {
             <div class="detail-grid" role="table" aria-label="Staffing scenario snapshot">
               <div class="detail-row detail-head" role="row">
                 <span role="columnheader">Agents</span>
+                <span role="columnheader">Headcount</span>
                 <span role="columnheader">Service Level</span>
                 <span role="columnheader">ASA</span>
                 <span role="columnheader">Answered Immediately</span>
@@ -258,6 +285,7 @@ const handleSubmit = async () => {
                 role="row"
               >
                 <span role="cell">{{ scenario.agents }}</span>
+                <span role="cell">{{ scenario.requiredHeadcount }}</span>
                 <span role="cell">{{ scenario.serviceLevel }}</span>
                 <span role="cell">{{ scenario.asa }}</span>
                 <span role="cell">{{ scenario.percentAnsweredImmediately }}</span>

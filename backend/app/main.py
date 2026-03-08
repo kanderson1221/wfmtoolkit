@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from .batch import process_batch_rows
 from .erlang import build_results_payload
 from .models import StaffingInput
 
@@ -17,6 +18,11 @@ class ErlangCRequest(BaseModel):
     serviceLevelGoal: float = Field(gt=0, le=100)
     serviceLevelThreshold: float = Field(ge=0)
     maxOccupancy: float = Field(gt=0, le=100, default=85)
+    shrinkageAssumption: float = Field(ge=0, lt=100, default=0)
+
+
+class ErlangCBatchRequest(BaseModel):
+    rows: list[dict[str, Any]]
 
 
 app = FastAPI(title="WFMToolkit API")
@@ -43,9 +49,17 @@ def calculate_erlang_c(payload: ErlangCRequest) -> dict[str, Any]:
             max_occupancy=payload.maxOccupancy / 100.0,
             avg_caller_patience_seconds=payload.averageCustomerPatience,
         )
-        return build_results_payload(inputs)
+        return build_results_payload(inputs, payload.shrinkageAssumption / 100.0)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/erlang-c/batch-calculate")
+def calculate_erlang_c_batch(payload: ErlangCBatchRequest) -> dict[str, Any]:
+    if not payload.rows:
+        raise HTTPException(status_code=422, detail="rows must contain at least one item")
+
+    return process_batch_rows(payload.rows)
 
 
 @app.get("/", include_in_schema=False)

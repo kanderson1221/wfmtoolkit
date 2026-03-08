@@ -10,6 +10,16 @@ UNSTABLE_DELAY_RATE_EPSILON = 1e-9
 ASA_TIME_BUCKETS_MINUTES = (1, 2, 5, 10, 20, 30, 60)
 
 
+def _apply_shrinkage(net_staff: int, shrinkage: float) -> int:
+    if net_staff < 0:
+        raise ValueError("net_staff must be >= 0")
+    if not 0 <= shrinkage < 1:
+        raise ValueError("shrinkage must be in [0, 1)")
+    if net_staff == 0:
+        return 0
+    return math.ceil(net_staff / (1.0 - shrinkage))
+
+
 def _erlang_b_prob(traffic_intensity_value: float, num_agents: int) -> float:
     """Compute Erlang B recursively to avoid factorial/power overflow."""
     if num_agents <= 0:
@@ -179,9 +189,13 @@ def _seconds_str(value: float) -> str:
     return f"> {ASA_TIME_BUCKETS_MINUTES[-1]} min"
 
 
-def build_results_payload(inputs: StaffingInput) -> dict[str, Any]:
+def build_results_payload(inputs: StaffingInput, shrinkage: float = 0.0) -> dict[str, Any]:
+    if not 0 <= shrinkage < 1:
+        raise ValueError("shrinkage must be in [0, 1)")
+
     recommended = staff_for_interval(inputs)
     recommended_agents = recommended["required_staff"]
+    recommended_headcount = _apply_shrinkage(recommended_agents, shrinkage)
 
     scenarios = []
     lower_bound = max(0, recommended_agents - 3)
@@ -192,6 +206,7 @@ def build_results_payload(inputs: StaffingInput) -> dict[str, Any]:
         scenarios.append(
             {
                 "agents": str(staff_count),
+                "requiredHeadcount": str(_apply_shrinkage(staff_count, shrinkage)),
                 "serviceLevel": _percent_str(metrics["service_level"]),
                 "asa": _seconds_str(metrics["average_speed_of_answer_seconds"]),
                 "percentAnsweredImmediately": _percent_str(
@@ -206,6 +221,7 @@ def build_results_payload(inputs: StaffingInput) -> dict[str, Any]:
     return {
         "summary": {
             "requiredAgents": str(recommended["required_staff"]),
+            "requiredHeadcount": str(recommended_headcount),
             "serviceLevel": _percent_str(recommended["service_level"]),
             "expectedAsa": _seconds_str(recommended["average_speed_of_answer_seconds"]),
             "percentAnsweredImmediately": _percent_str(

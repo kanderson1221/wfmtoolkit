@@ -66,8 +66,56 @@ This repo includes a Render Blueprint config in `render.yaml` and a multi-stage 
 ## Current scope
 
 - Frontend (Vue 3) + backend API (FastAPI)
-- Single homepage
-- Header, hero, Erlang C input form, and footer
+- Hash-routed pages:
+  - `#erlang-c` single-interval calculator
+  - `#csv-batch` Bulk Staffing Planner
 - Form posts input values to the calculation API endpoint
 - API returns calculated staffing summary and scenario rows
+- Batch API validates the full CSV and only processes when all rows are valid
 - No database or authentication
+
+## Batch CSV feature
+
+### Batch endpoint
+
+- `POST /api/erlang-c/batch-calculate`
+- Request body:
+
+```json
+{
+  "rows": [
+    {
+      "queue_id": "sales",
+      "interval_start": "2026-03-08T09:00:00Z",
+      "calls_offered": 180,
+      "aht_seconds": 240,
+      "mean_patience_seconds": 180,
+      "service_level_threshold": 80,
+      "service_level_target_seconds": 20,
+      "max_occupancy": 85,
+      "shrinkage": 0.3
+    }
+  ]
+}
+```
+
+`service_level_threshold` and `max_occupancy` accept either ratio (`0.8`) or percent (`80`).
+`shrinkage` is optional.
+
+### Response shape
+
+- `results`: row calculations (only populated when all rows are valid)
+- `summary`: processed/success/failed counts + aggregate service/ASA/staffing metrics
+- `errors`: row-level validation failures (`rowIndex` + message)
+
+### CSV files
+
+- Template: `public/erlang_batch_template.csv`
+
+## Manual test checklist (frontend)
+
+1. Upload `public/erlang_batch_template.csv` and run batch; verify non-zero results and empty errors.
+2. Remove a required column from CSV; verify parse-time error before API call.
+3. Set one row `aht_seconds` to `0`; verify no interval results are returned and row errors are displayed.
+4. Use large volume row (for example `calls_offered=5000`); verify no `NaN` appears in displayed metrics.
+5. Export processed results CSV and verify calculated values are present.
