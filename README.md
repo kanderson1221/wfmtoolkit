@@ -100,7 +100,7 @@ This repo includes a Render Blueprint config in `render.yaml` and a multi-stage 
 ```
 
 `service_level_threshold` and `max_occupancy` accept either ratio (`0.8`) or percent (`80`).
-`shrinkage` is optional.
+`shrinkage` is optional and accepts ratio (`0.3`) or percent (`30`).
 
 ### Response shape
 
@@ -119,3 +119,10 @@ This repo includes a Render Blueprint config in `render.yaml` and a multi-stage 
 3. Set one row `aht_seconds` to `0`; verify no interval results are returned and row errors are displayed.
 4. Use large volume row (for example `calls_offered=5000`); verify no `NaN` appears in displayed metrics.
 5. Export processed results CSV and verify calculated values are present.
+
+## Run backend tests
+
+```bash
+source .venv/bin/activate
+python -m unittest discover -s backend/tests -p "test_*.py" -v
+```

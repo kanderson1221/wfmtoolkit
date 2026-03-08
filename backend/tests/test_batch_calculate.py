@@ -39,6 +39,26 @@ class BatchCalculateTests(unittest.TestCase):
         self.assertEqual(len(body["results"]), 2)
         self.assertEqual(len(body["errors"]), 0)
 
+    def test_shrinkage_accepts_percent(self) -> None:
+        rows = [
+            {
+                "queue_id": "sales",
+                "interval_start": "2026-03-08T09:00:00Z",
+                "calls_offered": 180,
+                "aht_seconds": 240,
+                "mean_patience_seconds": 180,
+                "service_level_threshold": 80,
+                "service_level_target_seconds": 20,
+                "max_occupancy": 85,
+                "shrinkage": 30,
+            }
+        ]
+        body = process_batch_rows(rows)
+        self.assertEqual(body["summary"]["successfulRows"], 1)
+        self.assertEqual(len(body["errors"]), 0)
+        result = body["results"][0]
+        self.assertGreater(result["requiredStaffGross"], result["requiredStaffNet"])
+
     def test_mixed_valid_and_invalid_rows(self) -> None:
         rows = [
             {

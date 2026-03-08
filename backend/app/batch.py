@@ -21,7 +21,7 @@ class BatchIntervalRecord(BaseModel):
     service_level_threshold: float = Field(gt=0)
     service_level_target_seconds: float = Field(ge=0)
     max_occupancy: float = Field(gt=0)
-    shrinkage: float = Field(default=0.0, ge=0, lt=1)
+    shrinkage: float = Field(default=0.0, ge=0, lt=100)
 
 
 class BatchRowError(TypedDict):
@@ -70,6 +70,14 @@ def _ratio_from_percent_or_ratio(value: float, field_name: str) -> float:
     raise ValueError(f"{field_name} must be in (0, 1] or (0, 100]")
 
 
+def _shrinkage_from_percent_or_ratio(value: float) -> float:
+    if value < 1.0:
+        return value
+    if value < 100.0:
+        return value / 100.0
+    raise ValueError("shrinkage must be in [0, 1) or [0, 100)")
+
+
 def _validation_error_message(error: ValidationError) -> str:
     return "; ".join(issue["msg"] for issue in error.errors())
 
@@ -97,7 +105,7 @@ def _empty_summary(processed_rows: int, failed_rows: int) -> BatchSummary:
 
 
 def process_batch_rows(raw_rows: list[dict[str, Any]]) -> BatchPayload:
-    normalized_rows: list[tuple[int, BatchIntervalRecord, float, float]] = []
+    normalized_rows: list[tuple[int, BatchIntervalRecord, float, float, float]] = []
     errors: list[BatchRowError] = []
 
     for row_index, raw_row in enumerate(raw_rows, start=1):
@@ -114,11 +122,12 @@ def process_batch_rows(raw_rows: list[dict[str, Any]]) -> BatchPayload:
             max_occupancy = _ratio_from_percent_or_ratio(
                 row.max_occupancy, "max_occupancy"
             )
+            shrinkage = _shrinkage_from_percent_or_ratio(row.shrinkage)
         except ValueError as error:
             errors.append({"rowIndex": row_index, "message": str(error)})
             continue
 
-        normalized_rows.append((row_index, row, target_service_level, max_occupancy))
+        normalized_rows.append((row_index, row, target_service_level, max_occupancy, shrinkage))
 
     processed_rows = len(raw_rows)
     if errors:
@@ -136,7 +145,7 @@ def process_batch_rows(raw_rows: list[dict[str, Any]]) -> BatchPayload:
         }
 
     results: list[BatchRowResult] = []
-    for row_index, row, target_service_level, max_occupancy in normalized_rows:
+    for row_index, row, target_service_level, max_occupancy, shrinkage in normalized_rows:
 
         try:
             metrics = staff_for_interval(
@@ -151,7 +160,7 @@ def process_batch_rows(raw_rows: list[dict[str, Any]]) -> BatchPayload:
                 )
             )
             required_staff_net = metrics["required_staff"]
-            required_staff_gross = apply_shrinkage(required_staff_net, row.shrinkage)
+            required_staff_gross = apply_shrinkage(required_staff_net, shrinkage)
         except ValueError as error:
             errors.append({"rowIndex": row_index, "message": str(error)})
             continue

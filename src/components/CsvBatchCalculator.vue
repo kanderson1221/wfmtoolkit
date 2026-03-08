@@ -103,6 +103,10 @@ const parseCsvLine = (line) => {
     }
   }
 
+  if (inQuotes) {
+    throw new Error('CSV contains an unmatched quote character.')
+  }
+
   values.push(current)
   return values
 }
