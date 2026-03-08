@@ -10,20 +10,36 @@ UNSTABLE_DELAY_RATE_EPSILON = 1e-9
 ASA_TIME_BUCKETS_MINUTES = (1, 2, 5, 10, 20, 30, 60)
 
 
+def _erlang_b_prob(traffic_intensity_value: float, num_agents: int) -> float:
+    """Compute Erlang B recursively to avoid factorial/power overflow."""
+    if num_agents <= 0:
+        raise ValueError("num_agents must be > 0")
+    if traffic_intensity_value <= 0:
+        return 0.0
+
+    blocking_prob = 1.0
+    for staff_count in range(1, num_agents + 1):
+        numerator = traffic_intensity_value * blocking_prob
+        blocking_prob = numerator / (staff_count + numerator)
+
+    return blocking_prob
+
+
 def _erlang_c_prob(traffic_intensity_value: float, num_agents: int) -> float:
     if num_agents <= 0:
         raise ValueError("num_agents must be > 0")
+    if traffic_intensity_value <= 0:
+        return 0.0
     if traffic_intensity_value >= num_agents:
         return 1.0
 
-    sum_terms = term = 1.0
-    for k in range(1, num_agents):
-        term *= traffic_intensity_value / k
-        sum_terms += term
-
-    term *= traffic_intensity_value / num_agents
-    queue_wait_prob = term / (1.0 - traffic_intensity_value / num_agents)
-    return queue_wait_prob / (sum_terms + queue_wait_prob)
+    erlang_b = _erlang_b_prob(traffic_intensity_value, num_agents)
+    occupancy_ratio = traffic_intensity_value / num_agents
+    denominator = 1.0 - occupancy_ratio + occupancy_ratio * erlang_b
+    if denominator <= 0:
+        return 1.0
+    queue_wait_prob = erlang_b / denominator
+    return max(0.0, min(1.0, queue_wait_prob))
 
 
 def _erlang_a_abandon_prob(
