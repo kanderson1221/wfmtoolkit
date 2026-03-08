@@ -45,6 +45,24 @@ npm run build
 npm run preview
 ```
 
+## Deploy to Render (single-click)
+
+This repo includes a Render Blueprint config in `render.yaml` and a multi-stage `Dockerfile`.
+
+### Steps
+
+1. Push this repository to GitHub.
+2. In Render, click **New +** -> **Blueprint**.
+3. Connect your GitHub repo and select this project.
+4. Render will detect `render.yaml` and create one web service named `wfmtoolkit`.
+5. Click **Apply** to deploy.
+
+### Runtime behavior
+
+- FastAPI serves API routes under `/api/*`.
+- The built Vue app is served from the same service/domain.
+- Health check endpoint: `/api/health`.
+
 ## Current scope
 
 - Frontend (Vue 3) + backend API (FastAPI)
