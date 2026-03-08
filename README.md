@@ -74,12 +74,52 @@ This repo includes a Render Blueprint config in `render.yaml` and a multi-stage 
 - Batch API validates the full CSV and only processes when all rows are valid
 - No database or authentication
 
-## Batch CSV feature
+## Bulk Staffing Planner workflows
 
-### Batch endpoint
+The Bulk Staffing Planner (`#csv-batch`) supports three explicit workflows:
 
-- `POST /api/erlang-c/batch-calculate`
-- Request body:
+1. **File Processor**
+2. **Daily Plan Builder**
+3. **Weekly Plan Builder**
+
+All workflows share the same CSV contract and are all-or-nothing: if any row fails validation, no rows are processed.
+
+### CSV contract
+
+Required columns:
+
+- `queue_id`
+- `interval_start`
+- `calls_offered`
+- `aht_seconds`
+- `mean_patience_seconds`
+- `service_level_threshold`
+- `service_level_target_seconds`
+- `max_occupancy`
+
+Optional:
+
+- `shrinkage`
+
+Value handling:
+
+- `service_level_threshold` and `max_occupancy` accept ratio (`0.8`) or percent (`80`).
+- `shrinkage` accepts ratio (`0.3`) or percent (`30`).
+- Row-level validation errors return `rowIndex` + `message`.
+
+### API endpoints
+
+New workflow endpoints:
+
+- `POST /api/erlang-c/batch/file-processor`
+- `POST /api/erlang-c/batch/daily-plan`
+- `POST /api/erlang-c/batch/weekly-plan`
+
+Backward-compatible endpoint:
+
+- `POST /api/erlang-c/batch-calculate` (legacy file-processor shape)
+
+#### File Processor request example
 
 ```json
 {
@@ -99,26 +139,180 @@ This repo includes a Render Blueprint config in `render.yaml` and a multi-stage 
 }
 ```
 
-`service_level_threshold` and `max_occupancy` accept either ratio (`0.8`) or percent (`80`).
-`shrinkage` is optional and accepts ratio (`0.3`) or percent (`30`).
+#### File Processor response example (truncated)
 
-### Response shape
+```json
+{
+  "mode": "file-processor",
+  "summary": {
+    "processedRows": 1,
+    "successfulRows": 1,
+    "failedRows": 0
+  },
+  "results": [
+    {
+      "rowIndex": 1,
+      "queueId": "sales",
+      "requiredStaffNet": 35,
+      "requiredStaffGross": 50
+    }
+  ],
+  "errors": [],
+  "export": {
+    "enrichedFile": {
+      "headers": [
+        "...original columns...",
+        "Required Agents",
+        "Required Headcount",
+        "Service Level",
+        "Average Speed of Answer",
+        "Answered Immediately",
+        "Expected Occupancy",
+        "Caller Abandonment"
+      ]
+    }
+  }
+}
+```
 
-- `results`: row calculations (only populated when all rows are valid)
-- `summary`: processed/success/failed counts + aggregate service/ASA/staffing metrics
-- `errors`: row-level validation failures (`rowIndex` + message)
+#### Daily Plan request example
 
-### CSV files
+```json
+{
+  "shift_length_hours": 8,
+  "productive_hours_per_day": 6.5,
+  "rows": [
+    {
+      "queue_id": "sales",
+      "interval_start": "2026-03-08T09:00:00Z",
+      "calls_offered": 180,
+      "aht_seconds": 240,
+      "mean_patience_seconds": 180,
+      "service_level_threshold": 80,
+      "service_level_target_seconds": 20,
+      "max_occupancy": 85,
+      "shrinkage": 0.3
+    }
+  ]
+}
+```
 
-- Template: `public/erlang_batch_template.csv`
+#### Daily Plan response example (truncated)
+
+```json
+{
+  "mode": "daily-plan",
+  "summary": {
+    "serviceDate": "2026-03-08",
+    "requiredDailyFte": 12,
+    "totalRequiredHeadcountHours": 74.5,
+    "coverageGapHeadcount": 0,
+    "coverageOverageHeadcount": 10
+  },
+  "results": [
+    {
+      "intervalStart": "2026-03-08T09:00:00Z",
+      "requiredHeadcount": 50,
+      "coverageHeadcount": 50
+    }
+  ],
+  "shiftStarts": [],
+  "errors": [],
+  "export": {
+    "dailyPlan": {},
+    "shiftStarts": {}
+  }
+}
+```
+
+#### Weekly Plan request example
+
+```json
+{
+  "shift_length_hours": 8,
+  "productive_hours_per_day": 6.5,
+  "rows": [
+    {
+      "queue_id": "sales",
+      "interval_start": "2026-03-08T09:00:00Z",
+      "calls_offered": 180,
+      "aht_seconds": 240,
+      "mean_patience_seconds": 180,
+      "service_level_threshold": 80,
+      "service_level_target_seconds": 20,
+      "max_occupancy": 85,
+      "shrinkage": 0.3
+    },
+    {
+      "queue_id": "sales",
+      "interval_start": "2026-03-09T09:00:00Z",
+      "calls_offered": 170,
+      "aht_seconds": 240,
+      "mean_patience_seconds": 180,
+      "service_level_threshold": 80,
+      "service_level_target_seconds": 20,
+      "max_occupancy": 85,
+      "shrinkage": 0.3
+    }
+  ]
+}
+```
+
+#### Weekly Plan response example (truncated)
+
+```json
+{
+  "mode": "weekly-plan",
+  "summary": {
+    "dayCount": 2,
+    "totalRequiredHeadcountHours": 132.0,
+    "averageDailyFte": 11.5,
+    "peakDay": "2026-03-09",
+    "staffingVariability": 0.17
+  },
+  "results": [
+    {
+      "serviceDate": "2026-03-08",
+      "requiredHeadcountHours": 64.0,
+      "recommendedDailyFte": 10
+    }
+  ],
+  "dailyBreakdown": [],
+  "errors": [],
+  "export": {
+    "weeklyPlan": {},
+    "dailyBreakdown": {}
+  }
+}
+```
+
+### Planning algorithm
+
+- Erlang interval metrics come from the existing Erlang engine (`staff_for_interval`).
+- Shift planning uses a deterministic greedy latest-start heuristic:
+  - shift starts are evaluated at each interval boundary
+  - if an interval is under-covered, add starts in that interval
+  - objective is lexicographic: minimize understaffing first, then overstaffing
+- Tradeoff: this heuristic is fast, predictable, and dependency-free, but not globally optimal like MILP in every scenario.
+
+### CSV templates
+
+- `public/erlang_file_processor_template.csv`
+- `public/erlang_daily_plan_template.csv`
+- `public/erlang_weekly_plan_template.csv`
+- (legacy) `public/erlang_batch_template.csv`
 
 ## Manual test checklist (frontend)
 
-1. Upload `public/erlang_batch_template.csv` and run batch; verify non-zero results and empty errors.
-2. Remove a required column from CSV; verify parse-time error before API call.
-3. Set one row `aht_seconds` to `0`; verify no interval results are returned and row errors are displayed.
-4. Use large volume row (for example `calls_offered=5000`); verify no `NaN` appears in displayed metrics.
-5. Export processed results CSV and verify calculated values are present.
+1. Switch between File/Daily/Weekly modes and verify mode-specific inputs and export buttons.
+2. Upload each mode template and run processing; verify successful counts and rendered charts.
+3. Remove a required column; verify parse-time schema error before API call.
+4. Create a row with invalid range values (`aht_seconds=0` or `max_occupancy=120`); verify row-level errors and no processing.
+5. Daily mode with multiple dates should fail with a clear mode-level error.
+6. Weekly mode with only one date should fail with a clear mode-level error.
+7. Verify File mode export includes exact appended column names.
+8. Verify Daily mode exports interval demand vs coverage and shift starts.
+9. Verify Weekly mode exports weekly summary and daily breakdown CSV files.
 
 ## Run backend tests
 

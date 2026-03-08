@@ -1,0 +1,9 @@
+queue_id,interval_start,calls_offered,aht_seconds,mean_patience_seconds,service_level_threshold,service_level_target_seconds,max_occupancy,shrinkage
+sales,2026-03-08 08:00:00 AM,80,260,180,80,20,85,30
+sales,2026-03-08 08:30:00 AM,90,255,180,80,20,85,30
+sales,2026-03-08 09:00:00 AM,108,248,175,80,20,85,30
+sales,2026-03-08 09:30:00 AM,122,245,175,80,20,85,30
+sales,2026-03-08 10:00:00 AM,140,240,170,80,20,85,30
+sales,2026-03-08 10:30:00 AM,136,238,170,80,20,85,30
+sales,2026-03-08 11:00:00 AM,124,240,170,80,20,85,30
+sales,2026-03-08 11:30:00 AM,110,244,175,80,20,85,30

@@ -5,7 +5,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from .batch import process_batch_rows
+from .batch import (
+    process_batch_rows,
+    process_daily_plan_rows,
+    process_file_processor_rows,
+    process_weekly_plan_rows,
+)
 from .erlang import build_results_payload
 from .models import StaffingInput
 
@@ -23,6 +28,23 @@ class ErlangCRequest(BaseModel):
 
 class ErlangCBatchRequest(BaseModel):
     rows: list[dict[str, Any]]
+
+
+class ErlangCFileProcessorRequest(BaseModel):
+    rows: list[dict[str, Any]]
+
+
+class ErlangCDailyPlanRequest(BaseModel):
+    rows: list[dict[str, Any]]
+    shift_length_hours: float = Field(default=8, gt=0)
+    productive_hours_per_day: float = Field(default=8, gt=0)
+    interval_duration_minutes: float = Field(gt=0, default=30)
+
+
+class ErlangCWeeklyPlanRequest(BaseModel):
+    rows: list[dict[str, Any]]
+    shift_length_hours: float = Field(gt=0)
+    productive_hours_per_day: float = Field(gt=0)
 
 
 app = FastAPI(title="WFMToolkit API")
@@ -60,6 +82,39 @@ def calculate_erlang_c_batch(payload: ErlangCBatchRequest) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="rows must contain at least one item")
 
     return process_batch_rows(payload.rows)
+
+
+@app.post("/api/erlang-c/batch/file-processor")
+def file_processor(payload: ErlangCFileProcessorRequest) -> dict[str, Any]:
+    if not payload.rows:
+        raise HTTPException(status_code=422, detail="rows must contain at least one item")
+
+    return process_file_processor_rows(payload.rows)
+
+
+@app.post("/api/erlang-c/batch/daily-plan")
+def daily_plan(payload: ErlangCDailyPlanRequest) -> dict[str, Any]:
+    if not payload.rows:
+        raise HTTPException(status_code=422, detail="rows must contain at least one item")
+
+    return process_daily_plan_rows(
+        payload.rows,
+        shift_length_hours=payload.shift_length_hours,
+        productive_hours_per_day=payload.productive_hours_per_day,
+        interval_duration_minutes=payload.interval_duration_minutes,
+    )
+
+
+@app.post("/api/erlang-c/batch/weekly-plan")
+def weekly_plan(payload: ErlangCWeeklyPlanRequest) -> dict[str, Any]:
+    if not payload.rows:
+        raise HTTPException(status_code=422, detail="rows must contain at least one item")
+
+    return process_weekly_plan_rows(
+        payload.rows,
+        shift_length_hours=payload.shift_length_hours,
+        productive_hours_per_day=payload.productive_hours_per_day,
+    )
 
 
 @app.get("/", include_in_schema=False)
