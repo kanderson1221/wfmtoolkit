@@ -1,16 +1,18 @@
 <script setup>
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-defineProps({
+import logoUrl from '../assets/logo.png'
+
+const props = defineProps({
   currentRoute: {
     type: String,
     default: 'erlang'
   }
 })
 
-import logoUrl from '../assets/logo.png'
-
 const menuOpen = ref(false)
+const apiHealth = ref('checking')
+let healthPoll = null
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value
@@ -20,22 +22,53 @@ const closeMenu = () => {
   menuOpen.value = false
 }
 
+const checkApiHealth = async () => {
+  try {
+    const response = await fetch('/api/health', { cache: 'no-store' })
+    if (!response.ok) {
+      apiHealth.value = 'offline'
+      return
+    }
+
+    const payload = await response.json().catch(() => null)
+    apiHealth.value = payload?.status === 'ok' ? 'online' : 'degraded'
+  } catch {
+    apiHealth.value = 'offline'
+  }
+}
+
+const apiHealthLabel = computed(() => {
+  if (apiHealth.value === 'online') return 'Live'
+  if (apiHealth.value === 'degraded') return 'Degraded'
+  if (apiHealth.value === 'offline') return 'Offline'
+  return 'Checking'
+})
+
+const requestExport = () => {
+  window.dispatchEvent(new CustomEvent('wfm:export-primary'))
+}
+
 onMounted(() => {
   window.addEventListener('hashchange', closeMenu)
+  checkApiHealth()
+  healthPoll = window.setInterval(checkApiHealth, 45000)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', closeMenu)
+  if (healthPoll) {
+    window.clearInterval(healthPoll)
+  }
 })
 </script>
 
 <template>
   <header class="site-header">
     <div class="container header-content">
-      <a href="#" class="brand-wrap" aria-label="WFMToolkit home">
-        <img :src="logoUrl" alt="WFMToolkit logo" class="brand-logo" />
-        <span class="brand-tagline">Built for practical workforce planning.</span>
+      <a href="#erlang-c" class="brand-wrap" aria-label="WFMToolkit home">
+        <img :src="`${logoUrl}?v=20260310-1908`" alt="WFMToolkit logo" class="brand-logo" />
       </a>
+
       <nav class="site-nav" aria-label="Main navigation">
         <button
           class="nav-toggle"
@@ -49,25 +82,44 @@ onBeforeUnmount(() => {
           <span class="nav-toggle-bar"></span>
           <span class="nav-toggle-bar"></span>
         </button>
+
         <div id="main-nav-links" class="nav-links" :class="{ open: menuOpen }">
           <a
             href="#erlang-c"
             class="nav-link"
-            :class="{ active: currentRoute === 'erlang' }"
+            :class="{ active: props.currentRoute === 'erlang' }"
             @click="closeMenu"
           >
-            Erlang C Calculator
+            Interval Calculator
           </a>
           <a
             href="#csv-batch"
             class="nav-link"
-            :class="{ active: currentRoute === 'csv-batch' }"
+            :class="{ active: props.currentRoute === 'csv-batch' }"
             @click="closeMenu"
           >
-            Bulk Staffing Planner
+            Batch Planner
           </a>
         </div>
       </nav>
+
+      <div class="header-utilities">
+        <span class="api-indicator" :class="`is-${apiHealth}`">API {{ apiHealthLabel }}</span>
+        <a class="header-action" :href="props.currentRoute === 'csv-batch' ? '#batch-controls' : '#erlang-inputs'">
+          Inputs
+        </a>
+        <a class="header-action" :href="props.currentRoute === 'csv-batch' ? '#batch-results' : '#erlang-results'">
+          Outputs
+        </a>
+        <button
+          v-if="props.currentRoute === 'csv-batch'"
+          type="button"
+          class="header-action header-action-solid"
+          @click="requestExport"
+        >
+          Export CSV
+        </button>
+      </div>
     </div>
   </header>
 </template>

@@ -25,7 +25,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="app-shell">
     <AppHeader :current-route="currentRoute" />
-    <main>
+    <main class="app-main">
       <ErlangCForm v-if="currentRoute === 'erlang'" />
       <CsvBatchCalculator v-else />
     </main>

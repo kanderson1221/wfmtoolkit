@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watchEffect } from 'vue'
 
 const BASE_REQUIRED_HEADERS = [
   'queue_id',
@@ -19,16 +19,20 @@ const WORKFLOWS = [
   {
     id: 'file-processor',
     label: 'File Processor',
+    summary:
+      'Upload a CSV of interval demand and return an enriched file with required agents, required headcount, and core service metrics for every row.',
     endpoint: '/api/erlang-c/batch/file-processor',
     templateHref: '/erlang_file_processor_template.csv',
     runLabel: 'Run File Processor',
-    exportLabel: 'Export Enriched File',
+    exportLabel: 'Export Staffing File',
     exportKey: 'enrichedFile',
     exportFilename: 'enriched_staffing_results.csv'
   },
   {
     id: 'daily-plan',
     label: 'Plan A Day',
+    summary:
+      'Build a staffing plan for one service day by converting interval demand into required agents, required headcount, and daily workload totals.',
     endpoint: '/api/erlang-c/batch/daily-plan',
     templateHref: '/erlang_daily_plan_template.csv',
     runLabel: 'Build Plan',
@@ -39,6 +43,8 @@ const WORKFLOWS = [
   {
     id: 'weekly-plan',
     label: 'Weekly Plan Builder',
+    summary:
+      'Create a day-level and week-level staffing view from multi-day interval files, including totals, variability, and exportable planning outputs.',
     endpoint: '/api/erlang-c/batch/weekly-plan',
     templateHref: '/erlang_weekly_plan_template.csv',
     runLabel: 'Build Weekly Plan',
@@ -63,6 +69,8 @@ const results = ref([])
 const calculatedRows = ref([])
 const dailyBreakdown = ref([])
 const exportData = ref({})
+const activeResultsTab = ref('summary')
+const focusedRowIndex = ref(null)
 
 const dayPlannerInputs = reactive({
   assumptionSource: 'file',
@@ -319,12 +327,15 @@ const resetOutputs = () => {
   calculatedRows.value = []
   dailyBreakdown.value = []
   exportData.value = {}
+  activeResultsTab.value = 'summary'
+  focusedRowIndex.value = null
   activeChartPointIndex.value = null
 }
 
 const setMode = (mode) => {
   if (mode === selectedMode.value) return
   selectedMode.value = mode
+  parseError.value = ''
   submitError.value = ''
   resetOutputs()
 }
@@ -419,13 +430,21 @@ const runWorkflow = async () => {
     }
 
     const workflowPayload = await response.json()
+    const workflowErrors = workflowPayload.errors ?? []
+    const workflowResults = workflowPayload.results ?? []
+    const workflowCalculatedRows = workflowPayload.calculatedRows ?? workflowResults
     summary.value = workflowPayload.summary ?? null
-    errors.value = workflowPayload.errors ?? []
-    results.value = workflowPayload.results ?? []
-    calculatedRows.value = workflowPayload.calculatedRows ?? workflowPayload.results ?? []
+    errors.value = workflowErrors
+    results.value = workflowResults
+    calculatedRows.value = workflowCalculatedRows
     dailyBreakdown.value = workflowPayload.dailyBreakdown ?? []
     exportData.value = workflowPayload.export ?? {}
+    focusedRowIndex.value = null
     hasSubmitted.value = true
+    activeResultsTab.value =
+      workflowErrors.length > 0 && workflowResults.length === 0 && workflowCalculatedRows.length === 0
+        ? 'errors'
+        : 'summary'
   } catch (error) {
     submitError.value = error instanceof Error ? error.message : 'Unable to run selected workflow.'
   } finally {
@@ -740,49 +759,127 @@ const activeChartTooltip = computed(() => {
     requiredHeadcount: formatCount(point.barValue)
   }
 })
+
+const primaryKpi = computed(() => {
+  if (!summary.value) {
+    return {
+      label: 'Primary KPI',
+      value: '--',
+      meta: 'Run a workflow to calculate demand.'
+    }
+  }
+
+  if (selectedMode.value === 'daily-plan') {
+    return {
+      label: 'Required Daily FTE',
+      value: formatCount(summary.value.requiredDailyFte),
+      meta: 'recommended staffing for the selected day'
+    }
+  }
+
+  if (selectedMode.value === 'weekly-plan') {
+    return {
+      label: 'Average Daily FTE',
+      value: formatDecimal(summary.value.averageDailyFte),
+      meta: `across ${formatCount(summary.value.dayCount)} service days`
+    }
+  }
+
+  return {
+    label: 'Peak Headcount Need',
+    value: formatCount(summary.value.peakStaffGross),
+    meta: 'highest interval requirement in file'
+  }
+})
+
+const hasTrendTab = computed(
+  () => selectedMode.value !== 'file-processor' && trendChart.value !== null
+)
+
+const hasRowsTab = computed(() => {
+  if (selectedMode.value === 'file-processor') return false
+  if (selectedMode.value === 'daily-plan') return dailyDemandRows.value.length > 0
+  if (selectedMode.value === 'weekly-plan') return results.value.length > 0 || dailyBreakdown.value.length > 0
+  return false
+})
+
+const availableTabs = computed(() => {
+  const tabs = [{ id: 'summary', label: 'Summary' }]
+  if (hasTrendTab.value) tabs.push({ id: 'trend', label: 'Trend' })
+  if (hasRowsTab.value) tabs.push({ id: 'rows', label: 'Rows' })
+  if (errors.value.length > 0) tabs.push({ id: 'errors', label: `Errors (${errors.value.length})` })
+  return tabs
+})
+
+watchEffect(() => {
+  if (!hasSubmitted.value) {
+    activeResultsTab.value = 'summary'
+    return
+  }
+
+  if (!availableTabs.value.some((tab) => tab.id === activeResultsTab.value)) {
+    activeResultsTab.value = availableTabs.value[0]?.id ?? 'summary'
+  }
+})
+
+const jumpToOutputRow = async (rowIndex) => {
+  if (!Number.isFinite(Number(rowIndex)) || Number(rowIndex) <= 0) return
+  activeResultsTab.value = 'rows'
+  focusedRowIndex.value = Number(rowIndex)
+  await nextTick()
+  const rowElement = document.getElementById(`batch-row-${rowIndex}`)
+  rowElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+const handlePrimaryExportShortcut = () => {
+  if (primaryExportReady.value) {
+    exportPrimary()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('wfm:export-primary', handlePrimaryExportShortcut)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('wfm:export-primary', handlePrimaryExportShortcut)
+})
 </script>
 
 <template>
-  <section id="csv-batch" class="calculator-section" aria-labelledby="csv-batch-heading">
+  <section id="csv-batch" class="calculator-section workspace-section" aria-labelledby="csv-batch-heading">
     <div class="container">
-      <div class="calculator-card batch-card">
-        <h2 id="csv-batch-heading">Bulk Staffing Planner</h2>
-        <p class="calculator-intro">
-          Use one of three workforce workflows to transform interval demand into staffing decisions.
-        </p>
+      <div class="calculator-card workspace-shell batch-workspace">
+        <section id="batch-controls" class="workspace-pane workspace-controls">
+          <div class="pane-heading">
+            <p class="pane-kicker">Batch Planning</p>
+            <h2 id="csv-batch-heading">Bulk Staffing Planner</h2>
+            <p class="calculator-intro">
+              Configure a workflow, upload demand intervals, and generate planning outputs at scale.
+            </p>
+          </div>
 
-        <div class="mode-switcher" role="tablist" aria-label="Bulk planning workflow mode">
-          <button
-            v-for="workflow in WORKFLOWS"
-            :key="workflow.id"
-            type="button"
-            class="mode-btn"
-            :class="{ active: selectedMode === workflow.id }"
-            role="tab"
-            :aria-selected="selectedMode === workflow.id ? 'true' : 'false'"
-            @click="setMode(workflow.id)"
-          >
-            {{ workflow.label }}
-          </button>
-        </div>
-
-        <div v-if="selectedMode === 'weekly-plan'" class="coming-soon-panel" role="status">
-          <h3>Weekly Plan Builder</h3>
-          <p>Coming soon.</p>
-          <p class="helper-text">
-            Weekly planning is temporarily disabled while we finalize the new planning experience.
-          </p>
-        </div>
-
-        <p v-if="selectedMode === 'file-processor'" class="helper-text">
-          <a class="inline-link" :href="currentWorkflow.templateHref" download>
-            Download {{ currentWorkflow.label }} CSV template
-          </a>
-        </p>
-
-        <div v-if="selectedMode === 'daily-plan'" class="daily-setup">
           <div class="planner-inputs">
-            <h3>1. Choose A File</h3>
+            <h3>Workflow Mode</h3>
+            <div class="mode-switcher" role="tablist" aria-label="Bulk planning workflow mode">
+              <button
+                v-for="workflow in WORKFLOWS"
+                :key="workflow.id"
+                type="button"
+                class="mode-btn"
+                :class="{ active: selectedMode === workflow.id }"
+                role="tab"
+                :aria-selected="selectedMode === workflow.id ? 'true' : 'false'"
+                @click="setMode(workflow.id)"
+              >
+                {{ workflow.label }}
+              </button>
+            </div>
+            <p class="helper-text">{{ currentWorkflow.summary }}</p>
+          </div>
+
+          <div class="planner-inputs">
+            <h3>Source File</h3>
             <div class="batch-toolbar batch-toolbar-step">
               <label class="file-picker" for="batchCsvFile">Choose CSV</label>
               <input
@@ -795,7 +892,7 @@ const activeChartTooltip = computed(() => {
             </div>
             <p class="helper-text">
               <a class="inline-link" :href="currentWorkflow.templateHref" download>
-                Download Plan A Day CSV template
+                Download {{ currentWorkflow.label }} CSV template
               </a>
             </p>
             <p v-if="selectedFileName" class="helper-text">
@@ -803,8 +900,8 @@ const activeChartTooltip = computed(() => {
             </p>
           </div>
 
-          <div class="planner-inputs">
-            <h3>2. Interval Length Of Uploaded Data</h3>
+          <div v-if="selectedMode === 'daily-plan'" class="planner-inputs">
+            <h3>Daily Planner Inputs</h3>
             <div class="planner-grid planner-grid-single">
               <div class="field-group">
                 <label for="intervalDurationMinutes">Interval Length (minutes)</label>
@@ -819,25 +916,23 @@ const activeChartTooltip = computed(() => {
                 />
               </div>
             </div>
-          </div>
 
-          <div class="planner-inputs">
-            <h3>3. Assumption Source</h3>
             <div class="planner-grid planner-grid-single">
               <div class="field-group">
-                <label for="dailyAssumptionSource">Use Service Level and Shrinkage Assumptions From File?</label>
+                <label for="dailyAssumptionSource">Assumption Source</label>
                 <select id="dailyAssumptionSource" v-model="dayPlannerInputs.assumptionSource">
-                  <option value="file">Yes, use file values</option>
-                  <option value="override">No, use global overrides</option>
+                  <option value="file">Use values from file</option>
+                  <option value="override">Use global overrides</option>
                 </select>
               </div>
             </div>
+
             <p class="helper-text">
               <span v-if="useFileDailyAssumptions">
-                Using the assumptions from your uploaded file.
+                Using service level and shrinkage assumptions from the uploaded file.
               </span>
               <span v-else>
-                Configure global overrides below. Any blank override must still be present in the file.
+                Configure global overrides below. Blank overrides must still be present in the file.
               </span>
             </p>
 
@@ -906,545 +1001,614 @@ const activeChartTooltip = computed(() => {
             </div>
           </div>
 
+          <div v-if="selectedMode === 'weekly-plan'" class="planner-inputs">
+            <h3>Weekly Planner Inputs</h3>
+            <div class="planner-grid">
+              <div class="field-group">
+                <label for="weeklyShiftLength">Shift Length (hours)</label>
+                <input
+                  id="weeklyShiftLength"
+                  v-model.number="weeklyPlannerInputs.shiftLengthHours"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  inputmode="decimal"
+                  required
+                />
+              </div>
+              <div class="field-group">
+                <label for="weeklyProductiveHours">Productive Hours / Day</label>
+                <input
+                  id="weeklyProductiveHours"
+                  v-model.number="weeklyPlannerInputs.productiveHoursPerDay"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  inputmode="decimal"
+                  required
+                />
+              </div>
+            </div>
+            <p class="helper-text">
+              Weekly plans require at least two distinct service dates in the uploaded file.
+            </p>
+          </div>
+
           <div class="planner-inputs">
-            <h3>4. Build Plan</h3>
+            <h3>Run Workflow</h3>
             <button type="button" class="submit-btn" :disabled="isLoading" @click="runWorkflow">
               {{ isLoading ? 'Processing...' : currentWorkflow.runLabel }}
             </button>
           </div>
-        </div>
 
-        <div v-if="selectedMode === 'file-processor'" class="batch-toolbar">
-          <label class="file-picker" for="batchCsvFile">Choose CSV</label>
-          <input
-            id="batchCsvFile"
-            class="batch-file-input"
-            type="file"
-            accept=".csv,text/csv"
-            @change="handleFileSelect"
-          />
-          <button type="button" class="submit-btn" :disabled="isLoading" @click="runWorkflow">
-            {{ isLoading ? 'Processing...' : currentWorkflow.runLabel }}
-          </button>
-        </div>
+          <p v-if="parseError" class="status-message error">{{ parseError }}</p>
+          <p v-if="submitError" class="status-message error">{{ submitError }}</p>
+        </section>
 
-        <p v-if="selectedFileName && selectedMode === 'file-processor'" class="helper-text">
-          Loaded file: <strong>{{ selectedFileName }}</strong> ({{ parsedRowCount }} data rows)
-        </p>
-
-        <p v-if="parseError && selectedMode !== 'weekly-plan'" class="status-message error">{{ parseError }}</p>
-        <p v-if="submitError && selectedMode !== 'weekly-plan'" class="status-message error">{{ submitError }}</p>
-
-        <section
-          v-if="hasSubmitted && selectedMode !== 'weekly-plan'"
-          class="results-panel"
-          aria-live="polite"
-          aria-label="Batch calculation results"
-        >
-          <div class="results-header">
-            <h3>{{ currentWorkflow.label }} Results</h3>
-            <p>
-              Processed rows are shown only when all validations pass. Planner workflows include
-              interval demand outputs and export-ready plan tables.
-            </p>
-            <p v-if="selectedMode === 'file-processor'" class="helper-text">
-              Agent need is Erlang C staffing before shrinkage. Headcount need applies shrinkage:
-              agents / (1 - shrinkage).
-            </p>
-            <p
-              v-if="selectedMode === 'weekly-plan' && Array.isArray(summary?.planningNotes) && summary.planningNotes.length"
-              class="helper-text"
-            >
-              {{ summary.planningNotes[0] }}
-            </p>
+        <section id="batch-results" class="workspace-pane workspace-output" aria-live="polite">
+          <div class="workspace-output-header">
+            <h3>Output Workspace</h3>
+            <p>Sticky KPI summary, trend diagnostics, row-level tables, and CSV exports.</p>
           </div>
 
-          <div class="batch-counts" role="status" aria-label="Batch processing counts">
-            <span>Processed: {{ processedCount }}</span>
-            <span>Succeeded: {{ successfulCount }}</span>
-            <span>Failed: {{ failedCount }}</span>
+          <div v-if="!hasSubmitted && !isLoading && !parseError && !submitError" class="empty-state">
+            Select a workflow, upload a CSV, then run processing to populate this workspace.
           </div>
 
-          <div v-if="selectedMode === 'file-processor' || selectedMode === 'daily-plan'" class="results-metrics">
-            <article class="metric-card">
-              <p class="metric-label">Total Calls Offered</p>
-              <p class="metric-value">{{ formatVolume(fileProcessorTotalCalls) }}</p>
-              <p class="metric-meta">sum of interval call demand</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Avg Service Level</p>
-              <p class="metric-value">{{ formatPercent(summary?.avgServiceLevel) }}</p>
-              <p class="metric-meta">across successful rows</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Avg ASA</p>
-              <p class="metric-value">{{ formatAsaSeconds(summary?.avgAsaSeconds) }}</p>
-              <p class="metric-meta">across successful rows</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Total Agent Hours</p>
-              <p class="metric-value">{{ formatDecimal(summary?.totalRequiredStaffHoursNet) }}</p>
-              <p class="metric-meta">required agents (no shrinkage)</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Total Headcount Hours</p>
-              <p class="metric-value">{{ formatDecimal(summary?.totalRequiredStaffHoursGross) }}</p>
-              <p class="metric-meta">required headcount with shrinkage</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Peak Agent Need</p>
-              <p class="metric-value">{{ formatCount(summary?.peakStaffNet) }}</p>
-              <p class="metric-meta">highest interval agents required</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Peak Headcount Need</p>
-              <p class="metric-value">{{ formatCount(summary?.peakStaffGross) }}</p>
-              <p class="metric-meta">highest interval headcount required</p>
-            </article>
-          </div>
+          <section v-if="hasSubmitted" class="results-panel" aria-label="Batch calculation results">
+            <div class="results-sticky-summary">
+              <article class="answer-card answer-card-primary">
+                <p class="metric-label">{{ primaryKpi.label }}</p>
+                <p class="metric-value">{{ primaryKpi.value }}</p>
+                <p class="metric-meta">{{ primaryKpi.meta }}</p>
+              </article>
+              <article class="answer-card">
+                <p class="metric-label">Processed</p>
+                <p class="metric-value">{{ formatCount(processedCount) }}</p>
+                <p class="metric-meta">rows evaluated</p>
+              </article>
+              <article class="answer-card">
+                <p class="metric-label">Succeeded</p>
+                <p class="metric-value">{{ formatCount(successfulCount) }}</p>
+                <p class="metric-meta">rows with valid calculations</p>
+              </article>
+              <article class="answer-card">
+                <p class="metric-label">Failed</p>
+                <p class="metric-value">{{ formatCount(failedCount) }}</p>
+                <p class="metric-meta">rows requiring correction</p>
+              </article>
+            </div>
 
-          <div v-else class="results-metrics">
-            <article class="metric-card">
-              <p class="metric-label">Avg Service Level</p>
-              <p class="metric-value">{{ formatPercent(summary?.avgServiceLevel) }}</p>
-              <p class="metric-meta">across successful rows</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Avg ASA</p>
-              <p class="metric-value">{{ formatAsaSeconds(summary?.avgAsaSeconds) }}</p>
-              <p class="metric-meta">across successful rows</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Total Net Hours</p>
-              <p class="metric-value">{{ formatDecimal(summary?.totalRequiredStaffHoursNet) }}</p>
-              <p class="metric-meta">required labor net</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Total Gross Hours</p>
-              <p class="metric-value">{{ formatDecimal(summary?.totalRequiredStaffHoursGross) }}</p>
-              <p class="metric-meta">required labor gross</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Peak Net Staff</p>
-              <p class="metric-value">{{ formatCount(summary?.peakStaffNet) }}</p>
-              <p class="metric-meta">highest interval net staff</p>
-            </article>
-            <article class="metric-card">
-              <p class="metric-label">Peak Gross Staff</p>
-              <p class="metric-value">{{ formatCount(summary?.peakStaffGross) }}</p>
-              <p class="metric-meta">highest interval gross staff</p>
-            </article>
-
-            <article v-if="selectedMode === 'weekly-plan'" class="metric-card">
-              <p class="metric-label">Total Required HC Hours</p>
-              <p class="metric-value">{{ formatDecimal(summary?.totalRequiredHeadcountHours) }}</p>
-              <p class="metric-meta">week-level headcount demand</p>
-            </article>
-            <article v-if="selectedMode === 'weekly-plan'" class="metric-card">
-              <p class="metric-label">Average Daily FTE</p>
-              <p class="metric-value">{{ formatDecimal(summary?.averageDailyFte) }}</p>
-              <p class="metric-meta">daily average for included days</p>
-            </article>
-            <article v-if="selectedMode === 'weekly-plan'" class="metric-card">
-              <p class="metric-label">Peak Day</p>
-              <p class="metric-value">{{ summary?.peakDay ?? '-' }}</p>
-              <p class="metric-meta">{{ formatDecimal(summary?.peakDayRequiredHeadcountHours) }} HC hours</p>
-            </article>
-            <article v-if="selectedMode === 'weekly-plan'" class="metric-card">
-              <p class="metric-label">Staffing Variability</p>
-              <p class="metric-value">{{ formatDecimal((summary?.staffingVariability ?? 0) * 100, 1) }}%</p>
-              <p class="metric-meta">range vs average daily FTE</p>
-            </article>
-          </div>
-
-          <div class="batch-actions">
-            <button
-              type="button"
-              class="secondary-btn"
-              :disabled="!primaryExportReady"
-              @click="exportPrimary"
-            >
-              {{ currentWorkflow.exportLabel }}
-            </button>
-            <button
-              v-if="selectedMode === 'weekly-plan'"
-              type="button"
-              class="secondary-btn"
-              :disabled="!weeklyBreakdownExportReady"
-              @click="exportDailyBreakdown"
-            >
-              Export Weekly Daily Breakdown
-            </button>
-          </div>
-
-          <div v-if="selectedMode !== 'file-processor' && trendChart" class="results-detail">
-            <h4>{{ chartMeta.title }}</h4>
-            <p class="helper-text">{{ chartMeta.description }}</p>
-
-            <div class="trend-chart">
-              <svg
-                :viewBox="`0 0 ${trendChart.width} ${trendChart.height}`"
-                role="img"
-                aria-label="Mode-aware staffing trend chart"
-                @mouseleave="activeChartPointIndex = null"
+            <div class="results-tabs" role="tablist" aria-label="Batch result views">
+              <button
+                v-for="tab in availableTabs"
+                :key="tab.id"
+                type="button"
+                class="result-tab-btn"
+                :class="{ active: activeResultsTab === tab.id }"
+                role="tab"
+                :aria-selected="activeResultsTab === tab.id ? 'true' : 'false'"
+                @click="activeResultsTab = tab.id"
               >
-                <line
-                  v-for="tick in trendChart.yTicks"
-                  :key="`grid-${tick.y}`"
-                  :x1="trendChart.padding.left"
-                  :y1="tick.y"
-                  :x2="trendChart.width - trendChart.padding.right"
-                  :y2="tick.y"
-                  class="trend-grid-line"
-                />
+                {{ tab.label }}
+              </button>
+            </div>
 
-                <line
-                  :x1="trendChart.padding.left"
-                  :y1="trendChart.padding.top"
-                  :x2="trendChart.padding.left"
-                  :y2="trendChart.height - trendChart.padding.bottom"
-                  class="trend-axis"
-                />
-                <line
-                  :x1="trendChart.width - trendChart.padding.right"
-                  :y1="trendChart.padding.top"
-                  :x2="trendChart.width - trendChart.padding.right"
-                  :y2="trendChart.height - trendChart.padding.bottom"
-                  class="trend-axis"
-                />
-                <line
-                  :x1="trendChart.padding.left"
-                  :y1="trendChart.height - trendChart.padding.bottom"
-                  :x2="trendChart.width - trendChart.padding.right"
-                  :y2="trendChart.height - trendChart.padding.bottom"
-                  class="trend-axis"
-                />
-
-                <text
-                  v-for="tick in trendChart.yTicks"
-                  :key="`line-y-${tick.y}`"
-                  :x="trendChart.padding.left - 10"
-                  :y="tick.y + 4"
-                  class="trend-ytick trend-ytick-calls"
-                  text-anchor="end"
+            <div v-if="activeResultsTab === 'summary'" class="results-tab-panel">
+              <div class="results-header">
+                <h3>{{ currentWorkflow.label }} Results</h3>
+                <p>
+                  Processed rows are shown only when validations pass. Use the tabs for trend and row-level diagnostics.
+                </p>
+                <p
+                  v-if="selectedMode === 'weekly-plan' && Array.isArray(summary?.planningNotes) && summary.planningNotes.length"
+                  class="helper-text"
                 >
-                  {{ tick.lineValue }}
-                </text>
-                <text
-                  v-for="tick in trendChart.yTicks"
-                  :key="`bar-y-${tick.y}`"
-                  :x="trendChart.width - trendChart.padding.right + 10"
-                  :y="tick.y + 4"
-                  class="trend-ytick trend-ytick-staff"
-                  text-anchor="start"
-                >
-                  {{ tick.barValue }}
-                </text>
+                  {{ summary.planningNotes[0] }}
+                </p>
+              </div>
 
-                <rect
-                  v-if="selectedMode === 'daily-plan'"
-                  v-for="point in trendChart.points"
-                  :key="`bar-base-${point.x}`"
-                  :x="point.barX"
-                  :y="point.requiredAgentsY"
-                  :width="point.barWidth"
-                  :height="point.requiredAgentsHeight"
-                  :class="[
-                    'trend-bar',
-                    'trend-bar-staff-base',
-                    { active: activeChartPointIndex === point.index }
-                  ]"
-                >
-                  <title>{{ point.label }} | Required Agents: {{ formatCount(point.requiredAgents) }}</title>
-                </rect>
-                <rect
-                  v-if="selectedMode === 'daily-plan'"
-                  v-for="point in trendChart.points"
-                  :key="`bar-addon-${point.x}`"
-                  :x="point.barX"
-                  :y="point.requiredHeadcountY"
-                  :width="point.barWidth"
-                  :height="point.headcountAddonHeight"
-                  :class="[
-                    'trend-bar',
-                    'trend-bar-staff-addon',
-                    { active: activeChartPointIndex === point.index }
-                  ]"
-                >
-                  <title>
-                    {{ point.label }} | Headcount Add-On: {{ formatCount(point.headcountAddon) }} | Required
-                    Headcount: {{ formatCount(point.barValue) }}
-                  </title>
-                </rect>
-                <rect
-                  v-if="selectedMode !== 'daily-plan'"
-                  v-for="point in trendChart.points"
-                  :key="`bar-${point.x}`"
-                  :x="point.barX"
-                  :y="point.barY"
-                  :width="point.barWidth"
-                  :height="point.barHeight"
-                  class="trend-bar trend-bar-staff-base"
-                >
-                  <title>{{ point.label }} | {{ chartMeta.barLegend }}: {{ formatCount(point.barValue) }}</title>
-                </rect>
+              <div v-if="selectedMode === 'file-processor' || selectedMode === 'daily-plan'" class="results-metrics">
+                <article class="metric-card">
+                  <p class="metric-label">Total Calls Offered</p>
+                  <p class="metric-value">{{ formatVolume(fileProcessorTotalCalls) }}</p>
+                  <p class="metric-meta">sum of interval demand</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Avg Service Level</p>
+                  <p class="metric-value">{{ formatPercent(summary?.avgServiceLevel) }}</p>
+                  <p class="metric-meta">across successful rows</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Avg ASA</p>
+                  <p class="metric-value">{{ formatAsaSeconds(summary?.avgAsaSeconds) }}</p>
+                  <p class="metric-meta">across successful rows</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Total Agent Hours</p>
+                  <p class="metric-value">{{ formatDecimal(summary?.totalRequiredStaffHoursNet) }}</p>
+                  <p class="metric-meta">required agents (no shrinkage)</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Total Headcount Hours</p>
+                  <p class="metric-value">{{ formatDecimal(summary?.totalRequiredStaffHoursGross) }}</p>
+                  <p class="metric-meta">required headcount with shrinkage</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Peak Agent Need</p>
+                  <p class="metric-value">{{ formatCount(summary?.peakStaffNet) }}</p>
+                  <p class="metric-meta">highest interval requirement</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Peak Headcount Need</p>
+                  <p class="metric-value">{{ formatCount(summary?.peakStaffGross) }}</p>
+                  <p class="metric-meta">highest gross requirement</p>
+                </article>
+              </div>
 
-                <rect
-                  v-if="selectedMode === 'daily-plan'"
-                  v-for="point in trendChart.points"
-                  :key="`hover-zone-${point.x}`"
-                  class="trend-hover-zone"
-                  :x="point.hoverX"
-                  :y="trendChart.padding.top"
-                  :width="point.hoverWidth"
-                  :height="trendChart.height - trendChart.padding.top - trendChart.padding.bottom"
-                  tabindex="0"
-                  role="button"
-                  :aria-label="`Show interval details for ${point.label}`"
-                  @mouseenter="activeChartPointIndex = point.index"
-                  @focus="activeChartPointIndex = point.index"
-                  @blur="activeChartPointIndex = null"
-                />
+              <div v-else class="results-metrics">
+                <article class="metric-card">
+                  <p class="metric-label">Avg Service Level</p>
+                  <p class="metric-value">{{ formatPercent(summary?.avgServiceLevel) }}</p>
+                  <p class="metric-meta">across successful rows</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Avg ASA</p>
+                  <p class="metric-value">{{ formatAsaSeconds(summary?.avgAsaSeconds) }}</p>
+                  <p class="metric-meta">across successful rows</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Total Net Hours</p>
+                  <p class="metric-value">{{ formatDecimal(summary?.totalRequiredStaffHoursNet) }}</p>
+                  <p class="metric-meta">required labor net</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Total Gross Hours</p>
+                  <p class="metric-value">{{ formatDecimal(summary?.totalRequiredStaffHoursGross) }}</p>
+                  <p class="metric-meta">required labor gross</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Peak Net Staff</p>
+                  <p class="metric-value">{{ formatCount(summary?.peakStaffNet) }}</p>
+                  <p class="metric-meta">highest interval net staff</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Peak Gross Staff</p>
+                  <p class="metric-value">{{ formatCount(summary?.peakStaffGross) }}</p>
+                  <p class="metric-meta">highest interval gross staff</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Total Required HC Hours</p>
+                  <p class="metric-value">{{ formatDecimal(summary?.totalRequiredHeadcountHours) }}</p>
+                  <p class="metric-meta">week-level headcount demand</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Average Daily FTE</p>
+                  <p class="metric-value">{{ formatDecimal(summary?.averageDailyFte) }}</p>
+                  <p class="metric-meta">daily average for included days</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Peak Day</p>
+                  <p class="metric-value">{{ summary?.peakDay ?? '-' }}</p>
+                  <p class="metric-meta">{{ formatDecimal(summary?.peakDayRequiredHeadcountHours) }} HC hours</p>
+                </article>
+                <article class="metric-card">
+                  <p class="metric-label">Staffing Variability</p>
+                  <p class="metric-value">{{ formatDecimal((summary?.staffingVariability ?? 0) * 100, 1) }}%</p>
+                  <p class="metric-meta">range vs average daily FTE</p>
+                </article>
+              </div>
 
-                <line
-                  v-if="selectedMode === 'daily-plan' && activeChartPoint"
-                  :x1="activeChartPoint.x"
-                  :x2="activeChartPoint.x"
-                  :y1="trendChart.padding.top"
-                  :y2="trendChart.height - trendChart.padding.bottom"
-                  class="trend-focus-line"
-                />
-
-                <path :d="trendChart.linePath" class="trend-line trend-line-calls" />
-                <circle
-                  v-for="point in trendChart.points"
-                  :key="`line-point-${point.x}`"
-                  :cx="point.x"
-                  :cy="point.lineY"
-                  :class="[
-                    'trend-point',
-                    'trend-point-calls',
-                    { active: selectedMode === 'daily-plan' && activeChartPointIndex === point.index }
-                  ]"
-                  r="4"
+              <div class="batch-actions">
+                <button
+                  type="button"
+                  class="secondary-btn"
+                  :disabled="!primaryExportReady"
+                  @click="exportPrimary"
                 >
-                  <title>{{ point.label }} | {{ chartMeta.lineLegend }}: {{ formatCount(point.lineValue) }}</title>
-                </circle>
+                  {{ currentWorkflow.exportLabel }}
+                </button>
+                <button
+                  v-if="selectedMode === 'weekly-plan'"
+                  type="button"
+                  class="secondary-btn"
+                  :disabled="!weeklyBreakdownExportReady"
+                  @click="exportDailyBreakdown"
+                >
+                  Export Weekly Daily Breakdown
+                </button>
+              </div>
+            </div>
 
-                <g v-if="activeChartTooltip" style="pointer-events: none;">
-                  <rect
-                    class="trend-tooltip-box"
-                    :x="activeChartTooltip.x"
-                    :y="activeChartTooltip.y"
-                    :width="activeChartTooltip.width"
-                    :height="activeChartTooltip.height"
-                    rx="8"
-                    ry="8"
-                  />
-                  <text
-                    class="trend-tooltip-title"
-                    :x="activeChartTooltip.x + 10"
-                    :y="activeChartTooltip.y + 18"
+            <div v-if="activeResultsTab === 'trend' && hasTrendTab" class="results-tab-panel">
+              <div class="results-detail">
+                <h4>{{ chartMeta.title }}</h4>
+                <p class="helper-text">{{ chartMeta.description }}</p>
+
+                <div class="trend-chart">
+                  <svg
+                    :viewBox="`0 0 ${trendChart.width} ${trendChart.height}`"
+                    role="img"
+                    aria-label="Mode-aware staffing trend chart"
+                    @mouseleave="activeChartPointIndex = null"
                   >
-                    {{ activeChartTooltip.label }}
-                  </text>
-                  <text
-                    class="trend-tooltip-text"
-                    :x="activeChartTooltip.x + 10"
-                    :y="activeChartTooltip.y + 40"
+                    <line
+                      v-for="tick in trendChart.yTicks"
+                      :key="`grid-${tick.y}`"
+                      :x1="trendChart.padding.left"
+                      :y1="tick.y"
+                      :x2="trendChart.width - trendChart.padding.right"
+                      :y2="tick.y"
+                      class="trend-grid-line"
+                    />
+
+                    <line
+                      :x1="trendChart.padding.left"
+                      :y1="trendChart.padding.top"
+                      :x2="trendChart.padding.left"
+                      :y2="trendChart.height - trendChart.padding.bottom"
+                      class="trend-axis"
+                    />
+                    <line
+                      :x1="trendChart.width - trendChart.padding.right"
+                      :y1="trendChart.padding.top"
+                      :x2="trendChart.width - trendChart.padding.right"
+                      :y2="trendChart.height - trendChart.padding.bottom"
+                      class="trend-axis"
+                    />
+                    <line
+                      :x1="trendChart.padding.left"
+                      :y1="trendChart.height - trendChart.padding.bottom"
+                      :x2="trendChart.width - trendChart.padding.right"
+                      :y2="trendChart.height - trendChart.padding.bottom"
+                      class="trend-axis"
+                    />
+
+                    <text
+                      v-for="tick in trendChart.yTicks"
+                      :key="`line-y-${tick.y}`"
+                      :x="trendChart.padding.left - 10"
+                      :y="tick.y + 4"
+                      class="trend-ytick trend-ytick-calls"
+                      text-anchor="end"
+                    >
+                      {{ tick.lineValue }}
+                    </text>
+                    <text
+                      v-for="tick in trendChart.yTicks"
+                      :key="`bar-y-${tick.y}`"
+                      :x="trendChart.width - trendChart.padding.right + 10"
+                      :y="tick.y + 4"
+                      class="trend-ytick trend-ytick-staff"
+                      text-anchor="start"
+                    >
+                      {{ tick.barValue }}
+                    </text>
+
+                    <rect
+                      v-if="selectedMode === 'daily-plan'"
+                      v-for="point in trendChart.points"
+                      :key="`bar-base-${point.x}`"
+                      :x="point.barX"
+                      :y="point.requiredAgentsY"
+                      :width="point.barWidth"
+                      :height="point.requiredAgentsHeight"
+                      :class="[
+                        'trend-bar',
+                        'trend-bar-staff-base',
+                        { active: activeChartPointIndex === point.index }
+                      ]"
+                    >
+                      <title>{{ point.label }} | Required Agents: {{ formatCount(point.requiredAgents) }}</title>
+                    </rect>
+                    <rect
+                      v-if="selectedMode === 'daily-plan'"
+                      v-for="point in trendChart.points"
+                      :key="`bar-addon-${point.x}`"
+                      :x="point.barX"
+                      :y="point.requiredHeadcountY"
+                      :width="point.barWidth"
+                      :height="point.headcountAddonHeight"
+                      :class="[
+                        'trend-bar',
+                        'trend-bar-staff-addon',
+                        { active: activeChartPointIndex === point.index }
+                      ]"
+                    >
+                      <title>
+                        {{ point.label }} | Headcount Add-On: {{ formatCount(point.headcountAddon) }} | Required
+                        Headcount: {{ formatCount(point.barValue) }}
+                      </title>
+                    </rect>
+                    <rect
+                      v-if="selectedMode !== 'daily-plan'"
+                      v-for="point in trendChart.points"
+                      :key="`bar-${point.x}`"
+                      :x="point.barX"
+                      :y="point.barY"
+                      :width="point.barWidth"
+                      :height="point.barHeight"
+                      class="trend-bar trend-bar-staff-base"
+                    >
+                      <title>{{ point.label }} | {{ chartMeta.barLegend }}: {{ formatCount(point.barValue) }}</title>
+                    </rect>
+
+                    <rect
+                      v-if="selectedMode === 'daily-plan'"
+                      v-for="point in trendChart.points"
+                      :key="`hover-zone-${point.x}`"
+                      class="trend-hover-zone"
+                      :x="point.hoverX"
+                      :y="trendChart.padding.top"
+                      :width="point.hoverWidth"
+                      :height="trendChart.height - trendChart.padding.top - trendChart.padding.bottom"
+                      tabindex="0"
+                      role="button"
+                      :aria-label="`Show interval details for ${point.label}`"
+                      @mouseenter="activeChartPointIndex = point.index"
+                      @focus="activeChartPointIndex = point.index"
+                      @blur="activeChartPointIndex = null"
+                    />
+
+                    <line
+                      v-if="selectedMode === 'daily-plan' && activeChartPoint"
+                      :x1="activeChartPoint.x"
+                      :x2="activeChartPoint.x"
+                      :y1="trendChart.padding.top"
+                      :y2="trendChart.height - trendChart.padding.bottom"
+                      class="trend-focus-line"
+                    />
+
+                    <path :d="trendChart.linePath" class="trend-line trend-line-calls" />
+                    <circle
+                      v-for="point in trendChart.points"
+                      :key="`line-point-${point.x}`"
+                      :cx="point.x"
+                      :cy="point.lineY"
+                      :class="[
+                        'trend-point',
+                        'trend-point-calls',
+                        { active: selectedMode === 'daily-plan' && activeChartPointIndex === point.index }
+                      ]"
+                      r="4"
+                    >
+                      <title>{{ point.label }} | {{ chartMeta.lineLegend }}: {{ formatCount(point.lineValue) }}</title>
+                    </circle>
+
+                    <g v-if="activeChartTooltip" style="pointer-events: none;">
+                      <rect
+                        class="trend-tooltip-box"
+                        :x="activeChartTooltip.x"
+                        :y="activeChartTooltip.y"
+                        :width="activeChartTooltip.width"
+                        :height="activeChartTooltip.height"
+                        rx="8"
+                        ry="8"
+                      />
+                      <text
+                        class="trend-tooltip-title"
+                        :x="activeChartTooltip.x + 10"
+                        :y="activeChartTooltip.y + 18"
+                      >
+                        {{ activeChartTooltip.label }}
+                      </text>
+                      <text
+                        class="trend-tooltip-text"
+                        :x="activeChartTooltip.x + 10"
+                        :y="activeChartTooltip.y + 40"
+                      >
+                        Calls Offered: {{ activeChartTooltip.callsOffered }}
+                      </text>
+                      <text
+                        class="trend-tooltip-text"
+                        :x="activeChartTooltip.x + 10"
+                        :y="activeChartTooltip.y + 56"
+                      >
+                        Required Agents: {{ activeChartTooltip.requiredAgents }}
+                      </text>
+                      <text
+                        class="trend-tooltip-text"
+                        :x="activeChartTooltip.x + 10"
+                        :y="activeChartTooltip.y + 72"
+                      >
+                        Headcount Add-On: {{ activeChartTooltip.headcountAddon }}
+                      </text>
+                      <text
+                        class="trend-tooltip-text"
+                        :x="activeChartTooltip.x + 10"
+                        :y="activeChartTooltip.y + 88"
+                      >
+                        Required Headcount: {{ activeChartTooltip.requiredHeadcount }}
+                      </text>
+                    </g>
+
+                    <text
+                      v-for="tick in trendChart.xTicks"
+                      :key="`tick-${tick.x}`"
+                      :x="tick.x"
+                      :y="trendChart.height - trendChart.padding.bottom + 14"
+                      class="trend-tick-label"
+                      text-anchor="end"
+                      :transform="
+                        `rotate(-22 ${tick.x} ${trendChart.height - trendChart.padding.bottom + 14})`
+                      "
+                    >
+                      {{ tick.label }}
+                    </text>
+
+                    <text
+                      :x="22"
+                      :y="trendChart.height / 2"
+                      class="trend-axis-label trend-axis-label-y"
+                      text-anchor="middle"
+                      :transform="`rotate(-90 22 ${trendChart.height / 2})`"
+                    >
+                      {{ chartMeta.leftAxis }}
+                    </text>
+                    <text
+                      :x="trendChart.width - 18"
+                      :y="trendChart.height / 2"
+                      class="trend-axis-label trend-axis-label-y-right"
+                      text-anchor="middle"
+                      :transform="`rotate(90 ${trendChart.width - 18} ${trendChart.height / 2})`"
+                    >
+                      {{ chartMeta.rightAxis }}
+                    </text>
+                  </svg>
+                </div>
+
+                <div class="trend-legend" aria-label="Chart legend">
+                  <span class="trend-legend-item">
+                    <span class="trend-key trend-key-line-calls"></span>
+                    <span class="trend-key-point trend-key-point-calls"></span>
+                    {{ chartMeta.lineLegend }}
+                  </span>
+                  <span class="trend-legend-item" v-if="selectedMode === 'daily-plan'">
+                    <span class="trend-key trend-key-staff-base"></span>
+                    {{ chartMeta.barLegend }}
+                  </span>
+                  <span class="trend-legend-item" v-if="selectedMode === 'daily-plan'">
+                    <span class="trend-key trend-key-staff-addon"></span>
+                    {{ chartMeta.addonLegend }}
+                  </span>
+                  <span class="trend-legend-item" v-if="selectedMode !== 'daily-plan'">
+                    <span class="trend-key trend-key-staff-base"></span>
+                    {{ chartMeta.barLegend }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="activeResultsTab === 'rows' && hasRowsTab" class="results-tab-panel">
+              <div v-if="selectedMode === 'daily-plan' && dailyDemandRows.length" class="results-detail">
+                <h4>Interval Demand Table</h4>
+                <div class="detail-grid" role="table" aria-label="Daily interval demand table">
+                  <div class="detail-row detail-head detail-row-daily detail-row-daily-plan" role="row">
+                    <span role="columnheader">Queue</span>
+                    <span role="columnheader">Interval</span>
+                    <span role="columnheader">Offered Calls</span>
+                    <span role="columnheader">AHT</span>
+                    <span role="columnheader">Required Agents</span>
+                    <span role="columnheader">Required Headcount</span>
+                    <span role="columnheader">Service Level</span>
+                    <span role="columnheader">ASA</span>
+                    <span role="columnheader">Expected Occupancy</span>
+                  </div>
+                  <div
+                    v-for="row in dailyDemandRows"
+                    :id="`batch-row-${row.rowIndex}`"
+                    :key="`daily-row-${row.rowIndex}`"
+                    :class="['detail-row', 'detail-row-daily', 'detail-row-daily-plan', { focused: focusedRowIndex === row.rowIndex }]"
+                    role="row"
                   >
-                    Calls Offered: {{ activeChartTooltip.callsOffered }}
-                  </text>
-                  <text
-                    class="trend-tooltip-text"
-                    :x="activeChartTooltip.x + 10"
-                    :y="activeChartTooltip.y + 56"
+                    <span role="cell">{{ row.queueId }}</span>
+                    <span role="cell">{{ row.intervalStart }}</span>
+                    <span role="cell">{{ formatCount(row.callsOffered) }}</span>
+                    <span role="cell">{{ formatDecimal(row.ahtSeconds, 1) }}</span>
+                    <span role="cell">{{ formatCount(row.requiredAgents) }}</span>
+                    <span role="cell">{{ formatCount(row.requiredHeadcount) }}</span>
+                    <span role="cell">{{ formatPercent(row.serviceLevel) }}</span>
+                    <span role="cell">{{ formatAsaSeconds(row.asaSeconds) }}</span>
+                    <span role="cell">{{ formatPercent(row.expectedOccupancy) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="selectedMode === 'weekly-plan' && results.length" class="results-detail">
+                <h4>Weekly Day Summary</h4>
+                <div class="detail-grid" role="table" aria-label="Weekly day-level summary table">
+                  <div class="detail-row detail-head detail-row-weekly" role="row">
+                    <span role="columnheader">Service Date</span>
+                    <span role="columnheader">Required Agent Hours</span>
+                    <span role="columnheader">Required Headcount Hours</span>
+                    <span role="columnheader">Peak Required Agents</span>
+                    <span role="columnheader">Peak Required Headcount</span>
+                    <span role="columnheader">Recommended Daily FTE</span>
+                  </div>
+                  <div
+                    v-for="row in results"
+                    :key="`weekly-row-${row.serviceDate}`"
+                    class="detail-row detail-row-weekly"
+                    role="row"
                   >
-                    Required Agents: {{ activeChartTooltip.requiredAgents }}
-                  </text>
-                  <text
-                    class="trend-tooltip-text"
-                    :x="activeChartTooltip.x + 10"
-                    :y="activeChartTooltip.y + 72"
+                    <span role="cell">{{ row.serviceDate }}</span>
+                    <span role="cell">{{ formatDecimal(row.requiredAgentHours) }}</span>
+                    <span role="cell">{{ formatDecimal(row.requiredHeadcountHours) }}</span>
+                    <span role="cell">{{ formatCount(row.peakRequiredAgents) }}</span>
+                    <span role="cell">{{ formatCount(row.peakRequiredHeadcount) }}</span>
+                    <span role="cell">{{ formatCount(row.recommendedDailyFte) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="selectedMode === 'weekly-plan' && dailyBreakdown.length" class="results-detail">
+                <h4>Weekly Interval Breakdown</h4>
+                <div class="detail-grid" role="table" aria-label="Weekly interval breakdown table">
+                  <div class="detail-row detail-head detail-row-daily" role="row">
+                    <span role="columnheader">Queue</span>
+                    <span role="columnheader">Interval</span>
+                    <span role="columnheader">Offered Calls</span>
+                    <span role="columnheader">AHT</span>
+                    <span role="columnheader">Required Agents</span>
+                    <span role="columnheader">Required Headcount</span>
+                    <span role="columnheader">Service Level</span>
+                    <span role="columnheader">ASA</span>
+                    <span role="columnheader">Expected Occupancy</span>
+                  </div>
+                  <div
+                    v-for="(row, index) in dailyBreakdown"
+                    :id="`batch-row-${row.rowIndex}`"
+                    :key="`breakdown-row-${index}`"
+                    :class="['detail-row', 'detail-row-daily', { focused: focusedRowIndex === row.rowIndex }]"
+                    role="row"
                   >
-                    Headcount Add-On: {{ activeChartTooltip.headcountAddon }}
-                  </text>
-                  <text
-                    class="trend-tooltip-text"
-                    :x="activeChartTooltip.x + 10"
-                    :y="activeChartTooltip.y + 88"
+                    <span role="cell">{{ row.queueId }}</span>
+                    <span role="cell">{{ row.intervalStart }}</span>
+                    <span role="cell">{{ formatCount(row.callsOffered) }}</span>
+                    <span role="cell">{{ formatDecimal(row.ahtSeconds, 1) }}</span>
+                    <span role="cell">{{ formatCount(row.requiredAgents) }}</span>
+                    <span role="cell">{{ formatCount(row.requiredHeadcount) }}</span>
+                    <span role="cell">{{ formatPercent(row.serviceLevel) }}</span>
+                    <span role="cell">{{ formatAsaSeconds(row.asaSeconds) }}</span>
+                    <span role="cell">{{ formatPercent(row.expectedOccupancy) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="activeResultsTab === 'errors' && errors.length" class="results-tab-panel">
+              <div class="results-detail">
+                <h4>Row Errors</h4>
+                <div class="detail-grid" role="table" aria-label="Batch validation errors table">
+                  <div class="detail-row detail-head detail-row-errors detail-row-errors-actions" role="row">
+                    <span role="columnheader">Row</span>
+                    <span role="columnheader">Issue</span>
+                    <span role="columnheader">Action</span>
+                  </div>
+                  <div
+                    v-for="(error, index) in errors"
+                    :key="`error-${error.rowIndex}-${index}`"
+                    class="detail-row detail-row-errors detail-row-errors-actions"
+                    role="row"
                   >
-                    Required Headcount: {{ activeChartTooltip.requiredHeadcount }}
-                  </text>
-                </g>
-
-                <text
-                  v-for="tick in trendChart.xTicks"
-                  :key="`tick-${tick.x}`"
-                  :x="tick.x"
-                  :y="trendChart.height - trendChart.padding.bottom + 14"
-                  class="trend-tick-label"
-                  text-anchor="end"
-                  :transform="
-                    `rotate(-22 ${tick.x} ${trendChart.height - trendChart.padding.bottom + 14})`
-                  "
-                >
-                  {{ tick.label }}
-                </text>
-
-                <text
-                  :x="22"
-                  :y="trendChart.height / 2"
-                  class="trend-axis-label trend-axis-label-y"
-                  text-anchor="middle"
-                  :transform="`rotate(-90 22 ${trendChart.height / 2})`"
-                >
-                  {{ chartMeta.leftAxis }}
-                </text>
-                <text
-                  :x="trendChart.width - 18"
-                  :y="trendChart.height / 2"
-                  class="trend-axis-label trend-axis-label-y-right"
-                  text-anchor="middle"
-                  :transform="`rotate(90 ${trendChart.width - 18} ${trendChart.height / 2})`"
-                >
-                  {{ chartMeta.rightAxis }}
-                </text>
-              </svg>
-            </div>
-
-            <div class="trend-legend" aria-label="Chart legend">
-              <span class="trend-legend-item">
-                <span class="trend-key trend-key-line-calls"></span>
-                <span class="trend-key-point trend-key-point-calls"></span>
-                {{ chartMeta.lineLegend }}
-              </span>
-              <span class="trend-legend-item" v-if="selectedMode === 'daily-plan'">
-                <span class="trend-key trend-key-staff-base"></span>
-                {{ chartMeta.barLegend }}
-              </span>
-              <span class="trend-legend-item" v-if="selectedMode === 'daily-plan'">
-                <span class="trend-key trend-key-staff-addon"></span>
-                {{ chartMeta.addonLegend }}
-              </span>
-              <span class="trend-legend-item" v-if="selectedMode !== 'daily-plan'">
-                <span class="trend-key trend-key-staff-base"></span>
-                {{ chartMeta.barLegend }}
-              </span>
-            </div>
-          </div>
-
-          <div v-if="selectedMode === 'daily-plan' && dailyDemandRows.length" class="results-detail">
-            <h4>Interval Demand Table</h4>
-            <div class="detail-grid" role="table" aria-label="Daily interval demand table">
-              <div class="detail-row detail-head detail-row-daily" role="row">
-                <span role="columnheader">Queue</span>
-                <span role="columnheader">Interval</span>
-                <span role="columnheader">Offered Calls</span>
-                <span role="columnheader">AHT</span>
-                <span role="columnheader">Required Agents</span>
-                <span role="columnheader">Required Headcount</span>
-                <span role="columnheader">Service Level</span>
-                <span role="columnheader">ASA</span>
-                <span role="columnheader">Expected Occupancy</span>
-              </div>
-              <div
-                v-for="row in dailyDemandRows"
-                :key="`daily-row-${row.rowIndex}`"
-                class="detail-row detail-row-daily"
-                role="row"
-              >
-                <span role="cell">{{ row.queueId }}</span>
-                <span role="cell">{{ row.intervalStart }}</span>
-                <span role="cell">{{ formatCount(row.callsOffered) }}</span>
-                <span role="cell">{{ formatDecimal(row.ahtSeconds, 1) }}</span>
-                <span role="cell">{{ formatCount(row.requiredAgents) }}</span>
-                <span role="cell">{{ formatCount(row.requiredHeadcount) }}</span>
-                <span role="cell">{{ formatPercent(row.serviceLevel) }}</span>
-                <span role="cell">{{ formatAsaSeconds(row.asaSeconds) }}</span>
-                <span role="cell">{{ formatPercent(row.expectedOccupancy) }}</span>
+                    <span role="cell">{{ error.rowIndex }}</span>
+                    <span role="cell">{{ error.message }}</span>
+                    <span role="cell">
+                      <button
+                        v-if="error.rowIndex > 0 && hasRowsTab"
+                        type="button"
+                        class="row-jump-btn"
+                        @click="jumpToOutputRow(error.rowIndex)"
+                      >
+                        Go To Row
+                      </button>
+                      <span v-else class="helper-text">No row target</span>
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div v-if="selectedMode === 'weekly-plan' && results.length" class="results-detail">
-            <h4>Weekly Day Summary</h4>
-            <div class="detail-grid" role="table" aria-label="Weekly day-level summary table">
-              <div class="detail-row detail-head detail-row-weekly" role="row">
-                <span role="columnheader">Service Date</span>
-                <span role="columnheader">Required Agent Hours</span>
-                <span role="columnheader">Required Headcount Hours</span>
-                <span role="columnheader">Peak Required Agents</span>
-                <span role="columnheader">Peak Required Headcount</span>
-                <span role="columnheader">Recommended Daily FTE</span>
-              </div>
-              <div
-                v-for="row in results"
-                :key="`weekly-row-${row.serviceDate}`"
-                class="detail-row detail-row-weekly"
-                role="row"
-              >
-                <span role="cell">{{ row.serviceDate }}</span>
-                <span role="cell">{{ formatDecimal(row.requiredAgentHours) }}</span>
-                <span role="cell">{{ formatDecimal(row.requiredHeadcountHours) }}</span>
-                <span role="cell">{{ formatCount(row.peakRequiredAgents) }}</span>
-                <span role="cell">{{ formatCount(row.peakRequiredHeadcount) }}</span>
-                <span role="cell">{{ formatCount(row.recommendedDailyFte) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="selectedMode === 'weekly-plan' && dailyBreakdown.length" class="results-detail">
-            <h4>Weekly Daily Breakdown</h4>
-            <div class="detail-grid" role="table" aria-label="Weekly interval breakdown table">
-              <div class="detail-row detail-head detail-row-daily" role="row">
-                <span role="columnheader">Queue</span>
-                <span role="columnheader">Interval</span>
-                <span role="columnheader">Offered Calls</span>
-                <span role="columnheader">AHT</span>
-                <span role="columnheader">Required Agents</span>
-                <span role="columnheader">Required Headcount</span>
-                <span role="columnheader">Service Level</span>
-                <span role="columnheader">ASA</span>
-                <span role="columnheader">Expected Occupancy</span>
-              </div>
-              <div
-                v-for="(row, index) in dailyBreakdown"
-                :key="`breakdown-row-${index}`"
-                class="detail-row detail-row-daily"
-                role="row"
-              >
-                <span role="cell">{{ row.queueId }}</span>
-                <span role="cell">{{ row.intervalStart }}</span>
-                <span role="cell">{{ formatCount(row.callsOffered) }}</span>
-                <span role="cell">{{ formatDecimal(row.ahtSeconds, 1) }}</span>
-                <span role="cell">{{ formatCount(row.requiredAgents) }}</span>
-                <span role="cell">{{ formatCount(row.requiredHeadcount) }}</span>
-                <span role="cell">{{ formatPercent(row.serviceLevel) }}</span>
-                <span role="cell">{{ formatAsaSeconds(row.asaSeconds) }}</span>
-                <span role="cell">{{ formatPercent(row.expectedOccupancy) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="errors.length" class="results-detail">
-            <h4>Row Errors</h4>
-            <div class="detail-grid" role="table" aria-label="Batch validation errors table">
-              <div class="detail-row detail-head detail-row-errors" role="row">
-                <span role="columnheader">Row</span>
-                <span role="columnheader">Error</span>
-              </div>
-              <div
-                v-for="(error, index) in errors"
-                :key="`error-${error.rowIndex}-${index}`"
-                class="detail-row detail-row-errors"
-                role="row"
-              >
-                <span role="cell">{{ error.rowIndex }}</span>
-                <span role="cell">{{ error.message }}</span>
-              </div>
-            </div>
-          </div>
+          </section>
         </section>
       </div>
     </div>
