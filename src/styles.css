@@ -630,9 +630,7 @@ select:focus {
 }
 
 .results-sticky-summary {
-  position: sticky;
-  top: -0.02rem;
-  z-index: 8;
+  position: static;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.5rem;
@@ -793,8 +791,8 @@ select:focus {
 }
 
 .detail-row-daily-plan {
-  grid-template-columns: 0.62fr minmax(196px, 1.45fr) 0.62fr 0.54fr 0.64fr 0.76fr 0.6fr 0.54fr 0.76fr;
-  min-width: 1300px;
+  grid-template-columns: 110px 136px 110px 84px 136px 150px 122px 98px 150px;
+  min-width: 1096px;
 }
 
 .detail-row-daily-plan > span:nth-child(2) {
