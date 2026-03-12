@@ -44,10 +44,6 @@ const apiHealthLabel = computed(() => {
   return 'Checking'
 })
 
-const requestExport = () => {
-  window.dispatchEvent(new CustomEvent('wfm:export-primary'))
-}
-
 onMounted(() => {
   window.addEventListener('hashchange', closeMenu)
   checkApiHealth()
@@ -105,20 +101,6 @@ onBeforeUnmount(() => {
 
       <div class="header-utilities">
         <span class="api-indicator" :class="`is-${apiHealth}`">API {{ apiHealthLabel }}</span>
-        <a class="header-action" :href="props.currentRoute === 'csv-batch' ? '#batch-controls' : '#erlang-inputs'">
-          Inputs
-        </a>
-        <a class="header-action" :href="props.currentRoute === 'csv-batch' ? '#batch-results' : '#erlang-results'">
-          Outputs
-        </a>
-        <button
-          v-if="props.currentRoute === 'csv-batch'"
-          type="button"
-          class="header-action header-action-solid"
-          @click="requestExport"
-        >
-          Export CSV
-        </button>
       </div>
     </div>
   </header>

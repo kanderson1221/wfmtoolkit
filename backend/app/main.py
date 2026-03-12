@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -16,6 +16,7 @@ from .models import StaffingInput
 
 
 class ErlangCRequest(BaseModel):
+    model: Literal["erlang_c", "erlang_a"] = "erlang_c"
     callsOffered: float = Field(ge=0)
     intervalLength: float = Field(gt=0)
     averageHandleTime: float = Field(gt=0)
@@ -36,8 +37,10 @@ class ErlangCFileProcessorRequest(BaseModel):
 
 class ErlangCDailyPlanRequest(BaseModel):
     rows: list[dict[str, Any]]
-    shift_length_hours: float = Field(default=8, gt=0)
-    productive_hours_per_day: float = Field(default=8, gt=0)
+    shift_paid_hours: float = Field(default=8, gt=0)
+    unpaid_lunch_minutes: float = Field(default=30, ge=0)
+    lunch_window_start_hours: float = Field(default=3.5, ge=0)
+    lunch_window_end_hours: float = Field(default=4.5, ge=0)
     interval_duration_minutes: float = Field(gt=0, default=30)
 
 
@@ -71,7 +74,11 @@ def calculate_erlang_c(payload: ErlangCRequest) -> dict[str, Any]:
             max_occupancy=payload.maxOccupancy / 100.0,
             avg_caller_patience_seconds=payload.averageCustomerPatience,
         )
-        return build_results_payload(inputs, payload.shrinkageAssumption / 100.0)
+        return build_results_payload(
+            inputs,
+            payload.shrinkageAssumption / 100.0,
+            model=payload.model,
+        )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -99,8 +106,10 @@ def daily_plan(payload: ErlangCDailyPlanRequest) -> dict[str, Any]:
 
     return process_daily_plan_rows(
         payload.rows,
-        shift_length_hours=payload.shift_length_hours,
-        productive_hours_per_day=payload.productive_hours_per_day,
+        shift_paid_hours=payload.shift_paid_hours,
+        unpaid_lunch_hours=payload.unpaid_lunch_minutes / 60.0,
+        lunch_window_start_hours=payload.lunch_window_start_hours,
+        lunch_window_end_hours=payload.lunch_window_end_hours,
         interval_duration_minutes=payload.interval_duration_minutes,
     )
 

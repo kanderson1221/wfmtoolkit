@@ -32,10 +32,10 @@ const WORKFLOWS = [
     id: 'daily-plan',
     label: 'Plan A Day',
     summary:
-      'Build a staffing plan for one service day by converting interval demand into required agents, required headcount, and daily workload totals.',
+      'Build and optimize a one-day staffing schedule from interval demand, then visualize planned coverage versus required headcount.',
     endpoint: '/api/erlang-c/batch/daily-plan',
     templateHref: '/erlang_daily_plan_template.csv',
-    runLabel: 'Build Plan',
+    runLabel: 'Build Shift Plan',
     exportLabel: 'Export Daily Plan',
     exportKey: 'dailyPlan',
     exportFilename: 'daily_staffing_plan.csv'
@@ -68,13 +68,20 @@ const errors = ref([])
 const results = ref([])
 const calculatedRows = ref([])
 const dailyBreakdown = ref([])
+const shiftPlan = ref([])
+const scheduleCoverage = ref([])
+const agentSchedules = ref([])
 const exportData = ref({})
 const activeResultsTab = ref('summary')
 const focusedRowIndex = ref(null)
 
 const dayPlannerInputs = reactive({
   assumptionSource: 'file',
-  intervalDurationMinutes: 30
+  intervalDurationMinutes: 30,
+  shiftPaidHours: 8,
+  unpaidLunchMinutes: 30,
+  lunchWindowStartHours: 3.5,
+  lunchWindowEndHours: 4.5
 })
 
 const weeklyPlannerInputs = reactive({
@@ -326,10 +333,14 @@ const resetOutputs = () => {
   results.value = []
   calculatedRows.value = []
   dailyBreakdown.value = []
+  shiftPlan.value = []
+  scheduleCoverage.value = []
+  agentSchedules.value = []
   exportData.value = {}
   activeResultsTab.value = 'summary'
   focusedRowIndex.value = null
   activeChartPointIndex.value = null
+  activeSchedulePointIndex.value = null
 }
 
 const setMode = (mode) => {
@@ -402,11 +413,38 @@ const runWorkflow = async () => {
 
     if (selectedMode.value === 'daily-plan') {
       const intervalDurationMinutes = Number(dayPlannerInputs.intervalDurationMinutes)
+      const shiftPaidHours = Number(dayPlannerInputs.shiftPaidHours)
+      const unpaidLunchMinutes = Number(dayPlannerInputs.unpaidLunchMinutes)
+      const lunchWindowStartHours = Number(dayPlannerInputs.lunchWindowStartHours)
+      const lunchWindowEndHours = Number(dayPlannerInputs.lunchWindowEndHours)
       if (!Number.isFinite(intervalDurationMinutes) || intervalDurationMinutes <= 0) {
         throw new Error('Interval duration must be > 0 minutes.')
       }
+      if (!Number.isFinite(shiftPaidHours) || shiftPaidHours <= 0) {
+        throw new Error('Shift paid hours must be > 0.')
+      }
+      if (!Number.isFinite(unpaidLunchMinutes) || unpaidLunchMinutes < 0) {
+        throw new Error('Unpaid lunch must be >= 0 minutes.')
+      }
+      if (!Number.isFinite(lunchWindowStartHours) || lunchWindowStartHours < 0) {
+        throw new Error('Lunch window start must be >= 0 hours.')
+      }
+      if (!Number.isFinite(lunchWindowEndHours) || lunchWindowEndHours < lunchWindowStartHours) {
+        throw new Error('Lunch window end must be greater than or equal to lunch window start.')
+      }
+      const totalShiftLengthHours = shiftPaidHours + unpaidLunchMinutes / 60
+      if (
+        unpaidLunchMinutes > 0 &&
+        lunchWindowEndHours + unpaidLunchMinutes / 60 > totalShiftLengthHours
+      ) {
+        throw new Error('Lunch window plus unpaid lunch must fit inside the total shift length.')
+      }
 
       payload.interval_duration_minutes = intervalDurationMinutes
+      payload.shift_paid_hours = shiftPaidHours
+      payload.unpaid_lunch_minutes = unpaidLunchMinutes
+      payload.lunch_window_start_hours = lunchWindowStartHours
+      payload.lunch_window_end_hours = lunchWindowEndHours
     }
 
     if (selectedMode.value === 'weekly-plan') {
@@ -423,9 +461,30 @@ const runWorkflow = async () => {
     })
 
     if (!response.ok) {
-      const errorPayload = await response.json().catch(() => null)
-      const detail = errorPayload?.detail
-      const detailText = typeof detail === 'string' ? detail : 'Unable to run selected workflow.'
+      const rawErrorText = await response.text().catch(() => '')
+      let detailText = `Workflow failed (${response.status}).`
+
+      if (rawErrorText) {
+        try {
+          const errorPayload = JSON.parse(rawErrorText)
+          const detail = errorPayload?.detail
+          if (typeof detail === 'string' && detail.trim()) {
+            detailText = detail
+          } else if (Array.isArray(detail) && detail.length > 0) {
+            const firstDetail = detail[0]
+            if (typeof firstDetail === 'string' && firstDetail.trim()) {
+              detailText = firstDetail
+            } else if (firstDetail?.msg) {
+              detailText = String(firstDetail.msg)
+            }
+          }
+        } catch {
+          const flattened = rawErrorText.replace(/\s+/g, ' ').trim()
+          if (flattened.length > 0) {
+            detailText = flattened.slice(0, 220)
+          }
+        }
+      }
       throw new Error(detailText)
     }
 
@@ -438,6 +497,9 @@ const runWorkflow = async () => {
     results.value = workflowResults
     calculatedRows.value = workflowCalculatedRows
     dailyBreakdown.value = workflowPayload.dailyBreakdown ?? []
+    shiftPlan.value = workflowPayload.shiftPlan ?? []
+    scheduleCoverage.value = workflowPayload.scheduleCoverage ?? []
+    agentSchedules.value = workflowPayload.agentSchedules ?? []
     exportData.value = workflowPayload.export ?? {}
     focusedRowIndex.value = null
     hasSubmitted.value = true
@@ -586,24 +648,264 @@ const chartSeries = computed(() => {
     )
 })
 
-const dailyDemandRows = computed(() => {
+const dailyScheduleSeries = computed(() => {
   if (selectedMode.value !== 'daily-plan') return []
+  if (!Array.isArray(scheduleCoverage.value) || scheduleCoverage.value.length === 0) return []
 
-  return calculatedRows.value.map((row) => {
-    const source = parsedRows.value[row.rowIndex - 1] ?? {}
+  return scheduleCoverage.value
+    .map((row) => {
+      const requiredAgents = Number(row.requiredAgents)
+      const requiredHeadcount = Number(row.requiredHeadcount)
+      const shrinkageOverhead = Number(row.shrinkageOverhead)
+      const plannedHeadcount = Number(row.plannedHeadcount)
+      const coverageGap = Number(row.coverageGap)
+      const coverageOverage = Number(row.coverageOverage)
+      return {
+        intervalStart: row.intervalStart,
+        label: formatIntervalLabel(row.intervalStart),
+        requiredAgents: Number.isFinite(requiredAgents) ? requiredAgents : 0,
+        requiredHeadcount: Number.isFinite(requiredHeadcount) ? requiredHeadcount : 0,
+        shrinkageOverhead: Number.isFinite(shrinkageOverhead)
+          ? shrinkageOverhead
+          : Math.max(0, (Number.isFinite(requiredHeadcount) ? requiredHeadcount : 0) - (Number.isFinite(requiredAgents) ? requiredAgents : 0)),
+        plannedHeadcount: Number.isFinite(plannedHeadcount) ? plannedHeadcount : 0,
+        coverageGap: Number.isFinite(coverageGap) ? coverageGap : 0,
+        coverageOverage: Number.isFinite(coverageOverage) ? coverageOverage : 0
+      }
+    })
+    .filter((row) => row.label.length > 0)
+})
+
+const schedulePeakCoverage = computed(() =>
+  dailyScheduleSeries.value.reduce(
+    (peak, row) => Math.max(peak, row.requiredHeadcount, row.plannedHeadcount),
+    0
+  )
+)
+
+const scheduleCoverageChart = computed(() => {
+  const data = dailyScheduleSeries.value
+  if (selectedMode.value !== 'daily-plan' || data.length === 0) return null
+
+  const width = 980
+  const height = 420
+  const padding = { top: 36, right: 70, bottom: 74, left: 70 }
+  const plotWidth = width - padding.left - padding.right
+  const plotHeight = height - padding.top - padding.bottom
+  const pointCount = data.length
+
+  const maxStack = data.reduce(
+    (peak, point) => Math.max(peak, point.requiredHeadcount, point.plannedHeadcount),
+    0
+  )
+  const axisMax = niceCeiling(maxStack)
+  const barSlotWidth = pointCount > 1 ? plotWidth / pointCount : plotWidth * 0.5
+  const barWidth = Math.max(1, Math.min(barSlotWidth * 0.72, 30))
+  const xAt = (index) =>
+    padding.left + (pointCount === 1 ? plotWidth / 2 : barSlotWidth * (index + 0.5))
+  const yForValue = (value) => padding.top + plotHeight - (value / axisMax) * plotHeight
+  const zeroY = yForValue(0)
+
+  const hoverWidth = pointCount > 1 ? barSlotWidth : plotWidth * 0.5
+  const points = data.map((point, index) => {
+    const x = xAt(index)
+    const requiredAgentsY = yForValue(point.requiredAgents)
+    const requiredHeadcountY = yForValue(point.requiredHeadcount)
+    const plannedY = yForValue(point.plannedHeadcount)
     return {
-      rowIndex: row.rowIndex,
-      queueId: row.queueId,
-      intervalStart: row.intervalStart,
-      callsOffered: Number(source.calls_offered),
-      ahtSeconds: Number(source.aht_seconds),
-      requiredAgents: row.requiredStaffNet,
-      requiredHeadcount: row.requiredStaffGross,
-      serviceLevel: row.serviceLevel,
-      asaSeconds: row.asaSeconds,
-      expectedOccupancy: row.expectedOccupancy
+      ...point,
+      index,
+      x,
+      barX: x - barWidth / 2,
+      barWidth,
+      hoverX: x - hoverWidth / 2,
+      hoverWidth,
+      requiredAgentsY,
+      requiredHeadcountY,
+      plannedY,
+      baseHeight: Math.max(0, zeroY - requiredAgentsY),
+      overheadHeight: Math.max(0, requiredAgentsY - requiredHeadcountY)
     }
   })
+
+  const plannedLinePath = points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.plannedY}`)
+    .join(' ')
+
+  const yTickCount = 4
+  const yTicks = Array.from({ length: yTickCount + 1 }, (_, index) => {
+    const ratio = index / yTickCount
+    const y = padding.top + ratio * plotHeight
+    return {
+      y,
+      value: formatCount(axisMax * (1 - ratio))
+    }
+  })
+
+  const targetTicks = 8
+  const xTickStep = Math.max(1, Math.ceil(pointCount / targetTicks))
+  const xTickIndexes = []
+  for (let index = 0; index < pointCount; index += xTickStep) {
+    xTickIndexes.push(index)
+  }
+  if (xTickIndexes[xTickIndexes.length - 1] !== pointCount - 1) {
+    xTickIndexes.push(pointCount - 1)
+  }
+
+  const xTicks = xTickIndexes.map((index) => ({
+    x: points[index].x,
+    label: points[index].label
+  }))
+
+  return {
+    width,
+    height,
+    padding,
+    points,
+    yTicks,
+    xTicks,
+    plannedLinePath
+  }
+})
+
+const scheduleTotals = computed(() => {
+  if (selectedMode.value !== 'daily-plan') {
+    return {
+      shiftCount: 0,
+      shiftStarts: 0,
+      coverageRate: 0,
+      gap: 0,
+      overage: 0
+    }
+  }
+
+  return {
+    shiftCount: Number(summary.value?.optimizedShiftCount ?? 0),
+    shiftStarts: Number(summary.value?.optimizedShiftStarts ?? 0),
+    coverageRate: Number(summary.value?.coverageRate ?? 0),
+    gap: Number(summary.value?.totalCoverageGap ?? 0),
+    overage: Number(summary.value?.totalCoverageOverage ?? 0)
+  }
+})
+
+const activeSchedulePointIndex = ref(null)
+
+const activeSchedulePoint = computed(() => {
+  if (selectedMode.value !== 'daily-plan') return null
+  if (activeSchedulePointIndex.value === null) return null
+  return scheduleCoverageChart.value?.points?.[activeSchedulePointIndex.value] ?? null
+})
+
+const scheduleTimeline = computed(() => {
+  if (selectedMode.value !== 'daily-plan') return null
+  if (!Array.isArray(scheduleCoverage.value) || scheduleCoverage.value.length === 0) return null
+  const intervals = scheduleCoverage.value.map((row) => ({
+    raw: row.intervalStart,
+    label: formatIntervalLabel(row.intervalStart)
+  }))
+
+  const targetTicks = 10
+  const intervalCount = intervals.length
+  const tickStep = Math.max(1, Math.ceil(intervalCount / targetTicks))
+  const ticks = []
+  for (let index = 0; index < intervalCount; index += tickStep) {
+    ticks.push({
+      index,
+      label: intervals[index].label
+    })
+  }
+  if (ticks[ticks.length - 1]?.index !== intervalCount - 1) {
+    ticks.push({
+      index: intervalCount - 1,
+      label: intervals[intervalCount - 1].label
+    })
+  }
+
+  return {
+    intervals,
+    ticks,
+    intervalCount
+  }
+})
+
+const scheduleGanttRows = computed(() => {
+  if (selectedMode.value !== 'daily-plan') return []
+  if (!scheduleTimeline.value || scheduleTimeline.value.intervalCount <= 0) return []
+  if (!Array.isArray(agentSchedules.value) || agentSchedules.value.length === 0) return []
+
+  const intervalCount = scheduleTimeline.value.intervalCount
+  const toPct = (index) => (index / intervalCount) * 100
+  const widthPct = (start, endInclusive) => ((endInclusive - start + 1) / intervalCount) * 100
+  const normalizedRows = agentSchedules.value
+    .map((agent, index) => {
+      const shiftStartIndex = Number(agent.shiftStartIndex)
+      const shiftEndIndex = Number(agent.shiftEndIndex)
+      const lunchStartIndex =
+        agent.lunchStartIndex === null || agent.lunchStartIndex === undefined
+          ? null
+          : Number(agent.lunchStartIndex)
+      const lunchEndIndex =
+        agent.lunchEndIndex === null || agent.lunchEndIndex === undefined
+          ? null
+          : Number(agent.lunchEndIndex)
+      if (
+        !Number.isFinite(shiftStartIndex) ||
+        !Number.isFinite(shiftEndIndex) ||
+        shiftStartIndex < 0 ||
+        shiftEndIndex < shiftStartIndex
+      ) {
+        return null
+      }
+
+      const segments = []
+      if (
+        lunchStartIndex !== null &&
+        Number.isFinite(lunchStartIndex) &&
+        lunchEndIndex !== null &&
+        Number.isFinite(lunchEndIndex) &&
+        lunchStartIndex >= shiftStartIndex &&
+        lunchEndIndex >= lunchStartIndex
+      ) {
+        if (lunchStartIndex > shiftStartIndex) {
+          segments.push({
+            type: 'work',
+            left: toPct(shiftStartIndex),
+            width: widthPct(shiftStartIndex, lunchStartIndex - 1)
+          })
+        }
+        segments.push({
+          type: 'lunch',
+          left: toPct(lunchStartIndex),
+          width: widthPct(lunchStartIndex, lunchEndIndex)
+        })
+        if (lunchEndIndex < shiftEndIndex) {
+          segments.push({
+            type: 'work',
+            left: toPct(lunchEndIndex + 1),
+            width: widthPct(lunchEndIndex + 1, shiftEndIndex)
+          })
+        }
+      } else {
+        segments.push({
+          type: 'work',
+          left: toPct(shiftStartIndex),
+          width: widthPct(shiftStartIndex, shiftEndIndex)
+        })
+      }
+
+      return {
+        rowId: agent.agentId ?? `Agent-${index + 1}`,
+        agentId: agent.agentId ?? `A${String(index + 1).padStart(3, '0')}`,
+        shiftStart: formatIntervalLabel(agent.shiftStart),
+        shiftEnd: formatIntervalLabel(agent.shiftEnd),
+        lunchStart: agent.lunchStart ? formatIntervalLabel(agent.lunchStart) : null,
+        lunchEnd: agent.lunchEnd ? formatIntervalLabel(agent.lunchEnd) : null,
+        segments
+      }
+    })
+    .filter((row) => row !== null)
+
+  return normalizedRows
 })
 
 const fileProcessorTotalCalls = computed(() => {
@@ -796,9 +1098,15 @@ const hasTrendTab = computed(
   () => selectedMode.value !== 'file-processor' && trendChart.value !== null
 )
 
+const hasScheduleTab = computed(
+  () => selectedMode.value === 'daily-plan' && dailyScheduleSeries.value.length > 0
+)
+
 const hasRowsTab = computed(() => {
   if (selectedMode.value === 'file-processor') return false
-  if (selectedMode.value === 'daily-plan') return dailyDemandRows.value.length > 0
+  if (selectedMode.value === 'daily-plan') {
+    return calculatedRows.value.length > 0 || results.value.length > 0
+  }
   if (selectedMode.value === 'weekly-plan') return results.value.length > 0 || dailyBreakdown.value.length > 0
   return false
 })
@@ -806,6 +1114,7 @@ const hasRowsTab = computed(() => {
 const availableTabs = computed(() => {
   const tabs = [{ id: 'summary', label: 'Summary' }]
   if (hasTrendTab.value) tabs.push({ id: 'trend', label: 'Trend' })
+  if (hasScheduleTab.value) tabs.push({ id: 'schedule', label: 'Schedule Plan' })
   if (hasRowsTab.value) tabs.push({ id: 'rows', label: 'Rows' })
   if (errors.value.length > 0) tabs.push({ id: 'errors', label: `Errors (${errors.value.length})` })
   return tabs
@@ -902,7 +1211,7 @@ onBeforeUnmount(() => {
 
           <div v-if="selectedMode === 'daily-plan'" class="planner-inputs">
             <h3>Daily Planner Inputs</h3>
-            <div class="planner-grid planner-grid-single">
+            <div class="planner-grid">
               <div class="field-group">
                 <label for="intervalDurationMinutes">Interval Length (minutes)</label>
                 <input
@@ -912,6 +1221,54 @@ onBeforeUnmount(() => {
                   min="1"
                   step="1"
                   inputmode="numeric"
+                  required
+                />
+              </div>
+              <div class="field-group">
+                <label for="dailyShiftPaidHours">Shift Paid Hours</label>
+                <input
+                  id="dailyShiftPaidHours"
+                  v-model.number="dayPlannerInputs.shiftPaidHours"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  inputmode="decimal"
+                  required
+                />
+              </div>
+              <div class="field-group">
+                <label for="dailyUnpaidLunch">Unpaid Lunch (minutes)</label>
+                <input
+                  id="dailyUnpaidLunch"
+                  v-model.number="dayPlannerInputs.unpaidLunchMinutes"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  required
+                />
+              </div>
+              <div class="field-group">
+                <label for="lunchWindowStartHours">Lunch Earliest Start (hours into shift)</label>
+                <input
+                  id="lunchWindowStartHours"
+                  v-model.number="dayPlannerInputs.lunchWindowStartHours"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  required
+                />
+              </div>
+              <div class="field-group">
+                <label for="lunchWindowEndHours">Lunch Latest Start (hours into shift)</label>
+                <input
+                  id="lunchWindowEndHours"
+                  v-model.number="dayPlannerInputs.lunchWindowEndHours"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
                   required
                 />
               </div>
@@ -926,6 +1283,13 @@ onBeforeUnmount(() => {
                 </select>
               </div>
             </div>
+
+            <p class="helper-text">
+              Total shift length = Shift Paid Hours + Unpaid Lunch.
+            </p>
+            <p class="helper-text">
+              Lunch start is constrained between Earliest and Latest Start (hours into shift).
+            </p>
 
             <p class="helper-text">
               <span v-if="useFileDailyAssumptions">
@@ -1048,7 +1412,7 @@ onBeforeUnmount(() => {
         <section id="batch-results" class="workspace-pane workspace-output" aria-live="polite">
           <div class="workspace-output-header">
             <h3>Output Workspace</h3>
-            <p>Sticky KPI summary, trend diagnostics, row-level tables, and CSV exports.</p>
+            <p>KPI summary, trend diagnostics, schedule visualization, and CSV exports.</p>
           </div>
 
           <div v-if="!hasSubmitted && !isLoading && !parseError && !submitError" class="empty-state">
@@ -1098,7 +1462,7 @@ onBeforeUnmount(() => {
               <div class="results-header">
                 <h3>{{ currentWorkflow.label }} Results</h3>
                 <p>
-                  Processed rows are shown only when validations pass. Use the tabs for trend and row-level diagnostics.
+                  Use the tabs for trend diagnostics, schedule visualization, and workflow-specific detail views.
                 </p>
                 <p
                   v-if="selectedMode === 'weekly-plan' && Array.isArray(summary?.planningNotes) && summary.planningNotes.length"
@@ -1479,11 +1843,271 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
+            <div v-if="activeResultsTab === 'schedule' && hasScheduleTab" class="results-tab-panel">
+              <div class="results-detail">
+                <h4>Optimized Shift Schedule</h4>
+                <p class="helper-text">
+                  Planned coverage is generated from full shift span (paid hours + unpaid lunch).
+                </p>
+                <p
+                  v-if="Array.isArray(summary?.scheduleNotes) && summary.scheduleNotes.length"
+                  class="helper-text"
+                >
+                  {{ summary.scheduleNotes[0] }}
+                </p>
+
+                <div class="schedule-kpi-grid">
+                  <article class="metric-card">
+                    <p class="metric-label">Planned Shifts</p>
+                    <p class="metric-value">{{ formatCount(scheduleTotals.shiftCount) }}</p>
+                    <p class="metric-meta">total agent-shift assignments</p>
+                  </article>
+                  <article class="metric-card">
+                    <p class="metric-label">Required Daily FTE</p>
+                    <p class="metric-value">{{ formatCount(summary?.requiredDailyFte ?? 0) }}</p>
+                    <p class="metric-meta">
+                      {{
+                        Number(summary?.hoursBasedRequiredDailyFte ?? 0) === Number(summary?.requiredDailyFte ?? 0)
+                          ? 'hours-based shrinkage baseline'
+                          : 'constrained full-shift target'
+                      }}
+                    </p>
+                  </article>
+                  <article
+                    v-if="Number(summary?.hoursBasedRequiredDailyFte ?? 0) !== Number(summary?.requiredDailyFte ?? 0)"
+                    class="metric-card"
+                  >
+                    <p class="metric-label">Hours-Based Daily FTE</p>
+                    <p class="metric-value">{{ formatCount(summary?.hoursBasedRequiredDailyFte ?? 0) }}</p>
+                    <p class="metric-meta">demand hours / paid hours baseline</p>
+                  </article>
+                  <article class="metric-card">
+                    <p class="metric-label">Shift Start Times</p>
+                    <p class="metric-value">{{ formatCount(scheduleTotals.shiftStarts) }}</p>
+                    <p class="metric-meta">distinct optimized starts</p>
+                  </article>
+                  <article class="metric-card">
+                    <p class="metric-label">Coverage Attainment</p>
+                    <p class="metric-value">{{ (scheduleTotals.coverageRate * 100).toFixed(1) }}%</p>
+                    <p class="metric-meta">intervals fully covered</p>
+                  </article>
+                  <article class="metric-card">
+                    <p class="metric-label">Net Coverage Variance</p>
+                    <p class="metric-value">
+                      {{
+                        formatDecimal(
+                          scheduleTotals.overage - scheduleTotals.gap,
+                          1
+                        )
+                      }}
+                    </p>
+                    <p class="metric-meta">overage minus gap (agents)</p>
+                  </article>
+                </div>
+
+                <div
+                  class="schedule-chart"
+                  role="img"
+                  aria-label="Stacked interval staffing requirement versus scheduled staff"
+                  @mouseleave="activeSchedulePointIndex = null"
+                >
+                  <div v-if="activeSchedulePoint" class="schedule-tooltip" role="status" aria-live="polite">
+                    <p class="schedule-tooltip-title">{{ activeSchedulePoint.label }}</p>
+                    <p>Interval FTE Need: {{ formatDecimal(activeSchedulePoint.requiredAgents, 2) }}</p>
+                    <p>Shrinkage Add-On: {{ formatDecimal(activeSchedulePoint.shrinkageOverhead, 2) }}</p>
+                    <p>FTE With Shrinkage: {{ formatDecimal(activeSchedulePoint.requiredHeadcount, 2) }}</p>
+                    <p>Planned: {{ formatDecimal(activeSchedulePoint.plannedHeadcount, 2) }}</p>
+                    <p>
+                      Net Gap:
+                      {{ formatDecimal(activeSchedulePoint.coverageGap, 2) }}
+                      |
+                      Net Overage:
+                      {{ formatDecimal(activeSchedulePoint.coverageOverage, 2) }}
+                    </p>
+                  </div>
+                  <div class="schedule-plot">
+                    <svg
+                      v-if="scheduleCoverageChart"
+                      :viewBox="`0 0 ${scheduleCoverageChart.width} ${scheduleCoverageChart.height}`"
+                      preserveAspectRatio="xMinYMin meet"
+                    >
+                      <line
+                        class="schedule-plot-axis"
+                        :x1="scheduleCoverageChart.padding.left"
+                        :x2="scheduleCoverageChart.width - scheduleCoverageChart.padding.right"
+                        :y1="scheduleCoverageChart.height - scheduleCoverageChart.padding.bottom"
+                        :y2="scheduleCoverageChart.height - scheduleCoverageChart.padding.bottom"
+                      />
+                      <line
+                        class="schedule-plot-axis"
+                        :x1="scheduleCoverageChart.padding.left"
+                        :x2="scheduleCoverageChart.padding.left"
+                        :y1="scheduleCoverageChart.padding.top"
+                        :y2="scheduleCoverageChart.height - scheduleCoverageChart.padding.bottom"
+                      />
+
+                      <g v-for="tick in scheduleCoverageChart.yTicks" :key="`schedule-y-${tick.y}`">
+                        <line
+                          class="schedule-plot-grid-line"
+                          :x1="scheduleCoverageChart.padding.left"
+                          :x2="scheduleCoverageChart.width - scheduleCoverageChart.padding.right"
+                          :y1="tick.y"
+                          :y2="tick.y"
+                        />
+                        <text
+                          class="schedule-plot-ytick"
+                          :x="scheduleCoverageChart.padding.left - 10"
+                          :y="tick.y + 4"
+                          text-anchor="end"
+                        >
+                          {{ tick.value }}
+                        </text>
+                      </g>
+
+                      <rect
+                        v-for="point in scheduleCoverageChart.points"
+                        :key="`schedule-base-${point.intervalStart}`"
+                        class="schedule-plot-bar-base"
+                        :x="point.barX"
+                        :y="point.requiredAgentsY"
+                        :width="point.barWidth"
+                        :height="point.baseHeight"
+                        rx="2"
+                        ry="2"
+                      />
+                      <rect
+                        v-for="point in scheduleCoverageChart.points"
+                        :key="`schedule-overhead-${point.intervalStart}`"
+                        class="schedule-plot-bar-overhead"
+                        :x="point.barX"
+                        :y="point.requiredHeadcountY"
+                        :width="point.barWidth"
+                        :height="point.overheadHeight"
+                        rx="2"
+                        ry="2"
+                      />
+
+                      <path class="schedule-plot-line" :d="scheduleCoverageChart.plannedLinePath" />
+                      <circle
+                        v-for="point in scheduleCoverageChart.points"
+                        :key="`schedule-point-${point.intervalStart}`"
+                        class="schedule-plot-point"
+                        :class="{ active: activeSchedulePointIndex === point.index }"
+                        :cx="point.x"
+                        :cy="point.plannedY"
+                        r="4"
+                      />
+
+                      <line
+                        v-if="activeSchedulePoint"
+                        class="schedule-plot-focus-line"
+                        :x1="activeSchedulePoint.x"
+                        :x2="activeSchedulePoint.x"
+                        :y1="scheduleCoverageChart.padding.top"
+                        :y2="scheduleCoverageChart.height - scheduleCoverageChart.padding.bottom"
+                      />
+
+                      <rect
+                        v-for="point in scheduleCoverageChart.points"
+                        :key="`schedule-hover-${point.intervalStart}`"
+                        class="schedule-plot-hover-zone"
+                        :x="point.hoverX"
+                        :y="scheduleCoverageChart.padding.top"
+                        :width="point.hoverWidth"
+                        :height="scheduleCoverageChart.height - scheduleCoverageChart.padding.top - scheduleCoverageChart.padding.bottom"
+                        @mouseenter="activeSchedulePointIndex = point.index"
+                      />
+
+                      <text
+                        v-for="tick in scheduleCoverageChart.xTicks"
+                        :key="`schedule-x-${tick.x}`"
+                        :x="tick.x"
+                        :y="scheduleCoverageChart.height - scheduleCoverageChart.padding.bottom + 14"
+                        class="schedule-plot-tick-label"
+                        text-anchor="end"
+                        :transform="
+                          `rotate(-22 ${tick.x} ${scheduleCoverageChart.height - scheduleCoverageChart.padding.bottom + 14})`
+                        "
+                      >
+                        {{ tick.label }}
+                      </text>
+
+                    </svg>
+                  </div>
+                </div>
+
+                <div class="schedule-legend" aria-label="Schedule legend">
+                  <span class="schedule-legend-item">
+                    <span class="schedule-legend-swatch schedule-legend-required"></span>
+                    Interval FTE Need
+                  </span>
+                  <span class="schedule-legend-item">
+                    <span class="schedule-legend-swatch schedule-legend-overhead"></span>
+                    Shrinkage Overhead
+                  </span>
+                  <span class="schedule-legend-item">
+                    <span class="schedule-legend-line"></span>
+                    Scheduled Staff
+                  </span>
+                  <span class="schedule-legend-item">Peak {{ formatDecimal(schedulePeakCoverage, 1) }}</span>
+                </div>
+
+                <div v-if="scheduleTimeline && scheduleGanttRows.length" class="schedule-gantt">
+                  <div class="schedule-gantt-header">
+                    <h5>Agent Schedule View</h5>
+                    <p>
+                      Each row is one agent shift. Blue segments are paid work and amber segments are unpaid lunch.
+                    </p>
+                    <p>
+                      Lunch window:
+                      {{ formatDecimal(summary?.lunchWindowStartHours ?? 0, 1) }}h to
+                      {{ formatDecimal(summary?.lunchWindowEndHours ?? 0, 1) }}h into shift.
+                    </p>
+                  </div>
+                  <div class="schedule-gantt-axis">
+                    <span
+                      v-for="tick in scheduleTimeline.ticks"
+                      :key="`gantt-tick-${tick.index}`"
+                      class="schedule-gantt-tick"
+                      :style="{ left: `${(tick.index / scheduleTimeline.intervalCount) * 100}%` }"
+                    >
+                      {{ tick.label }}
+                    </span>
+                  </div>
+                  <div class="schedule-gantt-body">
+                    <div v-for="row in scheduleGanttRows" :key="row.rowId" class="schedule-gantt-row">
+                      <span class="schedule-gantt-agent">{{ row.agentId }}</span>
+                      <div class="schedule-gantt-track">
+                        <span
+                          v-for="(segment, segmentIndex) in row.segments"
+                          :key="`${row.rowId}-segment-${segmentIndex}`"
+                          :class="[
+                            'schedule-gantt-segment',
+                            segment.type === 'lunch' ? 'schedule-gantt-lunch' : 'schedule-gantt-work'
+                          ]"
+                          :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
+                        ></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="shiftPlan.length" class="schedule-starts">
+                  <h5>Shift Starts</h5>
+                  <div class="schedule-start-chips">
+                    <span v-for="(shift, index) in shiftPlan" :key="`${shift.shiftStart}-${index}`" class="schedule-chip">
+                      {{ formatIntervalLabel(shift.shiftStart) }} · {{ formatCount(shift.agents) }} agents
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div v-if="activeResultsTab === 'rows' && hasRowsTab" class="results-tab-panel">
-              <div v-if="selectedMode === 'daily-plan' && dailyDemandRows.length" class="results-detail">
-                <h4>Interval Demand Table</h4>
+              <div v-if="selectedMode === 'daily-plan' && calculatedRows.length" class="results-detail">
+                <h4>Interval Demand Rows</h4>
                 <div class="detail-grid" role="table" aria-label="Daily interval demand table">
-                  <div class="detail-row detail-head detail-row-daily detail-row-daily-plan" role="row">
+                  <div class="detail-row detail-head detail-row-daily" role="row">
                     <span role="columnheader">Queue</span>
                     <span role="columnheader">Interval</span>
                     <span role="columnheader">Offered Calls</span>
@@ -1495,10 +2119,14 @@ onBeforeUnmount(() => {
                     <span role="columnheader">Expected Occupancy</span>
                   </div>
                   <div
-                    v-for="row in dailyDemandRows"
-                    :id="`batch-row-${row.rowIndex}`"
-                    :key="`daily-row-${row.rowIndex}`"
-                    :class="['detail-row', 'detail-row-daily', 'detail-row-daily-plan', { focused: focusedRowIndex === row.rowIndex }]"
+                    v-for="(row, index) in calculatedRows"
+                    :id="`batch-row-${row.rowIndex ?? index + 1}`"
+                    :key="`daily-plan-row-${index}`"
+                    :class="[
+                      'detail-row',
+                      'detail-row-daily',
+                      { focused: focusedRowIndex === (row.rowIndex ?? index + 1) }
+                    ]"
                     role="row"
                   >
                     <span role="cell">{{ row.queueId }}</span>

@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 
 const form = reactive({
+  model: 'erlang_c',
   callsOffered: '',
   intervalLength: '',
   averageHandleTime: '',
@@ -82,135 +83,165 @@ const handleSubmit = async () => {
             </p>
           </div>
 
-          <form class="calculator-form" @submit.prevent="handleSubmit">
-            <div class="field-grid erlang-field-grid">
-              <div class="field-group">
-                <label for="callsOffered">Calls Offered</label>
-                <input
-                  id="callsOffered"
-                  v-model.number="form.callsOffered"
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder="e.g. 420"
-                  required
-                />
-                <p class="helper-text">Total call volume in the interval.</p>
-              </div>
+          <form class="calculator-form erlang-calculator-form" @submit.prevent="handleSubmit">
+            <div class="input-groups-grid">
+              <section class="input-group-card input-group-card-wide">
+                <div class="input-group-header">
+                  <h3>Model</h3>
+                </div>
+                <div class="field-grid erlang-field-grid-single">
+                  <div class="field-group">
+                    <label for="staffingModel">Staffing Model</label>
+                    <select id="staffingModel" v-model="form.model">
+                      <option value="erlang_c">Erlang C</option>
+                      <option value="erlang_a">Erlang A</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
 
-              <div class="field-group">
-                <label for="intervalLength">Interval Length (min)</label>
-                <input
-                  id="intervalLength"
-                  v-model.number="form.intervalLength"
-                  type="number"
-                  min="15"
-                  step="15"
-                  inputmode="numeric"
-                  placeholder="e.g. 30"
-                  required
-                />
-                <p class="helper-text">Minutes represented by this interval.</p>
-              </div>
+              <section class="input-group-card input-group-card-wide">
+                <div class="input-group-header">
+                  <h3>Demand Profile</h3>
+                </div>
+                <div class="field-grid erlang-field-grid">
+                  <div class="field-group">
+                    <label for="callsOffered">Calls Offered</label>
+                    <input
+                      id="callsOffered"
+                      v-model.number="form.callsOffered"
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputmode="numeric"
+                      placeholder="e.g. 420"
+                      required
+                    />
+                  </div>
 
-              <div class="field-group">
-                <label for="averageHandleTime">Average Handle Time</label>
-                <input
-                  id="averageHandleTime"
-                  v-model.number="form.averageHandleTime"
-                  type="number"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder="e.g. 360"
-                  required
-                />
-                <p class="helper-text">Seconds per call.</p>
-              </div>
+                  <div class="field-group">
+                    <label for="intervalLength">Interval Length (min)</label>
+                    <input
+                      id="intervalLength"
+                      v-model.number="form.intervalLength"
+                      type="number"
+                      min="15"
+                      step="15"
+                      inputmode="numeric"
+                      placeholder="e.g. 30"
+                      required
+                    />
+                  </div>
 
-              <div class="field-group">
-                <label for="averageCustomerPatience">Average Patience</label>
-                <input
-                  id="averageCustomerPatience"
-                  v-model.number="form.averageCustomerPatience"
-                  type="number"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder="e.g. 180"
-                  required
-                />
-                <p class="helper-text">Seconds callers wait before abandoning.</p>
-              </div>
+                  <div class="field-group">
+                    <label for="averageHandleTime">Average Handle Time</label>
+                    <input
+                      id="averageHandleTime"
+                      v-model.number="form.averageHandleTime"
+                      type="number"
+                      min="1"
+                      step="1"
+                      inputmode="numeric"
+                      placeholder="e.g. 360"
+                      required
+                    />
+                  </div>
 
-              <div class="field-group">
-                <label for="serviceLevelGoal">Service Level Goal (%)</label>
-                <input
-                  id="serviceLevelGoal"
-                  v-model.number="form.serviceLevelGoal"
-                  type="number"
-                  min="1"
-                  max="100"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder="e.g. 80"
-                  required
-                />
-                <p class="helper-text">Percent answered within threshold.</p>
-              </div>
+                  <div class="field-group">
+                    <label for="averageCustomerPatience">Average Patience</label>
+                    <input
+                      id="averageCustomerPatience"
+                      v-model.number="form.averageCustomerPatience"
+                      type="number"
+                      min="1"
+                      step="1"
+                      inputmode="numeric"
+                      placeholder="e.g. 180"
+                      required
+                    />
+                  </div>
+                </div>
+              </section>
 
-              <div class="field-group">
-                <label for="serviceLevelThreshold">Service Level Threshold (sec)</label>
-                <input
-                  id="serviceLevelThreshold"
-                  v-model.number="form.serviceLevelThreshold"
-                  type="number"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder="e.g. 20"
-                  required
-                />
-                <p class="helper-text">Target answer-time threshold in seconds.</p>
-              </div>
+              <section class="input-group-card">
+                <div class="input-group-header">
+                  <h3>Service Targets</h3>
+                </div>
+                <div class="field-grid erlang-field-grid">
+                  <div class="field-group">
+                    <label for="serviceLevelGoal">Service Level Goal (%)</label>
+                    <input
+                      id="serviceLevelGoal"
+                      v-model.number="form.serviceLevelGoal"
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      inputmode="numeric"
+                      placeholder="e.g. 80"
+                      required
+                    />
+                  </div>
 
-              <div class="field-group">
-                <label for="maxOccupancy">Max Occupancy (%)</label>
-                <input
-                  id="maxOccupancy"
-                  v-model.number="form.maxOccupancy"
-                  type="number"
-                  min="1"
-                  max="100"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder="e.g. 85"
-                  required
-                />
-                <p class="helper-text">Upper occupancy target.</p>
-              </div>
+                  <div class="field-group">
+                    <label for="serviceLevelThreshold">Service Level Threshold (sec)</label>
+                    <input
+                      id="serviceLevelThreshold"
+                      v-model.number="form.serviceLevelThreshold"
+                      type="number"
+                      min="1"
+                      step="1"
+                      inputmode="numeric"
+                      placeholder="e.g. 20"
+                      required
+                    />
+                  </div>
+                </div>
+              </section>
 
-              <div class="field-group">
-                <label for="shrinkageAssumption">Shrinkage (%)</label>
-                <input
-                  id="shrinkageAssumption"
-                  v-model.number="form.shrinkageAssumption"
-                  type="number"
-                  min="0"
-                  max="99.9"
-                  step="0.1"
-                  inputmode="decimal"
-                  placeholder="e.g. 30"
-                  required
-                />
-                <p class="helper-text">Converts staffed agents to required headcount.</p>
-              </div>
+              <section class="input-group-card">
+                <div class="input-group-header">
+                  <h3>Workforce Constraints</h3>
+                </div>
+                <div class="field-grid erlang-field-grid">
+                  <div class="field-group">
+                    <label for="maxOccupancy">Max Occupancy (%)</label>
+                    <input
+                      id="maxOccupancy"
+                      v-model.number="form.maxOccupancy"
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      inputmode="numeric"
+                      placeholder="e.g. 85"
+                      required
+                    />
+                  </div>
+
+                  <div class="field-group">
+                    <label for="shrinkageAssumption">Shrinkage (%)</label>
+                    <input
+                      id="shrinkageAssumption"
+                      v-model.number="form.shrinkageAssumption"
+                      type="number"
+                      min="0"
+                      max="99.9"
+                      step="0.1"
+                      inputmode="decimal"
+                      placeholder="e.g. 30"
+                      required
+                    />
+                  </div>
+                </div>
+              </section>
             </div>
 
-            <button type="submit" class="submit-btn" :disabled="isLoading">
-              {{ isLoading ? 'Calculating...' : 'Run Calculation' }}
-            </button>
+            <div class="form-actions">
+              <button type="submit" class="submit-btn" :disabled="isLoading">
+                {{ isLoading ? 'Calculating...' : 'Run Calculation' }}
+              </button>
+            </div>
           </form>
 
           <p v-if="isLoading" class="status-message">Calculating staffing results...</p>
@@ -230,7 +261,7 @@ const handleSubmit = async () => {
           <section
             v-if="hasSubmitted"
             class="results-panel erlang-results-panel"
-            aria-label="Erlang C results preview"
+            aria-label="Staffing results preview"
           >
             <div class="results-sticky-summary">
               <article class="answer-card answer-card-primary">

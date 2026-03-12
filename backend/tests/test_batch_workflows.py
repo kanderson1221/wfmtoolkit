@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import unittest
+from datetime import datetime, timedelta
 
 from backend.app.batch import (
     process_daily_plan_rows,
@@ -73,8 +74,8 @@ class BatchWorkflowTests(unittest.TestCase):
 
         body = process_daily_plan_rows(
             rows,
-            shift_length_hours=8,
-            productive_hours_per_day=6.5,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
         )
 
         self.assertEqual(body["mode"], "daily-plan")
@@ -83,7 +84,12 @@ class BatchWorkflowTests(unittest.TestCase):
         self.assertEqual(body["summary"]["serviceDate"], "2026-03-08")
         self.assertGreaterEqual(body["summary"]["requiredDailyFte"], 1)
         self.assertEqual(len(body["results"]), 3)
-        self.assertNotIn("shiftStarts", body)
+        self.assertIn("shiftPlan", body)
+        self.assertIn("scheduleCoverage", body)
+        self.assertIn("agentSchedules", body)
+        self.assertIsInstance(body["shiftPlan"], list)
+        self.assertIsInstance(body["agentSchedules"], list)
+        self.assertEqual(len(body["scheduleCoverage"]), 3)
         self.assertIn("serviceLevel", body["results"][0])
         self.assertIn("expectedOccupancy", body["results"][0])
 
@@ -95,13 +101,15 @@ class BatchWorkflowTests(unittest.TestCase):
 
         body = process_daily_plan_rows(
             rows,
-            shift_length_hours=8,
-            productive_hours_per_day=6.5,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
             interval_duration_minutes=15,
         )
 
         self.assertEqual(len(body["errors"]), 0)
         self.assertEqual(body["summary"]["intervalDurationMinutes"], 15.0)
+        self.assertIn("optimizedShiftCount", body["summary"])
+        self.assertIn("coverageRate", body["summary"])
 
     def test_daily_plan_with_multiple_dates_fails(self) -> None:
         rows = [
@@ -111,14 +119,256 @@ class BatchWorkflowTests(unittest.TestCase):
 
         body = process_daily_plan_rows(
             rows,
-            shift_length_hours=8,
-            productive_hours_per_day=6.5,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
         )
 
         self.assertEqual(body["summary"]["successfulRows"], 0)
         self.assertEqual(len(body["results"]), 0)
         self.assertGreaterEqual(len(body["errors"]), 1)
         self.assertIn("exactly one service date", body["errors"][0]["message"])
+        self.assertEqual(len(body["shiftPlan"]), 0)
+        self.assertEqual(len(body["scheduleCoverage"]), 0)
+
+    def test_daily_plan_rejects_negative_unpaid_lunch(self) -> None:
+        rows = [
+            self._row("2026-03-08T09:00:00Z", 120),
+            self._row("2026-03-08T09:30:00Z", 140),
+        ]
+
+        body = process_daily_plan_rows(
+            rows,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=-0.5,
+        )
+
+        self.assertEqual(body["summary"]["successfulRows"], 0)
+        self.assertEqual(len(body["results"]), 0)
+        self.assertGreaterEqual(len(body["errors"]), 1)
+        self.assertIn("unpaid_lunch_hours", body["errors"][0]["message"])
+
+    def test_daily_plan_rejects_invalid_lunch_window(self) -> None:
+        rows = [
+            self._row("2026-03-08T09:00:00Z", 120),
+            self._row("2026-03-08T09:30:00Z", 140),
+        ]
+
+        body = process_daily_plan_rows(
+            rows,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
+            lunch_window_start_hours=4.5,
+            lunch_window_end_hours=3.5,
+        )
+
+        self.assertEqual(body["summary"]["successfulRows"], 0)
+        self.assertEqual(len(body["results"]), 0)
+        self.assertGreaterEqual(len(body["errors"]), 1)
+        self.assertIn("lunch_window_end_hours", body["errors"][0]["message"])
+
+    def test_daily_plan_does_not_create_incomplete_shifts(self) -> None:
+        start = datetime(2026, 3, 8, 8, 0)
+        rows = []
+        for offset in range(25):  # 08:00 through 20:00 inclusive, 30-minute intervals
+            interval_start = (start + timedelta(minutes=30 * offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            calls = 260 if interval_start.endswith("16:00:00Z") else 40
+            rows.append(self._row(interval_start, calls_offered=calls))
+
+        body = process_daily_plan_rows(
+            rows,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
+            interval_duration_minutes=30,
+        )
+
+        self.assertEqual(len(body["errors"]), 0)
+        self.assertGreaterEqual(len(body["shiftPlan"]), 1)
+
+        row_index_by_interval = {
+            row["intervalStart"]: index for index, row in enumerate(body["results"])
+        }
+        expected_shift_span = math.ceil((8 + 0.5) / 0.5)
+        for shift in body["shiftPlan"]:
+            start_index = row_index_by_interval[shift["shiftStart"]]
+            end_index = row_index_by_interval[shift["shiftEnd"]]
+            self.assertEqual(end_index - start_index + 1, expected_shift_span)
+
+        latest_start = datetime.strptime("2026-03-08T12:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+        for shift in body["shiftPlan"]:
+            shift_start = datetime.strptime(shift["shiftStart"], "%Y-%m-%dT%H:%M:%SZ")
+            self.assertLessEqual(shift_start, latest_start)
+
+    def test_daily_plan_lunch_assignments_match_interval_coverage(self) -> None:
+        rows = [
+            self._row("3/8/26 8:00", 82),
+            self._row("3/8/26 8:30", 88),
+            self._row("3/8/26 9:00", 95),
+            self._row("3/8/26 9:30", 108),
+            self._row("3/8/26 10:00", 124),
+            self._row("3/8/26 10:30", 137),
+            self._row("3/8/26 11:00", 149),
+            self._row("3/8/26 11:30", 158),
+            self._row("3/8/26 12:00", 166),
+            self._row("3/8/26 12:30", 172),
+            self._row("3/8/26 13:00", 176),
+            self._row("3/8/26 13:30", 171),
+            self._row("3/8/26 14:00", 165),
+            self._row("3/8/26 14:30", 154),
+            self._row("3/8/26 15:00", 147),
+            self._row("3/8/26 15:30", 139),
+            self._row("3/8/26 16:00", 128),
+            self._row("3/8/26 16:30", 114),
+            self._row("3/8/26 17:00", 101),
+            self._row("3/8/26 17:30", 92),
+            self._row("3/8/26 18:00", 75),
+            self._row("3/8/26 18:30", 73),
+            self._row("3/8/26 19:00", 65),
+            self._row("3/8/26 19:30", 30),
+            self._row("3/8/26 20:00", 15),
+        ]
+
+        body = process_daily_plan_rows(
+            rows,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
+            lunch_window_start_hours=3.5,
+            lunch_window_end_hours=4.5,
+            interval_duration_minutes=30,
+        )
+
+        self.assertEqual(len(body["errors"]), 0)
+        self.assertEqual(len(body["agentSchedules"]), body["summary"]["optimizedShiftCount"])
+
+        expected_planned = [0] * len(body["scheduleCoverage"])
+        for agent in body["agentSchedules"]:
+            shift_start = int(agent["shiftStartIndex"])
+            shift_end = int(agent["shiftEndIndex"])
+            for interval_index in range(shift_start, shift_end + 1):
+                expected_planned[interval_index] += 1
+
+            lunch_start = agent["lunchStartIndex"]
+            lunch_end = agent["lunchEndIndex"]
+            if lunch_start is not None and lunch_end is not None:
+                self.assertGreaterEqual((lunch_start - shift_start) * 0.5, 3.5)
+                self.assertLessEqual((lunch_start - shift_start) * 0.5, 4.5)
+                for interval_index in range(int(lunch_start), int(lunch_end) + 1):
+                    expected_planned[interval_index] -= 1
+
+        planned_from_coverage = [
+            int(round(float(row["plannedHeadcount"]))) for row in body["scheduleCoverage"]
+        ]
+        self.assertEqual(expected_planned, planned_from_coverage)
+
+
+    def test_daily_plan_shift_volume_not_pathologically_over_scheduled(self) -> None:
+        rows = [
+            self._row("3/8/26 8:00", 82),
+            self._row("3/8/26 8:30", 88),
+            self._row("3/8/26 9:00", 95),
+            self._row("3/8/26 9:30", 108),
+            self._row("3/8/26 10:00", 124),
+            self._row("3/8/26 10:30", 137),
+            self._row("3/8/26 11:00", 149),
+            self._row("3/8/26 11:30", 158),
+            self._row("3/8/26 12:00", 166),
+            self._row("3/8/26 12:30", 172),
+            self._row("3/8/26 13:00", 176),
+            self._row("3/8/26 13:30", 171),
+            self._row("3/8/26 14:00", 165),
+            self._row("3/8/26 14:30", 154),
+            self._row("3/8/26 15:00", 147),
+            self._row("3/8/26 15:30", 139),
+            self._row("3/8/26 16:00", 128),
+            self._row("3/8/26 16:30", 114),
+            self._row("3/8/26 17:00", 101),
+            self._row("3/8/26 17:30", 92),
+            self._row("3/8/26 18:00", 75),
+            self._row("3/8/26 18:30", 73),
+            self._row("3/8/26 19:00", 65),
+            self._row("3/8/26 19:30", 30),
+            self._row("3/8/26 20:00", 15),
+        ]
+
+        body = process_daily_plan_rows(
+            rows,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
+            interval_duration_minutes=30,
+        )
+
+        self.assertEqual(len(body["errors"]), 0)
+        self.assertLess(body["summary"]["optimizedShiftCount"], 100)
+
+    def test_daily_plan_shift_count_matches_required_daily_fte_target(self) -> None:
+        rows = [
+            self._row("3/8/26 8:00", 82),
+            self._row("3/8/26 8:30", 88),
+            self._row("3/8/26 9:00", 95),
+            self._row("3/8/26 9:30", 108),
+            self._row("3/8/26 10:00", 124),
+            self._row("3/8/26 10:30", 137),
+            self._row("3/8/26 11:00", 149),
+            self._row("3/8/26 11:30", 158),
+            self._row("3/8/26 12:00", 166),
+            self._row("3/8/26 12:30", 172),
+            self._row("3/8/26 13:00", 176),
+            self._row("3/8/26 13:30", 171),
+            self._row("3/8/26 14:00", 165),
+            self._row("3/8/26 14:30", 154),
+            self._row("3/8/26 15:00", 147),
+            self._row("3/8/26 15:30", 139),
+            self._row("3/8/26 16:00", 128),
+            self._row("3/8/26 16:30", 114),
+            self._row("3/8/26 17:00", 101),
+            self._row("3/8/26 17:30", 92),
+            self._row("3/8/26 18:00", 75),
+            self._row("3/8/26 18:30", 73),
+            self._row("3/8/26 19:00", 65),
+            self._row("3/8/26 19:30", 30),
+            self._row("3/8/26 20:00", 15),
+        ]
+
+        body = process_daily_plan_rows(
+            rows,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
+            interval_duration_minutes=30,
+        )
+
+        self.assertEqual(len(body["errors"]), 0)
+        self.assertEqual(
+            int(body["summary"]["requiredDailyFte"]),
+            int(body["summary"]["hoursBasedRequiredDailyFte"]),
+        )
+        self.assertEqual(
+            int(body["summary"]["optimizedShiftCount"]),
+            int(body["summary"]["requiredDailyFte"]),
+        )
+        self.assertEqual(int(body["summary"]["shiftFteDelta"]), 0)
+        self.assertAlmostEqual(
+            float(body["summary"]["plannedHeadcountHours"]),
+            float(body["summary"]["plannedPaidHeadcountHours"]),
+            places=6,
+        )
+
+    def test_daily_plan_schedule_coverage_sorted_for_non_iso_intervals(self) -> None:
+        rows = [
+            self._row("3/8/26 10:00", 120),
+            self._row("3/8/26 8:00", 140),
+            self._row("3/8/26 9:00", 130),
+        ]
+
+        body = process_daily_plan_rows(
+            rows,
+            shift_paid_hours=8,
+            unpaid_lunch_hours=0.5,
+        )
+
+        self.assertEqual(len(body["errors"]), 0)
+        self.assertEqual(
+            [row["intervalStart"] for row in body["scheduleCoverage"]],
+            ["3/8/26 8:00", "3/8/26 9:00", "3/8/26 10:00"],
+        )
 
     def test_weekly_plan_with_multiple_dates(self) -> None:
         rows = [

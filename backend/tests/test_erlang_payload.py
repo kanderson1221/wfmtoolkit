@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from backend.app.erlang import build_results_payload
+from backend.app.erlang import build_results_payload, staff_for_interval
 from backend.app.models import StaffingInput
 
 
@@ -59,6 +59,34 @@ class ErlangPayloadTests(unittest.TestCase):
     def test_invalid_shrinkage_raises(self) -> None:
         with self.assertRaises(ValueError):
             build_results_payload(self.inputs, 1.0)
+
+    def test_payload_supports_erlang_a_model(self) -> None:
+        payload = build_results_payload(self.inputs, 0.30, model="erlang_a")
+        summary = payload["summary"]
+
+        self.assertGreaterEqual(int(summary["requiredAgents"]), 1)
+        self.assertEqual(len(payload["scenarios"]), 7)
+        self.assertTrue(any(row["isRecommended"] for row in payload["scenarios"]))
+
+    def test_higher_service_goal_requires_more_erlang_a_staff(self) -> None:
+        baseline = self.inputs
+        stricter = StaffingInput(
+            calls_offered=baseline.calls_offered,
+            interval_duration_seconds=baseline.interval_duration_seconds,
+            avg_handle_time_seconds=baseline.avg_handle_time_seconds,
+            target_service_level=0.90,
+            service_level_answer_time_seconds=baseline.service_level_answer_time_seconds,
+            max_occupancy=baseline.max_occupancy,
+            avg_caller_patience_seconds=baseline.avg_caller_patience_seconds,
+        )
+
+        baseline_staff = staff_for_interval(baseline, model="erlang_a")["required_staff"]
+        stricter_staff = staff_for_interval(stricter, model="erlang_a")["required_staff"]
+        self.assertGreaterEqual(stricter_staff, baseline_staff)
+
+    def test_invalid_model_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            build_results_payload(self.inputs, 0.30, model="invalid-model")
 
 
 if __name__ == "__main__":
