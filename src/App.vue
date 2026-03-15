@@ -4,12 +4,23 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import ErlangCForm from './components/ErlangCForm.vue'
 import CsvBatchCalculator from './components/CsvBatchCalculator.vue'
+import MonthlyPlanBuilder from './components/MonthlyPlanBuilder.vue'
 import AppFooter from './components/AppFooter.vue'
 
 const currentRoute = ref('erlang')
 
 const syncRouteFromHash = () => {
-  currentRoute.value = window.location.hash === '#csv-batch' ? 'csv-batch' : 'erlang'
+  if (window.location.hash === '#csv-batch') {
+    currentRoute.value = 'csv-batch'
+    return
+  }
+
+  if (window.location.hash === '#monthly-plan') {
+    currentRoute.value = 'monthly-plan'
+    return
+  }
+
+  currentRoute.value = 'erlang'
 }
 
 onMounted(() => {
@@ -27,6 +38,7 @@ onBeforeUnmount(() => {
     <AppHeader :current-route="currentRoute" />
     <main class="app-main">
       <ErlangCForm v-if="currentRoute === 'erlang'" />
+      <MonthlyPlanBuilder v-else-if="currentRoute === 'monthly-plan'" />
       <CsvBatchCalculator v-else />
     </main>
     <AppFooter />

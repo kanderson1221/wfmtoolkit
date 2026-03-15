@@ -89,6 +89,14 @@ onBeforeUnmount(() => {
             Interval Calculator
           </a>
           <a
+            href="#monthly-plan"
+            class="nav-link"
+            :class="{ active: props.currentRoute === 'monthly-plan' }"
+            @click="closeMenu"
+          >
+            Monthly Planner
+          </a>
+          <a
             href="#csv-batch"
             class="nav-link"
             :class="{ active: props.currentRoute === 'csv-batch' }"
