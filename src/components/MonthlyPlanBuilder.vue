@@ -11,6 +11,14 @@ const props = defineProps({
   initialPlan: {
     type: Object,
     default: null
+  },
+  centerDefaults: {
+    type: Object,
+    default: null
+  },
+  draftKey: {
+    type: String,
+    default: ''
   }
 })
 
@@ -66,14 +74,14 @@ const autosaveTimeFormatter = new Intl.DateTimeFormat('en-US', {
 const createPresenceMonth = (overrides = {}) => ({
   dayAdjustment: 0,
   paidHoursPerDay: 8,
-  plannedTimeOffHours: 18,
-  unplannedTimeOffHours: 6,
-  leaveTimeHours: 2,
-  meetingsHours: 4,
-  trainingHours: 3,
-  coachingHours: 1.5,
-  paidBreaksHoursPerDay: 0.5,
-  otherAwayHoursPerDay: 0.1,
+  plannedTimeOffHours: 0,
+  unplannedTimeOffHours: 0,
+  leaveTimeHours: 0,
+  meetingsHours: 0,
+  trainingHours: 0,
+  coachingHours: 0,
+  paidBreaksHoursPerDay: 0,
+  otherAwayHoursPerDay: 0,
   ...overrides
 })
 
@@ -133,16 +141,20 @@ const hydrateMonths = (months, fallbackBuilder, factory) =>
     : fallbackBuilder()
 
 const savedPlan = props.initialPlan || null
-const draftKey = buildPlannerDraftKey(savedPlan?.id)
+const isNewPlan = !savedPlan
+const draftKey = buildPlannerDraftKey(props.draftKey || savedPlan?.id)
 const restoredDraft = loadPlannerDraft(draftKey)
-const initialPlan = restoredDraft?.plan || savedPlan || {}
+const initialPlan = restoredDraft?.plan || savedPlan || props.centerDefaults || {}
 const initialUi = restoredDraft?.ui || {}
+const centerOperatingWeekdays = normalizeWeekdays(props.centerDefaults?.operatingWeekdays)
+const centerPaidHoursPerDay = toNumber(props.centerDefaults?.presenceMonths?.[0]?.paidHoursPerDay, 8)
+const centerRandomDefaults = createRandomMonth(props.centerDefaults?.randomDefaults || {})
 
-const planName = ref(initialPlan.name?.trim() || `${toNumber(initialPlan.planningYear, currentYear)} Staffing Plan`)
+const planName = ref(initialPlan.name?.trim() || '')
 const planningYear = ref(toNumber(initialPlan.planningYear, currentYear))
 const activeTab = ref(initialUi.activeTab || 'presence')
 const selectedMonthIndex = ref(clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1))
-const settingsOpen = ref(initialUi.settingsOpen ?? !savedPlan)
+const settingsOpen = ref(savedPlan ? initialUi.settingsOpen ?? false : true)
 const operatingWeekdays = ref(normalizeWeekdays(initialPlan.operatingWeekdays))
 const presenceMonths = ref(hydrateMonths(initialPlan.presenceMonths, buildPresenceMonths, createPresenceMonth))
 const randomDefaults = ref(createRandomMonth(initialPlan.randomDefaults || {}))
@@ -153,6 +165,8 @@ const autosaveState = ref(restoredDraft ? 'restored' : 'idle')
 const lastAutosavedAt = ref(restoredDraft?.autosavedAt || null)
 const autosaveReady = ref(false)
 const suspendAutosave = ref(false)
+const settingsStatusMessage = ref('')
+const settingsStatusTone = ref('success')
 
 let autosaveTimer = null
 
@@ -205,15 +219,6 @@ const createPresenceMonthFromProfile = ({
     paidBreaksHoursPerDay,
     otherAwayHoursPerDay
   })
-}
-
-const toggleWeekday = (weekdayValue) => {
-  if (operatingWeekdays.value.includes(weekdayValue)) {
-    operatingWeekdays.value = operatingWeekdays.value.filter((value) => value !== weekdayValue)
-    return
-  }
-
-  operatingWeekdays.value = [...operatingWeekdays.value, weekdayValue].sort((left, right) => left - right)
 }
 
 const setActiveTab = (tabId) => {
@@ -308,23 +313,22 @@ const handleRandomCopyAction = (action) => {
 }
 
 const loadExamplePlan = () => {
-  planName.value = `${currentYear + 1} Example Staffing Plan`
   planningYear.value = currentYear + 1
-  operatingWeekdays.value = [1, 2, 3, 4, 5, 6]
+  operatingWeekdays.value = [1, 2, 3, 4, 5]
 
   presenceMonths.value = [
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 0, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 7, unplannedTimeOffPercent: 3.2, leaveTimePercent: 0.8, meetingsPercent: 1.8, trainingPercent: 1.2, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 1, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 7, unplannedTimeOffPercent: 3.2, leaveTimePercent: 0.8, meetingsPercent: 1.8, trainingPercent: 1.2, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 2, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 8, unplannedTimeOffPercent: 3.4, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 3, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 8, unplannedTimeOffPercent: 3.4, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 4, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.6, leaveTimePercent: 1, meetingsPercent: 2, trainingPercent: 1.4, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.15 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 5, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 10, unplannedTimeOffPercent: 3.8, leaveTimePercent: 1, meetingsPercent: 2, trainingPercent: 1.5, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.15 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 6, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 12, unplannedTimeOffPercent: 4, leaveTimePercent: 1.2, meetingsPercent: 1.8, trainingPercent: 1.1, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.18 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 7, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 12, unplannedTimeOffPercent: 4, leaveTimePercent: 1.2, meetingsPercent: 1.8, trainingPercent: 1.1, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.18 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 8, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.6, leaveTimePercent: 1, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.14 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 9, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 8.8, unplannedTimeOffPercent: 3.5, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.14 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 10, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.7, leaveTimePercent: 1.1, meetingsPercent: 2, trainingPercent: 1.4, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.16 }),
-    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 11, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 11.5, unplannedTimeOffPercent: 4.2, leaveTimePercent: 1.3, meetingsPercent: 2.2, trainingPercent: 1.5, coachingPercent: 1.4, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.2 })
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 0, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 7, unplannedTimeOffPercent: 3.2, leaveTimePercent: 0.8, meetingsPercent: 1.8, trainingPercent: 1.2, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 1, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 7, unplannedTimeOffPercent: 3.2, leaveTimePercent: 0.8, meetingsPercent: 1.8, trainingPercent: 1.2, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 2, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 8, unplannedTimeOffPercent: 3.4, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 3, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 8, unplannedTimeOffPercent: 3.4, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 4, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.6, leaveTimePercent: 1, meetingsPercent: 2, trainingPercent: 1.4, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.15 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 5, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 10, unplannedTimeOffPercent: 3.8, leaveTimePercent: 1, meetingsPercent: 2, trainingPercent: 1.5, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.15 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 6, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 12, unplannedTimeOffPercent: 4, leaveTimePercent: 1.2, meetingsPercent: 1.8, trainingPercent: 1.1, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.18 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 7, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 12, unplannedTimeOffPercent: 4, leaveTimePercent: 1.2, meetingsPercent: 1.8, trainingPercent: 1.1, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.18 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 8, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.6, leaveTimePercent: 1, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.14 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 9, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 8.8, unplannedTimeOffPercent: 3.5, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.14 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 10, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.7, leaveTimePercent: 1.1, meetingsPercent: 2, trainingPercent: 1.4, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.16 }),
+    createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 11, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 11.5, unplannedTimeOffPercent: 4.2, leaveTimePercent: 1.3, meetingsPercent: 2.2, trainingPercent: 1.5, coachingPercent: 1.4, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.2 })
   ]
 
   randomDefaults.value = createRandomMonth({ occupancyPercent: 90, adherencePercent: 95 })
@@ -343,29 +347,59 @@ const loadExamplePlan = () => {
 
   activeTab.value = 'presence'
   selectedMonthIndex.value = 0
-  settingsOpen.value = false
+  settingsStatusTone.value = 'success'
+  settingsStatusMessage.value = planName.value.trim()
+    ? 'Sample data loaded.'
+    : 'Sample data loaded. Add a plan name to continue.'
 }
 
 const resetPlanner = () => {
-  planName.value = `${currentYear} Staffing Plan`
+  planName.value = ''
   planningYear.value = currentYear
-  operatingWeekdays.value = [1, 2, 3, 4, 5]
-  presenceMonths.value = buildPresenceMonths()
-  randomDefaults.value = createRandomMonth()
+  operatingWeekdays.value = centerOperatingWeekdays
+  presenceMonths.value = MONTH_LABELS.map(() =>
+    createPresenceMonth({
+      paidHoursPerDay: centerPaidHoursPerDay
+    })
+  )
+  randomDefaults.value = createRandomMonth(centerRandomDefaults)
   useMonthlyRandomOverrides.value = false
-  randomMonths.value = buildRandomMonths()
+  randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(centerRandomDefaults))
   planMonths.value = buildPlanMonths()
   activeTab.value = 'presence'
   selectedMonthIndex.value = currentMonthIndex
-  settingsOpen.value = false
+  settingsOpen.value = true
+  settingsStatusTone.value = 'success'
+  settingsStatusMessage.value = ''
 }
 
 const openSettings = () => {
   settingsOpen.value = true
 }
 
-const closeSettings = () => {
+const cancelSettings = () => {
+  if (isNewPlan) {
+    suspendAutosave.value = true
+    removeDraft()
+    emit('cancel')
+    return
+  }
+
   settingsOpen.value = false
+  settingsStatusMessage.value = ''
+  settingsStatusTone.value = 'success'
+}
+
+const closeSettings = () => {
+  if (!planName.value.trim()) {
+    settingsStatusTone.value = 'error'
+    settingsStatusMessage.value = 'Plan name is required before you can continue.'
+    settingsOpen.value = true
+    return
+  }
+
+  settingsOpen.value = false
+  settingsStatusMessage.value = ''
 }
 
 const monthlyRecords = computed(() =>
@@ -460,32 +494,14 @@ const monthlyRecords = computed(() =>
 
     if (presencePercentRaw <= 0 && paidHoursPerMonth > 0) {
       presenceWarnings.push('Absence losses total 100% or more of paid hours. The planner is clamping presence to avoid impossible staffing math.')
-    } else if (presencePercent < 55 && paidHoursPerMonth > 0) {
-      presenceWarnings.push('Presence is very low for a monthly budget plan. Recheck planned time off, unplanned time off, and leave time.')
     }
 
     if (utilizationPercentRaw <= 0) {
       utilizationWarnings.push('Scheduled and other utilization losses fully consume the present time in the month. Utilization is clamped to keep the plan calculable.')
-    } else if (utilizationPercent > 92) {
-      utilizationWarnings.push('Utilization is very tight for a monthly plan. Make sure the team can sustain this without excessive strain.')
-    } else if (utilizationPercent < 60) {
-      utilizationWarnings.push('Utilization is unusually low. Confirm that meetings, training, breaks, or other away time are not overstated.')
-    }
-
-    if (occupancyPercent > 95) {
-      randomWarnings.push('Occupancy is very high. Confirm the staffing plan can sustain this without excessive strain.')
-    } else if (occupancyPercent < 80) {
-      randomWarnings.push('Occupancy is unusually low. Confirm the assumption is intentional for this monthly budget.')
-    }
-
-    if (adherencePercent < 90) {
-      randomWarnings.push('Adherence is low for a monthly staffing plan. Recheck the assumption before finalizing required headcount.')
     }
 
     if (randomLossPercent >= scheduledPercent && scheduledPercent > 0) {
       randomWarnings.push('Total scheduled random loss is consuming all scheduled capacity. Recheck the adherence and occupancy assumptions.')
-    } else if (workloadStaffingRatio > 2.5) {
-      randomWarnings.push('The adherence and occupancy assumptions produce a large staffing ratio. Confirm the model is not double counting execution losses elsewhere.')
     }
 
     if (contacts > 0 && paidHoursPerMonth === 0) {
@@ -561,7 +577,7 @@ const operatingWeekdayLabel = computed(() => {
     .join(', ')
 })
 
-const displayPlanName = computed(() => planName.value.trim() || `${planningYear.value} Staffing Plan`)
+const displayPlanName = computed(() => planName.value.trim() || 'New staffing plan')
 
 const presenceSummary = computed(() => {
   const rows = monthlyRecords.value
@@ -626,7 +642,7 @@ const planSummary = computed(() => {
 const buildPlanPayload = () => ({
   id: savedPlan?.id || initialPlan.id || null,
   createdAt: savedPlan?.createdAt || initialPlan.createdAt || null,
-  name: planName.value.trim() || `${planningYear.value} Staffing Plan`,
+  name: planName.value.trim(),
   planningYear: planningYear.value,
   operatingWeekdays: [...operatingWeekdays.value],
   presenceMonths: presenceMonths.value.map((month) => createPresenceMonth(month)),
@@ -703,6 +719,13 @@ const removeDraft = () => {
 }
 
 const savePlan = () => {
+  if (!planName.value.trim()) {
+    settingsOpen.value = true
+    settingsStatusTone.value = 'error'
+    settingsStatusMessage.value = 'Plan name is required before you can save this plan.'
+    return
+  }
+
   suspendAutosave.value = true
   removeDraft()
   emit('save', buildPlanPayload())
@@ -746,6 +769,9 @@ const autosaveStatusClass = computed(() => ({
   restored: autosaveState.value === 'restored'
 }))
 
+const canCloseSettings = computed(() => Boolean(planName.value.trim()))
+const allowSettingsBackdropClose = computed(() => !isNewPlan && canCloseSettings.value)
+
 watch(
   [
     planName,
@@ -769,6 +795,13 @@ watch(
   },
   { deep: true }
 )
+
+watch(planName, (value) => {
+  if (value.trim() && settingsStatusTone.value === 'error') {
+    settingsStatusMessage.value = ''
+    settingsStatusTone.value = 'success'
+  }
+})
 
 onMounted(() => {
   autosaveReady.value = true
@@ -820,7 +853,7 @@ onBeforeUnmount(() => {
 
             <p v-if="plannerWarnings.length" class="status-message error monthly-global-warning">
               {{ plannerWarnings.length }} monthly warning{{ plannerWarnings.length === 1 ? '' : 's' }} detected.
-              Review the highlighted assumption notes in each step before finalizing headcount.
+              Review the plan for missing or invalid monthly inputs before finalizing headcount.
             </p>
           </section>
 
@@ -828,13 +861,15 @@ onBeforeUnmount(() => {
             v-if="settingsOpen"
             v-model:plan-name="planName"
             v-model:planning-year="planningYear"
-            v-model:operating-weekdays="operatingWeekdays"
+            :can-close="canCloseSettings"
+            :allow-backdrop-close="allowSettingsBackdropClose"
+            :status-message="settingsStatusMessage"
+            :status-tone="settingsStatusTone"
             :year-options="yearOptions"
-            :weekday-options="WEEKDAY_OPTIONS"
+            @cancel="cancelSettings"
             @close="closeSettings"
             @load-example="loadExamplePlan"
             @reset="resetPlanner"
-            @toggle-weekday="toggleWeekday"
           />
 
           <nav class="monthly-tab-strip" aria-label="Monthly planner sections">

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-import logoUrl from '../assets/logo.png'
+import logoUrl from '../assets/logo.svg'
 
 const props = defineProps({
   currentApp: {
@@ -80,7 +80,7 @@ onBeforeUnmount(() => {
   <header class="site-header">
     <div class="container header-content">
       <a href="#home" class="brand-wrap" aria-label="WFMToolkit home">
-        <img :src="`${logoUrl}?v=20260315-0900`" alt="WFMToolkit logo" class="brand-logo" />
+        <img :src="logoUrl" alt="WFMToolkit logo" class="brand-logo" />
       </a>
 
       <div class="header-right">

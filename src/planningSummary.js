@@ -1,3 +1,5 @@
+export const getCenterPlans = (center) => (Array.isArray(center?.plans) ? center.plans : [])
+
 export const getAnnualContacts = (plan) => {
   const summary = plan.summary || {}
   if (typeof summary.annualContacts === 'number') {
@@ -60,9 +62,10 @@ export const getMinRequiredHeadcount = (plan) => {
 export const getAverageRequiredHeadcount = (plan) => plan.summary?.averageRequiredHeadcount || 0
 export const getPeakRequiredHeadcount = (plan) => plan.summary?.peakRequiredHeadcount || 0
 
-export const summarizePlanPortfolio = (plans) => {
+export const summarizePlanList = (plans) => {
   if (!plans.length) {
     return {
+      planCount: 0,
       annualContacts: 0,
       averageAhtSeconds: 0,
       annualWorkloadHours: 0,
@@ -77,6 +80,7 @@ export const summarizePlanPortfolio = (plans) => {
   const annualWorkloadHours = plans.reduce((sum, plan) => sum + getAnnualWorkloadHours(plan), 0)
 
   return {
+    planCount: plans.length,
     annualContacts,
     averageAhtSeconds: annualContacts > 0 ? (annualWorkloadHours * 3600) / annualContacts : 0,
     annualWorkloadHours,
@@ -86,3 +90,47 @@ export const summarizePlanPortfolio = (plans) => {
     totalPeakHeadcount: plans.reduce((sum, plan) => sum + getPeakRequiredHeadcount(plan), 0)
   }
 }
+
+export const summarizeCenter = (center) => {
+  const plans = getCenterPlans(center)
+  return {
+    ...summarizePlanList(plans),
+    name: center?.name || 'Call Center',
+    timezone: center?.timezone || '',
+    defaultPaidHoursPerDay: center?.defaultPaidHoursPerDay || 0,
+    defaultOccupancyPercent: center?.defaultOccupancyPercent || 0,
+    defaultAdherencePercent: center?.defaultAdherencePercent || 0
+  }
+}
+
+export const summarizeCenterPortfolio = (centers) => {
+  if (!centers.length) {
+    return {
+      callCenterCount: 0,
+      totalPlanCount: 0,
+      annualContacts: 0,
+      averageAhtSeconds: 0,
+      annualWorkloadHours: 0,
+      totalNeededStaffHours: 0,
+      totalAvgRequiredHeadcount: 0,
+      totalPeakHeadcount: 0
+    }
+  }
+
+  const centerSummaries = centers.map((center) => summarizeCenter(center))
+  const annualContacts = centerSummaries.reduce((sum, summary) => sum + summary.annualContacts, 0)
+  const annualWorkloadHours = centerSummaries.reduce((sum, summary) => sum + summary.annualWorkloadHours, 0)
+
+  return {
+    callCenterCount: centers.length,
+    totalPlanCount: centerSummaries.reduce((sum, summary) => sum + summary.planCount, 0),
+    annualContacts,
+    averageAhtSeconds: annualContacts > 0 ? (annualWorkloadHours * 3600) / annualContacts : 0,
+    annualWorkloadHours,
+    totalNeededStaffHours: centerSummaries.reduce((sum, summary) => sum + summary.totalNeededStaffHours, 0),
+    totalAvgRequiredHeadcount: centerSummaries.reduce((sum, summary) => sum + summary.totalAvgRequiredHeadcount, 0),
+    totalPeakHeadcount: centerSummaries.reduce((sum, summary) => sum + summary.totalPeakHeadcount, 0)
+  }
+}
+
+export const summarizePlanPortfolio = (plans) => summarizePlanList(plans)

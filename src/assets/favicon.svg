@@ -1,0 +1,26 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WFMToolkit favicon">
+  <defs>
+    <linearGradient id="favicon-gradient" x1="8" y1="50" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7B9F8F"/>
+      <stop offset="0.48" stop-color="#5686A6"/>
+      <stop offset="1" stop-color="#2A4B65"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="16" fill="#F6F8F9"/>
+  <rect x="8" y="35" width="10" height="17" rx="4" fill="#7B9F8F"/>
+  <rect x="21" y="28" width="10" height="24" rx="4" fill="#6E9185"/>
+  <rect x="34" y="19" width="10" height="33" rx="4" fill="#5E8297"/>
+  <rect x="47" y="10" width="10" height="42" rx="4" fill="url(#favicon-gradient)"/>
+
+  <circle cx="14" cy="43" r="5" fill="#F6F8F9"/>
+  <circle cx="27" cy="33" r="5" fill="#F6F8F9"/>
+  <circle cx="40" cy="23" r="5" fill="#F6F8F9"/>
+  <circle cx="55" cy="7" r="5.5" fill="#AA9B72"/>
+
+  <circle cx="14" cy="43" r="2.5" fill="#5686A6"/>
+  <circle cx="27" cy="33" r="2.5" fill="#5686A6"/>
+  <circle cx="40" cy="23" r="2.5" fill="#5686A6"/>
+
+  <path d="M14 43C19 40 22 38 27 33C31 29 35 27 40 23C45 19 49 14 55 7" stroke="#F6F8F9" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
