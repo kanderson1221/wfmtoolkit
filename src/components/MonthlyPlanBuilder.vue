@@ -6,6 +6,25 @@ import PlannerPresenceTab from './planner/PlannerPresenceTab.vue'
 import PlannerRandomTab from './planner/PlannerRandomTab.vue'
 import PlannerSettingsModal from './planner/PlannerSettingsModal.vue'
 import { buildPlannerDraftKey, clearPlannerDraft, loadPlannerDraft, persistPlannerDraft } from '../plannerDraftStorage'
+import {
+  MONTH_LABELS,
+  buildPlanMonths,
+  buildPresenceMonths,
+  buildRandomMonths,
+  calculateCalendarOpenDays,
+  clamp,
+  collectPlannerWarnings,
+  computeMonthlyRecords,
+  createPlanMonth,
+  createPresenceMonth,
+  createRandomMonth,
+  getMonthlyChartMax,
+  normalizeWeekdays,
+  summarizePlanRecords,
+  summarizePresenceRecords,
+  summarizeRandomRecords,
+  toNumber
+} from '../plannerModel'
 
 const props = defineProps({
   initialPlan: {
@@ -24,21 +43,6 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel'])
 
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const FULL_MONTH_LABELS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December'
-]
 const WEEKDAY_OPTIONS = [
   { value: 0, label: 'Sun' },
   { value: 1, label: 'Mon' },
@@ -71,51 +75,6 @@ const autosaveTimeFormatter = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit'
 })
 
-const createPresenceMonth = (overrides = {}) => ({
-  dayAdjustment: 0,
-  paidHoursPerDay: 8,
-  plannedTimeOffHours: 0,
-  unplannedTimeOffHours: 0,
-  leaveTimeHours: 0,
-  meetingsHours: 0,
-  trainingHours: 0,
-  coachingHours: 0,
-  paidBreaksHoursPerDay: 0,
-  otherAwayHoursPerDay: 0,
-  ...overrides
-})
-
-const createRandomMonth = (overrides = {}) => ({
-  occupancyPercent: 90,
-  adherencePercent: 95,
-  ...overrides
-})
-
-const createPlanMonth = (overrides = {}) => ({
-  contacts: '',
-  ahtSeconds: 300,
-  ...overrides
-})
-
-const buildPresenceMonths = () => MONTH_LABELS.map(() => createPresenceMonth())
-const buildRandomMonths = () => MONTH_LABELS.map(() => createRandomMonth())
-const buildPlanMonths = () => MONTH_LABELS.map(() => createPlanMonth())
-
-const toNumber = (value, fallback = 0) => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value
-  }
-
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
-
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
-const average = (values) => {
-  if (!values.length) return 0
-  return values.reduce((sum, value) => sum + value, 0) / values.length
-}
-
 const formatNumber = (value, digits = 1) =>
   new Intl.NumberFormat('en-US', {
     minimumFractionDigits: digits,
@@ -129,11 +88,6 @@ const formatWhole = (value) =>
 
 const formatPercent = (value, digits = 1) => `${formatNumber(value, digits)}%`
 const formatFactor = (value, digits = 2) => `${formatNumber(value, digits)}x`
-
-const normalizeWeekdays = (weekdays) =>
-  Array.isArray(weekdays) && weekdays.length
-    ? [...new Set(weekdays.map((value) => toNumber(value, 0)))].sort((left, right) => left - right)
-    : [1, 2, 3, 4, 5]
 
 const hydrateMonths = (months, fallbackBuilder, factory) =>
   Array.isArray(months) && months.length === MONTH_LABELS.length
@@ -169,24 +123,6 @@ const settingsStatusMessage = ref('')
 const settingsStatusTone = ref('success')
 
 let autosaveTimer = null
-
-const calculateCalendarOpenDays = (year, monthIndex, activeDays) => {
-  if (!activeDays.length) {
-    return 0
-  }
-
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
-  let openDays = 0
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const weekday = new Date(year, monthIndex, day).getDay()
-    if (activeDays.includes(weekday)) {
-      openDays += 1
-    }
-  }
-
-  return openDays
-}
 
 const createPresenceMonthFromProfile = ({
   year,
@@ -403,167 +339,14 @@ const closeSettings = () => {
 }
 
 const monthlyRecords = computed(() =>
-  MONTH_LABELS.map((label, monthIndex) => {
-    const presenceInput = presenceMonths.value[monthIndex]
-    const randomInput = useMonthlyRandomOverrides.value ? randomMonths.value[monthIndex] : randomDefaults.value
-    const planInput = planMonths.value[monthIndex]
-
-    const calendarOpenDays = calculateCalendarOpenDays(planningYear.value, monthIndex, operatingWeekdays.value)
-    const dayAdjustment = Math.round(toNumber(presenceInput.dayAdjustment, 0))
-    const openDays = Math.max(calendarOpenDays + dayAdjustment, 0)
-    const paidHoursPerDay = clamp(toNumber(presenceInput.paidHoursPerDay, 8), 0, 24)
-    const paidHoursPerMonth = openDays * paidHoursPerDay
-
-    const plannedTimeOffHours = Math.max(toNumber(presenceInput.plannedTimeOffHours, 0), 0)
-    const unplannedTimeOffHours = Math.max(toNumber(presenceInput.unplannedTimeOffHours, 0), 0)
-    const leaveTimeHours = Math.max(toNumber(presenceInput.leaveTimeHours, 0), 0)
-    const meetingsHours = Math.max(toNumber(presenceInput.meetingsHours, 0), 0)
-    const trainingHours = Math.max(toNumber(presenceInput.trainingHours, 0), 0)
-    const coachingHours = Math.max(toNumber(presenceInput.coachingHours, 0), 0)
-    const paidBreaksHoursPerDay = Math.max(toNumber(presenceInput.paidBreaksHoursPerDay, 0), 0)
-    const otherAwayHoursPerDay = Math.max(toNumber(presenceInput.otherAwayHoursPerDay, 0), 0)
-
-    const rawPaidBreaksHours = paidBreaksHoursPerDay * openDays
-    const rawOtherAwayHours = otherAwayHoursPerDay * openDays
-    const otherLossHoursPerDay = paidBreaksHoursPerDay + otherAwayHoursPerDay
-
-    const absenceLossHours = plannedTimeOffHours + unplannedTimeOffHours + leaveTimeHours
-    const scheduledLossHours = meetingsHours + trainingHours + coachingHours
-    const absenceLossPercent = paidHoursPerMonth > 0 ? (absenceLossHours / paidHoursPerMonth) * 100 : 0
-
-    const presencePercentRaw = 100 - absenceLossPercent
-    const presencePercent = paidHoursPerMonth > 0 ? clamp(presencePercentRaw, 1, 100) : 0
-    const presenceShare = paidHoursPerMonth > 0 ? clamp(presencePercentRaw, 1, 100) / 100 : 1
-    const presentHours = paidHoursPerMonth * presenceShare
-    const presenceFactor = paidHoursPerMonth > 0 ? 1 / presenceShare : 1
-
-    const paidBreaksHours = rawPaidBreaksHours * presenceShare
-    const otherAwayHours = rawOtherAwayHours * presenceShare
-    const otherLossHours = paidBreaksHours + otherAwayHours
-    const utilizationLossHours = scheduledLossHours + otherLossHours
-    const totalLossHours = absenceLossHours + scheduledLossHours + otherLossHours
-
-    const utilizationPercentRaw = presentHours > 0 ? 100 - (utilizationLossHours / presentHours) * 100 : 0
-    const utilizationPercent = presentHours > 0 ? clamp(utilizationPercentRaw, 1, 100) : 0
-    const utilizationShare = presentHours > 0 ? clamp(utilizationPercentRaw, 1, 100) / 100 : 1
-    const utilizationFactor = 1 / utilizationShare
-    const scheduledPercent = paidHoursPerMonth > 0 ? presenceShare * utilizationShare * 100 : 0
-    const scheduledHours = paidHoursPerMonth * presenceShare * utilizationShare
-
-    const occupancyPercent = clamp(toNumber(randomInput.occupancyPercent, 90), 1, 100)
-    const adherencePercent = clamp(toNumber(randomInput.adherencePercent, 95), 1, 100)
-    const occupancyShare = occupancyPercent / 100
-    const adherenceShare = adherencePercent / 100
-    const adherenceLossPercent = (1 - adherenceShare) * scheduledPercent
-    const scheduledAfterAdherencePercent = scheduledPercent - adherenceLossPercent
-    const occupancyLossPercent = (1 - occupancyShare) * scheduledAfterAdherencePercent
-    const randomLossPercent = adherenceLossPercent + occupancyLossPercent
-    const designFactorPercent = scheduledPercent - randomLossPercent
-    const designFactorShare = designFactorPercent / 100
-    const workloadStaffingRatio = designFactorShare > 0 ? 1 / designFactorShare : 0
-
-    const contacts = Math.max(toNumber(planInput.contacts, 0), 0)
-    const ahtSeconds = Math.max(toNumber(planInput.ahtSeconds, 0), 0)
-    const workloadHours = (contacts * ahtSeconds) / 3600
-    const requiredStaffHours = workloadHours * workloadStaffingRatio
-    const requiredHeadcount = paidHoursPerMonth > 0 ? requiredStaffHours / paidHoursPerMonth : 0
-    const roundedHeadcount = requiredHeadcount > 0 ? Math.ceil(requiredHeadcount) : 0
-
-    const presenceWarnings = []
-    const utilizationWarnings = []
-    const randomWarnings = []
-    const planWarnings = []
-
-    if (!operatingWeekdays.value.length) {
-      presenceWarnings.push('No operating weekdays are selected, so open days are zero until you turn at least one day on.')
-      planWarnings.push('No operating weekdays are selected, so the final plan cannot create monthly capacity.')
-    }
-
-    if (openDays === 0 && operatingWeekdays.value.length) {
-      presenceWarnings.push('Open days are zero after the monthly day adjustment. Check holidays or temporary closures.')
-      planWarnings.push('Open days are zero for this month, so the plan shows no monthly paid capacity.')
-    }
-
-    if (paidHoursPerMonth === 0 && totalLossHours > 0) {
-      presenceWarnings.push('Presence hours are entered, but monthly paid hours are zero. Check open days or paid hours per day.')
-    }
-
-    if (otherLossHoursPerDay >= paidHoursPerDay && paidHoursPerDay > 0) {
-      presenceWarnings.push('Daily other loss is consuming all paid hours in the day. Recheck paid breaks or other away time.')
-    }
-
-    if (presencePercentRaw <= 0 && paidHoursPerMonth > 0) {
-      presenceWarnings.push('Absence losses total 100% or more of paid hours. The planner is clamping presence to avoid impossible staffing math.')
-    }
-
-    if (utilizationPercentRaw <= 0) {
-      utilizationWarnings.push('Scheduled and other utilization losses fully consume the present time in the month. Utilization is clamped to keep the plan calculable.')
-    }
-
-    if (randomLossPercent >= scheduledPercent && scheduledPercent > 0) {
-      randomWarnings.push('Total scheduled random loss is consuming all scheduled capacity. Recheck the adherence and occupancy assumptions.')
-    }
-
-    if (contacts > 0 && paidHoursPerMonth === 0) {
-      planWarnings.push('Contacts are forecasted, but paid hours per FTE are zero. The final staffing result will stay at zero until presence inputs are fixed.')
-    }
-
-    if (contacts === 0 && ahtSeconds > 0) {
-      planWarnings.push('AHT is populated, but contacts are zero. The month will show no workload until demand is entered.')
-    }
-
-    return {
-      monthIndex,
-      label,
-      fullLabel: FULL_MONTH_LABELS[monthIndex],
-      calendarOpenDays,
-      dayAdjustment,
-      openDays,
-      paidHoursPerDay,
-      paidHoursPerMonth,
-      plannedTimeOffHours,
-      unplannedTimeOffHours,
-      leaveTimeHours,
-      meetingsHours,
-      trainingHours,
-      coachingHours,
-      paidBreaksHoursPerDay,
-      otherAwayHoursPerDay,
-      rawPaidBreaksHours,
-      rawOtherAwayHours,
-      paidBreaksHours,
-      otherAwayHours,
-      otherLossHoursPerDay,
-      absenceLossHours,
-      scheduledLossHours,
-      otherLossHours,
-      utilizationLossHours,
-      presentHours,
-      scheduledHours,
-      totalLossHours,
-      presencePercent,
-      presenceFactor,
-      utilizationPercent,
-      utilizationFactor,
-      scheduledPercent,
-      occupancyPercent,
-      adherencePercent,
-      adherenceLossPercent,
-      occupancyLossPercent,
-      randomLossPercent,
-      designFactorPercent,
-      workloadStaffingRatio,
-      contacts,
-      ahtSeconds,
-      workloadHours,
-      requiredStaffHours,
-      requiredHeadcount,
-      roundedHeadcount,
-      presenceWarnings,
-      utilizationWarnings,
-      randomWarnings,
-      planWarnings
-    }
+  computeMonthlyRecords({
+    planningYear: planningYear.value,
+    operatingWeekdays: operatingWeekdays.value,
+    presenceMonths: presenceMonths.value,
+    randomDefaults: randomDefaults.value,
+    useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
+    randomMonths: randomMonths.value,
+    planMonths: planMonths.value
   })
 )
 
@@ -579,65 +362,13 @@ const operatingWeekdayLabel = computed(() => {
 
 const displayPlanName = computed(() => planName.value.trim() || 'New staffing plan')
 
-const presenceSummary = computed(() => {
-  const rows = monthlyRecords.value
+const presenceSummary = computed(() => summarizePresenceRecords(monthlyRecords.value))
 
-  return {
-    totalOpenDays: rows.reduce((sum, row) => sum + row.openDays, 0),
-    averageAbsenceLossHours: average(rows.map((row) => row.absenceLossHours)),
-    averageScheduledLossHours: average(rows.map((row) => row.scheduledLossHours)),
-    averageOtherLossHours: average(rows.map((row) => row.otherLossHours)),
-    averageTotalLossHours: average(rows.map((row) => row.totalLossHours)),
-    averagePresence: average(rows.map((row) => row.presencePercent))
-  }
-})
+const randomSummary = computed(() =>
+  summarizeRandomRecords(monthlyRecords.value, randomDefaults.value, useMonthlyRandomOverrides.value)
+)
 
-const randomSummary = computed(() => {
-  const rows = monthlyRecords.value
-  const globalOccupancyPercent = clamp(toNumber(randomDefaults.value.occupancyPercent, 90), 1, 100)
-  const globalAdherencePercent = clamp(toNumber(randomDefaults.value.adherencePercent, 95), 1, 100)
-
-  return {
-    usesMonthlyOverrides: useMonthlyRandomOverrides.value,
-    globalOccupancyPercent,
-    globalAdherencePercent,
-    averageOccupancyPercent: average(rows.map((row) => row.occupancyPercent)),
-    averageAdherencePercent: average(rows.map((row) => row.adherencePercent)),
-    averageAdherenceLossPercent: average(rows.map((row) => row.adherenceLossPercent)),
-    averageOccupancyLossPercent: average(rows.map((row) => row.occupancyLossPercent)),
-    averageRandomLossPercent: average(rows.map((row) => row.randomLossPercent))
-  }
-})
-
-const planSummary = computed(() => {
-  const rows = monthlyRecords.value
-  const peakMonth = rows.reduce((peak, row) => (row.requiredHeadcount > peak.requiredHeadcount ? row : peak))
-  const busiestMonth = rows.reduce((busiest, row) =>
-    row.workloadHours > busiest.workloadHours ? row : busiest
-  )
-  const annualContacts = rows.reduce((sum, row) => sum + row.contacts, 0)
-  const annualWorkloadHours = rows.reduce((sum, row) => sum + row.workloadHours, 0)
-  const annualRequiredStaffHours = rows.reduce((sum, row) => sum + row.requiredStaffHours, 0)
-  const averageAhtSeconds =
-    annualContacts > 0
-      ? (annualWorkloadHours * 3600) / annualContacts
-      : average(rows.map((row) => row.ahtSeconds))
-  const minimumRequiredHeadcount = rows.length
-    ? rows.reduce((minimum, row) => Math.min(minimum, row.requiredHeadcount), rows[0].requiredHeadcount)
-    : 0
-
-  return {
-    peakMonth,
-    busiestMonth,
-    annualContacts,
-    annualWorkloadHours,
-    annualRequiredStaffHours,
-    averageAhtSeconds,
-    minimumRequiredHeadcount,
-    averageRequiredStaffHours: average(rows.map((row) => row.requiredStaffHours)),
-    averageRequiredHeadcount: average(rows.map((row) => row.requiredHeadcount))
-  }
-})
+const planSummary = computed(() => summarizePlanRecords(monthlyRecords.value))
 
 const buildPlanPayload = () => ({
   id: savedPlan?.id || initialPlan.id || null,
@@ -737,17 +468,10 @@ const cancelEditor = () => {
 }
 
 const plannerWarnings = computed(() => {
-  const rows = monthlyRecords.value
-  return rows.flatMap((row) =>
-    [...row.presenceWarnings, ...row.utilizationWarnings, ...row.randomWarnings, ...row.planWarnings].map(
-      (message) => `${row.label}: ${message}`
-    )
-  )
+  return collectPlannerWarnings(monthlyRecords.value)
 })
 
-const monthlyChartMax = computed(() =>
-  Math.max(...monthlyRecords.value.flatMap((row) => [row.workloadHours, row.requiredStaffHours]), 1)
-)
+const monthlyChartMax = computed(() => getMonthlyChartMax(monthlyRecords.value))
 
 const autosaveStatusMessage = computed(() => {
   if (autosaveState.value === 'saving') {

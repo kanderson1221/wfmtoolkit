@@ -7,8 +7,26 @@ const props = defineProps({
   currentApp: {
     type: String,
     default: 'home'
+  },
+  isAuthenticated: {
+    type: Boolean,
+    default: false
+  },
+  userEmail: {
+    type: String,
+    default: ''
+  },
+  authConfigured: {
+    type: Boolean,
+    default: false
+  },
+  authBypassEnabled: {
+    type: Boolean,
+    default: false
   }
 })
+
+const emit = defineEmits(['sign-out'])
 
 const menuOpen = ref(false)
 const apiHealth = ref('checking')
@@ -17,7 +35,7 @@ let healthPoll = null
 const appLinks = [
   {
     id: 'home',
-    href: '#home',
+    href: props.authBypassEnabled ? '#planning' : '#home',
     label: 'Home'
   },
   {
@@ -38,6 +56,11 @@ const toggleMenu = () => {
 
 const closeMenu = () => {
   menuOpen.value = false
+}
+
+const handleSignOut = () => {
+  closeMenu()
+  emit('sign-out')
 }
 
 const checkApiHealth = async () => {
@@ -86,9 +109,13 @@ onBeforeUnmount(() => {
       <div class="header-right">
         <div class="header-utilities">
           <span class="api-indicator" :class="`is-${apiHealth}`">API {{ apiHealthLabel }}</span>
+          <span v-if="props.authBypassEnabled" class="auth-indicator auth-indicator-warning">Auth bypass active</span>
+          <span v-if="props.isAuthenticated && props.userEmail" class="auth-indicator auth-indicator-user">
+            {{ props.userEmail }}
+          </span>
         </div>
 
-        <nav class="site-nav" aria-label="Main navigation">
+        <nav v-if="props.isAuthenticated" class="site-nav" aria-label="Main navigation">
           <button
             class="nav-toggle"
             type="button"
@@ -116,8 +143,15 @@ onBeforeUnmount(() => {
             >
               {{ link.label }}
             </a>
+
+            <button v-if="!props.authBypassEnabled" type="button" class="nav-link nav-link-urgent" @click="handleSignOut">
+              Sign Out
+            </button>
           </div>
         </nav>
+
+        <span v-else-if="props.authConfigured" class="auth-indicator">Sign in required</span>
+        <span v-else class="auth-indicator auth-indicator-warning">Auth setup needed</span>
       </div>
     </div>
   </header>

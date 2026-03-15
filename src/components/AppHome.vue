@@ -1,9 +1,11 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { isSupabaseConfigured, supabase, supabaseConfigError } from '../supabaseClient'
 
 const mode = ref('sign-in')
 const statusMessage = ref('')
 const statusTone = ref('success')
+const authBusy = ref(false)
 
 const signInEmailRef = ref(null)
 const registerEmailRef = ref(null)
@@ -11,7 +13,6 @@ const registerEmailRef = ref(null)
 const signInForm = reactive({
   email: '',
   password: '',
-  rememberDevice: true,
   showPassword: false
 })
 
@@ -103,8 +104,14 @@ const switchMode = (nextMode) => {
   clearStatus()
 }
 
-const submitSignIn = () => {
+const submitSignIn = async () => {
   clearStatus()
+
+  if (!isSupabaseConfigured || !supabase) {
+    statusTone.value = 'error'
+    statusMessage.value = supabaseConfigError
+    return
+  }
 
   if (!validateSignIn()) {
     statusTone.value = 'error'
@@ -112,12 +119,33 @@ const submitSignIn = () => {
     return
   }
 
-  statusMessage.value =
-    'Sign-in form looks good. Connect your authentication service to complete login for this app.'
+  authBusy.value = true
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: signInForm.email.trim(),
+    password: signInForm.password
+  })
+
+  authBusy.value = false
+
+  if (error) {
+    statusTone.value = 'error'
+    statusMessage.value = error.message
+    return
+  }
+
+  statusTone.value = 'success'
+  statusMessage.value = 'Signed in. Redirecting to your workspace...'
 }
 
-const submitRegister = () => {
+const submitRegister = async () => {
   clearStatus()
+
+  if (!isSupabaseConfigured || !supabase) {
+    statusTone.value = 'error'
+    statusMessage.value = supabaseConfigError
+    return
+  }
 
   if (!validateRegister()) {
     statusTone.value = 'error'
@@ -125,13 +153,33 @@ const submitRegister = () => {
     return
   }
 
-  statusMessage.value =
-    'Registration form looks good. Connect your authentication service to create accounts from this screen.'
+  authBusy.value = true
+
+  const { data, error } = await supabase.auth.signUp({
+    email: registerForm.email.trim(),
+    password: registerForm.password,
+    options: {
+      emailRedirectTo: `${window.location.origin}${window.location.pathname}#home`
+    }
+  })
+
+  authBusy.value = false
+
+  if (error) {
+    statusTone.value = 'error'
+    statusMessage.value = error.message
+    return
+  }
+
+  statusTone.value = 'success'
+  statusMessage.value = data.session
+    ? 'Account created. Redirecting to your workspace...'
+    : 'Account created. Check your email to confirm your registration before signing in.'
 }
 
 const showResetNotice = () => {
-  statusTone.value = 'success'
-  statusMessage.value = 'Password reset can be wired into your authentication provider from this screen.'
+  statusTone.value = 'error'
+  statusMessage.value = 'Password reset is not wired yet. Entering real sign-in and registration now works.'
 }
 
 watch(mode, () => {
@@ -207,13 +255,10 @@ onMounted(() => {
               </p>
             </div>
 
-            <label class="home-auth-checkbox">
-              <input v-model="signInForm.rememberDevice" type="checkbox" />
-              <span>Remember this device</span>
-            </label>
-
             <div class="home-auth-actions">
-              <button type="submit" class="submit-btn">Sign In</button>
+              <button type="submit" class="submit-btn" :disabled="authBusy || !isSupabaseConfigured">
+                {{ authBusy ? 'Signing In...' : 'Sign In' }}
+              </button>
             </div>
           </form>
 
@@ -287,12 +332,14 @@ onMounted(() => {
             </div>
 
             <div class="home-auth-actions">
-              <button type="submit" class="submit-btn">Register</button>
+              <button type="submit" class="submit-btn" :disabled="authBusy || !isSupabaseConfigured">
+                {{ authBusy ? 'Creating Account...' : 'Register' }}
+              </button>
             </div>
           </form>
 
           <p class="helper-text home-auth-footer-note">
-            This screen is ready for authentication integration. The current build validates inputs on the client only.
+            {{ isSupabaseConfigured ? 'Authentication is powered by Supabase email and password sign-in.' : supabaseConfigError }}
           </p>
 
           <p class="home-auth-mode-link">

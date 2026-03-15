@@ -1,6 +1,8 @@
 const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
 const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
 
+const buildScopedStorageKey = (baseKey, scope = 'default') => `${baseKey}.${String(scope || 'default')}`
+
 const clonePlain = (value) => JSON.parse(JSON.stringify(value))
 
 const toNumber = (value, fallback = 0) => {
@@ -49,13 +51,14 @@ const sortCenters = (centers) =>
 
 const normalizePlan = (draftPlan, timestamp = new Date().toISOString()) => {
   const snapshot = clonePlain(draftPlan)
+  const { budgets: _discardBudgets, ...planSnapshot } = snapshot
 
   return {
-    ...snapshot,
-    id: snapshot.id || createEntityId('plan'),
-    name: snapshot.name?.trim() || `${snapshot.planningYear || new Date().getFullYear()} Staffing Plan`,
-    createdAt: snapshot.createdAt || timestamp,
-    updatedAt: snapshot.updatedAt || timestamp
+    ...planSnapshot,
+    id: planSnapshot.id || createEntityId('plan'),
+    name: planSnapshot.name?.trim() || `${planSnapshot.planningYear || new Date().getFullYear()} Staffing Plan`,
+    createdAt: planSnapshot.createdAt || timestamp,
+    updatedAt: planSnapshot.updatedAt || timestamp
   }
 }
 
@@ -90,12 +93,12 @@ const readStorage = (storageKey) => {
   }
 }
 
-const writeCenters = (centers) => {
+const writeCenters = (centers, scope = 'default') => {
   if (typeof window === 'undefined') {
     return
   }
 
-  window.localStorage.setItem(CENTERS_STORAGE_KEY, JSON.stringify(sortCenters(centers)))
+  window.localStorage.setItem(buildScopedStorageKey(CENTERS_STORAGE_KEY, scope), JSON.stringify(sortCenters(centers)))
 }
 
 const migrateLegacyPlans = (legacyPlans) => {
@@ -135,25 +138,43 @@ export const createPlanningCenterDraft = (overrides = {}) => ({
   ...overrides
 })
 
-export const loadPlanningCenters = () => {
-  const storedCenters = readStorage(CENTERS_STORAGE_KEY)
+export const loadPlanningCenters = (scope = 'default') => {
+  const scopedStorageKey = buildScopedStorageKey(CENTERS_STORAGE_KEY, scope)
+  const storedCenters = readStorage(scopedStorageKey)
 
   if (Array.isArray(storedCenters)) {
-    return sortCenters(storedCenters.map((center) => normalizeCenter(center, center.updatedAt || center.createdAt || new Date().toISOString())))
+    const normalizedCenters = sortCenters(
+      storedCenters.map((center) => normalizeCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
+    )
+    writeCenters(normalizedCenters, scope)
+    return normalizedCenters
+  }
+
+  const sharedCenters = scope !== 'default' ? readStorage(CENTERS_STORAGE_KEY) : null
+
+  if (Array.isArray(sharedCenters) && sharedCenters.length) {
+    const normalizedCenters = sortCenters(
+      sharedCenters.map((center) => normalizeCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
+    )
+    writeCenters(normalizedCenters, scope)
+    return normalizedCenters
   }
 
   const legacyPlans = readStorage(LEGACY_PLANS_STORAGE_KEY)
   const migratedCenters = migrateLegacyPlans(legacyPlans)
 
   if (migratedCenters.length) {
-    writeCenters(migratedCenters)
+    writeCenters(migratedCenters, scope)
   }
 
   return migratedCenters
 }
 
-export const persistPlanningCenters = (centers) => {
-  writeCenters(sortCenters(centers.map((center) => normalizeCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))))
+export const persistPlanningCenters = (centers, scope = 'default') => {
+  writeCenters(
+    sortCenters(centers.map((center) => normalizeCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))),
+    scope
+  )
 }
 
 export const findPlanningCenter = (centers, centerId) =>
@@ -161,6 +182,9 @@ export const findPlanningCenter = (centers, centerId) =>
 
 export const findPlanningCenterByPlanId = (centers, planId) =>
   centers.find((center) => Array.isArray(center.plans) && center.plans.some((plan) => plan.id === planId)) || null
+
+export const findPlanningPlan = (centers, centerId, planId) =>
+  findPlanningCenter(centers, centerId)?.plans.find((plan) => plan.id === planId) || null
 
 export const upsertPlanningCenter = (centers, draftCenter) => {
   const timestamp = new Date().toISOString()

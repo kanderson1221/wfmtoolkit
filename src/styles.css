@@ -296,6 +296,48 @@ h2 {
   background: #fff9ec;
 }
 
+.auth-indicator {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink-600);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.26rem 0.52rem;
+  white-space: nowrap;
+}
+
+.auth-indicator-user {
+  max-width: 240px;
+  color: var(--brand-700);
+  text-transform: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auth-indicator-warning {
+  border-color: rgba(var(--amber-rgb), 0.42);
+  color: var(--amber-500);
+  background: rgba(var(--amber-rgb), 0.1);
+}
+
+.nav-link-urgent {
+  width: 100%;
+  text-align: left;
+  border-color: rgba(207, 92, 79, 0.28);
+  color: var(--error-text);
+  background: rgba(253, 241, 239, 0.72);
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.nav-link-urgent:hover {
+  border-color: rgba(197, 71, 55, 0.44);
+  background: rgba(253, 233, 229, 0.92);
+  color: var(--error-text);
+}
+
 .header-action {
   border: 1px solid var(--border-strong);
   border-radius: 999px;
@@ -843,13 +885,22 @@ h2 {
 .planning-plan-actions .secondary-btn,
 .planning-plan-actions .urgent-btn {
   min-width: 82px;
+  min-height: 32px;
+  padding-block: 0.4rem;
   padding-inline: 0.62rem;
+  font-size: 0.72rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .planning-center-actions .secondary-btn,
 .planning-center-actions .urgent-btn {
   min-width: 82px;
+  min-height: 32px;
+  padding-block: 0.4rem;
   padding-inline: 0.62rem;
+  font-size: 0.72rem;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -2083,12 +2134,6 @@ select:focus {
 
 .field-group-wide {
   grid-column: span 2;
-}
-
-.monthly-budget-note {
-  background: linear-gradient(180deg, rgba(243, 248, 255, 0.92), rgba(255, 255, 255, 0.96));
-  border-radius: var(--radius-sm);
-  padding: 0.1rem;
 }
 
 .weekday-toggle-group {
