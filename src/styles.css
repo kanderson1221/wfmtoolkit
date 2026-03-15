@@ -2585,11 +2585,33 @@ select:focus {
   align-items: center;
 }
 
+.monthly-settings-actions-wrap {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+}
+
 .monthly-settings-actions .submit-btn,
 .monthly-settings-actions .secondary-btn {
   min-height: 34px;
   padding: 0.42rem 0.62rem;
   font-size: 0.71rem;
+}
+
+.monthly-settings-autosave {
+  margin: 0;
+  color: var(--ink-600);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.monthly-settings-autosave.saving {
+  color: var(--sky-700);
+}
+
+.monthly-settings-autosave.restored {
+  color: var(--ink-700);
 }
 
 .monthly-global-grid {
@@ -3737,6 +3759,10 @@ select:focus {
     justify-content: flex-start;
   }
 
+  .monthly-settings-actions-wrap {
+    justify-items: start;
+  }
+
   .monthly-settings-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3849,6 +3875,10 @@ select:focus {
   .monthly-settings-modal-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .monthly-settings-actions-wrap {
+    justify-items: stretch;
   }
 
   .monthly-settings-modal-header {

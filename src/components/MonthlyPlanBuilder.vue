@@ -1,5 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+import PlannerMonthlyPlanTab from './planner/PlannerMonthlyPlanTab.vue'
+import PlannerPresenceTab from './planner/PlannerPresenceTab.vue'
+import PlannerRandomTab from './planner/PlannerRandomTab.vue'
+import PlannerSettingsModal from './planner/PlannerSettingsModal.vue'
+import { buildPlannerDraftKey, clearPlannerDraft, loadPlannerDraft, persistPlannerDraft } from '../plannerDraftStorage'
 
 const props = defineProps({
   initialPlan: {
@@ -37,28 +43,25 @@ const WEEKDAY_OPTIONS = [
 const TABS = [
   {
     id: 'presence',
-    step: '1',
-    title: 'Presence / Utilization',
-    description: 'Build absence-based presence and scheduled-time utilization in one monthly table.'
+    title: 'Presence / Utilization'
   },
   {
     id: 'random',
-    step: '2',
-    title: 'Random',
-    description: 'Set occupancy and adherence assumptions that reduce scheduled % into a usable design factor.'
+    title: 'Random'
   },
   {
     id: 'plan',
-    step: '3',
-    title: 'Monthly Plan',
-    description: 'Enter call demand and convert workload into required staff hours and headcount.'
+    title: 'Monthly Plan'
   }
 ]
 
 const currentYear = new Date().getFullYear()
 const currentMonthIndex = new Date().getMonth()
-
 const yearOptions = Array.from({ length: 8 }, (_, index) => currentYear - 2 + index)
+const autosaveTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit'
+})
 
 const createPresenceMonth = (overrides = {}) => ({
   dayAdjustment: 0,
@@ -129,19 +132,29 @@ const hydrateMonths = (months, fallbackBuilder, factory) =>
     ? months.map((month) => factory(month))
     : fallbackBuilder()
 
-const initialPlan = props.initialPlan || {}
+const savedPlan = props.initialPlan || null
+const draftKey = buildPlannerDraftKey(savedPlan?.id)
+const restoredDraft = loadPlannerDraft(draftKey)
+const initialPlan = restoredDraft?.plan || savedPlan || {}
+const initialUi = restoredDraft?.ui || {}
 
 const planName = ref(initialPlan.name?.trim() || `${toNumber(initialPlan.planningYear, currentYear)} Staffing Plan`)
 const planningYear = ref(toNumber(initialPlan.planningYear, currentYear))
-const activeTab = ref('presence')
-const selectedMonthIndex = ref(currentMonthIndex)
-const settingsOpen = ref(!props.initialPlan)
+const activeTab = ref(initialUi.activeTab || 'presence')
+const selectedMonthIndex = ref(clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1))
+const settingsOpen = ref(initialUi.settingsOpen ?? !savedPlan)
 const operatingWeekdays = ref(normalizeWeekdays(initialPlan.operatingWeekdays))
 const presenceMonths = ref(hydrateMonths(initialPlan.presenceMonths, buildPresenceMonths, createPresenceMonth))
 const randomDefaults = ref(createRandomMonth(initialPlan.randomDefaults || {}))
 const useMonthlyRandomOverrides = ref(Boolean(initialPlan.useMonthlyRandomOverrides))
 const randomMonths = ref(hydrateMonths(initialPlan.randomMonths, buildRandomMonths, createRandomMonth))
 const planMonths = ref(hydrateMonths(initialPlan.planMonths, buildPlanMonths, createPlanMonth))
+const autosaveState = ref(restoredDraft ? 'restored' : 'idle')
+const lastAutosavedAt = ref(restoredDraft?.autosavedAt || null)
+const autosaveReady = ref(false)
+const suspendAutosave = ref(false)
+
+let autosaveTimer = null
 
 const calculateCalendarOpenDays = (year, monthIndex, activeDays) => {
   if (!activeDays.length) {
@@ -203,10 +216,6 @@ const toggleWeekday = (weekdayValue) => {
   operatingWeekdays.value = [...operatingWeekdays.value, weekdayValue].sort((left, right) => left - right)
 }
 
-const setSelectedMonth = (monthIndex) => {
-  selectedMonthIndex.value = monthIndex
-}
-
 const setActiveTab = (tabId) => {
   activeTab.value = tabId
 }
@@ -241,9 +250,7 @@ const copyPresenceQuarterForward = (monthIndex) => {
   )
 }
 
-const handlePresenceCopyAction = (event) => {
-  const action = event.target.value
-
+const handlePresenceCopyAction = (action) => {
   if (action === 'all') {
     copyPresenceMonthToAll(selectedMonthIndex.value)
   } else if (action === 'forward') {
@@ -251,8 +258,6 @@ const handlePresenceCopyAction = (event) => {
   } else if (action === 'quarter') {
     copyPresenceQuarterForward(selectedMonthIndex.value)
   }
-
-  event.target.value = ''
 }
 
 const syncRandomMonthsToDefaults = () => {
@@ -292,9 +297,7 @@ const copyRandomQuarterForward = (monthIndex) => {
   )
 }
 
-const handleRandomCopyAction = (event) => {
-  const action = event.target.value
-
+const handleRandomCopyAction = (action) => {
   if (action === 'all') {
     copyRandomMonthToAll(selectedMonthIndex.value)
   } else if (action === 'forward') {
@@ -302,8 +305,6 @@ const handleRandomCopyAction = (event) => {
   } else if (action === 'quarter') {
     copyRandomQuarterForward(selectedMonthIndex.value)
   }
-
-  event.target.value = ''
 }
 
 const loadExamplePlan = () => {
@@ -391,21 +392,11 @@ const monthlyRecords = computed(() =>
     const rawPaidBreaksHours = paidBreaksHoursPerDay * openDays
     const rawOtherAwayHours = otherAwayHoursPerDay * openDays
     const otherLossHoursPerDay = paidBreaksHoursPerDay + otherAwayHoursPerDay
-    const rawOtherLossHours = rawPaidBreaksHours + rawOtherAwayHours
 
     const absenceLossHours = plannedTimeOffHours + unplannedTimeOffHours + leaveTimeHours
     const scheduledLossHours = meetingsHours + trainingHours + coachingHours
-
-    const plannedTimeOffPercent = paidHoursPerMonth > 0 ? (plannedTimeOffHours / paidHoursPerMonth) * 100 : 0
-    const unplannedTimeOffPercent = paidHoursPerMonth > 0 ? (unplannedTimeOffHours / paidHoursPerMonth) * 100 : 0
-    const leaveTimePercent = paidHoursPerMonth > 0 ? (leaveTimeHours / paidHoursPerMonth) * 100 : 0
-    const meetingsPercent = paidHoursPerMonth > 0 ? (meetingsHours / paidHoursPerMonth) * 100 : 0
-    const trainingPercent = paidHoursPerMonth > 0 ? (trainingHours / paidHoursPerMonth) * 100 : 0
-    const coachingPercent = paidHoursPerMonth > 0 ? (coachingHours / paidHoursPerMonth) * 100 : 0
     const absenceLossPercent = paidHoursPerMonth > 0 ? (absenceLossHours / paidHoursPerMonth) * 100 : 0
 
-    const presenceLossHours = absenceLossHours
-    const presenceLossPercent = absenceLossPercent
     const presencePercentRaw = 100 - absenceLossPercent
     const presencePercent = paidHoursPerMonth > 0 ? clamp(presencePercentRaw, 1, 100) : 0
     const presenceShare = paidHoursPerMonth > 0 ? clamp(presencePercentRaw, 1, 100) / 100 : 1
@@ -417,13 +408,6 @@ const monthlyRecords = computed(() =>
     const otherLossHours = paidBreaksHours + otherAwayHours
     const utilizationLossHours = scheduledLossHours + otherLossHours
     const totalLossHours = absenceLossHours + scheduledLossHours + otherLossHours
-
-    const paidBreaksPercent = paidHoursPerMonth > 0 ? (paidBreaksHours / paidHoursPerMonth) * 100 : 0
-    const otherAwayPercent = paidHoursPerMonth > 0 ? (otherAwayHours / paidHoursPerMonth) * 100 : 0
-    const scheduledLossPercent = paidHoursPerMonth > 0 ? (scheduledLossHours / paidHoursPerMonth) * 100 : 0
-    const otherLossPercent = paidHoursPerMonth > 0 ? (otherLossHours / paidHoursPerMonth) * 100 : 0
-    const utilizationLossPercent = paidHoursPerMonth > 0 ? (utilizationLossHours / paidHoursPerMonth) * 100 : 0
-    const totalLossPercent = paidHoursPerMonth > 0 ? (totalLossHours / paidHoursPerMonth) * 100 : 0
 
     const utilizationPercentRaw = presentHours > 0 ? 100 - (utilizationLossHours / presentHours) * 100 : 0
     const utilizationPercent = presentHours > 0 ? clamp(utilizationPercentRaw, 1, 100) : 0
@@ -531,32 +515,16 @@ const monthlyRecords = computed(() =>
       otherAwayHoursPerDay,
       rawPaidBreaksHours,
       rawOtherAwayHours,
-      rawOtherLossHours,
       paidBreaksHours,
       otherAwayHours,
       otherLossHoursPerDay,
-      plannedTimeOffPercent,
-      unplannedTimeOffPercent,
-      leaveTimePercent,
-      meetingsPercent,
-      trainingPercent,
-      coachingPercent,
-      paidBreaksPercent,
-      otherAwayPercent,
       absenceLossHours,
       scheduledLossHours,
       otherLossHours,
       utilizationLossHours,
       presentHours,
       scheduledHours,
-      absenceLossPercent,
-      scheduledLossPercent,
-      otherLossPercent,
-      utilizationLossPercent,
       totalLossHours,
-      totalLossPercent,
-      presenceLossHours,
-      presenceLossPercent,
       presencePercent,
       presenceFactor,
       utilizationPercent,
@@ -582,8 +550,6 @@ const monthlyRecords = computed(() =>
     }
   })
 )
-
-const selectedMonth = computed(() => monthlyRecords.value[selectedMonthIndex.value] ?? monthlyRecords.value[0])
 
 const operatingWeekdayLabel = computed(() => {
   if (!operatingWeekdays.value.length) {
@@ -658,8 +624,8 @@ const planSummary = computed(() => {
 })
 
 const buildPlanPayload = () => ({
-  id: initialPlan.id || null,
-  createdAt: initialPlan.createdAt || null,
+  id: savedPlan?.id || initialPlan.id || null,
+  createdAt: savedPlan?.createdAt || initialPlan.createdAt || null,
   name: planName.value.trim() || `${planningYear.value} Staffing Plan`,
   planningYear: planningYear.value,
   operatingWeekdays: [...operatingWeekdays.value],
@@ -681,11 +647,69 @@ const buildPlanPayload = () => ({
   }
 })
 
+const buildDraftPayload = () => ({
+  plan: buildPlanPayload(),
+  ui: {
+    activeTab: activeTab.value,
+    selectedMonthIndex: selectedMonthIndex.value,
+    settingsOpen: settingsOpen.value
+  }
+})
+
+const clearPendingAutosave = () => {
+  if (autosaveTimer) {
+    window.clearTimeout(autosaveTimer)
+    autosaveTimer = null
+  }
+}
+
+const persistDraftNow = () => {
+  if (suspendAutosave.value) {
+    return
+  }
+
+  const nextDraft = persistPlannerDraft(draftKey, buildDraftPayload())
+  lastAutosavedAt.value = nextDraft.autosavedAt
+  autosaveState.value = 'saved'
+}
+
+const queueAutosave = () => {
+  if (!autosaveReady.value || suspendAutosave.value) {
+    return
+  }
+
+  clearPendingAutosave()
+  autosaveState.value = 'saving'
+  autosaveTimer = window.setTimeout(() => {
+    persistDraftNow()
+    autosaveTimer = null
+  }, 700)
+}
+
+const flushAutosave = () => {
+  if (!autosaveReady.value || suspendAutosave.value) {
+    return
+  }
+
+  clearPendingAutosave()
+  persistDraftNow()
+}
+
+const removeDraft = () => {
+  clearPendingAutosave()
+  clearPlannerDraft(draftKey)
+  lastAutosavedAt.value = null
+  autosaveState.value = 'idle'
+}
+
 const savePlan = () => {
+  suspendAutosave.value = true
+  removeDraft()
   emit('save', buildPlanPayload())
 }
 
 const cancelEditor = () => {
+  flushAutosave()
   emit('cancel')
 }
 
@@ -701,6 +725,63 @@ const plannerWarnings = computed(() => {
 const monthlyChartMax = computed(() =>
   Math.max(...monthlyRecords.value.flatMap((row) => [row.workloadHours, row.requiredStaffHours]), 1)
 )
+
+const autosaveStatusMessage = computed(() => {
+  if (autosaveState.value === 'saving') {
+    return 'Autosaving draft...'
+  }
+
+  if (lastAutosavedAt.value) {
+    const formattedTime = autosaveTimeFormatter.format(new Date(lastAutosavedAt.value))
+    return autosaveState.value === 'restored'
+      ? `Draft restored from ${formattedTime}`
+      : `Autosaved ${formattedTime}`
+  }
+
+  return 'Autosave ready'
+})
+
+const autosaveStatusClass = computed(() => ({
+  saving: autosaveState.value === 'saving',
+  restored: autosaveState.value === 'restored'
+}))
+
+watch(
+  [
+    planName,
+    planningYear,
+    activeTab,
+    selectedMonthIndex,
+    settingsOpen,
+    operatingWeekdays,
+    presenceMonths,
+    randomDefaults,
+    useMonthlyRandomOverrides,
+    randomMonths,
+    planMonths
+  ],
+  () => {
+    if (autosaveState.value === 'restored') {
+      autosaveState.value = 'idle'
+    }
+
+    queueAutosave()
+  },
+  { deep: true }
+)
+
+onMounted(() => {
+  autosaveReady.value = true
+  window.addEventListener('beforeunload', flushAutosave)
+})
+
+onBeforeUnmount(() => {
+  if (!suspendAutosave.value) {
+    flushAutosave()
+  }
+
+  window.removeEventListener('beforeunload', flushAutosave)
+})
 </script>
 
 <template>
@@ -708,12 +789,6 @@ const monthlyChartMax = computed(() =>
     <div class="container">
       <div class="calculator-card monthly-flow-card">
         <div class="monthly-flow-shell">
-          <section class="monthly-flow-hero">
-            <p class="pane-kicker">Planning App</p>
-            <h2>Monthly plan editor</h2>
-            <p class="calculator-intro">Build one staffing plan, save it, and return to the planning home when you&apos;re ready.</p>
-          </section>
-
           <section class="input-group-card monthly-settings-bar">
             <div class="monthly-settings-summary">
               <div class="monthly-settings-primary">
@@ -733,10 +808,13 @@ const monthlyChartMax = computed(() =>
                 </span>
               </div>
 
-              <div class="monthly-settings-actions">
-                <button type="button" class="secondary-btn" @click="openSettings">Edit Settings</button>
-                <button type="button" class="submit-btn" @click="savePlan">Save Plan</button>
-                <button type="button" class="secondary-btn" @click="cancelEditor">Back to Plans</button>
+              <div class="monthly-settings-actions-wrap">
+                <div class="monthly-settings-actions">
+                  <button type="button" class="secondary-btn" @click="openSettings">Edit Settings</button>
+                  <button type="button" class="submit-btn" @click="savePlan">Save Plan</button>
+                  <button type="button" class="secondary-btn" @click="cancelEditor">Back to Plans</button>
+                </div>
+                <p class="monthly-settings-autosave" :class="autosaveStatusClass">{{ autosaveStatusMessage }}</p>
               </div>
             </div>
 
@@ -746,59 +824,18 @@ const monthlyChartMax = computed(() =>
             </p>
           </section>
 
-          <div v-if="settingsOpen" class="monthly-settings-modal-backdrop" @click.self="closeSettings">
-            <section class="input-group-card monthly-settings-modal" role="dialog" aria-modal="true" aria-labelledby="plan-settings-title">
-              <div class="monthly-settings-modal-header">
-                <div>
-                  <p class="pane-kicker">Plan Settings</p>
-                  <h3 id="plan-settings-title">Configure this plan</h3>
-                </div>
-                <button type="button" class="secondary-btn" @click="closeSettings">Done</button>
-              </div>
-
-              <div class="monthly-global-grid monthly-settings-grid">
-                <div class="field-group monthly-name-field monthly-setup-card">
-                  <label for="plan-name">Plan name</label>
-                  <input
-                    id="plan-name"
-                    v-model.trim="planName"
-                    type="text"
-                    maxlength="80"
-                    placeholder="2026 Staffing Plan"
-                  />
-                </div>
-
-                <div class="field-group monthly-setup-card">
-                  <label for="planning-year">Planning year</label>
-                  <select id="planning-year" v-model.number="planningYear">
-                    <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
-                  </select>
-                </div>
-
-                <div class="field-group monthly-weekday-field monthly-setup-card monthly-settings-weekdays">
-                  <label>Operating days</label>
-                  <div class="weekday-toggle-group">
-                    <button
-                      v-for="weekday in WEEKDAY_OPTIONS"
-                      :key="weekday.value"
-                      type="button"
-                      class="weekday-toggle"
-                      :class="{ active: operatingWeekdays.includes(weekday.value) }"
-                      @click="toggleWeekday(weekday.value)"
-                    >
-                      {{ weekday.label }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="monthly-settings-modal-actions">
-                <button type="button" class="secondary-btn" @click="loadExamplePlan">Load Example</button>
-                <button type="button" class="secondary-btn" @click="resetPlanner">Reset</button>
-                <button type="button" class="submit-btn" @click="closeSettings">Done</button>
-              </div>
-            </section>
-          </div>
+          <PlannerSettingsModal
+            v-if="settingsOpen"
+            v-model:plan-name="planName"
+            v-model:planning-year="planningYear"
+            v-model:operating-weekdays="operatingWeekdays"
+            :year-options="yearOptions"
+            :weekday-options="WEEKDAY_OPTIONS"
+            @close="closeSettings"
+            @load-example="loadExamplePlan"
+            @reset="resetPlanner"
+            @toggle-weekday="toggleWeekday"
+          />
 
           <nav class="monthly-tab-strip" aria-label="Monthly planner sections">
             <button
@@ -813,599 +850,48 @@ const monthlyChartMax = computed(() =>
             </button>
           </nav>
 
-          <section v-if="activeTab === 'presence'" class="results-panel monthly-tab-panel">
-            <header class="monthly-tab-header">
-              <div>
-                <h3>Build presence / utilization month by month</h3>
-              </div>
-            </header>
+          <PlannerPresenceTab
+            v-if="activeTab === 'presence'"
+            v-model:presence-months="presenceMonths"
+            v-model:selected-month-index="selectedMonthIndex"
+            :monthly-records="monthlyRecords"
+            :summary="presenceSummary"
+            :format-whole="formatWhole"
+            :format-number="formatNumber"
+            :format-percent="formatPercent"
+            @copy-action="handlePresenceCopyAction"
+            @continue="moveTab(1)"
+          />
 
-            <div class="results-metrics monthly-summary-grid">
-              <article class="metric-card">
-                <p class="metric-label">Total Open Days</p>
-                <p class="metric-value">{{ formatWhole(presenceSummary.totalOpenDays) }}</p>
-                <p class="metric-meta">Open business days across the full plan year after day adjustments</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Avg Absence Loss / Month</p>
-                <p class="metric-value">{{ formatNumber(presenceSummary.averageAbsenceLossHours, 1) }}</p>
-                <p class="metric-meta">Planned time off, unplanned time off, and leave time per agent</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Avg Scheduled Loss / Month</p>
-                <p class="metric-value">{{ formatNumber(presenceSummary.averageScheduledLossHours, 1) }}</p>
-                <p class="metric-meta">Meetings, training, and coaching per agent</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Avg Other Loss / Month</p>
-                <p class="metric-value">{{ formatNumber(presenceSummary.averageOtherLossHours, 1) }}</p>
-                <p class="metric-meta">Paid breaks and other away time converted into monthly totals and reduced by presence</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Average Total Loss / Month</p>
-                <p class="metric-value">{{ formatNumber(presenceSummary.averageTotalLossHours, 1) }}</p>
-                <p class="metric-meta">Combined monthly and daily losses converted into monthly hours</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Average Presence</p>
-                <p class="metric-value">{{ formatPercent(presenceSummary.averagePresence, 1) }}</p>
-                <p class="metric-meta">Average monthly presence across the full plan year</p>
-              </article>
-            </div>
+          <PlannerRandomTab
+            v-else-if="activeTab === 'random'"
+            v-model:random-defaults="randomDefaults"
+            v-model:use-monthly-random-overrides="useMonthlyRandomOverrides"
+            v-model:random-months="randomMonths"
+            v-model:selected-month-index="selectedMonthIndex"
+            :monthly-records="monthlyRecords"
+            :summary="randomSummary"
+            :format-percent="formatPercent"
+            @copy-action="handleRandomCopyAction"
+            @previous="moveTab(-1)"
+            @continue="moveTab(1)"
+            @toggle-override-mode="setRandomOverrideMode"
+          />
 
-            <section class="input-group-card monthly-loss-group">
-              <div class="workspace-output-header">
-                <h3>Monthly Presence / Utilization Inputs</h3>
-                <p>Use one table to build absence-based presence, scheduled-time utilization, and final scheduled %.</p>
-              </div>
-              <div class="monthly-copy-toolbar">
-                <label class="monthly-copy-select" for="presence-copy-action">
-                  <span class="monthly-copy-label">Copy {{ selectedMonth.label }}</span>
-                  <select
-                    id="presence-copy-action"
-                    class="monthly-copy-select-input"
-                    @change="handlePresenceCopyAction"
-                  >
-                    <option value="">Choose action</option>
-                    <option value="all">To all months</option>
-                    <option value="forward">Forward</option>
-                    <option value="quarter">Through quarter</option>
-                  </select>
-                </label>
-              </div>
-              <div class="assumption-table-shell">
-                <table class="assumption-table assumption-table-presence-main">
-                  <thead>
-                    <tr class="presence-super-row">
-                      <th rowspan="3" class="presence-sticky-head" title="Planning month. Click a month name to highlight that row.">Month</th>
-                      <th rowspan="3" class="presence-sticky-head" title="Monthly business days after the weekday pattern and any day adjustment are applied.">
-                        <span class="presence-head-label">Business<br />Days</span>
-                      </th>
-                      <th rowspan="3" class="presence-sticky-head" title="Add or remove business days for holidays, closures, or special events.">Day Adj.</th>
-                      <th rowspan="3" class="presence-sticky-head presence-paid-head" title="Full paid hours for one agent in one business day before paid breaks are removed.">
-                        <span class="presence-head-label">Daily Paid<br />Hours</span>
-                      </th>
-                      <th colspan="3" class="presence-super-head presence-super-presence" title="Absence-driven losses that determine how much paid time remains available to work.">Presence</th>
-                      <th colspan="5" class="presence-super-head presence-super-utilization" title="Scheduled and daily working-time losses that determine how much present time remains usable.">Utilization</th>
-                      <th rowspan="3" class="presence-sticky-head presence-month-hours-head" title="Monthly paid hours for one FTE. Calculated as business days multiplied by daily paid hours.">
-                        <span class="presence-head-label">FTE Paid<br />Hours</span>
-                      </th>
-                      <th rowspan="3" class="presence-sticky-head" title="Combined monthly absence, scheduled, and presence-adjusted daily losses in hours.">Total Loss</th>
-                      <th rowspan="3" class="presence-sticky-head" title="Share of paid time left after absence loss is removed.">Presence %</th>
-                      <th rowspan="3" class="presence-sticky-head" title="Share of present time left after scheduled and other utilization loss is removed.">Utilization %</th>
-                      <th rowspan="3" class="presence-sticky-head" title="Share of total paid time still available for handling after both presence and utilization are applied.">Scheduled %</th>
-                    </tr>
-                    <tr class="presence-group-row">
-                      <th colspan="3" class="presence-group-head presence-group-absence" title="Monthly absence hours per agent that reduce presence.">Absence (Hours / Month)</th>
-                      <th colspan="3" class="presence-group-head presence-group-scheduled" title="Monthly scheduled hours per agent that reduce utilization.">Scheduled (Hours / Month)</th>
-                      <th colspan="2" class="presence-group-head presence-group-other" title="Daily paid-away hours per agent that reduce utilization after presence is applied.">Other (Hours / Day)</th>
-                    </tr>
-                    <tr class="presence-detail-row">
-                      <th title="Planned time off hours per agent for the month.">Planned</th>
-                      <th title="Unplanned absence hours per agent for the month.">Unplanned Off</th>
-                      <th title="Leave hours per agent for the month.">Leave</th>
-                      <th title="Meeting hours per agent for the month.">Meetings</th>
-                      <th title="Training hours per agent for the month.">Training</th>
-                      <th title="Coaching hours per agent for the month.">Coaching</th>
-                      <th title="Paid break hours per agent per business day. These daily hours are reduced by presence before they hit utilization.">Breaks</th>
-                      <th title="Other away time per agent per business day. These daily hours are reduced by presence before they hit utilization.">Away</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="record in monthlyRecords"
-                      :key="`presence-main-${record.label}`"
-                      :class="{ selected: selectedMonthIndex === record.monthIndex }"
-                    >
-                      <td class="month-cell">
-                        <button
-                          type="button"
-                          class="assumption-month-btn"
-                          @click="setSelectedMonth(record.monthIndex)"
-                        >
-                          {{ record.fullLabel }}
-                        </button>
-                      </td>
-                      <td>{{ formatWhole(record.openDays) }}</td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].dayAdjustment"
-                          type="number"
-                          step="1"
-                          aria-label="Business day adjustment for the month"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].paidHoursPerDay"
-                          type="number"
-                          min="0"
-                          max="24"
-                          step="0.25"
-                          aria-label="Paid hours per day"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].plannedTimeOffHours"
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          aria-label="Planned time off hours per agent per month"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].unplannedTimeOffHours"
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          aria-label="Unplanned time off hours per agent per month"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].leaveTimeHours"
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          aria-label="Leave time hours per agent per month"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].meetingsHours"
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          aria-label="Meetings hours per agent per month"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].trainingHours"
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          aria-label="Training hours per agent per month"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].coachingHours"
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          aria-label="Coaching hours per agent per month"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].paidBreaksHoursPerDay"
-                          type="number"
-                          min="0"
-                          step="0.05"
-                          aria-label="Paid breaks hours per agent per day"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="presenceMonths[record.monthIndex].otherAwayHoursPerDay"
-                          type="number"
-                          min="0"
-                          step="0.05"
-                          aria-label="Other away hours per agent per day"
-                        />
-                      </td>
-                      <td>{{ formatNumber(record.paidHoursPerMonth, 1) }}</td>
-                      <td>{{ formatNumber(record.totalLossHours, 1) }}</td>
-                      <td>{{ formatPercent(record.presencePercent, 1) }}</td>
-                      <td>{{ formatPercent(record.utilizationPercent, 1) }}</td>
-                      <td>{{ formatPercent(record.scheduledPercent, 1) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <div class="monthly-tab-actions">
-              <button type="button" class="submit-btn" @click="moveTab(1)">Continue to Random</button>
-            </div>
-          </section>
-
-          <section v-else-if="activeTab === 'random'" class="results-panel monthly-tab-panel">
-            <header class="monthly-tab-header">
-              <div>
-                <h3>Set occupancy and adherence assumptions</h3>
-              </div>
-              <p>Use one global assumption set for the year, and only turn on monthly overrides if a few months need different values.</p>
-            </header>
-
-            <div class="results-metrics monthly-summary-grid">
-              <article class="metric-card">
-                <p class="metric-label">{{ randomSummary.usesMonthlyOverrides ? 'Average Occupancy' : 'Occupancy' }}</p>
-                <p class="metric-value">
-                  {{ formatPercent(randomSummary.usesMonthlyOverrides ? randomSummary.averageOccupancyPercent : randomSummary.globalOccupancyPercent, 1) }}
-                </p>
-                <p class="metric-meta">
-                  {{ randomSummary.usesMonthlyOverrides ? 'Average monthly occupancy assumption' : 'Global occupancy assumption used across the full year' }}
-                </p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">{{ randomSummary.usesMonthlyOverrides ? 'Average Adherence' : 'Adherence' }}</p>
-                <p class="metric-value">
-                  {{ formatPercent(randomSummary.usesMonthlyOverrides ? randomSummary.averageAdherencePercent : randomSummary.globalAdherencePercent, 1) }}
-                </p>
-                <p class="metric-meta">
-                  {{ randomSummary.usesMonthlyOverrides ? 'Average monthly adherence assumption' : 'Global adherence assumption used across the full year' }}
-                </p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Avg Adherence Loss</p>
-                <p class="metric-value">
-                  {{ formatPercent(randomSummary.averageAdherenceLossPercent, 1) }}
-                </p>
-                <p class="metric-meta">Average monthly loss applied to scheduled % from adherence</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Avg Occupancy Loss</p>
-                <p class="metric-value">
-                  {{ formatPercent(randomSummary.averageOccupancyLossPercent, 1) }}
-                </p>
-                <p class="metric-meta">Average monthly loss applied after adherence loss is removed</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Avg Total Scheduled Random Loss</p>
-                <p class="metric-value">
-                  {{ formatPercent(randomSummary.averageRandomLossPercent, 1) }}
-                </p>
-                <p class="metric-meta">Adherence loss plus occupancy loss against scheduled %</p>
-              </article>
-            </div>
-
-            <section class="input-group-card random-global-panel">
-              <div class="workspace-output-header">
-                <h3>Random Assumptions</h3>
-                <p>These assumptions create adherence and occupancy losses against scheduled % and flow into the final design factor.</p>
-              </div>
-
-              <div class="monthly-global-grid random-global-grid">
-                <div class="field-group">
-                  <label for="global-occupancy">{{ useMonthlyRandomOverrides ? 'Default Occupancy %' : 'Occupancy %' }}</label>
-                  <input
-                    id="global-occupancy"
-                    v-model.number="randomDefaults.occupancyPercent"
-                    type="number"
-                    min="1"
-                    max="100"
-                    step="0.1"
-                    aria-label="Global occupancy percent"
-                  />
-                  <p class="helper-text">
-                    {{
-                      useMonthlyRandomOverrides
-                        ? 'Seeds the monthly override table.'
-                        : 'Applies across the full plan year.'
-                    }}
-                  </p>
-                </div>
-
-                <div class="field-group">
-                  <label for="global-adherence">{{ useMonthlyRandomOverrides ? 'Default Adherence %' : 'Adherence %' }}</label>
-                  <input
-                    id="global-adherence"
-                    v-model.number="randomDefaults.adherencePercent"
-                    type="number"
-                    min="1"
-                    max="100"
-                    step="0.1"
-                    aria-label="Global adherence percent"
-                  />
-                  <p class="helper-text">
-                    {{
-                      useMonthlyRandomOverrides
-                        ? 'Seeds the monthly override table.'
-                        : 'Applies across the full plan year.'
-                    }}
-                  </p>
-                </div>
-
-                <div class="field-group random-override-field">
-                  <label for="use-random-overrides">Monthly overrides</label>
-                  <label class="random-override-toggle">
-                    <input
-                      id="use-random-overrides"
-                      :checked="useMonthlyRandomOverrides"
-                      type="checkbox"
-                      @change="setRandomOverrideMode($event.target.checked)"
-                    />
-                    <span>Use monthly overrides</span>
-                  </label>
-                  <p class="helper-text">Off for one yearly assumption set. On for month-level edits.</p>
-                </div>
-              </div>
-            </section>
-
-            <section v-if="useMonthlyRandomOverrides" class="input-group-card random-overrides-panel">
-              <div class="workspace-output-header">
-                <h3>Monthly Random Overrides</h3>
-                <p>Adjust only the months that need different occupancy or adherence assumptions. Losses are calculated from scheduled % from Step 1.</p>
-              </div>
-
-              <div class="monthly-copy-toolbar">
-                <label class="monthly-copy-select" for="random-copy-action">
-                  <span class="monthly-copy-label">Copy {{ selectedMonth.label }}</span>
-                  <select
-                    id="random-copy-action"
-                    class="monthly-copy-select-input"
-                    @change="handleRandomCopyAction"
-                  >
-                    <option value="">Choose action</option>
-                    <option value="all">To all months</option>
-                    <option value="forward">Forward</option>
-                    <option value="quarter">Through quarter</option>
-                  </select>
-                </label>
-              </div>
-
-              <div class="assumption-table-shell">
-                <table class="assumption-table assumption-table-random">
-                  <thead>
-                    <tr>
-                      <th title="Planning month. Click a month name to highlight that row.">Month</th>
-                      <th title="Scheduled percentage flowing in from Step 1.">Scheduled %</th>
-                      <th title="Expected monthly occupancy assumption used in the random loss build.">Occupancy %</th>
-                      <th title="Expected monthly adherence assumption used in the random loss build.">Adherence %</th>
-                      <th title="Adherence loss calculated as (1 - Adherence %) x Scheduled %.">Adherence Loss</th>
-                      <th title="Occupancy loss calculated as (1 - Occupancy %) x (Scheduled % - Adherence Loss).">Occupancy Loss</th>
-                      <th title="Total scheduled random loss calculated as Adherence Loss + Occupancy Loss.">Total Random Loss</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="record in monthlyRecords"
-                      :key="record.label"
-                      :class="{ selected: selectedMonthIndex === record.monthIndex }"
-                    >
-                      <td class="month-cell">
-                        <button
-                          type="button"
-                          class="assumption-month-btn"
-                          @click="setSelectedMonth(record.monthIndex)"
-                      >
-                        {{ record.fullLabel }}
-                      </button>
-                    </td>
-                      <td>{{ formatPercent(record.scheduledPercent, 1) }}</td>
-                      <td>
-                        <input
-                          v-model.number="randomMonths[record.monthIndex].occupancyPercent"
-                          type="number"
-                          min="1"
-                          max="100"
-                          step="0.1"
-                          aria-label="Occupancy percent"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model.number="randomMonths[record.monthIndex].adherencePercent"
-                          type="number"
-                          min="1"
-                          max="100"
-                          step="0.1"
-                          aria-label="Adherence percent"
-                        />
-                      </td>
-                      <td>{{ formatPercent(record.adherenceLossPercent, 1) }}</td>
-                      <td>{{ formatPercent(record.occupancyLossPercent, 1) }}</td>
-                      <td>{{ formatPercent(record.randomLossPercent, 1) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <div v-else class="answer-card random-global-note">
-              <h4>Global mode is on</h4>
-              <p>These occupancy and adherence assumptions apply to every month in the plan. Adherence and occupancy losses are calculated from each month’s scheduled % from Step 1.</p>
-            </div>
-
-            <div class="monthly-tab-actions">
-              <button type="button" class="secondary-btn" @click="moveTab(-1)">Back to Presence / Utilization</button>
-              <button type="button" class="submit-btn" @click="moveTab(1)">Continue to Monthly Plan</button>
-            </div>
-          </section>
-
-          <section v-else class="results-panel monthly-tab-panel">
-            <header class="monthly-tab-header">
-              <div>
-                <h3>Enter call demand and review the full monthly plan</h3>
-              </div>
-            </header>
-
-            <div class="results-metrics monthly-summary-grid">
-              <article class="metric-card">
-                <p class="metric-label">Annual Contacts</p>
-                <p class="metric-value">{{ formatWhole(planSummary.annualContacts) }}</p>
-                <p class="metric-meta">Sum of all monthly demand entered in the plan</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Annual Workload Hours</p>
-                <p class="metric-value">{{ formatWhole(planSummary.annualWorkloadHours) }}</p>
-                <p class="metric-meta">{{ planSummary.busiestMonth.fullLabel }} is the busiest workload month</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Avg Required Staff Hours</p>
-                <p class="metric-value">{{ formatNumber(planSummary.averageRequiredStaffHours, 1) }}</p>
-                <p class="metric-meta">Average staffing hours required after design factor is applied</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Avg Required Headcount</p>
-                <p class="metric-value">{{ formatNumber(planSummary.averageRequiredHeadcount, 1) }}</p>
-                <p class="metric-meta">Average monthly required headcount before rounding</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Peak Required Headcount</p>
-                <p class="metric-value">{{ formatNumber(planSummary.peakMonth.requiredHeadcount, 1) }}</p>
-                <p class="metric-meta">{{ planSummary.peakMonth.fullLabel }}</p>
-              </article>
-            </div>
-
-            <div class="assumption-table-shell">
-              <table class="assumption-table assumption-table-plan">
-                <thead>
-                  <tr>
-                    <th title="Planning month. Click a month name to highlight that row.">Month</th>
-                    <th title="Monthly contact demand used to create workload hours.">Contacts</th>
-                    <th title="Average handle time in seconds used to create workload hours.">AHT Sec</th>
-                    <th title="Business days flowing in from Step 1 after weekday pattern and day adjustments.">Business Days</th>
-                    <th title="Scheduled percentage flowing in from Step 1 after presence and utilization are applied.">Scheduled %</th>
-                    <th title="Total scheduled random loss flowing in from Step 2.">
-                      <span class="plan-head-label">Total Random<br />Loss %</span>
-                    </th>
-                    <th title="Design Factor is calculated as Scheduled % - Total Random Loss %.">Design Factor</th>
-                    <th title="Workload Staffing Ratio is calculated as 1 / Design Factor. This ratio will later be used to convert workload into required staffing hours.">
-                      <span class="plan-head-label">Workload<br />Staffing Ratio</span>
-                    </th>
-                    <th title="Monthly workload hours calculated from contacts and AHT.">Workload Hours</th>
-                    <th title="Required staff hours calculated as Workload Hours x Workload Staffing Ratio.">
-                      <span class="plan-head-label">Required Staff<br />Hours</span>
-                    </th>
-                    <th title="Required headcount calculated as Required Staff Hours / Monthly FTE Paid Hours from Step 1.">
-                      <span class="plan-head-label">Required<br />Headcount</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="record in monthlyRecords"
-                    :key="record.label"
-                    :class="{ selected: selectedMonthIndex === record.monthIndex }"
-                  >
-                    <td class="month-cell">
-                      <button
-                        type="button"
-                        class="assumption-month-btn"
-                        @click="setSelectedMonth(record.monthIndex)"
-                      >
-                        {{ record.fullLabel }}
-                      </button>
-                    </td>
-                    <td>
-                      <input
-                        v-model.number="planMonths[record.monthIndex].contacts"
-                        type="number"
-                        min="0"
-                        step="100"
-                        aria-label="Contacts"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        v-model.number="planMonths[record.monthIndex].ahtSeconds"
-                        type="number"
-                        min="0"
-                        step="1"
-                        aria-label="Average handle time in seconds"
-                      />
-                    </td>
-                    <td>{{ formatWhole(record.openDays) }}</td>
-                    <td>{{ formatPercent(record.scheduledPercent, 1) }}</td>
-                    <td>{{ formatPercent(record.randomLossPercent, 1) }}</td>
-                    <td>{{ formatPercent(record.designFactorPercent, 1) }}</td>
-                    <td>{{ formatFactor(record.workloadStaffingRatio) }}</td>
-                    <td>{{ formatNumber(record.workloadHours, 1) }}</td>
-                    <td>{{ formatNumber(record.requiredStaffHours, 1) }}</td>
-                    <td>{{ formatNumber(record.requiredHeadcount, 1) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div v-if="selectedMonth.planWarnings.length" class="monthly-warning-stack">
-              <p v-for="warning in selectedMonth.planWarnings" :key="warning" class="status-message error">
-                {{ warning }}
-              </p>
-            </div>
-
-            <section class="monthly-chart-panel">
-              <div class="workspace-output-header">
-                <h3>Monthly Required Staffing</h3>
-                <p>Required staff hours by month after the design factor is applied.</p>
-              </div>
-              <div class="monthly-bars">
-                <button
-                  v-for="record in monthlyRecords"
-                  :key="record.label"
-                  type="button"
-                  class="monthly-bar-column"
-                  :class="{ active: selectedMonthIndex === record.monthIndex }"
-                  @click="setSelectedMonth(record.monthIndex)"
-                >
-                  <small class="monthly-bar-month">{{ record.label }}</small>
-                  <div class="monthly-bar-cap">
-                    <strong>{{ formatWhole(record.roundedHeadcount) }}</strong>
-                    <span>HC</span>
-                  </div>
-                  <div class="monthly-bar-stack">
-                    <div class="monthly-bar-track">
-                      <div
-                        class="monthly-bar-segment monthly-bar-final"
-                        :style="{
-                          height: `${Math.max((record.requiredStaffHours / monthlyChartMax) * 100, record.requiredStaffHours > 0 ? 6 : 0)}%`
-                        }"
-                      ></div>
-                    </div>
-                  </div>
-                  <div class="monthly-bar-footer">
-                    <strong>{{ formatWhole(record.requiredStaffHours) }}</strong>
-                    <span>hours</span>
-                  </div>
-                  <div class="monthly-bar-tooltip">
-                    <p class="monthly-bar-tooltip-title">{{ record.fullLabel }}</p>
-                    <div class="monthly-bar-tooltip-grid">
-                      <span>Workload Hours</span>
-                      <strong>{{ formatNumber(record.workloadHours, 1) }}</strong>
-                      <span>Required Staff Hrs</span>
-                      <strong>{{ formatNumber(record.requiredStaffHours, 1) }}</strong>
-                      <span>Required HC</span>
-                      <strong>{{ formatNumber(record.requiredHeadcount, 1) }}</strong>
-                      <span>Total Random Loss</span>
-                      <strong>{{ formatPercent(record.randomLossPercent, 1) }}</strong>
-                      <span>Design Factor</span>
-                      <strong>{{ formatPercent(record.designFactorPercent, 1) }}</strong>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </section>
-
-            <div class="monthly-tab-actions">
-              <button type="button" class="secondary-btn" @click="moveTab(-1)">Back to Random</button>
-              <button type="button" class="submit-btn" @click="savePlan">Save Plan</button>
-            </div>
-          </section>
+          <PlannerMonthlyPlanTab
+            v-else
+            v-model:plan-months="planMonths"
+            v-model:selected-month-index="selectedMonthIndex"
+            :monthly-records="monthlyRecords"
+            :plan-summary="planSummary"
+            :monthly-chart-max="monthlyChartMax"
+            :format-whole="formatWhole"
+            :format-number="formatNumber"
+            :format-percent="formatPercent"
+            :format-factor="formatFactor"
+            @previous="moveTab(-1)"
+            @save="savePlan"
+          />
         </div>
       </div>
     </div>
