@@ -36,7 +36,7 @@ const TABS = [
     id: 'random',
     step: '2',
     title: 'Random',
-    description: 'Add a variability buffer for forecast miss, seasonality, and events.'
+    description: 'Set occupancy and adherence assumptions that convert roster need into budgeted headcount.'
   },
   {
     id: 'plan',
@@ -66,9 +66,8 @@ const createPresenceMonth = (overrides = {}) => ({
 })
 
 const createRandomMonth = (overrides = {}) => ({
-  forecastRiskPercent: 4,
-  seasonalityRiskPercent: 2,
-  eventRiskPercent: 1,
+  occupancyPercent: 90,
+  adherencePercent: 95,
   ...overrides
 })
 
@@ -87,6 +86,8 @@ const activeTab = ref('presence')
 const selectedMonthIndex = ref(currentMonthIndex)
 const operatingWeekdays = ref([1, 2, 3, 4, 5])
 const presenceMonths = ref(buildPresenceMonths())
+const randomDefaults = ref(createRandomMonth())
+const useMonthlyRandomOverrides = ref(false)
 const randomMonths = ref(buildRandomMonths())
 const planMonths = ref(buildPlanMonths())
 
@@ -217,6 +218,71 @@ const copyPresenceQuarterForward = (monthIndex) => {
   )
 }
 
+const handlePresenceCopyAction = (event) => {
+  const action = event.target.value
+
+  if (action === 'all') {
+    copyPresenceMonthToAll(selectedMonthIndex.value)
+  } else if (action === 'forward') {
+    copyPresenceMonthForward(selectedMonthIndex.value)
+  } else if (action === 'quarter') {
+    copyPresenceQuarterForward(selectedMonthIndex.value)
+  }
+
+  event.target.value = ''
+}
+
+const syncRandomMonthsToDefaults = () => {
+  const source = { ...randomDefaults.value }
+  randomMonths.value = MONTH_LABELS.map(() => ({ ...source }))
+}
+
+const setRandomOverrideMode = (enabled) => {
+  useMonthlyRandomOverrides.value = enabled
+
+  if (enabled) {
+    syncRandomMonthsToDefaults()
+  }
+}
+
+const cloneRandomMonth = (monthIndex) => ({ ...randomMonths.value[monthIndex] })
+
+const copyRandomMonthToAll = (monthIndex) => {
+  const source = cloneRandomMonth(monthIndex)
+  randomMonths.value = MONTH_LABELS.map(() => ({ ...source }))
+}
+
+const copyRandomMonthForward = (monthIndex) => {
+  const source = cloneRandomMonth(monthIndex)
+  randomMonths.value = randomMonths.value.map((month, index) =>
+    index >= monthIndex ? { ...source } : month
+  )
+}
+
+const copyRandomQuarterForward = (monthIndex) => {
+  const source = cloneRandomMonth(monthIndex)
+  const quarterStart = Math.floor(monthIndex / 3) * 3
+  const quarterEnd = Math.min(quarterStart + 3, MONTH_LABELS.length)
+
+  randomMonths.value = randomMonths.value.map((month, index) =>
+    index >= monthIndex && index < quarterEnd ? { ...source } : month
+  )
+}
+
+const handleRandomCopyAction = (event) => {
+  const action = event.target.value
+
+  if (action === 'all') {
+    copyRandomMonthToAll(selectedMonthIndex.value)
+  } else if (action === 'forward') {
+    copyRandomMonthForward(selectedMonthIndex.value)
+  } else if (action === 'quarter') {
+    copyRandomQuarterForward(selectedMonthIndex.value)
+  }
+
+  event.target.value = ''
+}
+
 const loadExamplePlan = () => {
   planningYear.value = currentYear + 1
   operatingWeekdays.value = [1, 2, 3, 4, 5, 6]
@@ -236,20 +302,9 @@ const loadExamplePlan = () => {
     createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 11, weekdays: [1, 2, 3, 4, 5, 6], plannedTimeOffPercent: 11.5, unplannedTimeOffPercent: 4.2, leaveTimePercent: 1.3, meetingsPercent: 2.2, trainingPercent: 1.5, coachingPercent: 1.4, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.2 })
   ]
 
-  randomMonths.value = [
-    createRandomMonth({ forecastRiskPercent: 3, seasonalityRiskPercent: 1, eventRiskPercent: 1 }),
-    createRandomMonth({ forecastRiskPercent: 3, seasonalityRiskPercent: 1, eventRiskPercent: 1 }),
-    createRandomMonth({ forecastRiskPercent: 3.5, seasonalityRiskPercent: 1.5, eventRiskPercent: 1 }),
-    createRandomMonth({ forecastRiskPercent: 3.5, seasonalityRiskPercent: 1.5, eventRiskPercent: 1 }),
-    createRandomMonth({ forecastRiskPercent: 4, seasonalityRiskPercent: 2, eventRiskPercent: 1.5 }),
-    createRandomMonth({ forecastRiskPercent: 4, seasonalityRiskPercent: 2, eventRiskPercent: 1.5 }),
-    createRandomMonth({ forecastRiskPercent: 5, seasonalityRiskPercent: 2.5, eventRiskPercent: 2 }),
-    createRandomMonth({ forecastRiskPercent: 5, seasonalityRiskPercent: 2.5, eventRiskPercent: 2 }),
-    createRandomMonth({ forecastRiskPercent: 4, seasonalityRiskPercent: 1.8, eventRiskPercent: 1.2 }),
-    createRandomMonth({ forecastRiskPercent: 4, seasonalityRiskPercent: 1.8, eventRiskPercent: 1.2 }),
-    createRandomMonth({ forecastRiskPercent: 4.2, seasonalityRiskPercent: 2.2, eventRiskPercent: 1.4 }),
-    createRandomMonth({ forecastRiskPercent: 5.2, seasonalityRiskPercent: 3.2, eventRiskPercent: 2.3 })
-  ]
+  randomDefaults.value = createRandomMonth({ occupancyPercent: 90, adherencePercent: 95 })
+  useMonthlyRandomOverrides.value = false
+  syncRandomMonthsToDefaults()
 
   const exampleContacts = [44000, 42500, 44800, 46200, 47800, 49900, 53100, 54800, 50500, 48200, 47100, 52800]
   const exampleAht = [315, 312, 310, 305, 302, 300, 298, 300, 304, 308, 312, 320]
@@ -269,6 +324,8 @@ const resetPlanner = () => {
   planningYear.value = currentYear
   operatingWeekdays.value = [1, 2, 3, 4, 5]
   presenceMonths.value = buildPresenceMonths()
+  randomDefaults.value = createRandomMonth()
+  useMonthlyRandomOverrides.value = false
   randomMonths.value = buildRandomMonths()
   planMonths.value = buildPlanMonths()
   activeTab.value = 'presence'
@@ -278,7 +335,7 @@ const resetPlanner = () => {
 const monthlyRecords = computed(() =>
   MONTH_LABELS.map((label, monthIndex) => {
     const presenceInput = presenceMonths.value[monthIndex]
-    const randomInput = randomMonths.value[monthIndex]
+    const randomInput = useMonthlyRandomOverrides.value ? randomMonths.value[monthIndex] : randomDefaults.value
     const planInput = planMonths.value[monthIndex]
 
     const calendarOpenDays = calculateCalendarOpenDays(planningYear.value, monthIndex, operatingWeekdays.value)
@@ -340,24 +397,24 @@ const monthlyRecords = computed(() =>
     const scheduledPercent = paidHoursPerMonth > 0 ? presenceShare * utilizationShare * 100 : 0
     const scheduledHours = paidHoursPerMonth * presenceShare * utilizationShare
 
-    const forecastRiskPercent = clamp(toNumber(randomInput.forecastRiskPercent, 0), 0, 100)
-    const seasonalityRiskPercent = clamp(toNumber(randomInput.seasonalityRiskPercent, 0), 0, 100)
-    const eventRiskPercent = clamp(toNumber(randomInput.eventRiskPercent, 0), 0, 100)
-    const randomBufferPercent = forecastRiskPercent + seasonalityRiskPercent + eventRiskPercent
-    const randomFactor = 1 + randomBufferPercent / 100
+    const occupancyPercent = clamp(toNumber(randomInput.occupancyPercent, 90), 1, 100)
+    const adherencePercent = clamp(toNumber(randomInput.adherencePercent, 95), 1, 100)
+    const occupancyShare = occupancyPercent / 100
+    const adherenceShare = adherencePercent / 100
+    const adherenceLossPercent = (1 - adherenceShare) * scheduledPercent
+    const scheduledAfterAdherencePercent = scheduledPercent - adherenceLossPercent
+    const occupancyLossPercent = (1 - occupancyShare) * scheduledAfterAdherencePercent
+    const randomLossPercent = adherenceLossPercent + occupancyLossPercent
+    const designFactorPercent = scheduledPercent - randomLossPercent
+    const designFactorShare = designFactorPercent / 100
+    const workloadStaffingRatio = designFactorShare > 0 ? 1 / designFactorShare : 0
 
     const contacts = Math.max(toNumber(planInput.contacts, 0), 0)
     const ahtSeconds = Math.max(toNumber(planInput.ahtSeconds, 0), 0)
     const workloadHours = (contacts * ahtSeconds) / 3600
-    const baseWorkloadFte = paidHoursPerMonth > 0 ? workloadHours / paidHoursPerMonth : 0
-    const requiredPresentHeadcount = baseWorkloadFte * utilizationFactor
-    const requiredRosterHeadcount = requiredPresentHeadcount * presenceFactor
-    const finalFte = requiredRosterHeadcount * randomFactor
-    const roundedHeadcount = finalFte > 0 ? Math.ceil(finalFte) : 0
-    const expectedAveragePresentHeadcount = finalFte * presenceShare
-    const effectiveHoursPerFte =
-      paidHoursPerMonth > 0 ? paidHoursPerMonth * presenceShare * utilizationShare / randomFactor : 0
-    const auditFte = effectiveHoursPerFte > 0 ? workloadHours / effectiveHoursPerFte : 0
+    const requiredStaffHours = workloadHours * workloadStaffingRatio
+    const requiredHeadcount = paidHoursPerMonth > 0 ? requiredStaffHours / paidHoursPerMonth : 0
+    const roundedHeadcount = requiredHeadcount > 0 ? Math.ceil(requiredHeadcount) : 0
 
     const presenceWarnings = []
     const utilizationWarnings = []
@@ -396,8 +453,20 @@ const monthlyRecords = computed(() =>
       utilizationWarnings.push('Utilization is unusually low. Confirm that meetings, training, breaks, or other away time are not overstated.')
     }
 
-    if (randomBufferPercent > 20) {
-      randomWarnings.push('The random buffer is materially high. Confirm that variability is not already covered in your demand or utilization assumptions.')
+    if (occupancyPercent > 95) {
+      randomWarnings.push('Occupancy is very high. Confirm the staffing plan can sustain this without excessive strain.')
+    } else if (occupancyPercent < 80) {
+      randomWarnings.push('Occupancy is unusually low. Confirm the assumption is intentional for this monthly budget.')
+    }
+
+    if (adherencePercent < 90) {
+      randomWarnings.push('Adherence is low for a monthly staffing plan. Recheck the assumption before finalizing budgeted headcount.')
+    }
+
+    if (randomLossPercent >= scheduledPercent && scheduledPercent > 0) {
+      randomWarnings.push('Total scheduled random loss is consuming all scheduled capacity. Recheck the adherence and occupancy assumptions.')
+    } else if (workloadStaffingRatio > 2.5) {
+      randomWarnings.push('The adherence and occupancy assumptions produce a large staffing ratio. Confirm the model is not double counting execution losses elsewhere.')
     }
 
     if (contacts > 0 && paidHoursPerMonth === 0) {
@@ -458,22 +527,19 @@ const monthlyRecords = computed(() =>
       utilizationPercent,
       utilizationFactor,
       scheduledPercent,
-      forecastRiskPercent,
-      seasonalityRiskPercent,
-      eventRiskPercent,
-      randomBufferPercent,
-      randomFactor,
+      occupancyPercent,
+      adherencePercent,
+      adherenceLossPercent,
+      occupancyLossPercent,
+      randomLossPercent,
+      designFactorPercent,
+      workloadStaffingRatio,
       contacts,
       ahtSeconds,
       workloadHours,
-      baseWorkloadFte,
-      finalFte,
+      requiredStaffHours,
+      requiredHeadcount,
       roundedHeadcount,
-      requiredPresentHeadcount,
-      requiredRosterHeadcount,
-      expectedAveragePresentHeadcount,
-      effectiveHoursPerFte,
-      auditFte,
       presenceWarnings,
       utilizationWarnings,
       randomWarnings,
@@ -509,20 +575,24 @@ const presenceSummary = computed(() => {
 
 const randomSummary = computed(() => {
   const rows = monthlyRecords.value
-  const highestBufferMonth = rows.reduce((highest, row) =>
-    row.randomBufferPercent > highest.randomBufferPercent ? row : highest
-  )
+  const globalOccupancyPercent = clamp(toNumber(randomDefaults.value.occupancyPercent, 90), 1, 100)
+  const globalAdherencePercent = clamp(toNumber(randomDefaults.value.adherencePercent, 95), 1, 100)
 
   return {
-    averageRandomFactor: average(rows.map((row) => row.randomFactor)),
-    averageRandomBuffer: average(rows.map((row) => row.randomBufferPercent)),
-    highestBufferMonth
+    usesMonthlyOverrides: useMonthlyRandomOverrides.value,
+    globalOccupancyPercent,
+    globalAdherencePercent,
+    averageOccupancyPercent: average(rows.map((row) => row.occupancyPercent)),
+    averageAdherencePercent: average(rows.map((row) => row.adherencePercent)),
+    averageAdherenceLossPercent: average(rows.map((row) => row.adherenceLossPercent)),
+    averageOccupancyLossPercent: average(rows.map((row) => row.occupancyLossPercent)),
+    averageRandomLossPercent: average(rows.map((row) => row.randomLossPercent))
   }
 })
 
 const planSummary = computed(() => {
   const rows = monthlyRecords.value
-  const peakMonth = rows.reduce((peak, row) => (row.finalFte > peak.finalFte ? row : peak))
+  const peakMonth = rows.reduce((peak, row) => (row.requiredHeadcount > peak.requiredHeadcount ? row : peak))
   const busiestMonth = rows.reduce((busiest, row) =>
     row.workloadHours > busiest.workloadHours ? row : busiest
   )
@@ -530,10 +600,10 @@ const planSummary = computed(() => {
   return {
     peakMonth,
     busiestMonth,
+    annualContacts: rows.reduce((sum, row) => sum + row.contacts, 0),
     annualWorkloadHours: rows.reduce((sum, row) => sum + row.workloadHours, 0),
-    averagePresentHeadcount: average(rows.map((row) => row.requiredPresentHeadcount)),
-    averageBudgetedHeadcount: average(rows.map((row) => row.finalFte)),
-    annualBudgetedHeadcountMonths: rows.reduce((sum, row) => sum + row.finalFte, 0)
+    averageRequiredStaffHours: average(rows.map((row) => row.requiredStaffHours)),
+    averageRequiredHeadcount: average(rows.map((row) => row.requiredHeadcount))
   }
 })
 
@@ -546,7 +616,9 @@ const plannerWarnings = computed(() => {
   )
 })
 
-const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) => row.finalFte), 1))
+const monthlyChartMax = computed(() =>
+  Math.max(...monthlyRecords.value.flatMap((row) => [row.workloadHours, row.requiredStaffHours]), 1)
+)
 </script>
 
 <template>
@@ -556,16 +628,8 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
         <div class="monthly-flow-shell">
           <section class="monthly-flow-hero">
             <p class="pane-kicker">Monthly Budget Planner</p>
-            <h2>Plan monthly staffing with one design-factor method from start to finish</h2>
-            <p class="calculator-intro">
-              This planner uses a single budgeting chain:
-              <strong>presence</strong>,
-              <strong>utilization</strong>,
-              and
-              <strong>random factor</strong>.
-              Build those assumptions month by month, then enter only contacts and AHT on the final tab. This is a
-              monthly budgeting tool for staffing plans, budgets, and headcount conversations.
-            </p>
+            <h2>Build a monthly staffing plan</h2>
+            <p class="calculator-intro">Set monthly assumptions, then enter contacts and AHT to build the plan.</p>
           </section>
 
           <section class="input-group-card monthly-global-controls">
@@ -578,15 +642,15 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
             </div>
 
             <div class="monthly-global-grid">
-              <div class="field-group">
+              <div class="field-group monthly-setup-card">
                 <label for="planning-year">Planning year</label>
                 <select id="planning-year" v-model.number="planningYear">
                   <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
                 </select>
               </div>
 
-              <div class="field-group monthly-weekday-field">
-                <label>Operating weekdays</label>
+              <div class="field-group monthly-weekday-field monthly-setup-card">
+                <label>Operating days</label>
                 <div class="weekday-toggle-group">
                   <button
                     v-for="weekday in WEEKDAY_OPTIONS"
@@ -599,13 +663,9 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
                     {{ weekday.label }}
                   </button>
                 </div>
-                <p class="helper-text">
-                  Current pattern:
-                  <strong>{{ operatingWeekdayLabel }}</strong>
-                </p>
               </div>
 
-              <div class="field-group monthly-action-field">
+              <div class="field-group monthly-action-field monthly-setup-card">
                 <label>Planner actions</label>
                 <div class="batch-actions">
                   <button type="button" class="secondary-btn" @click="loadExamplePlan">Load Example Plan</button>
@@ -620,7 +680,7 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
             </p>
           </section>
 
-          <nav class="monthly-tab-strip" aria-label="Monthly planner steps">
+          <nav class="monthly-tab-strip" aria-label="Monthly planner sections">
             <button
               v-for="tab in TABS"
               :key="tab.id"
@@ -629,22 +689,15 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
               :class="{ active: activeTab === tab.id }"
               @click="setActiveTab(tab.id)"
             >
-              <span class="monthly-tab-step">Step {{ tab.step }}</span>
               <strong>{{ tab.title }}</strong>
-              <small>{{ tab.description }}</small>
             </button>
           </nav>
 
           <section v-if="activeTab === 'presence'" class="results-panel monthly-tab-panel">
             <header class="monthly-tab-header">
               <div>
-                <p class="pane-kicker">Step 1</p>
                 <h3>Build presence / utilization month by month</h3>
               </div>
-              <p>
-                Start with open days and paid hours, then enter absence, scheduled, and daily away-time losses. The
-                planner converts those hours into presence %, utilization %, and final scheduled % for you.
-              </p>
             </header>
 
             <div class="results-metrics monthly-summary-grid">
@@ -686,52 +739,56 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
                 <p>Use one table to build absence-based presence, scheduled-time utilization, and final scheduled %.</p>
               </div>
               <div class="monthly-copy-toolbar">
-                <button type="button" class="secondary-btn" @click="copyPresenceMonthToAll(selectedMonthIndex)">
-                  Copy {{ selectedMonth.label }} to All Months
-                </button>
-                <button type="button" class="secondary-btn" @click="copyPresenceMonthForward(selectedMonthIndex)">
-                  Copy {{ selectedMonth.label }} Forward
-                </button>
-                <button type="button" class="secondary-btn" @click="copyPresenceQuarterForward(selectedMonthIndex)">
-                  Copy {{ selectedMonth.label }} Through Quarter
-                </button>
+                <label class="monthly-copy-select" for="presence-copy-action">
+                  <span class="monthly-copy-label">Copy {{ selectedMonth.label }}</span>
+                  <select
+                    id="presence-copy-action"
+                    class="monthly-copy-select-input"
+                    @change="handlePresenceCopyAction"
+                  >
+                    <option value="">Choose action</option>
+                    <option value="all">To all months</option>
+                    <option value="forward">Forward</option>
+                    <option value="quarter">Through quarter</option>
+                  </select>
+                </label>
               </div>
               <div class="assumption-table-shell">
                 <table class="assumption-table assumption-table-presence-main">
                   <thead>
                     <tr class="presence-super-row">
-                      <th rowspan="3" class="presence-sticky-head">Month</th>
-                      <th rowspan="3" class="presence-sticky-head">
+                      <th rowspan="3" class="presence-sticky-head" title="Planning month. Click a month name to highlight that row.">Month</th>
+                      <th rowspan="3" class="presence-sticky-head" title="Monthly business days after the weekday pattern and any day adjustment are applied.">
                         <span class="presence-head-label">Business<br />Days</span>
                       </th>
-                      <th rowspan="3" class="presence-sticky-head">Day Adj.</th>
-                      <th rowspan="3" class="presence-sticky-head presence-paid-head">
+                      <th rowspan="3" class="presence-sticky-head" title="Add or remove business days for holidays, closures, or special events.">Day Adj.</th>
+                      <th rowspan="3" class="presence-sticky-head presence-paid-head" title="Full paid hours for one agent in one business day before paid breaks are removed.">
                         <span class="presence-head-label">Daily Paid<br />Hours</span>
                       </th>
-                      <th colspan="3" class="presence-super-head presence-super-presence">Presence</th>
-                      <th colspan="5" class="presence-super-head presence-super-utilization">Utilization</th>
-                      <th rowspan="3" class="presence-sticky-head presence-month-hours-head">
-                        <span class="presence-head-label">FTE Paid<br />Hours /<br />Month</span>
+                      <th colspan="3" class="presence-super-head presence-super-presence" title="Absence-driven losses that determine how much paid time remains available to work.">Presence</th>
+                      <th colspan="5" class="presence-super-head presence-super-utilization" title="Scheduled and daily working-time losses that determine how much present time remains usable.">Utilization</th>
+                      <th rowspan="3" class="presence-sticky-head presence-month-hours-head" title="Monthly paid hours for one FTE. Calculated as business days multiplied by daily paid hours.">
+                        <span class="presence-head-label">FTE Paid<br />Hours</span>
                       </th>
-                      <th rowspan="3" class="presence-sticky-head">Total Loss / Month</th>
-                      <th rowspan="3" class="presence-sticky-head">Presence %</th>
-                      <th rowspan="3" class="presence-sticky-head">Utilization %</th>
-                      <th rowspan="3" class="presence-sticky-head">Scheduled %</th>
+                      <th rowspan="3" class="presence-sticky-head" title="Combined monthly absence, scheduled, and presence-adjusted daily losses in hours.">Total Loss</th>
+                      <th rowspan="3" class="presence-sticky-head" title="Share of paid time left after absence loss is removed.">Presence %</th>
+                      <th rowspan="3" class="presence-sticky-head" title="Share of present time left after scheduled and other utilization loss is removed.">Utilization %</th>
+                      <th rowspan="3" class="presence-sticky-head" title="Share of total paid time still available for handling after both presence and utilization are applied.">Scheduled %</th>
                     </tr>
                     <tr class="presence-group-row">
-                      <th colspan="3" class="presence-group-head presence-group-absence">Absence (Hours / Month)</th>
-                      <th colspan="3" class="presence-group-head presence-group-scheduled">Scheduled (Hours / Month)</th>
-                      <th colspan="2" class="presence-group-head presence-group-other">Other (Hours / Day)</th>
+                      <th colspan="3" class="presence-group-head presence-group-absence" title="Monthly absence hours per agent that reduce presence.">Absence (Hours / Month)</th>
+                      <th colspan="3" class="presence-group-head presence-group-scheduled" title="Monthly scheduled hours per agent that reduce utilization.">Scheduled (Hours / Month)</th>
+                      <th colspan="2" class="presence-group-head presence-group-other" title="Daily paid-away hours per agent that reduce utilization after presence is applied.">Other (Hours / Day)</th>
                     </tr>
                     <tr class="presence-detail-row">
-                      <th>Planned Off</th>
-                      <th>Unplanned Off</th>
-                      <th>Leave</th>
-                      <th>Meetings</th>
-                      <th>Training</th>
-                      <th>Coaching</th>
-                      <th>Breaks</th>
-                      <th>Away</th>
+                      <th title="Planned time off hours per agent for the month.">Planned</th>
+                      <th title="Unplanned absence hours per agent for the month.">Unplanned Off</th>
+                      <th title="Leave hours per agent for the month.">Leave</th>
+                      <th title="Meeting hours per agent for the month.">Meetings</th>
+                      <th title="Training hours per agent for the month.">Training</th>
+                      <th title="Coaching hours per agent for the month.">Coaching</th>
+                      <th title="Paid break hours per agent per business day. These daily hours are reduced by presence before they hit utilization.">Breaks</th>
+                      <th title="Other away time per agent per business day. These daily hours are reduced by presence before they hit utilization.">Away</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -851,101 +908,6 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
               </div>
             </section>
 
-            <section class="monthly-focus-card">
-              <header class="monthly-focus-header">
-                <div>
-                  <p class="pane-kicker">Focused month</p>
-                  <h4>{{ selectedMonth.fullLabel }} presence / utilization build</h4>
-                </div>
-                <p>
-                  {{ formatPercent(selectedMonth.presencePercent, 1) }} presence x
-                  {{ formatPercent(selectedMonth.utilizationPercent, 1) }} utilization =
-                  {{ formatPercent(selectedMonth.scheduledPercent, 1) }} scheduled time.
-                </p>
-              </header>
-
-              <div class="monthly-formula-grid">
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Paid Hours / Month = {{ formatWhole(selectedMonth.openDays) }} x {{ formatNumber(selectedMonth.paidHoursPerDay, 2) }} = {{ formatNumber(selectedMonth.paidHoursPerMonth, 1) }}
-                  </p>
-                  <p class="helper-text">Paid hours per day should reflect the full paid day before paid breaks are removed.</p>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Absence Loss Hrs = {{ formatNumber(selectedMonth.plannedTimeOffHours, 1) }} + {{ formatNumber(selectedMonth.unplannedTimeOffHours, 1) }} + {{ formatNumber(selectedMonth.leaveTimeHours, 1) }} = {{ formatNumber(selectedMonth.absenceLossHours, 1) }}
-                  </p>
-                  <p class="helper-text">Planned time off, unplanned time off, and leave time all live in the monthly absence bucket.</p>
-                  <div class="monthly-breakdown-list">
-                    <span>Planned time off: {{ formatNumber(selectedMonth.plannedTimeOffHours, 1) }} hrs = {{ formatPercent(selectedMonth.plannedTimeOffPercent, 1) }}</span>
-                    <span>Unplanned time off: {{ formatNumber(selectedMonth.unplannedTimeOffHours, 1) }} hrs = {{ formatPercent(selectedMonth.unplannedTimeOffPercent, 1) }}</span>
-                    <span>Leave time: {{ formatNumber(selectedMonth.leaveTimeHours, 1) }} hrs = {{ formatPercent(selectedMonth.leaveTimePercent, 1) }}</span>
-                  </div>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Presence % = 100 - ({{ formatNumber(selectedMonth.absenceLossHours, 1) }} / {{ formatNumber(selectedMonth.paidHoursPerMonth, 1) }} x 100) = {{ formatPercent(selectedMonth.presencePercent, 1) }}
-                  </p>
-                  <p class="helper-text">Presence is driven only by the monthly absence bucket in this model.</p>
-                  <div class="monthly-breakdown-list">
-                    <span>Absence loss: {{ formatNumber(selectedMonth.absenceLossHours, 1) }} hrs = {{ formatPercent(selectedMonth.absenceLossPercent, 1) }}</span>
-                    <span>Present hours after absence: {{ formatNumber(selectedMonth.presentHours, 1) }}</span>
-                    <span>Presence factor: {{ formatFactor(selectedMonth.presenceFactor) }}</span>
-                  </div>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Scheduled Loss Hrs = {{ formatNumber(selectedMonth.meetingsHours, 1) }} + {{ formatNumber(selectedMonth.trainingHours, 1) }} + {{ formatNumber(selectedMonth.coachingHours, 1) }} = {{ formatNumber(selectedMonth.scheduledLossHours, 1) }}
-                  </p>
-                  <p class="helper-text">Meetings, training, and coaching are treated as scheduled monthly time away from handling work.</p>
-                  <div class="monthly-breakdown-list">
-                    <span>Meetings: {{ formatNumber(selectedMonth.meetingsHours, 1) }} hrs = {{ formatPercent(selectedMonth.meetingsPercent, 1) }}</span>
-                    <span>Training: {{ formatNumber(selectedMonth.trainingHours, 1) }} hrs = {{ formatPercent(selectedMonth.trainingPercent, 1) }}</span>
-                    <span>Coaching: {{ formatNumber(selectedMonth.coachingHours, 1) }} hrs = {{ formatPercent(selectedMonth.coachingPercent, 1) }}</span>
-                  </div>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Other Loss Hrs = (({{ formatNumber(selectedMonth.paidBreaksHoursPerDay, 2) }} + {{ formatNumber(selectedMonth.otherAwayHoursPerDay, 2) }}) x {{ formatWhole(selectedMonth.openDays) }}) x {{ formatNumber(selectedMonth.presencePercent / 100, 3) }} = {{ formatNumber(selectedMonth.otherLossHours, 1) }}
-                  </p>
-                  <p class="helper-text">Daily paid breaks and daily other away time are multiplied by open days, then reduced by presence so they only apply to time the agent is actually at work.</p>
-                  <div class="monthly-breakdown-list">
-                    <span>Paid breaks: {{ formatNumber(selectedMonth.rawPaidBreaksHours, 1) }} raw hrs x {{ formatPercent(selectedMonth.presencePercent, 1) }} = {{ formatNumber(selectedMonth.paidBreaksHours, 1) }} hrs</span>
-                    <span>Other away time: {{ formatNumber(selectedMonth.rawOtherAwayHours, 1) }} raw hrs x {{ formatPercent(selectedMonth.presencePercent, 1) }} = {{ formatNumber(selectedMonth.otherAwayHours, 1) }} hrs</span>
-                    <span>Other loss total: {{ formatNumber(selectedMonth.otherLossHours, 1) }} hrs = {{ formatPercent(selectedMonth.otherLossPercent, 1) }}</span>
-                  </div>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Utilization % = 100 - ({{ formatNumber(selectedMonth.utilizationLossHours, 1) }} / {{ formatNumber(selectedMonth.presentHours, 1) }} x 100) = {{ formatPercent(selectedMonth.utilizationPercent, 1) }}
-                  </p>
-                  <p class="helper-text">Utilization is driven by scheduled loss plus presence-adjusted daily other loss after absence has already been removed.</p>
-                  <div class="monthly-breakdown-list">
-                    <span>Scheduled loss: {{ formatNumber(selectedMonth.scheduledLossHours, 1) }} hrs = {{ formatPercent(selectedMonth.scheduledLossPercent, 1) }}</span>
-                    <span>Other loss: {{ formatNumber(selectedMonth.otherLossHours, 1) }} hrs = {{ formatPercent(selectedMonth.otherLossPercent, 1) }}</span>
-                    <span>Utilization loss total: {{ formatNumber(selectedMonth.utilizationLossHours, 1) }} hrs = {{ formatPercent(selectedMonth.utilizationLossPercent, 1) }}</span>
-                    <span>Utilization factor: {{ formatFactor(selectedMonth.utilizationFactor) }}</span>
-                  </div>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Scheduled % = {{ formatPercent(selectedMonth.presencePercent, 1) }} x {{ formatPercent(selectedMonth.utilizationPercent, 1) }} = {{ formatPercent(selectedMonth.scheduledPercent, 1) }}
-                  </p>
-                  <p class="helper-text">Scheduled % is the share of total paid time still available for handling after both presence and utilization losses.</p>
-                </div>
-              </div>
-
-              <div v-if="[...selectedMonth.presenceWarnings, ...selectedMonth.utilizationWarnings].length" class="monthly-warning-stack">
-                <p
-                  v-for="warning in [...selectedMonth.presenceWarnings, ...selectedMonth.utilizationWarnings]"
-                  :key="warning"
-                  class="status-message error"
-                >
-                  {{ warning }}
-                </p>
-              </div>
-            </section>
-
             <div class="monthly-tab-actions">
               <button type="button" class="submit-btn" @click="moveTab(1)">Continue to Random</button>
             </div>
@@ -954,145 +916,200 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
           <section v-else-if="activeTab === 'random'" class="results-panel monthly-tab-panel">
             <header class="monthly-tab-header">
               <div>
-                <p class="pane-kicker">Step 2</p>
-                <h3>Add a monthly random-factor buffer</h3>
+                <h3>Set occupancy and adherence assumptions</h3>
               </div>
-              <p>
-                The random factor captures remaining variability that is not already inside the demand forecast or the
-                utilization assumption.
-              </p>
+              <p>Use one global assumption set for the year, and only turn on monthly overrides if a few months need different values.</p>
             </header>
-
-            <div class="monthly-definition-grid">
-              <article class="answer-card">
-                <h4>Forecast risk</h4>
-                <p>Use this when monthly volume and AHT can miss plan even after normal forecasting effort.</p>
-              </article>
-              <article class="answer-card">
-                <h4>Seasonality risk</h4>
-                <p>Use this when certain months carry more volatility or mix change than the rest of the year.</p>
-              </article>
-              <article class="answer-card">
-                <h4>Event risk</h4>
-                <p>Use this for launches, storms, billing events, policy changes, or other known spikes that can distort the month.</p>
-              </article>
-            </div>
 
             <div class="results-metrics monthly-summary-grid">
               <article class="metric-card">
-                <p class="metric-label">Average Random Factor</p>
-                <p class="metric-value">{{ formatFactor(randomSummary.averageRandomFactor) }}</p>
-                <p class="metric-meta">Applied after presence and utilization</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Average Random Buffer</p>
-                <p class="metric-value">{{ formatPercent(randomSummary.averageRandomBuffer, 1) }}</p>
-                <p class="metric-meta">Forecast + seasonality + event risk</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Highest Buffer Month</p>
-                <p class="metric-value">{{ randomSummary.highestBufferMonth.label }}</p>
-                <p class="metric-meta">
-                  {{ formatPercent(randomSummary.highestBufferMonth.randomBufferPercent, 1) }}
-                  total buffer
+                <p class="metric-label">{{ randomSummary.usesMonthlyOverrides ? 'Average Occupancy' : 'Occupancy' }}</p>
+                <p class="metric-value">
+                  {{ formatPercent(randomSummary.usesMonthlyOverrides ? randomSummary.averageOccupancyPercent : randomSummary.globalOccupancyPercent, 1) }}
                 </p>
+                <p class="metric-meta">
+                  {{ randomSummary.usesMonthlyOverrides ? 'Average monthly occupancy assumption' : 'Global occupancy assumption used across the full year' }}
+                </p>
+              </article>
+              <article class="metric-card">
+                <p class="metric-label">{{ randomSummary.usesMonthlyOverrides ? 'Average Adherence' : 'Adherence' }}</p>
+                <p class="metric-value">
+                  {{ formatPercent(randomSummary.usesMonthlyOverrides ? randomSummary.averageAdherencePercent : randomSummary.globalAdherencePercent, 1) }}
+                </p>
+                <p class="metric-meta">
+                  {{ randomSummary.usesMonthlyOverrides ? 'Average monthly adherence assumption' : 'Global adherence assumption used across the full year' }}
+                </p>
+              </article>
+              <article class="metric-card">
+                <p class="metric-label">Avg Adherence Loss</p>
+                <p class="metric-value">
+                  {{ formatPercent(randomSummary.averageAdherenceLossPercent, 1) }}
+                </p>
+                <p class="metric-meta">Average monthly loss applied to scheduled % from adherence</p>
+              </article>
+              <article class="metric-card">
+                <p class="metric-label">Avg Occupancy Loss</p>
+                <p class="metric-value">
+                  {{ formatPercent(randomSummary.averageOccupancyLossPercent, 1) }}
+                </p>
+                <p class="metric-meta">Average monthly loss applied after adherence loss is removed</p>
+              </article>
+              <article class="metric-card">
+                <p class="metric-label">Avg Total Scheduled Random Loss</p>
+                <p class="metric-value">
+                  {{ formatPercent(randomSummary.averageRandomLossPercent, 1) }}
+                </p>
+                <p class="metric-meta">Adherence loss plus occupancy loss against scheduled %</p>
               </article>
             </div>
 
-            <div class="assumption-table-shell">
-              <table class="assumption-table assumption-table-random">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Forecast Risk %</th>
-                    <th>Seasonality Risk %</th>
-                    <th>Event Risk %</th>
-                    <th>Random Buffer %</th>
-                    <th>Random Factor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="record in monthlyRecords"
-                    :key="record.label"
-                    :class="{ selected: selectedMonthIndex === record.monthIndex }"
+            <section class="input-group-card random-global-panel">
+              <div class="workspace-output-header">
+                <h3>Random Assumptions</h3>
+                <p>These assumptions create adherence and occupancy losses against scheduled % and turn roster headcount into budgeted headcount.</p>
+              </div>
+
+              <div class="monthly-global-grid random-global-grid">
+                <div class="field-group">
+                  <label for="global-occupancy">{{ useMonthlyRandomOverrides ? 'Default Occupancy %' : 'Occupancy %' }}</label>
+                  <input
+                    id="global-occupancy"
+                    v-model.number="randomDefaults.occupancyPercent"
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="0.1"
+                    aria-label="Global occupancy percent"
+                  />
+                  <p class="helper-text">
+                    {{
+                      useMonthlyRandomOverrides
+                        ? 'Seeds the monthly override table.'
+                        : 'Applies across the full plan year.'
+                    }}
+                  </p>
+                </div>
+
+                <div class="field-group">
+                  <label for="global-adherence">{{ useMonthlyRandomOverrides ? 'Default Adherence %' : 'Adherence %' }}</label>
+                  <input
+                    id="global-adherence"
+                    v-model.number="randomDefaults.adherencePercent"
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="0.1"
+                    aria-label="Global adherence percent"
+                  />
+                  <p class="helper-text">
+                    {{
+                      useMonthlyRandomOverrides
+                        ? 'Seeds the monthly override table.'
+                        : 'Applies across the full plan year.'
+                    }}
+                  </p>
+                </div>
+
+                <div class="field-group random-override-field">
+                  <label for="use-random-overrides">Monthly overrides</label>
+                  <label class="random-override-toggle">
+                    <input
+                      id="use-random-overrides"
+                      :checked="useMonthlyRandomOverrides"
+                      type="checkbox"
+                      @change="setRandomOverrideMode($event.target.checked)"
+                    />
+                    <span>Use monthly overrides</span>
+                  </label>
+                  <p class="helper-text">Off for one yearly assumption set. On for month-level edits.</p>
+                </div>
+              </div>
+            </section>
+
+            <section v-if="useMonthlyRandomOverrides" class="input-group-card random-overrides-panel">
+              <div class="workspace-output-header">
+                <h3>Monthly Random Overrides</h3>
+                <p>Adjust only the months that need different occupancy or adherence assumptions. Losses are calculated from scheduled % from Step 1.</p>
+              </div>
+
+              <div class="monthly-copy-toolbar">
+                <label class="monthly-copy-select" for="random-copy-action">
+                  <span class="monthly-copy-label">Copy {{ selectedMonth.label }}</span>
+                  <select
+                    id="random-copy-action"
+                    class="monthly-copy-select-input"
+                    @change="handleRandomCopyAction"
                   >
-                    <td class="month-cell">
-                      <button
-                        type="button"
-                        class="assumption-month-btn"
-                        @click="setSelectedMonth(record.monthIndex)"
+                    <option value="">Choose action</option>
+                    <option value="all">To all months</option>
+                    <option value="forward">Forward</option>
+                    <option value="quarter">Through quarter</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="assumption-table-shell">
+                <table class="assumption-table assumption-table-random">
+                  <thead>
+                    <tr>
+                      <th title="Planning month. Click a month name to highlight that row.">Month</th>
+                      <th title="Scheduled percentage flowing in from Step 1.">Scheduled %</th>
+                      <th title="Expected monthly occupancy assumption used in the random loss build.">Occupancy %</th>
+                      <th title="Expected monthly adherence assumption used in the random loss build.">Adherence %</th>
+                      <th title="Adherence loss calculated as (1 - Adherence %) x Scheduled %.">Adherence Loss</th>
+                      <th title="Occupancy loss calculated as (1 - Occupancy %) x (Scheduled % - Adherence Loss).">Occupancy Loss</th>
+                      <th title="Total scheduled random loss calculated as Adherence Loss + Occupancy Loss.">Total Random Loss</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="record in monthlyRecords"
+                      :key="record.label"
+                      :class="{ selected: selectedMonthIndex === record.monthIndex }"
+                    >
+                      <td class="month-cell">
+                        <button
+                          type="button"
+                          class="assumption-month-btn"
+                          @click="setSelectedMonth(record.monthIndex)"
                       >
                         {{ record.fullLabel }}
                       </button>
                     </td>
-                    <td>
-                      <input
-                        v-model.number="randomMonths[record.monthIndex].forecastRiskPercent"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        aria-label="Forecast risk percent"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        v-model.number="randomMonths[record.monthIndex].seasonalityRiskPercent"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        aria-label="Seasonality risk percent"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        v-model.number="randomMonths[record.monthIndex].eventRiskPercent"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        aria-label="Event risk percent"
-                      />
-                    </td>
-                    <td>{{ formatPercent(record.randomBufferPercent, 1) }}</td>
-                    <td>{{ formatFactor(record.randomFactor) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <section class="monthly-focus-card">
-              <header class="monthly-focus-header">
-                <div>
-                  <p class="pane-kicker">Focused month</p>
-                  <h4>{{ selectedMonth.fullLabel }} random-factor build</h4>
-                </div>
-                <p>{{ formatPercent(selectedMonth.randomBufferPercent, 1) }} of added risk becomes a {{ formatFactor(selectedMonth.randomFactor) }} multiplier.</p>
-              </header>
-
-              <div class="monthly-formula-grid">
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Random Buffer % = {{ formatNumber(selectedMonth.forecastRiskPercent, 1) }} + {{ formatNumber(selectedMonth.seasonalityRiskPercent, 1) }} + {{ formatNumber(selectedMonth.eventRiskPercent, 1) }}
-                  </p>
-                  <p class="helper-text">Keep only the variability that remains after normal demand planning and utilization buffers.</p>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Random Factor = 1 + {{ formatNumber(selectedMonth.randomBufferPercent / 100, 3) }} = {{ formatFactor(selectedMonth.randomFactor) }}
-                  </p>
-                  <p class="helper-text">A 7% random buffer becomes a 1.07x staffing multiplier.</p>
-                </div>
-              </div>
-
-              <div v-if="selectedMonth.randomWarnings.length" class="monthly-warning-stack">
-                <p v-for="warning in selectedMonth.randomWarnings" :key="warning" class="status-message error">
-                  {{ warning }}
-                </p>
+                      <td>{{ formatPercent(record.scheduledPercent, 1) }}</td>
+                      <td>
+                        <input
+                          v-model.number="randomMonths[record.monthIndex].occupancyPercent"
+                          type="number"
+                          min="1"
+                          max="100"
+                          step="0.1"
+                          aria-label="Occupancy percent"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model.number="randomMonths[record.monthIndex].adherencePercent"
+                          type="number"
+                          min="1"
+                          max="100"
+                          step="0.1"
+                          aria-label="Adherence percent"
+                        />
+                      </td>
+                      <td>{{ formatPercent(record.adherenceLossPercent, 1) }}</td>
+                      <td>{{ formatPercent(record.occupancyLossPercent, 1) }}</td>
+                      <td>{{ formatPercent(record.randomLossPercent, 1) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </section>
+
+            <div v-else class="answer-card random-global-note">
+              <h4>Global mode is on</h4>
+              <p>These occupancy and adherence assumptions apply to every month in the plan. Adherence and occupancy losses are calculated from each month’s scheduled % from Step 1.</p>
+            </div>
 
             <div class="monthly-tab-actions">
               <button type="button" class="secondary-btn" @click="moveTab(-1)">Back to Presence / Utilization</button>
@@ -1103,83 +1120,61 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
           <section v-else class="results-panel monthly-tab-panel">
             <header class="monthly-tab-header">
               <div>
-                <p class="pane-kicker">Step 3</p>
                 <h3>Enter call demand and review the full monthly plan</h3>
               </div>
-              <p>
-                Only contacts and AHT are entered here. Open days, paid hours, presence, utilization, and random factors
-                all flow from the earlier steps.
-              </p>
             </header>
-
-            <div class="monthly-definition-grid">
-              <article class="answer-card">
-                <h4>Workload</h4>
-                <p>Contacts and AHT create monthly workload hours, which become the required present staffing need.</p>
-              </article>
-              <article class="answer-card">
-                <h4>Staffing chain</h4>
-                <p>Show the headcount leaders care about: present need, roster need before random, and budgeted headcount.</p>
-              </article>
-              <article class="answer-card">
-                <h4>Headcount</h4>
-                <p>The planner rounds the budgeted monthly requirement up to a whole headcount so leaders can see the staffing ask immediately.</p>
-              </article>
-            </div>
 
             <div class="results-metrics monthly-summary-grid">
               <article class="metric-card">
-                <p class="metric-label">Peak Headcount</p>
-                <p class="metric-value">{{ formatWhole(planSummary.peakMonth.roundedHeadcount) }}</p>
-                <p class="metric-meta">{{ planSummary.peakMonth.fullLabel }}</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Average Present Headcount</p>
-                <p class="metric-value">{{ formatNumber(planSummary.averagePresentHeadcount, 1) }}</p>
-                <p class="metric-meta">Average people needed present to run the workload</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Average Budgeted Headcount</p>
-                <p class="metric-value">{{ formatNumber(planSummary.averageBudgetedHeadcount, 1) }}</p>
-                <p class="metric-meta">Average monthly budget after random factor</p>
+                <p class="metric-label">Annual Contacts</p>
+                <p class="metric-value">{{ formatWhole(planSummary.annualContacts) }}</p>
+                <p class="metric-meta">Sum of all monthly demand entered in the plan</p>
               </article>
               <article class="metric-card">
                 <p class="metric-label">Annual Workload Hours</p>
                 <p class="metric-value">{{ formatWhole(planSummary.annualWorkloadHours) }}</p>
-                <p class="metric-meta">{{ planSummary.busiestMonth.fullLabel }} is the busiest month</p>
+                <p class="metric-meta">{{ planSummary.busiestMonth.fullLabel }} is the busiest workload month</p>
               </article>
               <article class="metric-card">
-                <p class="metric-label">Annual Budgeted HC-Months</p>
-                <p class="metric-value">{{ formatNumber(planSummary.annualBudgetedHeadcountMonths, 1) }}</p>
-                <p class="metric-meta">Sum of monthly budgeted headcount before rounding</p>
+                <p class="metric-label">Avg Required Staff Hours</p>
+                <p class="metric-value">{{ formatNumber(planSummary.averageRequiredStaffHours, 1) }}</p>
+                <p class="metric-meta">Average staffing hours required after design factor is applied</p>
               </article>
-            </div>
-
-            <div class="formula-card monthly-plan-formula">
-              <p class="formula-expression">
-                Workload Hours = Contacts x AHT / 3600 | Required Present HC = Workload Hours / (Paid Hours x Utilization)
-              </p>
-              <p class="formula-expression">
-                Budgeted HC = Required Roster HC before Random x Random Factor
-              </p>
+              <article class="metric-card">
+                <p class="metric-label">Avg Required Headcount</p>
+                <p class="metric-value">{{ formatNumber(planSummary.averageRequiredHeadcount, 1) }}</p>
+                <p class="metric-meta">Average monthly required headcount before rounding</p>
+              </article>
+              <article class="metric-card">
+                <p class="metric-label">Peak Required Headcount</p>
+                <p class="metric-value">{{ formatNumber(planSummary.peakMonth.requiredHeadcount, 1) }}</p>
+                <p class="metric-meta">{{ planSummary.peakMonth.fullLabel }}</p>
+              </article>
             </div>
 
             <div class="assumption-table-shell">
               <table class="assumption-table assumption-table-plan">
                 <thead>
                   <tr>
-                    <th>Month</th>
-                    <th>Contacts</th>
-                    <th>AHT Sec</th>
-                    <th>Open Days</th>
-                    <th>Presence %</th>
-                    <th>Utilization %</th>
-                    <th>Random Factor</th>
-                    <th>Workload Hours</th>
-                    <th>Required Present HC</th>
-                    <th>Roster HC Before Random</th>
-                    <th>Budgeted HC</th>
-                    <th>Rounded HC</th>
+                    <th title="Planning month. Click a month name to highlight that row.">Month</th>
+                    <th title="Monthly contact demand used to create workload hours.">Contacts</th>
+                    <th title="Average handle time in seconds used to create workload hours.">AHT Sec</th>
+                    <th title="Business days flowing in from Step 1 after weekday pattern and day adjustments.">Business Days</th>
+                    <th title="Scheduled percentage flowing in from Step 1 after presence and utilization are applied.">Scheduled %</th>
+                    <th title="Total scheduled random loss flowing in from Step 2.">
+                      <span class="plan-head-label">Total Random<br />Loss %</span>
+                    </th>
+                    <th title="Design Factor is calculated as Scheduled % - Total Random Loss %.">Design Factor</th>
+                    <th title="Workload Staffing Ratio is calculated as 1 / Design Factor. This ratio will later be used to convert workload into required staffing hours.">
+                      <span class="plan-head-label">Workload<br />Staffing Ratio</span>
+                    </th>
+                    <th title="Monthly workload hours calculated from contacts and AHT.">Workload Hours</th>
+                    <th title="Required staff hours calculated as Workload Hours x Workload Staffing Ratio.">
+                      <span class="plan-head-label">Required Staff<br />Hours</span>
+                    </th>
+                    <th title="Required headcount calculated as Required Staff Hours / Monthly FTE Paid Hours from Step 1.">
+                      <span class="plan-head-label">Required<br />Headcount</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1216,81 +1211,28 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
                       />
                     </td>
                     <td>{{ formatWhole(record.openDays) }}</td>
-                    <td>{{ formatPercent(record.presencePercent, 1) }}</td>
-                    <td>{{ formatPercent(record.utilizationPercent, 1) }}</td>
-                    <td>{{ formatFactor(record.randomFactor) }}</td>
+                    <td>{{ formatPercent(record.scheduledPercent, 1) }}</td>
+                    <td>{{ formatPercent(record.randomLossPercent, 1) }}</td>
+                    <td>{{ formatPercent(record.designFactorPercent, 1) }}</td>
+                    <td>{{ formatFactor(record.workloadStaffingRatio) }}</td>
                     <td>{{ formatNumber(record.workloadHours, 1) }}</td>
-                    <td>{{ formatNumber(record.requiredPresentHeadcount, 1) }}</td>
-                    <td>{{ formatNumber(record.requiredRosterHeadcount, 1) }}</td>
-                    <td>{{ formatNumber(record.finalFte, 1) }}</td>
-                    <td>{{ formatWhole(record.roundedHeadcount) }}</td>
+                    <td>{{ formatNumber(record.requiredStaffHours, 1) }}</td>
+                    <td>{{ formatNumber(record.requiredHeadcount, 1) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            <section class="monthly-focus-card">
-              <header class="monthly-focus-header">
-                <div>
-                  <p class="pane-kicker">Focused month</p>
-                  <h4>{{ selectedMonth.fullLabel }} staffing walkthrough</h4>
-                </div>
-                <p>{{ formatNumber(selectedMonth.finalFte, 1) }} budgeted heads rounds to {{ formatWhole(selectedMonth.roundedHeadcount) }} people.</p>
-              </header>
-
-              <div class="monthly-formula-grid">
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Workload Hours = {{ formatWhole(selectedMonth.contacts) }} x {{ formatWhole(selectedMonth.ahtSeconds) }} / 3600 = {{ formatNumber(selectedMonth.workloadHours, 1) }}
-                  </p>
-                  <p class="helper-text">Demand enters the model only here, after the assumptions are already built.</p>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Required Present HC = {{ formatNumber(selectedMonth.workloadHours, 1) }} / ({{ formatNumber(selectedMonth.paidHoursPerMonth, 1) }} x {{ formatNumber(selectedMonth.utilizationPercent / 100, 3) }}) = {{ formatNumber(selectedMonth.requiredPresentHeadcount, 1) }}
-                  </p>
-                  <p class="helper-text">This is the number of people that need to be present and usable on average to run the monthly workload.</p>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Required Roster HC Before Random = {{ formatNumber(selectedMonth.requiredPresentHeadcount, 1) }} / {{ formatNumber(selectedMonth.presencePercent / 100, 3) }} = {{ formatNumber(selectedMonth.requiredRosterHeadcount, 1) }}
-                  </p>
-                  <p class="helper-text">This converts present need into rostered headcount before the random-factor buffer is applied.</p>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Budgeted HC = {{ formatNumber(selectedMonth.requiredRosterHeadcount, 1) }} x {{ formatFactor(selectedMonth.randomFactor) }} = {{ formatNumber(selectedMonth.finalFte, 1) }}
-                  </p>
-                  <p class="helper-text">The random factor is the final budget buffer for forecast risk, seasonality, and event variation.</p>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Expected Average Present HC = {{ formatNumber(selectedMonth.finalFte, 1) }} x {{ formatNumber(selectedMonth.presencePercent / 100, 3) }} = {{ formatNumber(selectedMonth.expectedAveragePresentHeadcount, 1) }}
-                  </p>
-                  <p class="helper-text">This helps leaders translate the final budget back into the average people likely to be present.</p>
-                </div>
-                <div class="formula-card">
-                  <p class="formula-expression">
-                    Audit Math = {{ formatNumber(selectedMonth.workloadHours, 1) }} / {{ formatNumber(selectedMonth.effectiveHoursPerFte, 1) }} = {{ formatNumber(selectedMonth.auditFte, 1) }}
-                  </p>
-                  <p class="helper-text">
-                    Same budgeted answer from a denominator check:
-                    paid hours x presence x utilization / random factor.
-                  </p>
-                </div>
-              </div>
-
-              <div v-if="selectedMonth.planWarnings.length" class="monthly-warning-stack">
-                <p v-for="warning in selectedMonth.planWarnings" :key="warning" class="status-message error">
-                  {{ warning }}
-                </p>
-              </div>
-            </section>
+            <div v-if="selectedMonth.planWarnings.length" class="monthly-warning-stack">
+              <p v-for="warning in selectedMonth.planWarnings" :key="warning" class="status-message error">
+                {{ warning }}
+              </p>
+            </div>
 
             <section class="monthly-chart-panel">
               <div class="workspace-output-header">
-                <h3>Monthly staffing shape</h3>
-                <p>Headcount is rounded up from final FTE so leaders can see the staffing ask by month.</p>
+                <h3>Monthly Required Staffing</h3>
+                <p>Required staff hours by month after the design factor is applied.</p>
               </div>
               <div class="monthly-bars">
                 <button
@@ -1301,16 +1243,40 @@ const monthlyBarMax = computed(() => Math.max(...monthlyRecords.value.map((row) 
                   :class="{ active: selectedMonthIndex === record.monthIndex }"
                   @click="setSelectedMonth(record.monthIndex)"
                 >
-                  <small>{{ record.label }}</small>
-                  <div class="monthly-bar-stack">
-                    <div
-                      class="monthly-bar-segment monthly-bar-final"
-                      :style="{
-                        height: `${Math.max((record.finalFte / monthlyBarMax) * 100, record.finalFte > 0 ? 6 : 0)}%`
-                      }"
-                    ></div>
+                  <small class="monthly-bar-month">{{ record.label }}</small>
+                  <div class="monthly-bar-cap">
+                    <strong>{{ formatWhole(record.roundedHeadcount) }}</strong>
+                    <span>HC</span>
                   </div>
-                  <strong>{{ formatWhole(record.roundedHeadcount) }}</strong>
+                  <div class="monthly-bar-stack">
+                    <div class="monthly-bar-track">
+                      <div
+                        class="monthly-bar-segment monthly-bar-final"
+                        :style="{
+                          height: `${Math.max((record.requiredStaffHours / monthlyChartMax) * 100, record.requiredStaffHours > 0 ? 6 : 0)}%`
+                        }"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="monthly-bar-footer">
+                    <strong>{{ formatWhole(record.requiredStaffHours) }}</strong>
+                    <span>hours</span>
+                  </div>
+                  <div class="monthly-bar-tooltip">
+                    <p class="monthly-bar-tooltip-title">{{ record.fullLabel }}</p>
+                    <div class="monthly-bar-tooltip-grid">
+                      <span>Workload Hours</span>
+                      <strong>{{ formatNumber(record.workloadHours, 1) }}</strong>
+                      <span>Required Staff Hrs</span>
+                      <strong>{{ formatNumber(record.requiredStaffHours, 1) }}</strong>
+                      <span>Required HC</span>
+                      <strong>{{ formatNumber(record.requiredHeadcount, 1) }}</strong>
+                      <span>Total Random Loss</span>
+                      <strong>{{ formatPercent(record.randomLossPercent, 1) }}</strong>
+                      <span>Design Factor</span>
+                      <strong>{{ formatPercent(record.designFactorPercent, 1) }}</strong>
+                    </div>
+                  </div>
                 </button>
               </div>
             </section>
