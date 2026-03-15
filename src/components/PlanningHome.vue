@@ -1,5 +1,15 @@
 <script setup>
 import { computed } from 'vue'
+import {
+  getAnnualContacts,
+  getAnnualRequiredStaffHours,
+  getAnnualWorkloadHours,
+  getAverageAhtSeconds,
+  getAverageRequiredHeadcount,
+  getMinRequiredHeadcount,
+  getPeakRequiredHeadcount,
+  summarizePlanPortfolio
+} from '../planningSummary'
 
 const props = defineProps({
   plans: {
@@ -21,80 +31,6 @@ const formatNumber = (value, digits = 1) =>
     maximumFractionDigits: digits
   }).format(value || 0)
 
-const formatUpdatedAt = (value) => {
-  if (!value) return 'Not saved yet'
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  }).format(new Date(value))
-}
-
-const getAnnualContacts = (plan) => {
-  const summary = plan.summary || {}
-  if (typeof summary.annualContacts === 'number') {
-    return summary.annualContacts
-  }
-
-  if (Array.isArray(plan.planMonths)) {
-    return plan.planMonths.reduce((sum, month) => sum + (Number(month.contacts) || 0), 0)
-  }
-
-  return 0
-}
-
-const getAnnualWorkloadHours = (plan) => {
-  const summary = plan.summary || {}
-  return summary.annualWorkloadHours || 0
-}
-
-const getAnnualRequiredStaffHours = (plan) => {
-  const summary = plan.summary || {}
-  if (typeof summary.annualRequiredStaffHours === 'number') {
-    return summary.annualRequiredStaffHours
-  }
-
-  return (summary.averageRequiredStaffHours || 0) * 12
-}
-
-const getAverageAhtSeconds = (plan) => {
-  const summary = plan.summary || {}
-  if (typeof summary.averageAhtSeconds === 'number') {
-    return summary.averageAhtSeconds
-  }
-
-  const annualContacts = getAnnualContacts(plan)
-  const annualWorkloadHours = getAnnualWorkloadHours(plan)
-
-  if (annualContacts > 0 && annualWorkloadHours > 0) {
-    return (annualWorkloadHours * 3600) / annualContacts
-  }
-
-  if (Array.isArray(plan.planMonths)) {
-    const populatedMonths = plan.planMonths.filter((month) => Number(month.ahtSeconds) > 0)
-    if (populatedMonths.length) {
-      return populatedMonths.reduce((sum, month) => sum + Number(month.ahtSeconds || 0), 0) / populatedMonths.length
-    }
-  }
-
-  return 0
-}
-
-const getMinRequiredHeadcount = (plan) => {
-  const summary = plan.summary || {}
-  if (typeof summary.minimumRequiredHeadcount === 'number') {
-    return summary.minimumRequiredHeadcount
-  }
-
-  return summary.averageRequiredHeadcount || 0
-}
-
-const getAverageRequiredHeadcount = (plan) => plan.summary?.averageRequiredHeadcount || 0
-const getPeakRequiredHeadcount = (plan) => plan.summary?.peakRequiredHeadcount || 0
-
 const confirmDelete = (plan) => {
   const confirmed = window.confirm(
     `Delete "${plan.name}"? This removes the plan and its saved assumptions from this device.`
@@ -107,33 +43,7 @@ const confirmDelete = (plan) => {
   emit('delete-plan', plan.id)
 }
 
-const dashboardSummary = computed(() => {
-  if (!props.plans.length) {
-    return {
-      annualContacts: 0,
-      averageAhtSeconds: 0,
-      annualWorkloadHours: 0,
-      totalNeededStaffHours: 0,
-      totalMinRequiredHeadcount: 0,
-      totalAvgRequiredHeadcount: 0,
-      totalPeakHeadcount: 0
-    }
-  }
-
-  const annualContacts = props.plans.reduce((sum, plan) => sum + getAnnualContacts(plan), 0)
-  const annualWorkloadHours = props.plans.reduce((sum, plan) => sum + getAnnualWorkloadHours(plan), 0)
-
-  return {
-    totalPlans: props.plans.length,
-    annualContacts,
-    averageAhtSeconds: annualContacts > 0 ? (annualWorkloadHours * 3600) / annualContacts : 0,
-    annualWorkloadHours,
-    totalNeededStaffHours: props.plans.reduce((sum, plan) => sum + getAnnualRequiredStaffHours(plan), 0),
-    totalMinRequiredHeadcount: props.plans.reduce((sum, plan) => sum + getMinRequiredHeadcount(plan), 0),
-    totalAvgRequiredHeadcount: props.plans.reduce((sum, plan) => sum + getAverageRequiredHeadcount(plan), 0),
-    totalPeakHeadcount: props.plans.reduce((sum, plan) => sum + getPeakRequiredHeadcount(plan), 0)
-  }
-})
+const dashboardSummary = computed(() => summarizePlanPortfolio(props.plans))
 </script>
 
 <template>
