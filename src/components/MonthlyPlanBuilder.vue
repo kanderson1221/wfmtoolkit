@@ -1,6 +1,15 @@
 <script setup>
 import { computed, ref } from 'vue'
 
+const props = defineProps({
+  initialPlan: {
+    type: Object,
+    default: null
+  }
+})
+
+const emit = defineEmits(['save', 'cancel'])
+
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const FULL_MONTH_LABELS = [
   'January',
@@ -36,13 +45,13 @@ const TABS = [
     id: 'random',
     step: '2',
     title: 'Random',
-    description: 'Set occupancy and adherence assumptions that convert roster need into budgeted headcount.'
+    description: 'Set occupancy and adherence assumptions that reduce scheduled % into a usable design factor.'
   },
   {
     id: 'plan',
     step: '3',
     title: 'Monthly Plan',
-    description: 'Enter call demand and let the staffing plan flow from prior assumptions.'
+    description: 'Enter call demand and convert workload into required staff hours and headcount.'
   }
 ]
 
@@ -81,16 +90,6 @@ const buildPresenceMonths = () => MONTH_LABELS.map(() => createPresenceMonth())
 const buildRandomMonths = () => MONTH_LABELS.map(() => createRandomMonth())
 const buildPlanMonths = () => MONTH_LABELS.map(() => createPlanMonth())
 
-const planningYear = ref(currentYear)
-const activeTab = ref('presence')
-const selectedMonthIndex = ref(currentMonthIndex)
-const operatingWeekdays = ref([1, 2, 3, 4, 5])
-const presenceMonths = ref(buildPresenceMonths())
-const randomDefaults = ref(createRandomMonth())
-const useMonthlyRandomOverrides = ref(false)
-const randomMonths = ref(buildRandomMonths())
-const planMonths = ref(buildPlanMonths())
-
 const toNumber = (value, fallback = 0) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value
@@ -119,6 +118,30 @@ const formatWhole = (value) =>
 
 const formatPercent = (value, digits = 1) => `${formatNumber(value, digits)}%`
 const formatFactor = (value, digits = 2) => `${formatNumber(value, digits)}x`
+
+const normalizeWeekdays = (weekdays) =>
+  Array.isArray(weekdays) && weekdays.length
+    ? [...new Set(weekdays.map((value) => toNumber(value, 0)))].sort((left, right) => left - right)
+    : [1, 2, 3, 4, 5]
+
+const hydrateMonths = (months, fallbackBuilder, factory) =>
+  Array.isArray(months) && months.length === MONTH_LABELS.length
+    ? months.map((month) => factory(month))
+    : fallbackBuilder()
+
+const initialPlan = props.initialPlan || {}
+
+const planName = ref(initialPlan.name?.trim() || `${toNumber(initialPlan.planningYear, currentYear)} Staffing Plan`)
+const planningYear = ref(toNumber(initialPlan.planningYear, currentYear))
+const activeTab = ref('presence')
+const selectedMonthIndex = ref(currentMonthIndex)
+const settingsOpen = ref(!props.initialPlan)
+const operatingWeekdays = ref(normalizeWeekdays(initialPlan.operatingWeekdays))
+const presenceMonths = ref(hydrateMonths(initialPlan.presenceMonths, buildPresenceMonths, createPresenceMonth))
+const randomDefaults = ref(createRandomMonth(initialPlan.randomDefaults || {}))
+const useMonthlyRandomOverrides = ref(Boolean(initialPlan.useMonthlyRandomOverrides))
+const randomMonths = ref(hydrateMonths(initialPlan.randomMonths, buildRandomMonths, createRandomMonth))
+const planMonths = ref(hydrateMonths(initialPlan.planMonths, buildPlanMonths, createPlanMonth))
 
 const calculateCalendarOpenDays = (year, monthIndex, activeDays) => {
   if (!activeDays.length) {
@@ -284,6 +307,7 @@ const handleRandomCopyAction = (event) => {
 }
 
 const loadExamplePlan = () => {
+  planName.value = `${currentYear + 1} Example Staffing Plan`
   planningYear.value = currentYear + 1
   operatingWeekdays.value = [1, 2, 3, 4, 5, 6]
 
@@ -318,9 +342,11 @@ const loadExamplePlan = () => {
 
   activeTab.value = 'presence'
   selectedMonthIndex.value = 0
+  settingsOpen.value = false
 }
 
 const resetPlanner = () => {
+  planName.value = `${currentYear} Staffing Plan`
   planningYear.value = currentYear
   operatingWeekdays.value = [1, 2, 3, 4, 5]
   presenceMonths.value = buildPresenceMonths()
@@ -330,6 +356,15 @@ const resetPlanner = () => {
   planMonths.value = buildPlanMonths()
   activeTab.value = 'presence'
   selectedMonthIndex.value = currentMonthIndex
+  settingsOpen.value = false
+}
+
+const openSettings = () => {
+  settingsOpen.value = true
+}
+
+const closeSettings = () => {
+  settingsOpen.value = false
 }
 
 const monthlyRecords = computed(() =>
@@ -460,7 +495,7 @@ const monthlyRecords = computed(() =>
     }
 
     if (adherencePercent < 90) {
-      randomWarnings.push('Adherence is low for a monthly staffing plan. Recheck the assumption before finalizing budgeted headcount.')
+      randomWarnings.push('Adherence is low for a monthly staffing plan. Recheck the assumption before finalizing required headcount.')
     }
 
     if (randomLossPercent >= scheduledPercent && scheduledPercent > 0) {
@@ -560,6 +595,8 @@ const operatingWeekdayLabel = computed(() => {
     .join(', ')
 })
 
+const displayPlanName = computed(() => planName.value.trim() || `${planningYear.value} Staffing Plan`)
+
 const presenceSummary = computed(() => {
   const rows = monthlyRecords.value
 
@@ -596,16 +633,61 @@ const planSummary = computed(() => {
   const busiestMonth = rows.reduce((busiest, row) =>
     row.workloadHours > busiest.workloadHours ? row : busiest
   )
+  const annualContacts = rows.reduce((sum, row) => sum + row.contacts, 0)
+  const annualWorkloadHours = rows.reduce((sum, row) => sum + row.workloadHours, 0)
+  const annualRequiredStaffHours = rows.reduce((sum, row) => sum + row.requiredStaffHours, 0)
+  const averageAhtSeconds =
+    annualContacts > 0
+      ? (annualWorkloadHours * 3600) / annualContacts
+      : average(rows.map((row) => row.ahtSeconds))
+  const minimumRequiredHeadcount = rows.length
+    ? rows.reduce((minimum, row) => Math.min(minimum, row.requiredHeadcount), rows[0].requiredHeadcount)
+    : 0
 
   return {
     peakMonth,
     busiestMonth,
-    annualContacts: rows.reduce((sum, row) => sum + row.contacts, 0),
-    annualWorkloadHours: rows.reduce((sum, row) => sum + row.workloadHours, 0),
+    annualContacts,
+    annualWorkloadHours,
+    annualRequiredStaffHours,
+    averageAhtSeconds,
+    minimumRequiredHeadcount,
     averageRequiredStaffHours: average(rows.map((row) => row.requiredStaffHours)),
     averageRequiredHeadcount: average(rows.map((row) => row.requiredHeadcount))
   }
 })
+
+const buildPlanPayload = () => ({
+  id: initialPlan.id || null,
+  createdAt: initialPlan.createdAt || null,
+  name: planName.value.trim() || `${planningYear.value} Staffing Plan`,
+  planningYear: planningYear.value,
+  operatingWeekdays: [...operatingWeekdays.value],
+  presenceMonths: presenceMonths.value.map((month) => createPresenceMonth(month)),
+  randomDefaults: createRandomMonth(randomDefaults.value),
+  useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
+  randomMonths: randomMonths.value.map((month) => createRandomMonth(month)),
+  planMonths: planMonths.value.map((month) => createPlanMonth(month)),
+  summary: {
+    annualContacts: planSummary.value.annualContacts,
+    annualWorkloadHours: planSummary.value.annualWorkloadHours,
+    annualRequiredStaffHours: planSummary.value.annualRequiredStaffHours,
+    averageAhtSeconds: planSummary.value.averageAhtSeconds,
+    minimumRequiredHeadcount: planSummary.value.minimumRequiredHeadcount,
+    averageRequiredStaffHours: planSummary.value.averageRequiredStaffHours,
+    averageRequiredHeadcount: planSummary.value.averageRequiredHeadcount,
+    peakRequiredHeadcount: planSummary.value.peakMonth.requiredHeadcount,
+    peakMonthLabel: planSummary.value.peakMonth.fullLabel
+  }
+})
+
+const savePlan = () => {
+  emit('save', buildPlanPayload())
+}
+
+const cancelEditor = () => {
+  emit('cancel')
+}
 
 const plannerWarnings = computed(() => {
   const rows = monthlyRecords.value
@@ -627,50 +709,34 @@ const monthlyChartMax = computed(() =>
       <div class="calculator-card monthly-flow-card">
         <div class="monthly-flow-shell">
           <section class="monthly-flow-hero">
-            <p class="pane-kicker">Monthly Budget Planner</p>
-            <h2>Build a monthly staffing plan</h2>
-            <p class="calculator-intro">Set monthly assumptions, then enter contacts and AHT to build the plan.</p>
+            <p class="pane-kicker">Planning App</p>
+            <h2>Monthly plan editor</h2>
+            <p class="calculator-intro">Build one staffing plan, save it, and return to the planning home when you&apos;re ready.</p>
           </section>
 
-          <section class="input-group-card monthly-global-controls">
-            <div class="input-group-header">
-              <h3>Global setup</h3>
-              <p class="helper-text">
-                The selected year and operating weekdays drive each month&apos;s calendar open days before presence is
-                applied.
-              </p>
-            </div>
-
-            <div class="monthly-global-grid">
-              <div class="field-group monthly-setup-card">
-                <label for="planning-year">Planning year</label>
-                <select id="planning-year" v-model.number="planningYear">
-                  <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
-                </select>
+          <section class="input-group-card monthly-settings-bar">
+            <div class="monthly-settings-summary">
+              <div class="monthly-settings-primary">
+                <p class="pane-kicker">Plan Settings</p>
+                <h3>{{ displayPlanName }}</h3>
+                <p>{{ planningYear }} plan using {{ operatingWeekdayLabel }} as the operating day pattern.</p>
               </div>
 
-              <div class="field-group monthly-weekday-field monthly-setup-card">
-                <label>Operating days</label>
-                <div class="weekday-toggle-group">
-                  <button
-                    v-for="weekday in WEEKDAY_OPTIONS"
-                    :key="weekday.value"
-                    type="button"
-                    class="weekday-toggle"
-                    :class="{ active: operatingWeekdays.includes(weekday.value) }"
-                    @click="toggleWeekday(weekday.value)"
-                  >
-                    {{ weekday.label }}
-                  </button>
-                </div>
+              <div class="monthly-settings-stats">
+                <span>
+                  <strong>Year</strong>
+                  <em>{{ planningYear }}</em>
+                </span>
+                <span>
+                  <strong>Operating Days</strong>
+                  <em>{{ operatingWeekdayLabel }}</em>
+                </span>
               </div>
 
-              <div class="field-group monthly-action-field monthly-setup-card">
-                <label>Planner actions</label>
-                <div class="batch-actions">
-                  <button type="button" class="secondary-btn" @click="loadExamplePlan">Load Example Plan</button>
-                  <button type="button" class="secondary-btn" @click="resetPlanner">Reset Planner</button>
-                </div>
+              <div class="monthly-settings-actions">
+                <button type="button" class="secondary-btn" @click="openSettings">Edit Settings</button>
+                <button type="button" class="submit-btn" @click="savePlan">Save Plan</button>
+                <button type="button" class="secondary-btn" @click="cancelEditor">Back to Plans</button>
               </div>
             </div>
 
@@ -679,6 +745,60 @@ const monthlyChartMax = computed(() =>
               Review the highlighted assumption notes in each step before finalizing headcount.
             </p>
           </section>
+
+          <div v-if="settingsOpen" class="monthly-settings-modal-backdrop" @click.self="closeSettings">
+            <section class="input-group-card monthly-settings-modal" role="dialog" aria-modal="true" aria-labelledby="plan-settings-title">
+              <div class="monthly-settings-modal-header">
+                <div>
+                  <p class="pane-kicker">Plan Settings</p>
+                  <h3 id="plan-settings-title">Configure this plan</h3>
+                </div>
+                <button type="button" class="secondary-btn" @click="closeSettings">Done</button>
+              </div>
+
+              <div class="monthly-global-grid monthly-settings-grid">
+                <div class="field-group monthly-name-field monthly-setup-card">
+                  <label for="plan-name">Plan name</label>
+                  <input
+                    id="plan-name"
+                    v-model.trim="planName"
+                    type="text"
+                    maxlength="80"
+                    placeholder="2026 Staffing Plan"
+                  />
+                </div>
+
+                <div class="field-group monthly-setup-card">
+                  <label for="planning-year">Planning year</label>
+                  <select id="planning-year" v-model.number="planningYear">
+                    <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
+                  </select>
+                </div>
+
+                <div class="field-group monthly-weekday-field monthly-setup-card monthly-settings-weekdays">
+                  <label>Operating days</label>
+                  <div class="weekday-toggle-group">
+                    <button
+                      v-for="weekday in WEEKDAY_OPTIONS"
+                      :key="weekday.value"
+                      type="button"
+                      class="weekday-toggle"
+                      :class="{ active: operatingWeekdays.includes(weekday.value) }"
+                      @click="toggleWeekday(weekday.value)"
+                    >
+                      {{ weekday.label }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="monthly-settings-modal-actions">
+                <button type="button" class="secondary-btn" @click="loadExamplePlan">Load Example</button>
+                <button type="button" class="secondary-btn" @click="resetPlanner">Reset</button>
+                <button type="button" class="submit-btn" @click="closeSettings">Done</button>
+              </div>
+            </section>
+          </div>
 
           <nav class="monthly-tab-strip" aria-label="Monthly planner sections">
             <button
@@ -966,7 +1086,7 @@ const monthlyChartMax = computed(() =>
             <section class="input-group-card random-global-panel">
               <div class="workspace-output-header">
                 <h3>Random Assumptions</h3>
-                <p>These assumptions create adherence and occupancy losses against scheduled % and turn roster headcount into budgeted headcount.</p>
+                <p>These assumptions create adherence and occupancy losses against scheduled % and flow into the final design factor.</p>
               </div>
 
               <div class="monthly-global-grid random-global-grid">
@@ -1283,6 +1403,7 @@ const monthlyChartMax = computed(() =>
 
             <div class="monthly-tab-actions">
               <button type="button" class="secondary-btn" @click="moveTab(-1)">Back to Random</button>
+              <button type="button" class="submit-btn" @click="savePlan">Save Plan</button>
             </div>
           </section>
         </div>

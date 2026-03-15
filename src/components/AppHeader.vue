@@ -4,15 +4,33 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import logoUrl from '../assets/logo.png'
 
 const props = defineProps({
-  currentRoute: {
+  currentApp: {
     type: String,
-    default: 'erlang'
+    default: 'home'
   }
 })
 
 const menuOpen = ref(false)
 const apiHealth = ref('checking')
 let healthPoll = null
+
+const appLinks = [
+  {
+    id: 'home',
+    href: '#home',
+    label: 'Home'
+  },
+  {
+    id: 'calculators',
+    href: '#calculators/interval',
+    label: 'Calculator Suite'
+  },
+  {
+    id: 'planning',
+    href: '#planning',
+    label: 'Planning App'
+  }
+]
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value
@@ -61,54 +79,45 @@ onBeforeUnmount(() => {
 <template>
   <header class="site-header">
     <div class="container header-content">
-      <a href="#erlang-c" class="brand-wrap" aria-label="WFMToolkit home">
-        <img :src="`${logoUrl}?v=20260310-1908`" alt="WFMToolkit logo" class="brand-logo" />
+      <a href="#home" class="brand-wrap" aria-label="WFMToolkit home">
+        <img :src="`${logoUrl}?v=20260315-0900`" alt="WFMToolkit logo" class="brand-logo" />
       </a>
 
-      <nav class="site-nav" aria-label="Main navigation">
-        <button
-          class="nav-toggle"
-          type="button"
-          :aria-expanded="menuOpen ? 'true' : 'false'"
-          aria-controls="main-nav-links"
-          aria-label="Toggle navigation menu"
-          @click="toggleMenu"
-        >
-          <span class="nav-toggle-bar"></span>
-          <span class="nav-toggle-bar"></span>
-          <span class="nav-toggle-bar"></span>
-        </button>
-
-        <div id="main-nav-links" class="nav-links" :class="{ open: menuOpen }">
-          <a
-            href="#erlang-c"
-            class="nav-link"
-            :class="{ active: props.currentRoute === 'erlang' }"
-            @click="closeMenu"
-          >
-            Interval Calculator
-          </a>
-          <a
-            href="#monthly-plan"
-            class="nav-link"
-            :class="{ active: props.currentRoute === 'monthly-plan' }"
-            @click="closeMenu"
-          >
-            Monthly Planner
-          </a>
-          <a
-            href="#csv-batch"
-            class="nav-link"
-            :class="{ active: props.currentRoute === 'csv-batch' }"
-            @click="closeMenu"
-          >
-            Batch Planner
-          </a>
+      <div class="header-right">
+        <div class="header-utilities">
+          <span class="api-indicator" :class="`is-${apiHealth}`">API {{ apiHealthLabel }}</span>
         </div>
-      </nav>
 
-      <div class="header-utilities">
-        <span class="api-indicator" :class="`is-${apiHealth}`">API {{ apiHealthLabel }}</span>
+        <nav class="site-nav" aria-label="Main navigation">
+          <button
+            class="nav-toggle"
+            type="button"
+            :aria-expanded="menuOpen ? 'true' : 'false'"
+            aria-controls="main-nav-links"
+            aria-label="Toggle navigation menu"
+            @click="toggleMenu"
+          >
+            <span class="nav-toggle-label">Menu</span>
+            <span class="nav-toggle-icon" aria-hidden="true">
+              <span class="nav-toggle-bar"></span>
+              <span class="nav-toggle-bar"></span>
+              <span class="nav-toggle-bar"></span>
+            </span>
+          </button>
+
+          <div id="main-nav-links" class="nav-links" :class="{ open: menuOpen }">
+            <a
+              v-for="link in appLinks"
+              :key="link.id"
+              :href="link.href"
+              class="nav-link app-nav-link"
+              :class="{ active: props.currentApp === link.id }"
+              @click="closeMenu"
+            >
+              {{ link.label }}
+            </a>
+          </div>
+        </nav>
       </div>
     </div>
   </header>
