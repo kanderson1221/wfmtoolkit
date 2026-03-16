@@ -196,8 +196,8 @@ const gapClass = (value) => ({
               <th title="Date the class is hired into the roster and enters training.">Hire Date</th>
               <th title="Heads entering the class on the hire date.">Hire Count</th>
               <th title="Derived class end date based on the global training duration in workdays.">Graduation Date</th>
-              <th title="Derived graduating headcount after applying the global graduation yield.">
-                <span class="plan-head-label">Projected Grad<br />HC</span>
+              <th title="Full class headcount scheduled to finish training on the graduation date.">
+                <span class="plan-head-label">Graduating<br />Headcount</span>
               </th>
               <th title="Derived frontline-ready date after applying post-training nesting days.">Frontline Ready</th>
               <th :title="`Status relative to ${selectedMonthLabel}.`">Status</th>
@@ -232,7 +232,7 @@ const gapClass = (value) => ({
                 />
               </td>
               <td>{{ formatDerivedDate(getTrainingMetrics(trainingClass).graduationDate) }}</td>
-              <td>{{ props.formatNumber(getTrainingMetrics(trainingClass).projectedGraduatingHeadcount, 1) }}</td>
+              <td>{{ props.formatNumber(getTrainingMetrics(trainingClass).graduatingHeadcount, 1) }}</td>
               <td>{{ formatDerivedDate(getTrainingMetrics(trainingClass).frontlineReadyDate) }}</td>
               <td>
                 <span
@@ -275,8 +275,8 @@ const gapClass = (value) => ({
               <th title="Total people hired into training during the month.">
                 <span class="plan-head-label">Hired into<br />Training</span>
               </th>
-              <th title="People who finish training and become frontline-ready during the month.">
-                <span class="plan-head-label">Graduates to<br />Frontline</span>
+              <th title="Full class headcount scheduled to finish training during the month. Graduation yield still affects how many become frontline-ready after nesting.">
+                <span class="plan-head-label">Graduating<br />Headcount</span>
               </th>
               <th title="People still in training at the end of the month and therefore not yet available as frontline supply.">
                 <span class="plan-head-label">Still in Training<br />Month End</span>

@@ -3952,6 +3952,14 @@ select:focus {
   text-transform: uppercase;
 }
 
+.settings-field-checkbox {
+  align-content: space-between;
+}
+
+.settings-field-checkbox .random-override-toggle {
+  min-height: 36px;
+}
+
 .settings-field input {
   min-height: 36px;
   padding: 0.38rem 0.62rem;

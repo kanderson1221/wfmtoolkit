@@ -94,6 +94,17 @@ const concurrentTrainingCapacity = computed(
             aria-label="Post training nesting days"
           />
         </label>
+        <div class="settings-field settings-field-checkbox">
+          <span>Recommended Start Week</span>
+          <label class="random-override-toggle">
+            <input
+              v-model="trainingSettings.startOnFirstBusinessDayOfWeek"
+              type="checkbox"
+              aria-label="Start recommended classes on the first business day of the week"
+            />
+            <span>Start recommended classes on the first business day of the week</span>
+          </label>
+        </div>
         <div class="training-settings-capacity-card">
           <span>Concurrent Training Capacity</span>
           <strong>{{ props.formatNumber(concurrentTrainingCapacity, 0) }}</strong>
