@@ -911,8 +911,15 @@ export const computeStaffingRecords = (
   trainingSettings
 ) => {
   const trainingSummary = buildTrainingClassMonthlySummary(planningYear, trainingClasses, trainingSettings)
-  let runningHeadcount = Math.max(toNumber(startingHeadcount, 0), 0)
-  let runningFrontlineHeadcount = Math.min(Math.max(toNumber(startingFrontlineHeadcount, runningHeadcount), 0), runningHeadcount)
+  const normalizedStartingHeadcount = Math.max(toNumber(startingHeadcount, 0), 0)
+  const normalizedStartingFrontlineHeadcount = Math.max(toNumber(startingFrontlineHeadcount, normalizedStartingHeadcount), 0)
+  const openingCarryInNonFrontlineHeadcount = trainingSummary.monthlySummary[0]?.startingNonFrontlineHeadcount || 0
+
+  let runningHeadcount = Math.max(
+    normalizedStartingHeadcount,
+    normalizedStartingFrontlineHeadcount + openingCarryInNonFrontlineHeadcount
+  )
+  let runningFrontlineHeadcount = Math.min(normalizedStartingFrontlineHeadcount, runningHeadcount)
 
   const records = monthlyRecords.map((planned, monthIndex) => {
     const staffingInput = createStaffingMonth(staffingMonths?.[monthIndex] || {})
@@ -934,8 +941,10 @@ export const computeStaffingRecords = (
       Math.max(runningFrontlineHeadcount + frontlineReadyHeadcount - frontlineAttritionHeadcount, 0),
       endingHeadcount
     )
-    const gapToRequirement = endingFrontlineHeadcount - planned.requiredHeadcount
-    const gapToRoundedRequirement = endingFrontlineHeadcount - planned.roundedHeadcount
+    const startingGapToRequirement = startingFrontlineHeadcount - planned.requiredHeadcount
+    const startingGapToRoundedRequirement = startingFrontlineHeadcount - planned.roundedHeadcount
+    const endingGapToRequirement = endingFrontlineHeadcount - planned.requiredHeadcount
+    const endingGapToRoundedRequirement = endingFrontlineHeadcount - planned.roundedHeadcount
 
     const record = {
       monthIndex,
@@ -953,9 +962,13 @@ export const computeStaffingRecords = (
       frontlineReadyHeadcount,
       endingRosterHeadcount: endingHeadcount,
       endingFrontlineHeadcount,
-      gapToRequirement,
-      gapToRoundedRequirement,
-      isBelowRequirement: gapToRequirement < 0,
+      gapToRequirement: startingGapToRequirement,
+      gapToRoundedRequirement: startingGapToRoundedRequirement,
+      startingGapToRequirement,
+      startingGapToRoundedRequirement,
+      endingGapToRequirement,
+      endingGapToRoundedRequirement,
+      isBelowRequirement: startingGapToRequirement < 0,
       activeTrainingClasses: trainingMonth?.activeClassesCount || 0,
       startingInTrainingHeadcount: trainingMonth?.startingInTrainingHeadcount || 0,
       inTrainingHeadcount: trainingMonth?.inTrainingHeadcount || 0,

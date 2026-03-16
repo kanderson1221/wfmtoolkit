@@ -290,8 +290,8 @@ const gapClass = (value) => ({
               <th title="Productive frontline headcount available at the end of the month after graduates and attrition are applied.">
                 <span class="plan-head-label">Ending Frontline<br />Headcount</span>
               </th>
-              <th title="Ending frontline headcount minus required headcount from the demand model. Negative values indicate a shortfall.">
-                <span class="plan-head-label">Headcount Gap<br />to Need</span>
+              <th title="Starting frontline headcount minus required headcount from the demand model. Negative values indicate the month opens short.">
+                <span class="plan-head-label">Opening Frontline<br />Gap</span>
               </th>
             </tr>
           </thead>
