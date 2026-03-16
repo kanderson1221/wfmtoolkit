@@ -2,9 +2,17 @@
 import { computed } from 'vue'
 
 const props = defineProps({
+  mode: {
+    type: String,
+    default: 'plan'
+  },
   monthlyRecords: {
     type: Array,
     required: true
+  },
+  actualRecords: {
+    type: Array,
+    default: () => []
   },
   summary: {
     type: Object,
@@ -20,17 +28,22 @@ const emit = defineEmits(['copy-action', 'previous', 'continue', 'toggle-overrid
 
 const randomDefaults = defineModel('randomDefaults', {
   type: Object,
-  required: true
+  default: null
 })
 
 const useMonthlyRandomOverrides = defineModel('useMonthlyRandomOverrides', {
   type: Boolean,
-  required: true
+  default: false
 })
 
 const randomMonths = defineModel('randomMonths', {
   type: Array,
-  required: true
+  default: null
+})
+
+const actualMonths = defineModel('actualMonths', {
+  type: Array,
+  default: null
 })
 
 const selectedMonthIndex = defineModel('selectedMonthIndex', {
@@ -38,8 +51,11 @@ const selectedMonthIndex = defineModel('selectedMonthIndex', {
   required: true
 })
 
+const isActualMode = computed(() => props.mode === 'actuals')
+const rows = computed(() => (isActualMode.value ? props.actualRecords : props.monthlyRecords))
+
 const selectedMonth = computed(
-  () => props.monthlyRecords[selectedMonthIndex.value] ?? props.monthlyRecords[0] ?? { label: 'month' }
+  () => rows.value[selectedMonthIndex.value] ?? rows.value[0] ?? { label: 'month' }
 )
 
 const setSelectedMonth = (monthIndex) => {
@@ -63,54 +79,84 @@ const handleOverrideModeChange = (event) => {
   <section class="results-panel monthly-tab-panel">
     <header class="monthly-tab-header">
       <div>
-        <h3>Set occupancy and adherence assumptions</h3>
+        <h3>{{ isActualMode ? 'Track actual adherence and occupancy month by month' : 'Set occupancy and adherence assumptions' }}</h3>
       </div>
-      <p>Use one global assumption set for the year, and only turn on monthly overrides if a few months need different values.</p>
+      <p>
+        {{
+          isActualMode
+            ? 'Track actual monthly adherence and occupancy against the actual scheduled % flowing in from the actual presence / utilization step.'
+            : 'Use one global assumption set for the year, and only turn on monthly overrides if a few months need different values.'
+        }}
+      </p>
     </header>
 
     <div class="results-metrics monthly-summary-grid">
       <article class="metric-card">
-        <p class="metric-label">{{ props.summary.usesMonthlyOverrides ? 'Average Occupancy' : 'Occupancy' }}</p>
+        <p class="metric-label">{{ isActualMode ? 'Average Actual Occupancy' : props.summary.usesMonthlyOverrides ? 'Average Occupancy' : 'Occupancy' }}</p>
         <p class="metric-value">
-          {{ props.formatPercent(props.summary.usesMonthlyOverrides ? props.summary.averageOccupancyPercent : props.summary.globalOccupancyPercent, 1) }}
+          {{
+            props.formatPercent(
+              isActualMode
+                ? props.summary.averageOccupancyPercent
+                : props.summary.usesMonthlyOverrides
+                  ? props.summary.averageOccupancyPercent
+                  : props.summary.globalOccupancyPercent,
+              1
+            )
+          }}
         </p>
         <p class="metric-meta">
-          {{ props.summary.usesMonthlyOverrides ? 'Average monthly occupancy assumption' : 'Global occupancy assumption used across the full year' }}
+          {{
+            isActualMode
+              ? 'Average actual occupancy result across the year'
+              : props.summary.usesMonthlyOverrides
+                ? 'Average monthly occupancy assumption'
+                : 'Global occupancy assumption used across the full year'
+          }}
         </p>
       </article>
       <article class="metric-card">
-        <p class="metric-label">{{ props.summary.usesMonthlyOverrides ? 'Average Adherence' : 'Adherence' }}</p>
+        <p class="metric-label">{{ isActualMode ? 'Average Actual Adherence' : props.summary.usesMonthlyOverrides ? 'Average Adherence' : 'Adherence' }}</p>
         <p class="metric-value">
-          {{ props.formatPercent(props.summary.usesMonthlyOverrides ? props.summary.averageAdherencePercent : props.summary.globalAdherencePercent, 1) }}
+          {{
+            props.formatPercent(
+              isActualMode
+                ? props.summary.averageAdherencePercent
+                : props.summary.usesMonthlyOverrides
+                  ? props.summary.averageAdherencePercent
+                  : props.summary.globalAdherencePercent,
+              1
+            )
+          }}
         </p>
         <p class="metric-meta">
-          {{ props.summary.usesMonthlyOverrides ? 'Average monthly adherence assumption' : 'Global adherence assumption used across the full year' }}
+          {{
+            isActualMode
+              ? 'Average actual adherence result across the year'
+              : props.summary.usesMonthlyOverrides
+                ? 'Average monthly adherence assumption'
+                : 'Global adherence assumption used across the full year'
+          }}
         </p>
       </article>
       <article class="metric-card">
         <p class="metric-label">Avg Adherence Loss</p>
-        <p class="metric-value">
-          {{ props.formatPercent(props.summary.averageAdherenceLossPercent, 1) }}
-        </p>
-        <p class="metric-meta">Average monthly loss applied to scheduled % from adherence</p>
+        <p class="metric-value">{{ props.formatPercent(props.summary.averageAdherenceLossPercent, 1) }}</p>
+        <p class="metric-meta">{{ isActualMode ? 'Average actual loss applied to scheduled % from adherence' : 'Average monthly loss applied to scheduled % from adherence' }}</p>
       </article>
       <article class="metric-card">
         <p class="metric-label">Avg Occupancy Loss</p>
-        <p class="metric-value">
-          {{ props.formatPercent(props.summary.averageOccupancyLossPercent, 1) }}
-        </p>
-        <p class="metric-meta">Average monthly loss applied after adherence loss is removed</p>
+        <p class="metric-value">{{ props.formatPercent(props.summary.averageOccupancyLossPercent, 1) }}</p>
+        <p class="metric-meta">{{ isActualMode ? 'Average actual loss applied after adherence loss is removed' : 'Average monthly loss applied after adherence loss is removed' }}</p>
       </article>
       <article class="metric-card">
         <p class="metric-label">Avg Total Scheduled Random Loss</p>
-        <p class="metric-value">
-          {{ props.formatPercent(props.summary.averageRandomLossPercent, 1) }}
-        </p>
+        <p class="metric-value">{{ props.formatPercent(props.summary.averageRandomLossPercent, 1) }}</p>
         <p class="metric-meta">Adherence loss plus occupancy loss against scheduled %</p>
       </article>
     </div>
 
-    <section class="input-group-card random-global-panel">
+    <section v-if="!isActualMode" class="input-group-card random-global-panel">
       <div class="workspace-output-header">
         <h3>Random Assumptions</h3>
         <p>These assumptions create adherence and occupancy losses against scheduled % and flow into the final design factor.</p>
@@ -173,13 +219,19 @@ const handleOverrideModeChange = (event) => {
       </div>
     </section>
 
-    <section v-if="useMonthlyRandomOverrides" class="input-group-card random-overrides-panel">
+    <section class="input-group-card random-overrides-panel">
       <div class="workspace-output-header">
-        <h3>Monthly Random Overrides</h3>
-        <p>Adjust only the months that need different occupancy or adherence assumptions. Losses are calculated from scheduled % from Step 1.</p>
+        <h3>{{ isActualMode ? 'Monthly Actual Random Results' : 'Monthly Random Overrides' }}</h3>
+        <p>
+          {{
+            isActualMode
+              ? 'Enter actual monthly occupancy and adherence. Losses are calculated from the actual scheduled % from the actual presence / utilization step.'
+              : 'Adjust only the months that need different occupancy or adherence assumptions. Losses are calculated from scheduled % from Step 1.'
+          }}
+        </p>
       </div>
 
-      <div class="monthly-copy-toolbar">
+      <div v-if="!isActualMode && useMonthlyRandomOverrides" class="monthly-copy-toolbar">
         <label class="monthly-copy-select" for="random-copy-action">
           <span class="monthly-copy-label">Copy {{ selectedMonth.label }}</span>
           <select
@@ -195,7 +247,12 @@ const handleOverrideModeChange = (event) => {
         </label>
       </div>
 
-      <div class="assumption-table-shell">
+      <div v-if="!isActualMode && !useMonthlyRandomOverrides" class="answer-card random-global-note">
+        <h4>Global mode is on</h4>
+        <p>These occupancy and adherence assumptions apply to every month in the plan. Adherence and occupancy losses are calculated from each month’s scheduled % from Step 1.</p>
+      </div>
+
+      <div v-else-if="!isActualMode && useMonthlyRandomOverrides" class="assumption-table-shell">
         <table class="assumption-table assumption-table-random">
           <thead>
             <tr>
@@ -210,7 +267,7 @@ const handleOverrideModeChange = (event) => {
           </thead>
           <tbody>
             <tr
-              v-for="record in props.monthlyRecords"
+              v-for="record in rows"
               :key="record.label"
               :class="{ selected: selectedMonthIndex === record.monthIndex }"
             >
@@ -251,16 +308,74 @@ const handleOverrideModeChange = (event) => {
           </tbody>
         </table>
       </div>
+
+      <div v-else class="assumption-table-shell">
+        <table class="assumption-table assumption-table-random">
+          <thead>
+            <tr>
+              <th title="Planning month. Click a month name to highlight that row.">Month</th>
+              <th title="Actual scheduled percentage flowing in from the actual presence / utilization step.">Actual Scheduled %</th>
+              <th title="Actual occupancy result for the month.">Actual Occupancy %</th>
+              <th title="Actual adherence result for the month.">Actual Adherence %</th>
+              <th title="Adherence loss calculated as (1 - Adherence %) x Actual Scheduled %.">Adherence Loss</th>
+              <th title="Occupancy loss calculated as (1 - Occupancy %) x (Actual Scheduled % - Adherence Loss).">Occupancy Loss</th>
+              <th title="Total scheduled random loss calculated as Adherence Loss + Occupancy Loss.">Total Random Loss</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="record in rows"
+              :key="`actual-random-${record.label}`"
+              :class="{ selected: selectedMonthIndex === record.monthIndex }"
+            >
+              <td class="month-cell">
+                <button
+                  type="button"
+                  class="assumption-month-btn"
+                  @click="setSelectedMonth(record.monthIndex)"
+                >
+                  {{ record.fullLabel }}
+                </button>
+              </td>
+              <td>{{ props.formatPercent(record.actualScheduledPercent, 1) }}</td>
+              <td>
+                <input
+                  v-model.number="actualMonths[record.monthIndex].actualOccupancyPercent"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="0.1"
+                  aria-label="Actual occupancy percent"
+                />
+              </td>
+              <td>
+                <input
+                  v-model.number="actualMonths[record.monthIndex].actualAdherencePercent"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="0.1"
+                  aria-label="Actual adherence percent"
+                />
+              </td>
+              <td>{{ props.formatPercent(record.actualAdherenceLossPercent, 1) }}</td>
+              <td>{{ props.formatPercent(record.actualOccupancyLossPercent, 1) }}</td>
+              <td>{{ props.formatPercent(record.actualRandomLossPercent, 1) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
-    <div v-else class="answer-card random-global-note">
-      <h4>Global mode is on</h4>
-      <p>These occupancy and adherence assumptions apply to every month in the plan. Adherence and occupancy losses are calculated from each month’s scheduled % from Step 1.</p>
+    <div v-if="isActualMode && selectedMonth.warnings?.length" class="monthly-warning-stack">
+      <p v-for="warning in selectedMonth.warnings" :key="warning" class="status-message error">
+        {{ warning }}
+      </p>
     </div>
 
     <div class="monthly-tab-actions">
       <button type="button" class="secondary-btn" @click="emit('previous')">Back to Presence / Utilization</button>
-      <button type="button" class="submit-btn" @click="emit('continue')">Continue to Monthly Plan</button>
+      <button type="button" class="submit-btn" @click="emit('continue')">Continue to Headcount Requirement</button>
     </div>
   </section>
 </template>

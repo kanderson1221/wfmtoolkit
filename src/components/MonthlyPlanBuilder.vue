@@ -5,24 +5,42 @@ import PlannerMonthlyPlanTab from './planner/PlannerMonthlyPlanTab.vue'
 import PlannerPresenceTab from './planner/PlannerPresenceTab.vue'
 import PlannerRandomTab from './planner/PlannerRandomTab.vue'
 import PlannerSettingsModal from './planner/PlannerSettingsModal.vue'
+import PlannerStaffingPlanTab from './planner/PlannerStaffingPlanTab.vue'
 import { buildPlannerDraftKey, clearPlannerDraft, loadPlannerDraft, persistPlannerDraft } from '../plannerDraftStorage'
 import {
   MONTH_LABELS,
+  buildActualMonths,
+  buildSeedActualMonthsFromRecords,
   buildPlanMonths,
   buildPresenceMonths,
   buildRandomMonths,
+  buildStaffingMonths,
+  buildTrainingClasses,
   calculateCalendarOpenDays,
   clamp,
   collectPlannerWarnings,
+  computeActualRecords,
   computeMonthlyRecords,
+  computeStaffingRecords,
+  deriveStartingFrontlineHeadcount,
+  createActualMonth,
   createPlanMonth,
   createPresenceMonth,
   createRandomMonth,
+  createStaffingMonth,
+  createTrainingClass,
+  createTrainingSettings,
   getMonthlyChartMax,
   normalizeWeekdays,
+  recommendTrainingClasses,
+  summarizeActualRecords,
+  summarizeActualPlanRecords,
+  summarizeActualPresenceRecords,
+  summarizeActualRandomRecords,
   summarizePlanRecords,
   summarizePresenceRecords,
   summarizeRandomRecords,
+  summarizeStaffingRecords,
   toNumber
 } from '../plannerModel'
 
@@ -63,8 +81,13 @@ const TABS = [
   },
   {
     id: 'plan',
-    title: 'Monthly Plan'
+    title: 'Headcount Requirement'
   }
+]
+const MODES = [
+  { id: 'plan', title: 'Demand Model' },
+  { id: 'staffing', title: 'Staffing Plan' },
+  { id: 'actuals', title: 'Track Actuals' }
 ]
 
 const currentYear = new Date().getFullYear()
@@ -103,9 +126,14 @@ const initialUi = restoredDraft?.ui || {}
 const centerOperatingWeekdays = normalizeWeekdays(props.centerDefaults?.operatingWeekdays)
 const centerPaidHoursPerDay = toNumber(props.centerDefaults?.presenceMonths?.[0]?.paidHoursPerDay, 8)
 const centerRandomDefaults = createRandomMonth(props.centerDefaults?.randomDefaults || {})
+const initialStartingHeadcount = Math.max(toNumber(initialPlan.startingHeadcount, 0), 0)
+const hydratedTrainingClasses = Array.isArray(initialPlan.trainingClasses)
+  ? initialPlan.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass))
+  : buildTrainingClasses()
 
 const planName = ref(initialPlan.name?.trim() || '')
 const planningYear = ref(toNumber(initialPlan.planningYear, currentYear))
+const activeMode = ref(initialUi.activeMode || 'plan')
 const activeTab = ref(initialUi.activeTab || 'presence')
 const selectedMonthIndex = ref(clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1))
 const settingsOpen = ref(savedPlan ? initialUi.settingsOpen ?? false : true)
@@ -115,6 +143,28 @@ const randomDefaults = ref(createRandomMonth(initialPlan.randomDefaults || {}))
 const useMonthlyRandomOverrides = ref(Boolean(initialPlan.useMonthlyRandomOverrides))
 const randomMonths = ref(hydrateMonths(initialPlan.randomMonths, buildRandomMonths, createRandomMonth))
 const planMonths = ref(hydrateMonths(initialPlan.planMonths, buildPlanMonths, createPlanMonth))
+const trainingSettings = ref(createTrainingSettings(initialPlan.trainingSettings || {}))
+const startingHeadcount = ref(initialStartingHeadcount)
+const startingFrontlineHeadcount = ref(
+  Math.min(
+    Math.max(
+      toNumber(
+        initialPlan.startingFrontlineHeadcount,
+        deriveStartingFrontlineHeadcount(
+          toNumber(initialPlan.planningYear, currentYear),
+          initialStartingHeadcount,
+          hydratedTrainingClasses,
+          trainingSettings.value
+        )
+      ),
+      0
+    ),
+    initialStartingHeadcount
+  )
+)
+const staffingMonths = ref(hydrateMonths(initialPlan.staffingMonths, buildStaffingMonths, createStaffingMonth))
+const trainingClasses = ref(hydratedTrainingClasses)
+const actualMonths = ref(buildActualMonths())
 const autosaveState = ref(restoredDraft ? 'restored' : 'idle')
 const lastAutosavedAt = ref(restoredDraft?.autosavedAt || null)
 const autosaveReady = ref(false)
@@ -156,6 +206,27 @@ const createPresenceMonthFromProfile = ({
     otherAwayHoursPerDay
   })
 }
+
+const buildActualMonthsFromInputs = ({
+  year = planningYear.value,
+  weekdays = operatingWeekdays.value,
+  presence = presenceMonths.value,
+  randomDefaultValues = randomDefaults.value,
+  monthlyRandomOverridesEnabled = useMonthlyRandomOverrides.value,
+  randomOverrideMonths = randomMonths.value,
+  plans = planMonths.value
+} = {}) =>
+  buildSeedActualMonthsFromRecords(
+    computeMonthlyRecords({
+      planningYear: year,
+      operatingWeekdays: weekdays,
+      presenceMonths: presence,
+      randomDefaults: randomDefaultValues,
+      useMonthlyRandomOverrides: monthlyRandomOverridesEnabled,
+      randomMonths: randomOverrideMonths,
+      planMonths: plans
+    })
+  )
 
 const setActiveTab = (tabId) => {
   activeTab.value = tabId
@@ -280,7 +351,48 @@ const loadExamplePlan = () => {
       ahtSeconds: exampleAht[index]
     })
   )
+  startingHeadcount.value = 52
+  startingFrontlineHeadcount.value = 52
+  trainingSettings.value = createTrainingSettings({
+    trainingDurationWorkdays: 20,
+    graduationYieldPercent: 85,
+    availableTrainers: 2,
+    maxClassSize: 12,
+    postTrainingNestingDays: 5
+  })
+  staffingMonths.value = MONTH_LABELS.map((_, index) =>
+    createStaffingMonth({
+      frontlineAttritionHeadcount: [1.3, 1.3, 1.5, 1.5, 1.7, 1.7, 1.9, 1.9, 1.7, 1.7, 1.5, 1.5][index]
+    })
+  )
+  trainingClasses.value = [
+    createTrainingClass({
+      id: 'class-spring',
+      hireDate: `${currentYear + 1}-02-10`,
+      hireCount: 8
+    }),
+    createTrainingClass({
+      id: 'class-summer',
+      hireDate: `${currentYear + 1}-06-09`,
+      hireCount: 10
+    }),
+    createTrainingClass({
+      id: 'class-fall',
+      hireDate: `${currentYear + 1}-09-08`,
+      hireCount: 9
+    })
+  ]
+  actualMonths.value = buildActualMonthsFromInputs({
+    year: planningYear.value,
+    weekdays: operatingWeekdays.value,
+    presence: presenceMonths.value,
+    randomDefaultValues: randomDefaults.value,
+    monthlyRandomOverridesEnabled: useMonthlyRandomOverrides.value,
+    randomOverrideMonths: randomMonths.value,
+    plans: planMonths.value
+  })
 
+  activeMode.value = 'plan'
   activeTab.value = 'presence'
   selectedMonthIndex.value = 0
   settingsStatusTone.value = 'success'
@@ -302,6 +414,21 @@ const resetPlanner = () => {
   useMonthlyRandomOverrides.value = false
   randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(centerRandomDefaults))
   planMonths.value = buildPlanMonths()
+  trainingSettings.value = createTrainingSettings()
+  startingHeadcount.value = 0
+  startingFrontlineHeadcount.value = 0
+  staffingMonths.value = buildStaffingMonths()
+  trainingClasses.value = buildTrainingClasses()
+  actualMonths.value = buildActualMonthsFromInputs({
+    year: currentYear,
+    weekdays: centerOperatingWeekdays,
+    presence: presenceMonths.value,
+    randomDefaultValues: randomDefaults.value,
+    monthlyRandomOverridesEnabled: useMonthlyRandomOverrides.value,
+    randomOverrideMonths: randomMonths.value,
+    plans: planMonths.value
+  })
+  activeMode.value = 'plan'
   activeTab.value = 'presence'
   selectedMonthIndex.value = currentMonthIndex
   settingsOpen.value = true
@@ -311,6 +438,23 @@ const resetPlanner = () => {
 
 const openSettings = () => {
   settingsOpen.value = true
+}
+
+const generateRecommendedTrainingClasses = () => {
+  const recommendations = recommendTrainingClasses({
+    monthlyRecords: monthlyRecords.value,
+    planningYear: planningYear.value,
+    startingHeadcount: startingHeadcount.value,
+    startingFrontlineHeadcount: startingFrontlineHeadcount.value,
+    staffingMonths: staffingMonths.value,
+    trainingClasses: trainingClasses.value,
+    trainingSettings: trainingSettings.value
+  })
+
+  trainingClasses.value = [
+    ...trainingClasses.value.filter((trainingClass) => createTrainingClass(trainingClass).source !== 'recommended'),
+    ...recommendations
+  ]
 }
 
 const cancelSettings = () => {
@@ -350,6 +494,12 @@ const monthlyRecords = computed(() =>
   })
 )
 
+actualMonths.value = hydrateMonths(
+  initialPlan.actualMonths,
+  () => buildActualMonthsFromInputs(),
+  createActualMonth
+)
+
 const operatingWeekdayLabel = computed(() => {
   if (!operatingWeekdays.value.length) {
     return 'No days selected'
@@ -370,6 +520,25 @@ const randomSummary = computed(() =>
 
 const planSummary = computed(() => summarizePlanRecords(monthlyRecords.value))
 
+const actualRecords = computed(() => computeActualRecords(monthlyRecords.value, actualMonths.value))
+const staffingRecords = computed(() =>
+  computeStaffingRecords(
+    monthlyRecords.value,
+    planningYear.value,
+    startingHeadcount.value,
+    startingFrontlineHeadcount.value,
+    staffingMonths.value,
+    trainingClasses.value,
+    trainingSettings.value
+  )
+)
+
+const actualsSummary = computed(() => summarizeActualRecords(actualRecords.value))
+const actualPresenceSummary = computed(() => summarizeActualPresenceRecords(actualRecords.value))
+const actualRandomSummary = computed(() => summarizeActualRandomRecords(actualRecords.value))
+const actualPlanSummary = computed(() => summarizeActualPlanRecords(actualRecords.value))
+const staffingSummary = computed(() => summarizeStaffingRecords(staffingRecords.value))
+
 const buildPlanPayload = () => ({
   id: savedPlan?.id || initialPlan.id || null,
   createdAt: savedPlan?.createdAt || initialPlan.createdAt || null,
@@ -381,6 +550,12 @@ const buildPlanPayload = () => ({
   useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
   randomMonths: randomMonths.value.map((month) => createRandomMonth(month)),
   planMonths: planMonths.value.map((month) => createPlanMonth(month)),
+  trainingSettings: createTrainingSettings(trainingSettings.value),
+  startingHeadcount: startingHeadcount.value,
+  startingFrontlineHeadcount: startingFrontlineHeadcount.value,
+  staffingMonths: staffingMonths.value.map((month) => createStaffingMonth(month)),
+  trainingClasses: trainingClasses.value.map((trainingClass) => createTrainingClass(trainingClass)),
+  actualMonths: actualMonths.value.map((month) => createActualMonth(month)),
   summary: {
     annualContacts: planSummary.value.annualContacts,
     annualWorkloadHours: planSummary.value.annualWorkloadHours,
@@ -390,13 +565,30 @@ const buildPlanPayload = () => ({
     averageRequiredStaffHours: planSummary.value.averageRequiredStaffHours,
     averageRequiredHeadcount: planSummary.value.averageRequiredHeadcount,
     peakRequiredHeadcount: planSummary.value.peakMonth.requiredHeadcount,
-    peakMonthLabel: planSummary.value.peakMonth.fullLabel
+    peakMonthLabel: planSummary.value.peakMonth.fullLabel,
+    startingRosterHeadcount: staffingSummary.value.startingRosterHeadcount,
+    startingFrontlineHeadcount: staffingSummary.value.startingFrontlineHeadcount,
+    endingRosterHeadcount: staffingSummary.value.endingRosterHeadcount,
+    endingFrontlineHeadcount: staffingSummary.value.endingFrontlineHeadcount,
+    totalHireHeadcount: staffingSummary.value.totalHireHeadcount,
+    totalGraduatingHeadcount: staffingSummary.value.totalGraduatingHeadcount,
+    totalFrontlineAttritionHeadcount: staffingSummary.value.totalFrontlineAttritionHeadcount,
+    averageGapToRequirement: staffingSummary.value.averageGapToRequirement,
+    peakInTrainingHeadcount: staffingSummary.value.peakInTrainingHeadcount,
+    annualActualContacts: actualsSummary.value.annualActualContacts,
+    annualActualWorkloadHours: actualsSummary.value.annualActualWorkloadHours,
+    annualActualRequiredStaffHours: actualsSummary.value.annualActualRequiredStaffHours,
+    averageActualHeadcount: actualsSummary.value.averageActualHeadcount,
+    averageActualRequiredHeadcount: actualsSummary.value.averageActualRequiredHeadcount,
+    peakActualHeadcount: actualsSummary.value.peakActualHeadcount,
+    peakActualRequiredHeadcount: actualsSummary.value.peakActualRequiredHeadcount
   }
 })
 
 const buildDraftPayload = () => ({
   plan: buildPlanPayload(),
   ui: {
+    activeMode: activeMode.value,
     activeTab: activeTab.value,
     selectedMonthIndex: selectedMonthIndex.value,
     settingsOpen: settingsOpen.value
@@ -467,11 +659,23 @@ const cancelEditor = () => {
   emit('cancel')
 }
 
+const planWarnings = computed(() => collectPlannerWarnings(monthlyRecords.value))
+const actualWarnings = computed(() =>
+  actualRecords.value.flatMap((row) => row.warnings.map((message) => `${row.label}: ${message}`))
+)
 const plannerWarnings = computed(() => {
-  return collectPlannerWarnings(monthlyRecords.value)
+  if (activeMode.value === 'staffing') {
+    return []
+  }
+
+  return activeMode.value === 'actuals' ? actualWarnings.value : planWarnings.value
 })
 
-const monthlyChartMax = computed(() => getMonthlyChartMax(monthlyRecords.value))
+const monthlyChartMax = computed(() =>
+  activeMode.value === 'actuals'
+    ? Math.max(...actualRecords.value.flatMap((row) => [row.actualWorkloadHours, row.actualRequiredStaffHours]), 1)
+    : getMonthlyChartMax(monthlyRecords.value)
+)
 
 const autosaveStatusMessage = computed(() => {
   if (autosaveState.value === 'saving') {
@@ -500,6 +704,7 @@ watch(
   [
     planName,
     planningYear,
+    activeMode,
     activeTab,
     selectedMonthIndex,
     settingsOpen,
@@ -508,7 +713,13 @@ watch(
     randomDefaults,
     useMonthlyRandomOverrides,
     randomMonths,
-    planMonths
+    planMonths,
+    trainingSettings,
+    startingHeadcount,
+    startingFrontlineHeadcount,
+    staffingMonths,
+    trainingClasses,
+    actualMonths
   ],
   () => {
     if (autosaveState.value === 'restored') {
@@ -524,6 +735,12 @@ watch(planName, (value) => {
   if (value.trim() && settingsStatusTone.value === 'error') {
     settingsStatusMessage.value = ''
     settingsStatusTone.value = 'success'
+  }
+})
+
+watch(startingHeadcount, (value) => {
+  if (startingFrontlineHeadcount.value > value) {
+    startingFrontlineHeadcount.value = value
   }
 })
 
@@ -577,7 +794,11 @@ onBeforeUnmount(() => {
 
             <p v-if="plannerWarnings.length" class="status-message error monthly-global-warning">
               {{ plannerWarnings.length }} monthly warning{{ plannerWarnings.length === 1 ? '' : 's' }} detected.
-              Review the plan for missing or invalid monthly inputs before finalizing headcount.
+              {{
+                activeMode === 'actuals'
+                  ? 'Review the tracker for missing or invalid actual monthly inputs before finalizing comparisons.'
+                  : 'Review the plan for missing or invalid monthly inputs before finalizing headcount.'
+              }}
             </p>
           </section>
 
@@ -596,7 +817,24 @@ onBeforeUnmount(() => {
             @reset="resetPlanner"
           />
 
-          <nav class="monthly-tab-strip" aria-label="Monthly planner sections">
+          <nav class="monthly-mode-strip" aria-label="Planner mode">
+            <button
+              v-for="mode in MODES"
+              :key="mode.id"
+              type="button"
+              class="monthly-mode-btn"
+              :class="{ active: activeMode === mode.id }"
+              @click="activeMode = mode.id"
+            >
+              <strong>{{ mode.title }}</strong>
+            </button>
+          </nav>
+
+          <nav
+            v-if="activeMode !== 'staffing'"
+            class="monthly-tab-strip"
+            aria-label="Monthly planner sections"
+          >
             <button
               v-for="tab in TABS"
               :key="tab.id"
@@ -609,12 +847,30 @@ onBeforeUnmount(() => {
             </button>
           </nav>
 
+          <PlannerStaffingPlanTab
+            v-if="activeMode === 'staffing'"
+            :planning-year="planningYear"
+            v-model:starting-headcount="startingHeadcount"
+            v-model:starting-frontline-headcount="startingFrontlineHeadcount"
+            v-model:training-settings="trainingSettings"
+            v-model:staffing-months="staffingMonths"
+            v-model:training-classes="trainingClasses"
+            v-model:selected-month-index="selectedMonthIndex"
+            :staffing-records="staffingRecords"
+            :format-number="formatNumber"
+            @recommend-classes="generateRecommendedTrainingClasses"
+            @save="savePlan"
+          />
+
           <PlannerPresenceTab
-            v-if="activeTab === 'presence'"
+            v-else-if="activeTab === 'presence'"
+            :mode="activeMode"
             v-model:presence-months="presenceMonths"
+            v-model:actual-months="actualMonths"
             v-model:selected-month-index="selectedMonthIndex"
             :monthly-records="monthlyRecords"
-            :summary="presenceSummary"
+            :actual-records="actualRecords"
+            :summary="activeMode === 'actuals' ? actualPresenceSummary : presenceSummary"
             :format-whole="formatWhole"
             :format-number="formatNumber"
             :format-percent="formatPercent"
@@ -624,12 +880,15 @@ onBeforeUnmount(() => {
 
           <PlannerRandomTab
             v-else-if="activeTab === 'random'"
+            :mode="activeMode"
             v-model:random-defaults="randomDefaults"
             v-model:use-monthly-random-overrides="useMonthlyRandomOverrides"
             v-model:random-months="randomMonths"
+            v-model:actual-months="actualMonths"
             v-model:selected-month-index="selectedMonthIndex"
             :monthly-records="monthlyRecords"
-            :summary="randomSummary"
+            :actual-records="actualRecords"
+            :summary="activeMode === 'actuals' ? actualRandomSummary : randomSummary"
             :format-percent="formatPercent"
             @copy-action="handleRandomCopyAction"
             @previous="moveTab(-1)"
@@ -639,10 +898,14 @@ onBeforeUnmount(() => {
 
           <PlannerMonthlyPlanTab
             v-else
+            :mode="activeMode"
             v-model:plan-months="planMonths"
+            v-model:actual-months="actualMonths"
             v-model:selected-month-index="selectedMonthIndex"
             :monthly-records="monthlyRecords"
+            :actual-records="actualRecords"
             :plan-summary="planSummary"
+            :actual-summary="actualPlanSummary"
             :monthly-chart-max="monthlyChartMax"
             :format-whole="formatWhole"
             :format-number="formatNumber"
