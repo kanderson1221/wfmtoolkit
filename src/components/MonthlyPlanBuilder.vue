@@ -6,6 +6,7 @@ import PlannerPresenceTab from './planner/PlannerPresenceTab.vue'
 import PlannerRandomTab from './planner/PlannerRandomTab.vue'
 import PlannerSettingsModal from './planner/PlannerSettingsModal.vue'
 import PlannerStaffingPlanTab from './planner/PlannerStaffingPlanTab.vue'
+import AppButton from './ui/AppButton.vue'
 import { buildPlannerDraftKey, clearPlannerDraft, loadPlannerDraft, persistPlannerDraft } from '../plannerDraftStorage'
 import {
   MONTH_LABELS,
@@ -358,7 +359,7 @@ const loadExamplePlan = () => {
   settingsStatusTone.value = 'success'
   settingsStatusMessage.value = planName.value.trim()
     ? 'Sample data loaded.'
-    : 'Sample data loaded. Add a plan name to continue.'
+    : 'Sample data loaded. Add a staffing group name to continue.'
 }
 
 const resetPlanner = () => {
@@ -424,7 +425,7 @@ const cancelSettings = () => {
 const closeSettings = () => {
   if (!planName.value.trim()) {
     settingsStatusTone.value = 'error'
-    settingsStatusMessage.value = 'Plan name is required before you can continue.'
+    settingsStatusMessage.value = 'Staffing group name is required before you can continue.'
     settingsOpen.value = true
     return
   }
@@ -455,7 +456,7 @@ const operatingWeekdayLabel = computed(() => {
     .join(', ')
 })
 
-const displayPlanName = computed(() => planName.value.trim() || 'New staffing plan')
+const displayPlanName = computed(() => planName.value.trim() || 'New staffing group')
 
 const presenceSummary = computed(() => summarizePresenceRecords(monthlyRecords.value))
 
@@ -576,7 +577,7 @@ const savePlan = () => {
   if (!planName.value.trim()) {
     settingsOpen.value = true
     settingsStatusTone.value = 'error'
-    settingsStatusMessage.value = 'Plan name is required before you can save this plan.'
+    settingsStatusMessage.value = 'Staffing group name is required before you can save this staffing group.'
     return
   }
 
@@ -683,15 +684,15 @@ onBeforeUnmount(() => {
 
 <template>
   <section id="monthly-plan" class="calculator-section">
-    <div class="container">
+    <div class="app-frame">
       <div class="calculator-card monthly-flow-card">
         <div class="monthly-flow-shell">
           <section class="input-group-card monthly-settings-bar">
             <div class="monthly-settings-summary">
               <div class="monthly-settings-primary">
-                <p class="pane-kicker">Plan Settings</p>
+                <p class="pane-kicker">Staffing Group Settings</p>
                 <h3>{{ displayPlanName }}</h3>
-                <p>{{ planningYear }} plan using {{ operatingWeekdayLabel }} as the operating day pattern.</p>
+                <p>{{ planningYear }} staffing group using {{ operatingWeekdayLabel }} as the operating day pattern.</p>
               </div>
 
               <div class="monthly-settings-stats">
@@ -707,9 +708,9 @@ onBeforeUnmount(() => {
 
               <div class="monthly-settings-actions-wrap">
                 <div class="monthly-settings-actions">
-                  <button type="button" class="secondary-btn" @click="openSettings">Edit Settings</button>
-                  <button type="button" class="submit-btn" @click="savePlan">Save Plan</button>
-                  <button type="button" class="secondary-btn" @click="cancelEditor">Back to Plans</button>
+                  <AppButton variant="secondary" @click="openSettings">Edit Settings</AppButton>
+                  <AppButton variant="primary" @click="savePlan">Save Staffing Group</AppButton>
+                  <AppButton variant="secondary" @click="cancelEditor">Back to Staffing Groups</AppButton>
                 </div>
                 <p class="monthly-settings-autosave" :class="autosaveStatusClass">{{ autosaveStatusMessage }}</p>
               </div>
@@ -717,7 +718,7 @@ onBeforeUnmount(() => {
 
             <p v-if="plannerWarnings.length" class="status-message error monthly-global-warning">
               {{ plannerWarnings.length }} monthly warning{{ plannerWarnings.length === 1 ? '' : 's' }} detected.
-              {{ 'Review the plan for missing or invalid monthly inputs before finalizing headcount.' }}
+              {{ 'Review the demand model for missing or invalid monthly inputs before finalizing headcount.' }}
             </p>
           </section>
 
@@ -737,16 +738,15 @@ onBeforeUnmount(() => {
           />
 
           <nav class="monthly-mode-strip" aria-label="Planner mode">
-            <button
+            <AppButton
               v-for="mode in MODES"
               :key="mode.id"
-              type="button"
-              class="monthly-mode-btn"
-              :class="{ active: activeMode === mode.id }"
+              variant="tab"
+              :active="activeMode === mode.id"
               @click="activeMode = mode.id"
             >
               <strong>{{ mode.title }}</strong>
-            </button>
+            </AppButton>
           </nav>
 
           <nav
@@ -754,16 +754,15 @@ onBeforeUnmount(() => {
             class="monthly-tab-strip"
             aria-label="Monthly planner sections"
           >
-            <button
+            <AppButton
               v-for="tab in TABS"
               :key="tab.id"
-              type="button"
-              class="monthly-tab-btn"
-              :class="{ active: activeTab === tab.id }"
+              variant="tab"
+              :active="activeTab === tab.id"
               @click="setActiveTab(tab.id)"
             >
               <strong>{{ tab.title }}</strong>
-            </button>
+            </AppButton>
           </nav>
 
           <PlannerStaffingPlanTab
@@ -783,7 +782,6 @@ onBeforeUnmount(() => {
 
           <PlannerPresenceTab
             v-else-if="activeTab === 'presence'"
-            :mode="activeMode"
             v-model:presence-months="presenceMonths"
             v-model:selected-month-index="selectedMonthIndex"
             :monthly-records="monthlyRecords"
@@ -797,7 +795,6 @@ onBeforeUnmount(() => {
 
           <PlannerRandomTab
             v-else-if="activeTab === 'random'"
-            :mode="activeMode"
             v-model:random-defaults="randomDefaults"
             v-model:use-monthly-random-overrides="useMonthlyRandomOverrides"
             v-model:random-months="randomMonths"
@@ -813,7 +810,6 @@ onBeforeUnmount(() => {
 
           <PlannerMonthlyPlanTab
             v-else
-            :mode="activeMode"
             v-model:plan-months="planMonths"
             v-model:selected-month-index="selectedMonthIndex"
             :monthly-records="monthlyRecords"

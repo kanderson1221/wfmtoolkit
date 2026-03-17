@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@plugin "tailwindcss-primeui";
+
+@import "./styles/base.css";
+@import "./styles/layout.css";
+@import "./styles/primitives.css";
+@import "./styles/calculators.css";
+@import "./styles/planner.css";

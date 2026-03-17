@@ -72,7 +72,7 @@ const handleSubmit = async () => {
 
 <template>
   <section id="erlang-c" class="calculator-section workspace-section" aria-labelledby="erlang-c-heading">
-    <div class="container">
+    <div class="app-frame">
       <div class="calculator-card workspace-shell erlang-workspace">
         <section id="erlang-inputs" class="workspace-pane workspace-controls">
           <div class="pane-heading">

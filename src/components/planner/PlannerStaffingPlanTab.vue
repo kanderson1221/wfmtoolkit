@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import PlannerTrainingSettingsModal from './PlannerTrainingSettingsModal.vue'
 import { createTrainingClass, createTrainingSettings, deriveTrainingClassMetrics } from '../../plannerModel'
+import AppButton from '../ui/AppButton.vue'
 
 const props = defineProps({
   planningYear: {
@@ -176,17 +177,16 @@ const gapClass = (value) => ({
       </div>
 
       <div class="training-class-toolbar">
-        <button type="button" class="secondary-btn" @click="trainingSettingsOpen = true">Training Settings</button>
-        <button type="button" class="secondary-btn" @click="addTrainingClass">Add Training Class</button>
-        <button
-          type="button"
-          class="secondary-btn"
+        <AppButton variant="secondary" @click="trainingSettingsOpen = true">Training Settings</AppButton>
+        <AppButton variant="secondary" @click="addTrainingClass">Add Training Class</AppButton>
+        <AppButton
+          variant="secondary"
           :disabled="!canRecommendClasses"
           title="Recommend class start dates and sizes from the current training settings."
           @click="emit('recommend-classes')"
         >
           Recommend Classes
-        </button>
+        </AppButton>
       </div>
 
       <div class="assumption-table-shell">
@@ -243,9 +243,7 @@ const gapClass = (value) => ({
                 </span>
               </td>
               <td class="training-action-cell">
-                <button type="button" class="danger-btn compact-btn" @click="removeTrainingClass(trainingClass.id)">
-                  Remove
-                </button>
+                <AppButton variant="danger" size="sm" @click="removeTrainingClass(trainingClass.id)">Remove</AppButton>
               </td>
             </tr>
           </tbody>
@@ -357,7 +355,7 @@ const gapClass = (value) => ({
     </section>
 
     <div class="monthly-tab-actions">
-      <button type="button" class="submit-btn" @click="emit('save')">Save Plan</button>
+      <AppButton variant="primary" @click="emit('save')">Save Staffing Group</AppButton>
     </div>
 
     <PlannerTrainingSettingsModal

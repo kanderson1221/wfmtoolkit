@@ -1,0 +1,116 @@
+@layer components {
+  .app-frame {
+    @apply mx-auto w-[calc(100%-1.5rem)] xl:w-[calc(100%-2rem)] 2xl:w-[calc(100%-2.5rem)];
+  }
+
+  .app-shell {
+    @apply min-h-screen bg-slate-50;
+  }
+
+  .app-main {
+    @apply min-h-[calc(100vh-74px)] py-3;
+  }
+
+  .site-footer {
+    @apply border-t border-slate-200 bg-white/90;
+  }
+
+  .site-footer .app-frame {
+    @apply py-4 text-sm text-slate-500;
+  }
+
+  .calculator-section,
+  .workspace-section {
+    @apply py-3;
+  }
+
+  .calculator-card,
+  .results-panel {
+    @apply overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm;
+  }
+
+  .input-group-card,
+  .answer-card,
+  .metric-card {
+    @apply rounded-[24px] border border-slate-200 bg-slate-50/70;
+  }
+
+  .answer-card {
+    @apply px-4 py-3.5;
+  }
+
+  .answer-card-primary {
+    @apply border-sky-100 bg-sky-50;
+  }
+
+  .metric-card {
+    @apply grid gap-1 px-4 py-3.5;
+  }
+
+  .metric-label {
+    @apply text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
+  }
+
+  .metric-value {
+    @apply text-[1.4rem] font-semibold tracking-[-0.04em] text-slate-950;
+  }
+
+  .metric-meta {
+    @apply text-[0.82rem] leading-5 text-slate-500;
+  }
+
+  .results-sticky-summary {
+    @apply grid gap-3 md:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .results-metrics,
+  .monthly-summary-grid,
+  .schedule-kpi-grid {
+    @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-3;
+  }
+
+  .workspace-shell {
+    @apply grid gap-4 xl:grid-cols-[minmax(20rem,0.84fr)_minmax(0,1.16fr)];
+  }
+
+  .workspace-pane {
+    @apply grid gap-4 p-5;
+  }
+
+  .workspace-controls,
+  .workspace-output {
+    @apply content-start;
+  }
+
+  .pane-heading,
+  .workspace-output-header,
+  .results-header {
+    @apply grid gap-1.5;
+  }
+
+  .pane-kicker {
+    @apply text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-sky-700;
+  }
+
+  .pane-heading h2,
+  .workspace-output-header h3,
+  .results-header h3 {
+    @apply text-[clamp(1.35rem,1.8vw,1.85rem)] font-semibold tracking-[-0.04em] text-slate-950;
+  }
+
+  .workspace-output-header h4,
+  .results-detail h4 {
+    @apply text-base font-semibold tracking-[-0.03em] text-slate-950;
+  }
+
+  .calculator-intro,
+  .workspace-output-header p,
+  .results-header p,
+  .helper-text {
+    @apply text-sm leading-6 text-slate-600;
+  }
+
+  .helper-text strong {
+    @apply font-semibold text-slate-800;
+  }
+}

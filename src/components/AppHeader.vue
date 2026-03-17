@@ -1,7 +1,18 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
+import {
+  mdiBriefcaseOutline,
+  mdiCalculatorVariantOutline,
+  mdiHomeOutline,
+  mdiLogout,
+  mdiMenu
+} from '@mdi/js'
+import Menu from 'primevue/menu'
 
 import logoUrl from '../assets/logo.svg'
+import AppIcon from './ui/AppIcon.vue'
+import AppIconButton from './ui/AppIconButton.vue'
+import { menuPanelPt } from './ui/primevuePresets'
 
 const props = defineProps({
   currentApp: {
@@ -28,130 +39,120 @@ const props = defineProps({
 
 const emit = defineEmits(['sign-out'])
 
-const menuOpen = ref(false)
-const apiHealth = ref('checking')
-let healthPoll = null
+const menuRef = ref(null)
 
-const appLinks = [
+const appLinks = computed(() => [
   {
     id: 'home',
     href: props.authBypassEnabled ? '#planning' : '#home',
-    label: 'Home'
+    label: 'Home',
+    icon: mdiHomeOutline
   },
   {
     id: 'calculators',
     href: '#calculators/interval',
-    label: 'Calculator Suite'
+    label: 'Calculator Suite',
+    icon: mdiCalculatorVariantOutline
   },
   {
     id: 'planning',
     href: '#planning',
-    label: 'Planning App'
+    label: 'Planning App',
+    icon: mdiBriefcaseOutline
   }
-]
+])
 
-const toggleMenu = () => {
-  menuOpen.value = !menuOpen.value
+const menuItems = computed(() => [
+  ...appLinks.value,
+  ...(props.authBypassEnabled
+    ? []
+    : [
+        {
+          id: 'sign-out',
+          label: 'Sign Out',
+          icon: mdiLogout,
+          tone: 'danger'
+        }
+      ])
+])
+
+const toggleMenu = (event) => {
+  menuRef.value?.toggle(event)
 }
 
 const closeMenu = () => {
-  menuOpen.value = false
+  menuRef.value?.hide?.()
 }
 
-const handleSignOut = () => {
+const handleMenuItemClick = (item) => {
   closeMenu()
-  emit('sign-out')
-}
 
-const checkApiHealth = async () => {
-  try {
-    const response = await fetch('/api/health', { cache: 'no-store' })
-    if (!response.ok) {
-      apiHealth.value = 'offline'
-      return
-    }
+  if (item.id === 'sign-out') {
+    emit('sign-out')
+    return
+  }
 
-    const payload = await response.json().catch(() => null)
-    apiHealth.value = payload?.status === 'ok' ? 'online' : 'degraded'
-  } catch {
-    apiHealth.value = 'offline'
+  if (item.href) {
+    window.location.hash = item.href
   }
 }
-
-const apiHealthLabel = computed(() => {
-  if (apiHealth.value === 'online') return 'Live'
-  if (apiHealth.value === 'degraded') return 'Degraded'
-  if (apiHealth.value === 'offline') return 'Offline'
-  return 'Checking'
-})
-
-onMounted(() => {
-  window.addEventListener('hashchange', closeMenu)
-  checkApiHealth()
-  healthPoll = window.setInterval(checkApiHealth, 45000)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('hashchange', closeMenu)
-  if (healthPoll) {
-    window.clearInterval(healthPoll)
-  }
-})
 </script>
 
 <template>
-  <header class="site-header">
-    <div class="container header-content">
-      <a href="#home" class="brand-wrap" aria-label="WFMToolkit home">
-        <img :src="logoUrl" alt="WFMToolkit logo" class="brand-logo" />
+  <header class="sticky top-0 z-[60] border-b border-slate-200 bg-white/95 backdrop-blur-xl">
+    <div class="app-frame flex min-h-[74px] items-center gap-4 px-2">
+      <a href="#home" class="inline-flex items-center" aria-label="WFMToolkit home">
+        <img :src="logoUrl" alt="WFMToolkit logo" class="block h-14 w-auto" />
       </a>
 
-      <div class="header-right">
-        <div class="header-utilities">
-          <span class="api-indicator" :class="`is-${apiHealth}`">API {{ apiHealthLabel }}</span>
-          <span v-if="props.authBypassEnabled" class="auth-indicator auth-indicator-warning">Auth bypass active</span>
-          <span v-if="props.isAuthenticated && props.userEmail" class="auth-indicator auth-indicator-user">
-            {{ props.userEmail }}
-          </span>
-        </div>
+      <div class="ml-auto flex items-center gap-2.5">
+        <span
+          v-if="!props.isAuthenticated && props.authConfigured"
+          class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-slate-600"
+        >
+          Sign in required
+        </span>
 
-        <nav v-if="props.isAuthenticated" class="site-nav" aria-label="Main navigation">
-          <button
-            class="nav-toggle"
-            type="button"
-            :aria-expanded="menuOpen ? 'true' : 'false'"
-            aria-controls="main-nav-links"
-            aria-label="Toggle navigation menu"
+        <span
+          v-else-if="!props.isAuthenticated"
+          class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-amber-700"
+        >
+          Auth setup needed
+        </span>
+
+        <template v-else>
+          <AppIconButton
+            :icon="mdiMenu"
+            label="Open navigation menu"
             @click="toggleMenu"
+          />
+
+          <Menu
+            ref="menuRef"
+            popup
+            :model="menuItems"
+            :pt="menuPanelPt"
           >
-            <span class="nav-toggle-label">Menu</span>
-            <span class="nav-toggle-icon" aria-hidden="true">
-              <span class="nav-toggle-bar"></span>
-              <span class="nav-toggle-bar"></span>
-              <span class="nav-toggle-bar"></span>
-            </span>
-          </button>
-
-          <div id="main-nav-links" class="nav-links" :class="{ open: menuOpen }">
-            <a
-              v-for="link in appLinks"
-              :key="link.id"
-              :href="link.href"
-              class="nav-link app-nav-link"
-              :class="{ active: props.currentApp === link.id }"
-              @click="closeMenu"
-            >
-              {{ link.label }}
-            </a>
-
-            <button v-if="!props.authBypassEnabled" type="button" class="nav-link nav-link-urgent" @click="handleSignOut">
-              Sign Out
-            </button>
-          </div>
-        </nav>
-
-        <span v-else-if="props.authConfigured" class="auth-indicator">Sign in required</span>
-        <span v-else class="auth-indicator auth-indicator-warning">Auth setup needed</span>
+            <template #item="{ item, props: menuItemProps }">
+              <button
+                v-bind="menuItemProps.action"
+                type="button"
+                class="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition"
+                :class="
+                  item.tone === 'danger'
+                    ? 'border border-transparent text-rose-700 hover:border-rose-100 hover:bg-rose-50'
+                    : props.currentApp === item.id
+                      ? 'border border-sky-100 bg-sky-50 text-sky-800'
+                      : 'border border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                "
+                @click="handleMenuItemClick(item)"
+              >
+                <AppIcon :path="item.icon" class="h-5 w-5 shrink-0" />
+                <span class="flex-1">{{ item.label }}</span>
+              </button>
+            </template>
+          </Menu>
+        </template>
       </div>
     </div>
   </header>

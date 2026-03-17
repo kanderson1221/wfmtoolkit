@@ -1157,7 +1157,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section id="csv-batch" class="calculator-section workspace-section" aria-labelledby="csv-batch-heading">
-    <div class="container">
+    <div class="app-frame">
       <div class="calculator-card workspace-shell batch-workspace">
         <section id="batch-controls" class="workspace-pane workspace-controls">
           <div class="pane-heading">

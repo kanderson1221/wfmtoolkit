@@ -193,7 +193,7 @@ onMounted(() => {
 
 <template>
   <section class="calculator-section home-page-shell home-auth-shell" aria-label="Login screen">
-    <div class="container">
+    <div class="app-frame">
       <div class="home-auth-layout">
         <section class="results-panel home-auth-card">
           <p

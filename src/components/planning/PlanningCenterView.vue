@@ -13,6 +13,10 @@ import {
   getPeakRequiredHeadcount,
   summarizeCenter
 } from '../../planningSummary'
+import AppButton from '../ui/AppButton.vue'
+import AppPageHeader from '../ui/AppPageHeader.vue'
+import AppPanel from '../ui/AppPanel.vue'
+import AppTableShell from '../ui/AppTableShell.vue'
 
 const props = defineProps({
   center: {
@@ -58,17 +62,6 @@ const closeCenterSettings = () => {
   centerSettingsOpen.value = false
 }
 
-const toggleWeekday = (weekdayValue) => {
-  const activeDays = centerDraft.value.operatingWeekdays
-
-  if (activeDays.includes(weekdayValue)) {
-    centerDraft.value.operatingWeekdays = activeDays.filter((value) => value !== weekdayValue)
-    return
-  }
-
-  centerDraft.value.operatingWeekdays = [...activeDays, weekdayValue].sort((left, right) => left - right)
-}
-
 const saveCenter = () => {
   emit('save-center', {
     ...props.center,
@@ -79,7 +72,7 @@ const saveCenter = () => {
 
 const confirmDeletePlan = (plan) => {
   const confirmed = window.confirm(
-    `Delete "${plan.name}"? This removes the plan and its saved assumptions from this call center.`
+    `Delete staffing group "${plan.name}"? This removes its demand model and staffing plan from this call center.`
   )
 
   if (!confirmed) {
@@ -95,155 +88,169 @@ const confirmDeletePlan = (plan) => {
 </script>
 
 <template>
-  <section class="calculator-section planning-home-section">
-    <div class="container">
-      <div class="planning-center-shell">
-        <section class="planning-center-hero calculator-card">
-          <div class="planning-center-hero-copy">
-            <p class="pane-kicker">Call Center</p>
-            <h2>{{ props.center.name }}</h2>
-            <p class="calculator-intro">
-              Manage plans for this call center, using shared defaults for operating days, paid hours, and random assumptions.
-            </p>
-          </div>
+  <section class="bg-slate-50/80 py-3">
+    <div class="app-frame grid gap-3">
+      <a href="#planning" class="planning-breadcrumb-link">Call Centers</a>
 
-          <div class="planning-center-hero-actions">
-            <button type="button" class="secondary-btn" @click="openCenterSettings">Edit Center</button>
-            <a :href="`#planning/center/${props.center.id}/new`" class="submit-btn">+ Create Plan</a>
-          </div>
-        </section>
+      <AppPageHeader
+        kicker="Call Center"
+        :title="props.center.name"
+        description="Review the staffing portfolio for this operation, then open individual staffing groups to manage demand models and staffing plans."
+      >
+        <template #actions>
+          <AppButton variant="secondary" @click="openCenterSettings">Edit Center</AppButton>
+        </template>
+      </AppPageHeader>
 
-        <section class="planning-center-overview">
-          <section class="results-panel planning-center-summary">
-            <div class="workspace-output-header">
-              <h3>Center Portfolio</h3>
-              <p>Roll-up metrics across all staffing plans saved inside this call center.</p>
+      <AppPanel :padded="false">
+        <div class="grid xl:grid-cols-[1.1fr_0.95fr]">
+          <div class="grid gap-3 border-b border-slate-200 px-5 py-4 xl:border-b-0 xl:border-r">
+            <div class="grid gap-1.5">
+              <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-sky-700">
+                Center Portfolio
+              </span>
+              <h2 class="text-[clamp(1.05rem,1.55vw,1.35rem)] font-semibold tracking-[-0.04em] text-slate-950">
+                Understand the combined demand and headcount requirement across every staffing group in this call center.
+              </h2>
             </div>
 
-            <div class="results-metrics monthly-summary-grid">
+            <div class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
               <article class="metric-card">
-                <p class="metric-label">Plans</p>
+                <p class="metric-label">Staffing Groups</p>
                 <p class="metric-value">{{ formatWhole(centerSummary.planCount) }}</p>
-                <p class="metric-meta">Saved staffing plans in this call center</p>
+                <p class="metric-meta">Saved groups inside this operation</p>
               </article>
               <article class="metric-card">
                 <p class="metric-label">Annual Contacts</p>
                 <p class="metric-value">{{ formatWhole(centerSummary.annualContacts) }}</p>
-                <p class="metric-meta">Combined annual contacts across this call center</p>
+                <p class="metric-meta">Combined annual demand</p>
               </article>
               <article class="metric-card">
-                <p class="metric-label">Needed Staff Hrs</p>
+                <p class="metric-label">Needed Staff Hours</p>
                 <p class="metric-value">{{ formatWhole(centerSummary.totalNeededStaffHours) }}</p>
-                <p class="metric-meta">Combined required staff hours across saved plans</p>
+                <p class="metric-meta">Combined required staffing hours</p>
               </article>
               <article class="metric-card">
                 <p class="metric-label">Total Required Headcount</p>
                 <p class="metric-value">{{ formatNumber(centerSummary.totalAvgRequiredHeadcount, 1) }}</p>
-                <p class="metric-meta">Combined required headcount across the saved plans in this call center</p>
+                <p class="metric-meta">Combined modeled headcount</p>
               </article>
-              <article class="metric-card">
-                <p class="metric-label">Peak Req HC</p>
+              <article class="metric-card sm:col-span-2 xl:col-span-1">
+                <p class="metric-label">Peak Required Headcount</p>
                 <p class="metric-value">{{ formatNumber(centerSummary.totalPeakHeadcount, 1) }}</p>
-                <p class="metric-meta">Combined peak required headcount across saved plans</p>
+                <p class="metric-meta">Combined peak monthly requirement</p>
               </article>
             </div>
-          </section>
-
-          <section class="results-panel planning-center-defaults">
-            <div class="workspace-output-header">
-              <h3>Center Defaults</h3>
-              <p>These defaults seed new plans created inside this call center.</p>
-            </div>
-
-            <div class="planning-center-setting-list">
-              <div class="planning-center-setting-row">
-                <strong>Time Zone</strong>
-                <span>{{ props.center.timezone }}</span>
-              </div>
-              <div class="planning-center-setting-row">
-                <strong>Operating Days</strong>
-                <span>{{ operatingDayLabel }}</span>
-              </div>
-              <div class="planning-center-setting-row">
-                <strong>Default Paid Hours</strong>
-                <span>{{ formatNumber(props.center.defaultPaidHoursPerDay, 1) }}</span>
-              </div>
-              <div class="planning-center-setting-row">
-                <strong>Default Occupancy</strong>
-                <span>{{ formatNumber(props.center.defaultOccupancyPercent, 1) }}%</span>
-              </div>
-              <div class="planning-center-setting-row">
-                <strong>Default Adherence</strong>
-                <span>{{ formatNumber(props.center.defaultAdherencePercent, 1) }}%</span>
-              </div>
-            </div>
-          </section>
-        </section>
-
-        <section class="results-panel planning-center-plan-list">
-          <div class="workspace-output-header">
-            <h3>Plans In This Call Center</h3>
-            <p>Each plan belongs to this call center and inherits these defaults when it is created.</p>
           </div>
 
-          <div v-if="!props.center.plans.length" class="empty-state planning-empty-state">
-            No plans yet for this call center. Create the first plan to start building a staffing portfolio.
-          </div>
-
-          <div v-else class="planning-plan-list">
-            <div class="planning-plan-list-head" aria-hidden="true">
-              <span>Plan Name</span>
-              <span>Year</span>
-              <span>Annual Contacts</span>
-              <span>AHT</span>
-              <span>Annual Workload</span>
-              <span>Needed Staff Hrs</span>
-              <span>Min Req HC</span>
-              <span>Avg Req HC</span>
-              <span>Peak Req HC</span>
-              <span>Action</span>
+          <div class="grid divide-y divide-slate-200">
+            <div class="grid gap-1 px-5 py-4">
+              <span class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Center Defaults
+              </span>
+              <p class="text-sm leading-6 text-slate-600">
+                New staffing groups inherit these defaults unless planners adjust the inputs later.
+              </p>
             </div>
 
-            <article v-for="plan in props.center.plans" :key="plan.id" class="answer-card planning-plan-row">
-              <div class="planning-plan-primary" data-label="Plan Name">
-                <h4>{{ plan.name }}</h4>
+            <div class="grid divide-y divide-slate-200">
+              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
+                <strong class="font-semibold text-slate-800">Time Zone</strong>
+                <span class="text-right text-slate-600">{{ props.center.timezone }}</span>
               </div>
-              <div class="planning-plan-stat" data-label="Year">
-                <span>{{ plan.planningYear }}</span>
+              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
+                <strong class="font-semibold text-slate-800">Operating Days</strong>
+                <span class="text-right text-slate-600">{{ operatingDayLabel }}</span>
               </div>
-              <div class="planning-plan-stat" data-label="Annual Contacts">
-                <span>{{ formatWhole(getAnnualContacts(plan)) }}</span>
+              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
+                <strong class="font-semibold text-slate-800">Default Paid Hours</strong>
+                <span class="text-right text-slate-600">{{ formatNumber(props.center.defaultPaidHoursPerDay, 1) }}</span>
               </div>
-              <div class="planning-plan-stat" data-label="AHT">
-                <span>{{ formatWhole(getAverageAhtSeconds(plan)) }}</span>
+              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
+                <strong class="font-semibold text-slate-800">Default Occupancy</strong>
+                <span class="text-right text-slate-600">{{ formatNumber(props.center.defaultOccupancyPercent, 1) }}%</span>
               </div>
-              <div class="planning-plan-stat" data-label="Annual Workload">
-                <span>{{ formatWhole(getAnnualWorkloadHours(plan)) }}</span>
+              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
+                <strong class="font-semibold text-slate-800">Default Adherence</strong>
+                <span class="text-right text-slate-600">{{ formatNumber(props.center.defaultAdherencePercent, 1) }}%</span>
               </div>
-              <div class="planning-plan-stat" data-label="Needed Staff Hrs">
-                <span>{{ formatWhole(getAnnualRequiredStaffHours(plan)) }}</span>
-              </div>
-              <div class="planning-plan-stat" data-label="Min Req HC">
-                <span>{{ formatNumber(getMinRequiredHeadcount(plan), 1) }}</span>
-              </div>
-              <div class="planning-plan-stat" data-label="Avg Req HC">
-                <span>{{ formatNumber(getAverageRequiredHeadcount(plan), 1) }}</span>
-              </div>
-              <div class="planning-plan-stat" data-label="Peak Req HC">
-                <span>{{ formatNumber(getPeakRequiredHeadcount(plan), 1) }}</span>
-              </div>
-              <div class="planning-plan-actions">
-                <a :href="`#planning/center/${props.center.id}/plan/${plan.id}`" class="secondary-btn">Open Plan</a>
-                <button type="button" class="urgent-btn" @click="confirmDeletePlan(plan)">Delete</button>
-              </div>
-            </article>
+            </div>
           </div>
-        </section>
-
-        <div class="planning-center-footer-actions">
-          <a href="#planning" class="secondary-btn">Back to Call Centers</a>
         </div>
-      </div>
+      </AppPanel>
+
+      <AppTableShell>
+        <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-3.5 lg:flex-row lg:items-end lg:justify-between">
+          <div class="grid gap-1">
+            <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Staffing Groups
+            </span>
+            <h2 class="text-lg font-semibold text-slate-950">Staffing Groups In This Call Center</h2>
+            <p class="text-sm text-slate-600">
+              Each staffing group models one team or queue separately, such as voice, chat, back office, or vendor support.
+            </p>
+          </div>
+
+          <AppButton :href="`#planning/center/${props.center.id}/new`" variant="primary">+ New Group</AppButton>
+        </div>
+
+        <div v-if="!props.center.plans.length" class="grid justify-items-start gap-3 px-5 py-7">
+          <div class="grid gap-2">
+            <h3 class="text-xl font-semibold text-slate-950">Create the first staffing group</h3>
+            <p class="max-w-2xl text-sm leading-6 text-slate-600">
+              Start a staffing group for each team you plan separately, then build the demand model and staffing plan for that group.
+            </p>
+          </div>
+          <AppButton :href="`#planning/center/${props.center.id}/new`" variant="primary">+ New Group</AppButton>
+        </div>
+
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-[1260px] w-full border-collapse text-sm text-slate-700">
+            <thead class="border-b border-slate-200 bg-slate-50/90">
+              <tr>
+                <th class="px-5 py-3 text-left text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Staffing Group</th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Year</th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Annual Contacts</th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">AHT</th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Annual Workload</th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Needed Staff Hours</th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Min Required Headcount</th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Avg Required Headcount</th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Peak Required Headcount</th>
+                <th class="px-5 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="plan in props.center.plans"
+                :key="plan.id"
+                class="border-b border-slate-200 last:border-b-0 odd:bg-white even:bg-slate-50/40"
+              >
+                <td class="px-5 py-3.5">
+                  <div class="grid gap-1">
+                    <strong class="text-sm font-semibold text-slate-950">{{ plan.name }}</strong>
+                    <span class="text-xs text-slate-500">Demand model and staffing plan</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3.5 text-right">{{ plan.planningYear }}</td>
+                <td class="px-4 py-3.5 text-right">{{ formatWhole(getAnnualContacts(plan)) }}</td>
+                <td class="px-4 py-3.5 text-right">{{ formatWhole(getAverageAhtSeconds(plan)) }}</td>
+                <td class="px-4 py-3.5 text-right">{{ formatWhole(getAnnualWorkloadHours(plan)) }}</td>
+                <td class="px-4 py-3.5 text-right">{{ formatWhole(getAnnualRequiredStaffHours(plan)) }}</td>
+                <td class="px-4 py-3.5 text-right">{{ formatNumber(getMinRequiredHeadcount(plan), 1) }}</td>
+                <td class="px-4 py-3.5 text-right">{{ formatNumber(getAverageRequiredHeadcount(plan), 1) }}</td>
+                <td class="px-4 py-3.5 text-right">{{ formatNumber(getPeakRequiredHeadcount(plan), 1) }}</td>
+                <td class="px-5 py-3.5">
+                  <div class="flex justify-end gap-2">
+                    <AppButton :href="`#planning/center/${props.center.id}/plan/${plan.id}`" variant="secondary">Open Group</AppButton>
+                    <AppButton variant="danger" @click="confirmDeletePlan(plan)">Delete</AppButton>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </AppTableShell>
     </div>
 
     <CallCenterSettingsModal
@@ -259,7 +266,6 @@ const confirmDeletePlan = (plan) => {
       submit-label="Save Call Center"
       @close="closeCenterSettings"
       @save="saveCenter"
-      @toggle-weekday="toggleWeekday"
     />
   </section>
 </template>

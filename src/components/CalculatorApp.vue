@@ -24,29 +24,34 @@ const calculatorTabs = [
 </script>
 
 <template>
-  <section class="calculator-section calculator-app-intro">
-    <div class="container">
-      <div class="calculator-app-shell">
-        <section class="calculator-app-hero input-group-card">
-          <div class="workspace-output-header">
-            <h3>Calculator Suite</h3>
-            <p>Keep interval and batch calculators together in one application area, separate from the planning app.</p>
-          </div>
-        </section>
+  <section class="bg-slate-50/80 py-3">
+    <div class="app-frame grid gap-3">
+      <header class="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-end lg:justify-between">
+        <div class="grid gap-1.5">
+          <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-sky-700">
+            Calculator Suite
+          </span>
+          <h1 class="text-[clamp(1.55rem,2vw,2.1rem)] font-semibold tracking-[-0.04em] text-slate-950">
+            Interval and batch workforce calculators
+          </h1>
+          <p class="max-w-3xl text-sm leading-6 text-slate-600">
+            Keep fast Erlang staffing checks and bulk planning workflows together in one operational workspace, separate from the planning application.
+          </p>
+        </div>
+      </header>
 
-        <nav class="calculator-suite-nav" aria-label="Calculator suite tools">
-          <a
-            v-for="tab in calculatorTabs"
-            :key="tab.id"
-            :href="`#calculators/${tab.id}`"
-            class="calculator-suite-link"
-            :class="{ active: props.activeTool === tab.id }"
-          >
-            <strong>{{ tab.title }}</strong>
-            <span>{{ tab.description }}</span>
-          </a>
-        </nav>
-      </div>
+      <nav class="calculator-suite-nav" aria-label="Calculator suite tools">
+        <a
+          v-for="tab in calculatorTabs"
+          :key="tab.id"
+          :href="`#calculators/${tab.id}`"
+          class="calculator-suite-link"
+          :class="{ active: props.activeTool === tab.id }"
+        >
+          <strong>{{ tab.title }}</strong>
+          <span>{{ tab.description }}</span>
+        </a>
+      </nav>
     </div>
   </section>
 

@@ -1,5 +1,9 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import './styles.css'
+import './tailwind.css'
+import { installPrimeVue } from './plugins/primevue'
 
-createApp(App).mount('#app')
+const app = createApp(App)
+
+installPrimeVue(app)
+app.mount('#app')

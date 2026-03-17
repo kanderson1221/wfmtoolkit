@@ -56,7 +56,7 @@ const normalizePlan = (draftPlan, timestamp = new Date().toISOString()) => {
   return {
     ...planSnapshot,
     id: planSnapshot.id || createEntityId('plan'),
-    name: planSnapshot.name?.trim() || `${planSnapshot.planningYear || new Date().getFullYear()} Staffing Plan`,
+    name: planSnapshot.name?.trim() || `${planSnapshot.planningYear || new Date().getFullYear()} Staffing Group`,
     createdAt: planSnapshot.createdAt || timestamp,
     updatedAt: planSnapshot.updatedAt || timestamp
   }

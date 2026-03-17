@@ -1,0 +1,432 @@
+@layer components {
+  .planning-breadcrumb-link {
+    @apply inline-flex items-center text-sm font-semibold text-sky-700;
+  }
+
+  .planning-center-shell {
+    @apply grid gap-4;
+  }
+
+  .planning-center-hero {
+    @apply flex flex-col gap-3 p-5 lg:flex-row lg:items-end lg:justify-between;
+  }
+
+  .planning-center-hero-copy {
+    @apply grid gap-1.5;
+  }
+
+  .planning-center-hero-copy h2 {
+    @apply text-[clamp(1.5rem,2vw,2.1rem)] font-semibold tracking-[-0.04em] text-slate-950;
+  }
+
+  .planning-center-overview {
+    @apply grid gap-4 xl:grid-cols-[1.15fr_0.95fr];
+  }
+
+  .planning-center-summary,
+  .planning-center-defaults,
+  .planning-center-plan-list {
+    @apply p-5;
+  }
+
+  .planning-center-setting-list {
+    @apply grid gap-3;
+  }
+
+  .planning-center-setting-row {
+    @apply flex items-center justify-between gap-4 rounded-[20px] border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm;
+  }
+
+  .planning-center-setting-row strong {
+    @apply font-semibold text-slate-800;
+  }
+
+  .planning-center-setting-row span {
+    @apply text-right text-slate-600;
+  }
+
+  .planning-section-header {
+    @apply flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between;
+  }
+
+  .planning-empty-state {
+    @apply mt-4;
+  }
+
+  .planning-plan-list {
+    @apply mt-4 grid gap-3;
+  }
+
+  .planning-plan-list-head {
+    @apply hidden items-center gap-4 border-b border-slate-200 px-4 pb-3 text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500 xl:grid;
+    grid-template-columns: minmax(14rem, 1.4fr) repeat(8, minmax(6rem, 0.7fr)) auto;
+  }
+
+  .planning-plan-row {
+    @apply grid gap-3 px-4 py-3 xl:items-center;
+    grid-template-columns: 1fr;
+  }
+
+  .planning-plan-row h4 {
+    @apply text-base font-semibold tracking-[-0.03em] text-slate-950;
+  }
+
+  .planning-plan-primary,
+  .planning-plan-stat,
+  .planning-plan-actions {
+    @apply grid gap-1 text-sm text-slate-700;
+  }
+
+  .planning-plan-stat::before {
+    content: attr(data-label);
+    @apply text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-slate-500 xl:hidden;
+  }
+
+  .planning-plan-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  @media (min-width: 1280px) {
+    .planning-plan-row {
+      grid-template-columns: minmax(14rem, 1.4fr) repeat(8, minmax(6rem, 0.7fr)) auto;
+    }
+
+    .planning-plan-stat::before {
+      content: none;
+    }
+  }
+
+  .monthly-flow-card {
+    @apply p-3 md:p-4;
+  }
+
+  .monthly-flow-shell {
+    @apply grid gap-4;
+  }
+
+  .monthly-settings-bar {
+    @apply border border-slate-200 bg-white p-4;
+  }
+
+  .monthly-settings-summary {
+    @apply flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between;
+  }
+
+  .monthly-settings-primary {
+    @apply grid gap-1.5;
+  }
+
+  .monthly-settings-primary h3 {
+    @apply text-[clamp(1.4rem,1.8vw,1.8rem)] font-semibold tracking-[-0.04em] text-slate-950;
+  }
+
+  .monthly-settings-primary p:last-child {
+    @apply text-sm leading-6 text-slate-600;
+  }
+
+  .monthly-settings-stats {
+    @apply grid gap-3 sm:grid-cols-2;
+  }
+
+  .monthly-settings-stats span {
+    @apply grid gap-1 rounded-[22px] border border-slate-200 bg-slate-50/70 px-4 py-3;
+  }
+
+  .monthly-settings-stats strong {
+    @apply text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
+  }
+
+  .monthly-settings-stats em {
+    @apply text-sm font-semibold not-italic text-slate-900;
+  }
+
+  .monthly-settings-actions-wrap {
+    @apply grid gap-2 xl:justify-items-end;
+  }
+
+  .monthly-settings-autosave {
+    @apply text-sm font-medium text-slate-500;
+  }
+
+  .monthly-settings-autosave.is-saving {
+    @apply text-sky-700;
+  }
+
+  .monthly-settings-autosave.is-restored {
+    @apply text-emerald-700;
+  }
+
+  .monthly-global-warning {
+    @apply mt-4;
+  }
+
+  .monthly-tab-panel {
+    @apply grid gap-4 p-4;
+  }
+
+  .monthly-tab-header {
+    @apply grid gap-2;
+  }
+
+  .monthly-tab-header h3 {
+    @apply text-xl font-semibold tracking-[-0.03em] text-slate-950;
+  }
+
+  .monthly-tab-header p {
+    @apply text-sm leading-6 text-slate-600;
+  }
+
+  .monthly-copy-toolbar {
+    @apply flex justify-end;
+  }
+
+  .monthly-copy-select {
+    @apply grid gap-2 text-sm font-medium text-slate-700;
+  }
+
+  .monthly-copy-label {
+    @apply text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
+  }
+
+  .assumption-table-shell {
+    @apply overflow-x-auto rounded-[24px] border border-slate-200 bg-white shadow-sm;
+  }
+
+  .assumption-table {
+    @apply w-max min-w-full text-sm text-slate-700;
+  }
+
+  .assumption-table thead th {
+    @apply border-b border-slate-200 bg-slate-50 px-3 py-3 align-middle text-center text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-slate-500;
+  }
+
+  .assumption-table tbody td {
+    @apply border-b border-slate-200 px-3 py-3 text-center align-middle;
+  }
+
+  .assumption-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .assumption-table tbody tr:nth-child(even) td {
+    @apply bg-slate-50/55;
+  }
+
+  .assumption-table tbody tr:hover td {
+    @apply bg-slate-50;
+  }
+
+  .assumption-table tbody tr.selected td {
+    @apply bg-sky-50/70;
+  }
+
+  .assumption-table input:not([type="checkbox"]),
+  .assumption-table select {
+    @apply min-w-[5.25rem] rounded-xl border border-slate-300 bg-white px-3 py-2 text-center text-sm shadow-sm transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100;
+  }
+
+  .month-cell {
+    @apply sticky left-0 z-10 whitespace-nowrap bg-white text-left;
+  }
+
+  .assumption-month-btn {
+    @apply inline-flex items-center rounded-xl border border-transparent px-2 py-1 text-left font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50;
+  }
+
+  .plan-head-label,
+  .presence-head-label {
+    @apply inline-block leading-4;
+  }
+
+  .assumption-table thead th:first-child {
+    @apply sticky left-0 z-20 text-left;
+  }
+
+  .assumption-table tbody tr:nth-child(even) td.month-cell {
+    @apply bg-slate-50/55;
+  }
+
+  .assumption-table tbody tr:hover td.month-cell {
+    @apply bg-slate-50;
+  }
+
+  .assumption-table tbody tr.selected td.month-cell {
+    @apply bg-sky-50/70;
+  }
+
+  .assumption-table-plan th:first-child,
+  .assumption-table-random th:first-child,
+  .assumption-table-training th:first-child,
+  .assumption-table-staffing th:first-child {
+    @apply text-left;
+  }
+
+  .assumption-table-plan td:first-child,
+  .assumption-table-random td:first-child,
+  .assumption-table-training td:first-child,
+  .assumption-table-staffing td:first-child {
+    @apply text-left;
+  }
+
+  .assumption-table-presence-main thead .presence-super-row th {
+    @apply bg-slate-100 text-center text-[0.7rem] text-slate-600;
+  }
+
+  .assumption-table-presence-main thead .presence-super-row th:first-child {
+    @apply text-left;
+  }
+
+  .assumption-table-presence-main thead .presence-super-head.presence-super-presence {
+    @apply bg-sky-50 text-sky-800;
+  }
+
+  .assumption-table-presence-main thead .presence-super-head.presence-super-utilization {
+    @apply bg-emerald-50 text-emerald-800;
+  }
+
+  .assumption-table-presence-main thead .presence-group-row th {
+    @apply text-center text-[0.68rem] text-slate-600;
+  }
+
+  .assumption-table-presence-main thead .presence-group-absence {
+    @apply bg-sky-50/80 text-sky-800;
+  }
+
+  .assumption-table-presence-main thead .presence-group-scheduled {
+    @apply bg-emerald-50/80 text-emerald-800;
+  }
+
+  .assumption-table-presence-main thead .presence-group-other {
+    @apply bg-amber-50/80 text-amber-800;
+  }
+
+  .assumption-table-presence-main thead .presence-detail-row th {
+    @apply bg-white text-[0.7rem] font-semibold normal-case tracking-normal text-slate-500;
+  }
+
+  .assumption-table-presence-main tbody td {
+    @apply text-center;
+  }
+
+  .assumption-table-presence-main tbody td:first-child {
+    @apply text-left;
+  }
+
+  .random-global-note {
+    @apply px-4 py-3 text-sm leading-6 text-slate-600;
+  }
+
+  .training-class-toolbar {
+    @apply pb-1;
+  }
+
+  .training-class-recommended {
+    @apply bg-sky-50/50;
+  }
+
+  .training-status-pill {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+  }
+
+  .training-status-invalid {
+    @apply bg-rose-100 text-rose-700;
+  }
+
+  .training-status-future {
+    @apply bg-slate-100 text-slate-700;
+  }
+
+  .training-status-training {
+    @apply bg-amber-100 text-amber-800;
+  }
+
+  .training-status-graduating {
+    @apply bg-sky-100 text-sky-800;
+  }
+
+  .training-status-frontline {
+    @apply bg-emerald-100 text-emerald-700;
+  }
+
+  .training-status-nesting {
+    @apply bg-violet-100 text-violet-700;
+  }
+
+  .training-empty-state {
+    @apply py-8 text-center text-sm leading-6 text-slate-600;
+  }
+
+  .variance-positive {
+    @apply font-semibold text-emerald-700;
+  }
+
+  .variance-negative {
+    @apply font-semibold text-rose-700;
+  }
+
+  .monthly-warning-stack {
+    @apply grid gap-2;
+  }
+
+  .monthly-chart-panel {
+    @apply grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4;
+  }
+
+  .monthly-bars {
+    @apply grid gap-3 md:grid-cols-3 xl:grid-cols-6;
+  }
+
+  .monthly-bar-column {
+    @apply relative grid gap-2 rounded-[22px] border border-slate-200 bg-white px-3 py-3 text-left shadow-sm;
+  }
+
+  .monthly-bar-column.active {
+    @apply border-sky-200 bg-sky-50;
+  }
+
+  .monthly-bar-month {
+    @apply text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500;
+  }
+
+  .monthly-bar-cap,
+  .monthly-bar-footer {
+    @apply flex items-end justify-between gap-2 text-sm text-slate-600;
+  }
+
+  .monthly-bar-cap strong,
+  .monthly-bar-footer strong {
+    @apply text-base font-semibold text-slate-950;
+  }
+
+  .monthly-bar-stack {
+    @apply flex h-40 items-end;
+  }
+
+  .monthly-bar-track {
+    @apply flex h-full w-full items-end rounded-2xl bg-slate-100 p-1;
+  }
+
+  .monthly-bar-segment {
+    @apply w-full rounded-xl bg-sky-600;
+  }
+
+  .monthly-bar-tooltip {
+    @apply pointer-events-none absolute left-3 right-3 top-3 hidden rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-600 shadow-lg;
+  }
+
+  .monthly-bar-column:hover .monthly-bar-tooltip {
+    @apply block;
+  }
+
+  .monthly-bar-tooltip-title {
+    @apply mb-2 text-sm font-semibold text-slate-950;
+  }
+
+  .monthly-bar-tooltip-grid {
+    @apply grid grid-cols-[auto_1fr] gap-x-3 gap-y-1;
+  }
+
+  .monthly-bar-tooltip-grid strong {
+    @apply justify-self-end font-semibold text-slate-900;
+  }
+}
