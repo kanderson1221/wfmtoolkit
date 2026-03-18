@@ -104,62 +104,6 @@
     @apply grid gap-4;
   }
 
-  .monthly-settings-bar {
-    @apply border border-slate-200 bg-white p-4;
-  }
-
-  .monthly-settings-summary {
-    @apply flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between;
-  }
-
-  .monthly-settings-primary {
-    @apply grid gap-1.5;
-  }
-
-  .monthly-settings-primary h3 {
-    @apply text-[clamp(1.4rem,1.8vw,1.8rem)] font-semibold tracking-[-0.04em] text-slate-950;
-  }
-
-  .monthly-settings-primary p:last-child {
-    @apply text-sm leading-6 text-slate-600;
-  }
-
-  .monthly-settings-stats {
-    @apply grid gap-3 sm:grid-cols-2;
-  }
-
-  .monthly-settings-stats span {
-    @apply grid gap-1 rounded-[22px] border border-slate-200 bg-slate-50/70 px-4 py-3;
-  }
-
-  .monthly-settings-stats strong {
-    @apply text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
-  }
-
-  .monthly-settings-stats em {
-    @apply text-sm font-semibold not-italic text-slate-900;
-  }
-
-  .monthly-settings-actions-wrap {
-    @apply grid gap-2 xl:justify-items-end;
-  }
-
-  .monthly-settings-autosave {
-    @apply text-sm font-medium text-slate-500;
-  }
-
-  .monthly-settings-autosave.is-saving {
-    @apply text-sky-700;
-  }
-
-  .monthly-settings-autosave.is-restored {
-    @apply text-emerald-700;
-  }
-
-  .monthly-global-warning {
-    @apply mt-4;
-  }
-
   .monthly-tab-panel {
     @apply grid gap-4 p-4;
   }

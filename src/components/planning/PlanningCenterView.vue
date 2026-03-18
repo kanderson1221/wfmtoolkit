@@ -15,8 +15,10 @@ import {
 } from '../../planningSummary'
 import AppButton from '../ui/AppButton.vue'
 import AppPageHeader from '../ui/AppPageHeader.vue'
-import AppPanel from '../ui/AppPanel.vue'
+import AppSectionHeader from '../ui/AppSectionHeader.vue'
+import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppTableShell from '../ui/AppTableShell.vue'
+import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 
 const props = defineProps({
   center: {
@@ -52,6 +54,42 @@ const operatingDayLabel = computed(() =>
     .filter(Boolean)
     .join(', ')
 )
+
+const portfolioItems = computed(() => [
+  {
+    label: 'Staffing Groups',
+    value: formatWhole(centerSummary.value.planCount),
+    meta: 'Saved groups inside this operation'
+  },
+  {
+    label: 'Annual Contacts',
+    value: formatWhole(centerSummary.value.annualContacts),
+    meta: 'Combined annual demand'
+  },
+  {
+    label: 'Needed Staff Hours',
+    value: formatWhole(centerSummary.value.totalNeededStaffHours),
+    meta: 'Combined required staffing hours'
+  },
+  {
+    label: 'Total Required Headcount',
+    value: formatNumber(centerSummary.value.totalAvgRequiredHeadcount, 1),
+    meta: 'Combined modeled headcount'
+  },
+  {
+    label: 'Peak Required Headcount',
+    value: formatNumber(centerSummary.value.totalPeakHeadcount, 1),
+    meta: 'Combined peak monthly requirement'
+  }
+])
+
+const defaultItems = computed(() => [
+  { label: 'Time Zone', value: props.center.timezone },
+  { label: 'Operating Days', value: operatingDayLabel.value },
+  { label: 'Default Paid Hours', value: formatNumber(props.center.defaultPaidHoursPerDay, 1) },
+  { label: 'Default Occupancy', value: `${formatNumber(props.center.defaultOccupancyPercent, 1)}%` },
+  { label: 'Default Adherence', value: `${formatNumber(props.center.defaultAdherencePercent, 1)}%` }
+])
 
 const openCenterSettings = () => {
   centerDraft.value = createPlanningCenterDraft(props.center)
@@ -102,94 +140,40 @@ const confirmDeletePlan = (plan) => {
         </template>
       </AppPageHeader>
 
-      <AppPanel :padded="false">
-        <div class="grid xl:grid-cols-[1.1fr_0.95fr]">
-          <div class="grid gap-3 border-b border-slate-200 px-5 py-4 xl:border-b-0 xl:border-r">
-            <div class="grid gap-1.5">
-              <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-sky-700">
-                Center Portfolio
-              </span>
-              <h2 class="text-[clamp(1.05rem,1.55vw,1.35rem)] font-semibold tracking-[-0.04em] text-slate-950">
-                Understand the combined demand and headcount requirement across every staffing group in this call center.
-              </h2>
-            </div>
+      <div class="grid gap-3 xl:grid-cols-[1.1fr_0.95fr]">
+        <AppWorkspaceSection
+          kicker="Center Portfolio"
+          title="Combined demand and headcount requirement"
+          description="Understand the combined demand and staffing requirement across every staffing group in this call center."
+        >
+          <AppStatStrip :items="portfolioItems" columns="sm:grid-cols-2 xl:grid-cols-3" />
+        </AppWorkspaceSection>
 
-            <div class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-              <article class="metric-card">
-                <p class="metric-label">Staffing Groups</p>
-                <p class="metric-value">{{ formatWhole(centerSummary.planCount) }}</p>
-                <p class="metric-meta">Saved groups inside this operation</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Annual Contacts</p>
-                <p class="metric-value">{{ formatWhole(centerSummary.annualContacts) }}</p>
-                <p class="metric-meta">Combined annual demand</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Needed Staff Hours</p>
-                <p class="metric-value">{{ formatWhole(centerSummary.totalNeededStaffHours) }}</p>
-                <p class="metric-meta">Combined required staffing hours</p>
-              </article>
-              <article class="metric-card">
-                <p class="metric-label">Total Required Headcount</p>
-                <p class="metric-value">{{ formatNumber(centerSummary.totalAvgRequiredHeadcount, 1) }}</p>
-                <p class="metric-meta">Combined modeled headcount</p>
-              </article>
-              <article class="metric-card sm:col-span-2 xl:col-span-1">
-                <p class="metric-label">Peak Required Headcount</p>
-                <p class="metric-value">{{ formatNumber(centerSummary.totalPeakHeadcount, 1) }}</p>
-                <p class="metric-meta">Combined peak monthly requirement</p>
-              </article>
+        <AppWorkspaceSection
+          kicker="Center Defaults"
+          title="Inherited operating defaults"
+          description="New staffing groups inherit these defaults unless planners adjust the inputs later."
+        >
+          <div class="grid divide-y divide-slate-200 rounded-[20px] border border-slate-200 bg-white">
+            <div
+              v-for="item in defaultItems"
+              :key="item.label"
+              class="flex items-center justify-between gap-4 px-4 py-3.5 text-sm"
+            >
+              <strong class="font-semibold text-slate-800">{{ item.label }}</strong>
+              <span class="text-right text-slate-600">{{ item.value }}</span>
             </div>
           </div>
-
-          <div class="grid divide-y divide-slate-200">
-            <div class="grid gap-1 px-5 py-4">
-              <span class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Center Defaults
-              </span>
-              <p class="text-sm leading-6 text-slate-600">
-                New staffing groups inherit these defaults unless planners adjust the inputs later.
-              </p>
-            </div>
-
-            <div class="grid divide-y divide-slate-200">
-              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
-                <strong class="font-semibold text-slate-800">Time Zone</strong>
-                <span class="text-right text-slate-600">{{ props.center.timezone }}</span>
-              </div>
-              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
-                <strong class="font-semibold text-slate-800">Operating Days</strong>
-                <span class="text-right text-slate-600">{{ operatingDayLabel }}</span>
-              </div>
-              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
-                <strong class="font-semibold text-slate-800">Default Paid Hours</strong>
-                <span class="text-right text-slate-600">{{ formatNumber(props.center.defaultPaidHoursPerDay, 1) }}</span>
-              </div>
-              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
-                <strong class="font-semibold text-slate-800">Default Occupancy</strong>
-                <span class="text-right text-slate-600">{{ formatNumber(props.center.defaultOccupancyPercent, 1) }}%</span>
-              </div>
-              <div class="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
-                <strong class="font-semibold text-slate-800">Default Adherence</strong>
-                <span class="text-right text-slate-600">{{ formatNumber(props.center.defaultAdherencePercent, 1) }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </AppPanel>
+        </AppWorkspaceSection>
+      </div>
 
       <AppTableShell>
         <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-3.5 lg:flex-row lg:items-end lg:justify-between">
-          <div class="grid gap-1">
-            <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Staffing Groups
-            </span>
-            <h2 class="text-lg font-semibold text-slate-950">Staffing Groups In This Call Center</h2>
-            <p class="text-sm text-slate-600">
-              Each staffing group models one team or queue separately, such as voice, chat, back office, or vendor support.
-            </p>
-          </div>
+          <AppSectionHeader
+            kicker="Staffing Groups"
+            title="Staffing Groups In This Call Center"
+            description="Each staffing group models one team or queue separately, such as voice, chat, back office, or vendor support."
+          />
 
           <AppButton :href="`#planning/center/${props.center.id}/new`" variant="primary">+ New Group</AppButton>
         </div>

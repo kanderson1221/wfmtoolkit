@@ -2,7 +2,6 @@ import {
   FULL_MONTH_LABELS,
   MONTH_LABELS,
   average,
-  clamp,
   createStaffingMonth,
   createTrainingClass,
   createTrainingSettings,
@@ -499,7 +498,6 @@ export const recommendTrainingClasses = ({
           source: 'recommended'
         })
       )
-      remainingHiresNeeded -= classHireCount
 
       staffingProjection = computeStaffingRecords(
         monthlyRecords,
@@ -525,4 +523,3 @@ export const recommendTrainingClasses = ({
 
   return recommendations
 }
-

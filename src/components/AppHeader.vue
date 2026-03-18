@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import {
   mdiBriefcaseOutline,
   mdiCalculatorVariantOutline,
@@ -7,12 +7,9 @@ import {
   mdiLogout,
   mdiMenu
 } from '@mdi/js'
-import Menu from 'primevue/menu'
 
 import logoUrl from '../assets/logo.svg'
-import AppIcon from './ui/AppIcon.vue'
-import AppIconButton from './ui/AppIconButton.vue'
-import { menuPanelPt } from './ui/primevuePresets'
+import AppMenu from './ui/AppMenu.vue'
 
 const props = defineProps({
   currentApp: {
@@ -38,8 +35,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['sign-out'])
-
-const menuRef = ref(null)
 
 const appLinks = computed(() => [
   {
@@ -76,17 +71,7 @@ const menuItems = computed(() => [
       ])
 ])
 
-const toggleMenu = (event) => {
-  menuRef.value?.toggle(event)
-}
-
-const closeMenu = () => {
-  menuRef.value?.hide?.()
-}
-
 const handleMenuItemClick = (item) => {
-  closeMenu()
-
   if (item.id === 'sign-out') {
     emit('sign-out')
     return
@@ -121,37 +106,13 @@ const handleMenuItemClick = (item) => {
         </span>
 
         <template v-else>
-          <AppIconButton
-            :icon="mdiMenu"
-            label="Open navigation menu"
-            @click="toggleMenu"
+          <AppMenu
+            :items="menuItems"
+            :active-id="props.currentApp"
+            :trigger-icon="mdiMenu"
+            trigger-label="Open navigation menu"
+            @select="handleMenuItemClick"
           />
-
-          <Menu
-            ref="menuRef"
-            popup
-            :model="menuItems"
-            :pt="menuPanelPt"
-          >
-            <template #item="{ item, props: menuItemProps }">
-              <button
-                v-bind="menuItemProps.action"
-                type="button"
-                class="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition"
-                :class="
-                  item.tone === 'danger'
-                    ? 'border border-transparent text-rose-700 hover:border-rose-100 hover:bg-rose-50'
-                    : props.currentApp === item.id
-                      ? 'border border-sky-100 bg-sky-50 text-sky-800'
-                      : 'border border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-                "
-                @click="handleMenuItemClick(item)"
-              >
-                <AppIcon :path="item.icon" class="h-5 w-5 shrink-0" />
-                <span class="flex-1">{{ item.label }}</span>
-              </button>
-            </template>
-          </Menu>
         </template>
       </div>
     </div>

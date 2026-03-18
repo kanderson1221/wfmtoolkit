@@ -1,5 +1,5 @@
 <script setup>
-import { computed, useAttrs } from 'vue'
+import { computed, ref, useAttrs } from 'vue'
 import InputText from 'primevue/inputtext'
 
 import { fieldInputClass } from './primevuePresets'
@@ -21,15 +21,26 @@ const [model, modifiers] = defineModel({
 })
 
 const attrs = useAttrs()
+const inputRef = ref(null)
 const inputClass = computed(() => [fieldInputClass, attrs.class])
 
 const updateValue = (nextValue) => {
   model.value = modifiers.trim && typeof nextValue === 'string' ? nextValue.trim() : nextValue
 }
+
+const focus = () => {
+  const inputElement = inputRef.value?.$el?.querySelector?.('input') || inputRef.value?.$el || inputRef.value
+  inputElement?.focus?.()
+}
+
+defineExpose({
+  focus
+})
 </script>
 
 <template>
   <InputText
+    ref="inputRef"
     :model-value="model"
     :type="props.type"
     :class="inputClass"

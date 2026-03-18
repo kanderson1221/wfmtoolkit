@@ -1,32 +1,4 @@
 @layer components {
-  .calculator-app-shell {
-    @apply grid gap-4;
-  }
-
-  .calculator-app-hero {
-    @apply p-5;
-  }
-
-  .calculator-suite-nav {
-    @apply grid gap-3 md:grid-cols-2;
-  }
-
-  .calculator-suite-link {
-    @apply grid gap-1 rounded-[24px] border border-slate-200 bg-white px-5 py-4 shadow-sm transition hover:border-slate-300 hover:bg-slate-50;
-  }
-
-  .calculator-suite-link strong {
-    @apply text-base font-semibold tracking-[-0.03em] text-slate-950;
-  }
-
-  .calculator-suite-link span {
-    @apply text-sm leading-6 text-slate-600;
-  }
-
-  .calculator-suite-link.active {
-    @apply border-sky-100 bg-sky-50;
-  }
-
   .schedule-start-chips,
   .schedule-starts,
   .schedule-legend,

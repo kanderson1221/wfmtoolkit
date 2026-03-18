@@ -1,7 +1,6 @@
 @layer components {
   .planner-inputs,
-  .calculator-form,
-  .home-auth-form {
+  .calculator-form {
     @apply grid gap-4;
   }
 
@@ -16,33 +15,25 @@
     @apply grid gap-4 md:grid-cols-2;
   }
 
-  .input-group-card-wide,
-  .planner-grid-single {
+  .input-group-card-wide {
     @apply md:col-span-2;
-  }
-
-  .planner-grid-assumptions {
-    @apply xl:grid-cols-3;
   }
 
   .erlang-field-grid-single {
     @apply md:grid-cols-1;
   }
 
-  .field-group,
-  .home-auth-field {
+  .field-group {
     @apply grid gap-2;
   }
 
-  .field-group label,
-  .home-auth-label {
+  .field-group label {
     @apply text-sm font-medium text-slate-700;
   }
 
   .field-group input:not([type="file"]):not([type="checkbox"]),
   .field-group select,
   .field-group textarea,
-  .home-auth-field input:not([type="checkbox"]),
   .monthly-copy-select-input,
   .calculator-section input[type="date"],
   .calculator-section input[type="number"],
@@ -54,49 +45,6 @@
     @apply w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100;
   }
 
-  .field-group input[type="file"],
-  .batch-file-input {
-    @apply sr-only;
-  }
-
-  .file-picker {
-    @apply inline-flex w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800;
-  }
-
-  .submit-btn,
-  .secondary-btn,
-  .urgent-btn,
-  .danger-btn,
-  .mode-btn,
-  .result-tab-btn,
-  .monthly-mode-btn,
-  .monthly-tab-btn,
-  .row-jump-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold shadow-sm transition;
-  }
-
-  .submit-btn {
-    @apply border border-sky-800 bg-sky-700 text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-500;
-  }
-
-  .secondary-btn {
-    @apply border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50;
-  }
-
-  .urgent-btn,
-  .danger-btn {
-    @apply border border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300 hover:bg-rose-100;
-  }
-
-  .compact-btn {
-    @apply px-3 py-2 text-xs;
-  }
-
-  .inline-link,
-  .home-auth-link-btn {
-    @apply inline-flex items-center gap-1 text-sm font-semibold text-sky-700 hover:text-sky-800;
-  }
-
   .status-message {
     @apply rounded-3xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-800;
   }
@@ -105,42 +53,10 @@
     @apply border-rose-200 bg-rose-50 text-rose-700;
   }
 
-  .empty-state {
-    @apply rounded-[24px] border border-dashed border-slate-300 bg-slate-50/80 px-5 py-7 text-sm leading-6 text-slate-600;
-  }
-
-  .mode-switcher,
-  .results-tabs,
-  .monthly-mode-strip,
-  .monthly-tab-strip {
-    @apply flex flex-wrap gap-2;
-  }
-
-  .mode-btn,
-  .result-tab-btn,
-  .monthly-mode-btn,
-  .monthly-tab-btn {
-    @apply border border-slate-200 bg-slate-100 text-slate-700 hover:border-slate-300 hover:bg-slate-50;
-  }
-
-  .mode-btn.active,
-  .result-tab-btn.active,
-  .monthly-mode-btn.active,
-  .monthly-tab-btn.active {
-    @apply border-sky-100 bg-sky-50 text-sky-800;
-  }
-
-  .batch-actions,
-  .batch-toolbar,
   .form-actions,
   .monthly-tab-actions,
-  .monthly-settings-actions,
   .training-class-toolbar {
     @apply flex flex-wrap items-center gap-3;
-  }
-
-  .batch-toolbar-step {
-    @apply justify-start;
   }
 
   .results-tab-panel {
@@ -181,37 +97,4 @@
     @apply bg-sky-50/70;
   }
 
-  .home-auth-shell {
-    @apply py-8 md:py-12;
-  }
-
-  .home-auth-layout {
-    @apply mx-auto flex min-h-[calc(100vh-12rem)] max-w-2xl items-center justify-center;
-  }
-
-  .home-auth-card {
-    @apply w-full max-w-xl p-6 md:p-8;
-  }
-
-  .home-auth-label-row,
-  .home-auth-mode-link {
-    @apply flex items-center justify-between gap-3;
-  }
-
-  .home-auth-password-row {
-    @apply grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto];
-  }
-
-  .home-auth-password-toggle {
-    @apply whitespace-nowrap;
-  }
-
-  .home-auth-error {
-    @apply text-sm font-medium text-rose-700;
-  }
-
-  .home-auth-actions,
-  .home-auth-footer-note {
-    @apply pt-2;
-  }
 }

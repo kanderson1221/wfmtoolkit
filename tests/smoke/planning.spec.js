@@ -28,3 +28,17 @@ test('opens the hamburger menu and exposes primary destinations', async ({ page 
   await expect(page.getByText('Calculator Suite')).toBeVisible()
   await expect(page.getByText('Planning App')).toBeVisible()
 })
+
+test('opens a new staffing group editor from a call center', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'Create Call Center' }).first().click()
+  await page.getByLabel('Call Center Name').fill('North America Operations')
+  await page.getByRole('button', { name: 'Create Call Center' }).last().click()
+
+  await page.getByRole('link', { name: /\+ New Group|New Group/ }).first().click()
+
+  await expect(page.getByRole('heading', { name: 'Staffing Group Settings' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Demand Model' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Staffing Plan' })).toBeVisible()
+})

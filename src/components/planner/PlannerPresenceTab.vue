@@ -2,6 +2,11 @@
 import { computed } from 'vue'
 
 import AppButton from '../ui/AppButton.vue'
+import AppSectionHeader from '../ui/AppSectionHeader.vue'
+import AppStatStrip from '../ui/AppStatStrip.vue'
+import AppTableNumberField from '../ui/AppTableNumberField.vue'
+import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
+import PlannerCopyMenu from './PlannerCopyMenu.vue'
 
 const props = defineProps({
   monthlyRecords: {
@@ -46,77 +51,63 @@ const setSelectedMonth = (monthIndex) => {
   selectedMonthIndex.value = monthIndex
 }
 
-const handleCopyAction = (event) => {
-  const action = event.target.value
-  if (!action) return
-
+const handleCopyAction = (action) => {
   emit('copy-action', action)
-  event.target.value = ''
 }
+
+const summaryItems = computed(() => [
+  {
+    label: 'Total Open Days',
+    value: props.formatWhole(props.summary.totalOpenDays),
+    meta: 'Open business days across the full year after the plan calendar is applied'
+  },
+  {
+    label: 'Avg Absence Loss / Month',
+    value: props.formatNumber(props.summary.averageAbsenceLossHours, 1),
+    meta: 'Planned time off, unplanned time off, and leave time per agent'
+  },
+  {
+    label: 'Avg Scheduled Loss / Month',
+    value: props.formatNumber(props.summary.averageScheduledLossHours, 1),
+    meta: 'Meetings, training, and coaching per agent'
+  },
+  {
+    label: 'Avg Other Loss / Month',
+    value: props.formatNumber(props.summary.averageOtherLossHours, 1),
+    meta: 'Paid breaks and other away time converted into monthly totals and reduced by presence'
+  },
+  {
+    label: 'Average Total Loss / Month',
+    value: props.formatNumber(props.summary.averageTotalLossHours, 1),
+    meta: 'Combined monthly and daily losses converted into monthly hours'
+  },
+  {
+    label: 'Average Presence',
+    value: props.formatPercent(props.summary.averagePresence, 1),
+    meta: 'Average monthly presence across the full plan year'
+  }
+])
 </script>
 
 <template>
   <section class="results-panel monthly-tab-panel">
-    <header class="monthly-tab-header">
-      <div>
-        <h3>Build presence / utilization month by month</h3>
-      </div>
-    </header>
+    <AppSectionHeader
+      title="Build presence / utilization month by month"
+      description="Use one table to build absence-based presence, scheduled-time utilization, and final scheduled percentage."
+    />
 
-    <div class="results-metrics monthly-summary-grid">
-      <article class="metric-card">
-        <p class="metric-label">Total Open Days</p>
-        <p class="metric-value">{{ props.formatWhole(props.summary.totalOpenDays) }}</p>
-        <p class="metric-meta">Open business days across the full year after the plan calendar is applied</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Avg Absence Loss / Month</p>
-        <p class="metric-value">{{ props.formatNumber(props.summary.averageAbsenceLossHours, 1) }}</p>
-        <p class="metric-meta">Planned time off, unplanned time off, and leave time per agent</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Avg Scheduled Loss / Month</p>
-        <p class="metric-value">{{ props.formatNumber(props.summary.averageScheduledLossHours, 1) }}</p>
-        <p class="metric-meta">Meetings, training, and coaching per agent</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Avg Other Loss / Month</p>
-        <p class="metric-value">{{ props.formatNumber(props.summary.averageOtherLossHours, 1) }}</p>
-        <p class="metric-meta">Paid breaks and other away time converted into monthly totals and reduced by presence</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Average Total Loss / Month</p>
-        <p class="metric-value">{{ props.formatNumber(props.summary.averageTotalLossHours, 1) }}</p>
-        <p class="metric-meta">Combined monthly and daily losses converted into monthly hours</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Average Presence</p>
-        <p class="metric-value">{{ props.formatPercent(props.summary.averagePresence, 1) }}</p>
-        <p class="metric-meta">Average monthly presence across the full plan year</p>
-      </article>
-    </div>
+    <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-3" />
 
-    <section class="input-group-card monthly-loss-group">
-      <div class="workspace-output-header">
-        <h3>Monthly Presence / Utilization Inputs</h3>
-        <p>Use one table to build absence-based presence, scheduled-time utilization, and final scheduled %.</p>
-      </div>
-
-      <div class="monthly-copy-toolbar">
-        <label class="monthly-copy-select" for="presence-copy-action">
-          <span class="monthly-copy-label">Copy {{ selectedMonth.label }}</span>
-          <select
-            id="presence-copy-action"
-            class="monthly-copy-select-input"
-            @change="handleCopyAction"
-          >
-            <option value="">Choose action</option>
-            <option value="all">To all months</option>
-            <option value="forward">Forward</option>
-            <option value="quarter">Through quarter</option>
-          </select>
-        </label>
-      </div>
+    <AppWorkspaceSection
+      class="monthly-loss-group"
+      title="Monthly Presence / Utilization Inputs"
+      description="Edit each month directly, then use copy actions when several months share the same assumption set."
+    >
+      <PlannerCopyMenu
+        input-id="presence-copy-action"
+        :label="selectedMonth.label"
+        @select="handleCopyAction"
+      />
 
       <div class="assumption-table-shell">
         <table class="assumption-table assumption-table-presence-main">
@@ -179,92 +170,91 @@ const handleCopyAction = (event) => {
               </td>
               <td>{{ props.formatWhole(record.openDays) }}</td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].dayAdjustment"
-                  type="number"
                   step="1"
                   aria-label="Business day adjustment for the month"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].paidHoursPerDay"
-                  type="number"
                   min="0"
                   max="24"
                   step="0.25"
+                  :max-fraction-digits="2"
                   aria-label="Paid hours per day"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].plannedTimeOffHours"
-                  type="number"
                   min="0"
                   step="0.25"
+                  :max-fraction-digits="2"
                   aria-label="Planned time off hours per agent per month"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].unplannedTimeOffHours"
-                  type="number"
                   min="0"
                   step="0.25"
+                  :max-fraction-digits="2"
                   aria-label="Unplanned time off hours per agent per month"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].leaveTimeHours"
-                  type="number"
                   min="0"
                   step="0.25"
+                  :max-fraction-digits="2"
                   aria-label="Leave time hours per agent per month"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].meetingsHours"
-                  type="number"
                   min="0"
                   step="0.25"
+                  :max-fraction-digits="2"
                   aria-label="Meetings hours per agent per month"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].trainingHours"
-                  type="number"
                   min="0"
                   step="0.25"
+                  :max-fraction-digits="2"
                   aria-label="Training hours per agent per month"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].coachingHours"
-                  type="number"
                   min="0"
                   step="0.25"
+                  :max-fraction-digits="2"
                   aria-label="Coaching hours per agent per month"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].paidBreaksHoursPerDay"
-                  type="number"
                   min="0"
                   step="0.05"
+                  :max-fraction-digits="2"
                   aria-label="Paid breaks hours per agent per day"
                 />
               </td>
               <td>
-                <input
+                <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].otherAwayHoursPerDay"
-                  type="number"
                   min="0"
                   step="0.05"
+                  :max-fraction-digits="2"
                   aria-label="Other away hours per agent per day"
                 />
               </td>
@@ -277,7 +267,7 @@ const handleCopyAction = (event) => {
           </tbody>
         </table>
       </div>
-    </section>
+    </AppWorkspaceSection>
 
     <div class="monthly-tab-actions">
       <AppButton variant="primary" @click="emit('continue')">Continue to Random</AppButton>

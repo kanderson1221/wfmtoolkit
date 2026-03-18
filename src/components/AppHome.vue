@@ -1,6 +1,13 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+
 import { isSupabaseConfigured, supabase, supabaseConfigError } from '../supabaseClient'
+import AppButton from './ui/AppButton.vue'
+import AppFieldGroup from './ui/AppFieldGroup.vue'
+import AppPageHeader from './ui/AppPageHeader.vue'
+import AppPanel from './ui/AppPanel.vue'
+import AppStatusMessage from './ui/AppStatusMessage.vue'
+import AppTextField from './ui/AppTextField.vue'
 
 const mode = ref('sign-in')
 const statusMessage = ref('')
@@ -36,10 +43,17 @@ const registerErrors = reactive({
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const statusClass = computed(() => ({
-  'status-message': true,
-  error: statusTone.value === 'error'
-}))
+const authTitle = computed(() =>
+  mode.value === 'sign-in' ? 'Sign in to WFM Toolkit' : 'Create your WFM Toolkit account'
+)
+
+const authDescription = computed(() =>
+  mode.value === 'sign-in'
+    ? 'Use your work email and password to access workforce planning tools and saved staffing groups.'
+    : 'Register with your work email to create a workspace for call centers, staffing groups, and calculator tools.'
+)
+
+const authNoteTone = computed(() => (isSupabaseConfigured ? 'success' : 'error'))
 
 const clearErrors = (errors) => {
   Object.keys(errors).forEach((key) => {
@@ -55,7 +69,7 @@ const clearStatus = () => {
 const focusActiveEmailField = async () => {
   await nextTick()
   const target = mode.value === 'sign-in' ? signInEmailRef.value : registerEmailRef.value
-  target?.focus()
+  target?.focus?.()
 }
 
 const validateEmail = (value) => emailPattern.test(value.trim())
@@ -192,167 +206,207 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="calculator-section home-page-shell home-auth-shell" aria-label="Login screen">
+  <section class="calculator-section py-8 md:py-12" aria-label="Login screen">
     <div class="app-frame">
-      <div class="home-auth-layout">
-        <section class="results-panel home-auth-card">
-          <p
-            v-if="statusMessage"
-            :class="statusClass"
-            :role="statusTone === 'error' ? 'alert' : 'status'"
-            aria-live="polite"
-          >
-            {{ statusMessage }}
-          </p>
+      <div class="mx-auto flex min-h-[calc(100vh-12rem)] max-w-2xl items-center justify-center">
+        <AppPanel class="w-full max-w-xl" :padded="false">
+          <div class="grid gap-6 p-6 md:p-8">
+            <AppPageHeader
+              kicker="Workspace Access"
+              :title="authTitle"
+              :description="authDescription"
+            />
 
-          <form v-if="mode === 'sign-in'" class="home-auth-form" novalidate @submit.prevent="submitSignIn">
-            <div class="home-auth-field">
-              <label for="sign-in-email" class="home-auth-label">Work email</label>
-              <input
-                id="sign-in-email"
-                ref="signInEmailRef"
-                v-model="signInForm.email"
-                type="email"
-                inputmode="email"
-                autocomplete="username"
-                autocapitalize="none"
-                spellcheck="false"
-                placeholder="name@company.com"
-                :aria-invalid="signInErrors.email ? 'true' : 'false'"
-                :aria-describedby="signInErrors.email ? 'sign-in-email-error' : undefined"
-              />
-              <p v-if="signInErrors.email" id="sign-in-email-error" class="home-auth-error">
-                {{ signInErrors.email }}
-              </p>
-            </div>
+            <AppStatusMessage
+              v-if="statusMessage"
+              :tone="statusTone"
+            >
+              {{ statusMessage }}
+            </AppStatusMessage>
 
-            <div class="home-auth-field">
-              <div class="home-auth-label-row">
-                <label for="sign-in-password" class="home-auth-label">Password</label>
-                <button type="button" class="home-auth-link-btn" @click="showResetNotice">Forgot password?</button>
-              </div>
-              <div class="home-auth-password-row">
-                <input
-                  id="sign-in-password"
-                  v-model="signInForm.password"
-                  :type="signInForm.showPassword ? 'text' : 'password'"
+            <form
+              v-if="mode === 'sign-in'"
+              class="grid gap-5"
+              novalidate
+              @submit.prevent="submitSignIn"
+            >
+              <AppFieldGroup
+                label="Work email"
+                input-id="sign-in-email"
+                :error="signInErrors.email"
+              >
+                <AppTextField
+                  id="sign-in-email"
+                  ref="signInEmailRef"
+                  v-model.trim="signInForm.email"
+                  type="email"
+                  inputmode="email"
+                  autocomplete="username"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  placeholder="name@company.com"
+                  :aria-invalid="signInErrors.email ? 'true' : 'false'"
+                />
+              </AppFieldGroup>
+
+              <AppFieldGroup
+                label="Password"
+                input-id="sign-in-password"
+                :error="signInErrors.password"
+              >
+                <template #action>
+                  <button
+                    type="button"
+                    class="text-sm font-semibold text-sky-700 transition hover:text-sky-800"
+                    @click="showResetNotice"
+                  >
+                    Forgot password?
+                  </button>
+                </template>
+
+                <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <AppTextField
+                    id="sign-in-password"
+                    v-model="signInForm.password"
+                    :type="signInForm.showPassword ? 'text' : 'password'"
                   autocomplete="current-password"
                   placeholder="Enter your password"
                   :aria-invalid="signInErrors.password ? 'true' : 'false'"
-                  :aria-describedby="signInErrors.password ? 'sign-in-password-error' : undefined"
                 />
-                <button
-                  type="button"
-                  class="secondary-btn home-auth-password-toggle"
-                  :aria-label="signInForm.showPassword ? 'Hide password' : 'Show password'"
-                  @click="signInForm.showPassword = !signInForm.showPassword"
+                  <AppButton
+                    variant="secondary"
+                    size="sm"
+                    :aria-label="signInForm.showPassword ? 'Hide password' : 'Show password'"
+                    @click="signInForm.showPassword = !signInForm.showPassword"
+                  >
+                    {{ signInForm.showPassword ? 'Hide' : 'Show' }}
+                  </AppButton>
+                </div>
+              </AppFieldGroup>
+
+              <div class="pt-1">
+                <AppButton
+                  type="submit"
+                  variant="primary"
+                  block
+                  :disabled="authBusy || !isSupabaseConfigured"
                 >
-                  {{ signInForm.showPassword ? 'Hide' : 'Show' }}
-                </button>
+                  {{ authBusy ? 'Signing In...' : 'Sign In' }}
+                </AppButton>
               </div>
-              <p v-if="signInErrors.password" id="sign-in-password-error" class="home-auth-error">
-                {{ signInErrors.password }}
-              </p>
-            </div>
+            </form>
 
-            <div class="home-auth-actions">
-              <button type="submit" class="submit-btn" :disabled="authBusy || !isSupabaseConfigured">
-                {{ authBusy ? 'Signing In...' : 'Sign In' }}
-              </button>
-            </div>
-          </form>
+            <form
+              v-else
+              class="grid gap-5"
+              novalidate
+              @submit.prevent="submitRegister"
+            >
+              <AppFieldGroup
+                label="Work email"
+                input-id="register-email"
+                :error="registerErrors.email"
+              >
+                <AppTextField
+                  id="register-email"
+                  ref="registerEmailRef"
+                  v-model.trim="registerForm.email"
+                  type="email"
+                  inputmode="email"
+                  autocomplete="email"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  placeholder="name@company.com"
+                  :aria-invalid="registerErrors.email ? 'true' : 'false'"
+                />
+              </AppFieldGroup>
 
-          <form v-else class="home-auth-form" novalidate @submit.prevent="submitRegister">
-            <div class="home-auth-field">
-              <label for="register-email" class="home-auth-label">Work email</label>
-              <input
-                id="register-email"
-                ref="registerEmailRef"
-                v-model="registerForm.email"
-                type="email"
-                inputmode="email"
-                autocomplete="email"
-                autocapitalize="none"
-                spellcheck="false"
-                placeholder="name@company.com"
-                :aria-invalid="registerErrors.email ? 'true' : 'false'"
-                :aria-describedby="registerErrors.email ? 'register-email-error' : undefined"
-              />
-              <p v-if="registerErrors.email" id="register-email-error" class="home-auth-error">
-                {{ registerErrors.email }}
-              </p>
-            </div>
-
-            <div class="home-auth-field">
-              <label for="register-password" class="home-auth-label">Create password</label>
-              <div class="home-auth-password-row">
-                <input
-                  id="register-password"
-                  v-model="registerForm.password"
-                  :type="registerForm.showPassword ? 'text' : 'password'"
+              <AppFieldGroup
+                label="Create password"
+                input-id="register-password"
+                help-text="Use a unique password with at least 12 characters."
+                :error="registerErrors.password"
+              >
+                <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <AppTextField
+                    id="register-password"
+                    v-model="registerForm.password"
+                    :type="registerForm.showPassword ? 'text' : 'password'"
                   autocomplete="new-password"
                   minlength="12"
                   placeholder="Use at least 12 characters"
                   :aria-invalid="registerErrors.password ? 'true' : 'false'"
-                  :aria-describedby="registerErrors.password ? 'register-password-error' : 'register-password-help'"
                 />
+                  <AppButton
+                    variant="secondary"
+                    size="sm"
+                    :aria-label="registerForm.showPassword ? 'Hide password' : 'Show password'"
+                    @click="registerForm.showPassword = !registerForm.showPassword"
+                  >
+                    {{ registerForm.showPassword ? 'Hide' : 'Show' }}
+                  </AppButton>
+                </div>
+              </AppFieldGroup>
+
+              <AppFieldGroup
+                label="Confirm password"
+                input-id="register-confirm-password"
+                :error="registerErrors.confirmPassword"
+              >
+                <AppTextField
+                  id="register-confirm-password"
+                  v-model="registerForm.confirmPassword"
+                  :type="registerForm.showPassword ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  placeholder="Re-enter your password"
+                  :aria-invalid="registerErrors.confirmPassword ? 'true' : 'false'"
+                />
+              </AppFieldGroup>
+
+              <div class="pt-1">
+                <AppButton
+                  type="submit"
+                  variant="primary"
+                  block
+                  :disabled="authBusy || !isSupabaseConfigured"
+                >
+                  {{ authBusy ? 'Creating Account...' : 'Register' }}
+                </AppButton>
+              </div>
+            </form>
+
+            <AppStatusMessage :tone="authNoteTone">
+              {{
+                isSupabaseConfigured
+                  ? 'Authentication is powered by Supabase email and password sign-in.'
+                  : supabaseConfigError
+              }}
+            </AppStatusMessage>
+
+            <p class="flex items-center justify-between gap-3 text-sm text-slate-600">
+              <template v-if="mode === 'sign-in'">
+                <span>Don't have an account?</span>
                 <button
                   type="button"
-                  class="secondary-btn home-auth-password-toggle"
-                  :aria-label="registerForm.showPassword ? 'Hide password' : 'Show password'"
-                  @click="registerForm.showPassword = !registerForm.showPassword"
+                  class="font-semibold text-sky-700 transition hover:text-sky-800"
+                  @click="switchMode('register')"
                 >
-                  {{ registerForm.showPassword ? 'Hide' : 'Show' }}
+                  Register
                 </button>
-              </div>
-              <p id="register-password-help" class="helper-text">Use a unique password with at least 12 characters.</p>
-              <p v-if="registerErrors.password" id="register-password-error" class="home-auth-error">
-                {{ registerErrors.password }}
-              </p>
-            </div>
-
-            <div class="home-auth-field">
-              <label for="register-confirm-password" class="home-auth-label">Confirm password</label>
-              <input
-                id="register-confirm-password"
-                v-model="registerForm.confirmPassword"
-                :type="registerForm.showPassword ? 'text' : 'password'"
-                autocomplete="new-password"
-                placeholder="Re-enter your password"
-                :aria-invalid="registerErrors.confirmPassword ? 'true' : 'false'"
-                :aria-describedby="registerErrors.confirmPassword ? 'register-confirm-password-error' : undefined"
-              />
-              <p
-                v-if="registerErrors.confirmPassword"
-                id="register-confirm-password-error"
-                class="home-auth-error"
-              >
-                {{ registerErrors.confirmPassword }}
-              </p>
-            </div>
-
-            <div class="home-auth-actions">
-              <button type="submit" class="submit-btn" :disabled="authBusy || !isSupabaseConfigured">
-                {{ authBusy ? 'Creating Account...' : 'Register' }}
-              </button>
-            </div>
-          </form>
-
-          <p class="helper-text home-auth-footer-note">
-            {{ isSupabaseConfigured ? 'Authentication is powered by Supabase email and password sign-in.' : supabaseConfigError }}
-          </p>
-
-          <p class="home-auth-mode-link">
-            <template v-if="mode === 'sign-in'">
-              Don't have an account?
-              <button type="button" class="home-auth-link-btn" @click="switchMode('register')">Register</button>
-            </template>
-            <template v-else>
-              Already have an account?
-              <button type="button" class="home-auth-link-btn" @click="switchMode('sign-in')">Sign in</button>
-            </template>
-          </p>
-        </section>
+              </template>
+              <template v-else>
+                <span>Already have an account?</span>
+                <button
+                  type="button"
+                  class="font-semibold text-sky-700 transition hover:text-sky-800"
+                  @click="switchMode('sign-in')"
+                >
+                  Sign in
+                </button>
+              </template>
+            </p>
+          </div>
+        </AppPanel>
       </div>
     </div>
   </section>

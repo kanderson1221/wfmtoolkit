@@ -2,6 +2,11 @@
 import { computed } from 'vue'
 
 import AppButton from '../ui/AppButton.vue'
+import AppSectionHeader from '../ui/AppSectionHeader.vue'
+import AppStatStrip from '../ui/AppStatStrip.vue'
+import AppTableNumberField from '../ui/AppTableNumberField.vue'
+import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
+import PlannerMonthlyRequirementChart from './PlannerMonthlyRequirementChart.vue'
 
 const props = defineProps({
   monthlyRecords: {
@@ -53,45 +58,50 @@ const selectedMonth = computed(
 const setSelectedMonth = (monthIndex) => {
   selectedMonthIndex.value = monthIndex
 }
+
+const summaryItems = computed(() => [
+  {
+    label: 'Annual Contacts',
+    value: props.formatWhole(props.planSummary?.annualContacts),
+    meta: 'Sum of all monthly demand entered in the demand model'
+  },
+  {
+    label: 'Annual Workload Hours',
+    value: props.formatWhole(props.planSummary?.annualWorkloadHours),
+    meta: `${props.planSummary?.busiestMonth?.fullLabel || 'The busiest month'} is the busiest workload month`
+  },
+  {
+    label: 'Avg Required Staff Hours',
+    value: props.formatNumber(props.planSummary?.averageRequiredStaffHours, 1),
+    meta: 'Average staffing hours required after design factor is applied'
+  },
+  {
+    label: 'Avg Required Headcount',
+    value: props.formatNumber(props.planSummary?.averageRequiredHeadcount, 1),
+    meta: 'Average monthly required headcount before rounding'
+  },
+  {
+    label: 'Peak Required Headcount',
+    value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
+    meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
+  }
+])
 </script>
 
 <template>
   <section class="results-panel monthly-tab-panel">
-    <header class="monthly-tab-header">
-      <div>
-        <h3>Build the monthly headcount requirement from demand</h3>
-      </div>
-    </header>
+    <AppSectionHeader
+      title="Build the monthly headcount requirement from demand"
+      description="Enter workload by month and review the design-factor-driven staffing requirement before moving into the staffing plan."
+    />
 
-    <div class="results-metrics monthly-summary-grid">
-      <article class="metric-card">
-        <p class="metric-label">Annual Contacts</p>
-        <p class="metric-value">{{ props.formatWhole(props.planSummary?.annualContacts) }}</p>
-        <p class="metric-meta">Sum of all monthly demand entered in the demand model</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Annual Workload Hours</p>
-        <p class="metric-value">{{ props.formatWhole(props.planSummary?.annualWorkloadHours) }}</p>
-        <p class="metric-meta">{{ (props.planSummary?.busiestMonth?.fullLabel || 'The busiest month') + ' is the busiest workload month' }}</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Avg Required Staff Hours</p>
-        <p class="metric-value">{{ props.formatNumber(props.planSummary?.averageRequiredStaffHours, 1) }}</p>
-        <p class="metric-meta">Average staffing hours required after design factor is applied</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Avg Required Headcount</p>
-        <p class="metric-value">{{ props.formatNumber(props.planSummary?.averageRequiredHeadcount, 1) }}</p>
-        <p class="metric-meta">Average monthly required headcount before rounding</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Peak Required Headcount</p>
-        <p class="metric-value">{{ props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1) }}</p>
-        <p class="metric-meta">{{ props.planSummary?.peakMonth?.fullLabel }}</p>
-      </article>
-    </div>
+    <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-5" />
 
-    <div class="assumption-table-shell">
+    <AppWorkspaceSection
+      title="Monthly Headcount Requirement"
+      description="Enter workload inputs and review how scheduled time, random loss, and design factor translate into required staff hours and headcount."
+    >
+      <div class="assumption-table-shell">
       <table class="assumption-table assumption-table-plan">
         <thead>
           <tr>
@@ -132,18 +142,16 @@ const setSelectedMonth = (monthIndex) => {
               </button>
             </td>
             <td>
-              <input
+              <AppTableNumberField
                 v-model.number="planMonths[record.monthIndex].contacts"
-                type="number"
                 min="0"
                 step="100"
                 aria-label="Contacts"
               />
             </td>
             <td>
-              <input
+              <AppTableNumberField
                 v-model.number="planMonths[record.monthIndex].ahtSeconds"
-                type="number"
                 min="0"
                 step="1"
                 aria-label="Average handle time in seconds"
@@ -160,7 +168,8 @@ const setSelectedMonth = (monthIndex) => {
           </tr>
         </tbody>
       </table>
-    </div>
+      </div>
+    </AppWorkspaceSection>
 
     <div v-if="selectedMonth.planWarnings?.length" class="monthly-warning-stack">
       <p
@@ -172,57 +181,14 @@ const setSelectedMonth = (monthIndex) => {
       </p>
     </div>
 
-    <section class="monthly-chart-panel">
-      <div class="workspace-output-header">
-        <h3>Monthly Required Staffing</h3>
-        <p>Required staff hours by month after the design factor is applied.</p>
-      </div>
-      <div class="monthly-bars">
-        <button
-          v-for="record in props.monthlyRecords"
-          :key="record.label"
-          type="button"
-          class="monthly-bar-column"
-          :class="{ active: selectedMonthIndex === record.monthIndex }"
-          @click="setSelectedMonth(record.monthIndex)"
-        >
-          <small class="monthly-bar-month">{{ record.label }}</small>
-          <div class="monthly-bar-cap">
-            <strong>{{ props.formatWhole(record.roundedHeadcount) }}</strong>
-            <span>HC</span>
-          </div>
-          <div class="monthly-bar-stack">
-            <div class="monthly-bar-track">
-              <div
-                class="monthly-bar-segment monthly-bar-final"
-                :style="{
-                  height: `${Math.max(((record.requiredStaffHours || 0) / props.monthlyChartMax) * 100, (record.requiredStaffHours || 0) > 0 ? 6 : 0)}%`
-                }"
-              ></div>
-            </div>
-          </div>
-          <div class="monthly-bar-footer">
-            <strong>{{ props.formatWhole(record.requiredStaffHours) }}</strong>
-            <span>hours</span>
-          </div>
-          <div class="monthly-bar-tooltip">
-            <p class="monthly-bar-tooltip-title">{{ record.fullLabel }}</p>
-            <div class="monthly-bar-tooltip-grid">
-              <span>Workload Hours</span>
-              <strong>{{ props.formatNumber(record.workloadHours, 1) }}</strong>
-              <span>Required Staff Hrs</span>
-              <strong>{{ props.formatNumber(record.requiredStaffHours, 1) }}</strong>
-              <span>Required HC</span>
-              <strong>{{ props.formatNumber(record.requiredHeadcount, 1) }}</strong>
-              <span>Total Random Loss</span>
-              <strong>{{ props.formatPercent(record.randomLossPercent, 1) }}</strong>
-              <span>Design Factor</span>
-              <strong>{{ props.formatPercent(record.designFactorPercent, 1) }}</strong>
-            </div>
-          </div>
-        </button>
-      </div>
-    </section>
+    <PlannerMonthlyRequirementChart
+      v-model:selected-month-index="selectedMonthIndex"
+      :monthly-records="props.monthlyRecords"
+      :monthly-chart-max="props.monthlyChartMax"
+      :format-whole="props.formatWhole"
+      :format-number="props.formatNumber"
+      :format-percent="props.formatPercent"
+    />
 
     <div class="monthly-tab-actions">
       <AppButton variant="secondary" @click="emit('previous')">Back to Random</AppButton>

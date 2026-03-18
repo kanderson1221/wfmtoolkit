@@ -55,6 +55,11 @@ defineEmits(['click'])
 
 const attrs = useAttrs()
 
+const forwardedAttrs = computed(() => {
+  const { class: _class, ...rest } = attrs
+  return rest
+})
+
 const sizeClasses = {
   sm: 'rounded-2xl px-3 py-2 text-sm',
   md: 'rounded-2xl px-4 py-2.5 text-sm',
@@ -97,8 +102,9 @@ const buttonClass = computed(() => [
   attrs.class
 ])
 
-const sharedProps = computed(() => ({
-  'aria-label': props.ariaLabel || undefined
+const mergedAttrs = computed(() => ({
+  ...forwardedAttrs.value,
+  'aria-label': props.ariaLabel || forwardedAttrs.value['aria-label'] || undefined
 }))
 
 const isAnchor = computed(() => Boolean(props.href))
@@ -109,7 +115,7 @@ const isAnchor = computed(() => Boolean(props.href))
     v-if="isAnchor"
     :href="props.href"
     :class="buttonClass"
-    v-bind="sharedProps"
+    v-bind="mergedAttrs"
   >
     <AppIcon v-if="props.icon && props.iconPosition === 'left'" :path="props.icon" class="h-4 w-4 shrink-0" />
     <slot />
@@ -122,7 +128,7 @@ const isAnchor = computed(() => Boolean(props.href))
     :type="props.type"
     :disabled="props.disabled"
     :class="buttonClass"
-    v-bind="sharedProps"
+    v-bind="mergedAttrs"
     @click="$emit('click', $event)"
   >
     <AppIcon v-if="props.icon && props.iconPosition === 'left'" :path="props.icon" class="h-4 w-4 shrink-0" />

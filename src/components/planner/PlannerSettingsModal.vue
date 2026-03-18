@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import AppButton from '../ui/AppButton.vue'
 import AppDialog from '../ui/AppDialog.vue'
 import AppSelect from '../ui/AppSelect.vue'
+import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTextField from '../ui/AppTextField.vue'
 
 const props = defineProps({
@@ -90,17 +91,9 @@ const dialogOpen = computed({
         </div>
       </section>
 
-      <div
-        v-if="props.statusMessage"
-        class="rounded-3xl border px-4 py-3 text-sm font-medium"
-        :class="
-          props.statusTone === 'error'
-            ? 'border-rose-200 bg-rose-50 text-rose-700'
-            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-        "
-      >
-          {{ props.statusMessage }}
-      </div>
+      <AppStatusMessage v-if="props.statusMessage" :tone="props.statusTone">
+        {{ props.statusMessage }}
+      </AppStatusMessage>
     </div>
 
     <template #footer>
