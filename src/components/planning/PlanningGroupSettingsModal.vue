@@ -24,7 +24,7 @@ const props = defineProps({
   },
   allowBackdropClose: {
     type: Boolean,
-    default: true
+    default: false
   }
 })
 
@@ -121,8 +121,8 @@ const operatingDaySummary = computed(() =>
               class="inline-flex min-w-14 items-center justify-center rounded-2xl border px-3 py-2 text-sm font-semibold transition"
               :class="
                 operatingWeekdays.includes(weekday.value)
-                  ? 'border-sky-700 bg-sky-700 text-white shadow-sm'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-sky-300 hover:text-sky-700'
+                  ? 'border-[#15395f] bg-[#15395f] text-white shadow-sm'
+                  : 'border-slate-300 bg-white text-slate-700 hover:border-[#a7bbce] hover:text-[#15395f]'
               "
               @click="toggleWeekday(weekday.value)"
             >

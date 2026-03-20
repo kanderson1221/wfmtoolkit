@@ -17,7 +17,7 @@ const props = defineProps({
   },
   allowBackdropClose: {
     type: Boolean,
-    default: true
+    default: false
   }
 })
 

@@ -22,7 +22,7 @@
   }
 
   a {
-    @apply text-sky-700 no-underline transition hover:text-sky-800;
+    @apply text-blue-900 no-underline transition hover:text-blue-950;
   }
 
   button,
@@ -41,10 +41,10 @@
   }
 
   :focus-visible {
-    @apply ring-4 ring-sky-100;
+    @apply ring-4 ring-blue-100;
   }
 
   input[type="checkbox"] {
-    accent-color: rgb(3 105 161);
+    accent-color: rgb(21 57 95);
   }
 }

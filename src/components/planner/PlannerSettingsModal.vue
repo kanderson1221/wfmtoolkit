@@ -29,7 +29,7 @@ const props = defineProps({
   },
   allowBackdropClose: {
     type: Boolean,
-    default: true
+    default: false
   },
   statusMessage: {
     type: String,
@@ -76,10 +76,6 @@ const dialogOpen = computed({
       <AppFieldGroup label="Planning Year" input-id="plan-year">
         <AppSelect id="plan-year" v-model="planningYear" :options="props.yearOptions" autofocus />
       </AppFieldGroup>
-
-      <AppStatusMessage>
-        The plan will be labeled automatically as <strong>{{ planningYear }} Plan</strong>. Operating days, paid hours, occupancy, and adherence come from the staffing group.
-      </AppStatusMessage>
 
       <AppStatusMessage v-if="props.statusMessage" :tone="props.statusTone">
         {{ props.statusMessage }}

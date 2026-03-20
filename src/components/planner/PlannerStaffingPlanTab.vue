@@ -58,11 +58,8 @@ const trainingSettingsOpen = ref(false)
 </script>
 
 <template>
-  <section class="results-panel monthly-tab-panel staffing-plan-panel">
-    <AppSectionHeader
-      title="Build the staffing plan against the demand model"
-      description="Use training classes and monthly attrition to translate the demand model into an opening and ending frontline supply plan."
-    />
+  <section class="monthly-tab-panel staffing-plan-panel">
+    <AppSectionHeader title="Staffing Plan" />
 
     <PlannerTrainingPipelineTable
       v-model:training-settings="trainingSettings"

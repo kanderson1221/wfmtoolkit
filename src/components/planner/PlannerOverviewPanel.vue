@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import AppButton from '../ui/AppButton.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
-import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
+import AppStatusMessage from '../ui/AppStatusMessage.vue'
 
 const props = defineProps({
   planSummary: {
@@ -22,6 +22,10 @@ const props = defineProps({
   nextRecommendation: {
     type: Object,
     default: null
+  },
+  planComplete: {
+    type: Boolean,
+    default: false
   },
   formatWhole: {
     type: Function,
@@ -58,6 +62,58 @@ const overviewItems = computed(() => [
   }
 ])
 
+const demandItems = computed(() => [
+  {
+    label: 'Annual Contacts',
+    value: props.formatWhole(props.planSummary?.annualContacts),
+    meta: 'Total yearly contact demand'
+  },
+  {
+    label: 'Annual Workload Hours',
+    value: props.formatWhole(props.planSummary?.annualWorkloadHours),
+    meta: 'Total yearly workload built from contacts and AHT'
+  },
+  {
+    label: 'Peak Required Headcount',
+    value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
+    meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
+  }
+])
+
+const staffingItems = computed(() => [
+  {
+    label: 'Ending Frontline Headcount',
+    value: props.formatNumber(props.staffingSummary?.endingFrontlineHeadcount, 1),
+    meta: 'Projected productive frontline at year end'
+  },
+  {
+    label: 'Total Graduating',
+    value: props.formatNumber(props.staffingSummary?.totalGraduatingHeadcount, 1),
+    meta: 'Training graduates delivered into frontline'
+  },
+  {
+    label: 'Average Frontline Gap',
+    value: props.formatNumber(props.staffingSummary?.averageGapToRequirement, 1),
+    meta: 'Average opening gap between staffing and need'
+  }
+])
+
+const guidanceTone = computed(() => {
+  if (props.nextRecommendation) {
+    return 'info'
+  }
+
+  return (props.staffingSummary?.averageGapToRequirement ?? 0) >= 0 ? 'success' : 'info'
+})
+
+const guidanceMessage = computed(() => {
+  if (props.nextRecommendation) {
+    return 'Use this page to track progress across the plan and move through the next recommended step.'
+  }
+
+  return 'The core inputs are in place. Finish the staffing plan to turn this into the final annual dashboard.'
+})
+
 const openSection = (sectionId, stepId = '') => {
   emit('open-section', {
     sectionId,
@@ -68,63 +124,79 @@ const openSection = (sectionId, stepId = '') => {
 
 <template>
   <section class="grid gap-4">
-    <AppSectionHeader
-      title="Overview"
-      description="Use this page to see where the plan stands, what still needs attention, and which step should come next."
-    />
+    <AppSectionHeader title="Overview" />
 
     <AppStatStrip :items="overviewItems" columns="md:grid-cols-2 xl:grid-cols-4" />
 
-    <AppWorkspaceSection
-      title="Recommended next step"
-      description="Move through the workflow in business order. Forecast need first, then turn that requirement into a staffing plan."
-    >
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <template v-if="!props.planComplete">
+      <AppStatusMessage :tone="guidanceTone">
+        {{ guidanceMessage }}
+      </AppStatusMessage>
+
+      <section
+        v-if="props.nextRecommendation"
+        class="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between"
+      >
         <div class="grid gap-1">
-          <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
-            {{ props.nextRecommendation?.title || 'Forecast need' }}
-          </strong>
-          <p class="text-sm leading-6 text-slate-600">
-            {{ props.nextRecommendation?.description || 'Start with the forecast so the staffing plan has a requirement to solve against.' }}
-          </p>
+          <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Next Step
+          </span>
+          <div class="grid gap-1">
+            <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
+              {{ props.nextRecommendation.title }}
+            </strong>
+            <p class="text-sm leading-6 text-slate-600">
+              {{ props.nextRecommendation.description }}
+            </p>
+          </div>
         </div>
 
         <AppButton
           variant="primary"
-          @click="openSection(props.nextRecommendation?.sectionId || 'forecast', props.nextRecommendation?.stepId || '')"
+          @click="openSection(props.nextRecommendation.sectionId || 'availability', props.nextRecommendation.stepId || '')"
         >
-          {{ props.nextRecommendation?.actionLabel || 'Open Forecast Need' }}
+          {{ props.nextRecommendation.actionLabel || 'Open Agent Availability' }}
         </AppButton>
-      </div>
-    </AppWorkspaceSection>
+      </section>
 
-    <div class="grid gap-4 xl:grid-cols-2">
-      <article
-        v-for="card in props.sectionCards"
-        :key="card.id"
-        class="grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div class="grid gap-1">
-            <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
-              {{ card.title }}
-            </strong>
-            <p class="text-sm leading-6 text-slate-600">
-              {{ card.description }}
-            </p>
+      <div class="grid divide-y divide-slate-200">
+        <article
+          v-for="card in props.sectionCards"
+          :key="card.id"
+          class="flex flex-col gap-3 py-4 xl:flex-row xl:items-center xl:justify-between"
+        >
+          <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between xl:flex-1">
+            <div class="grid gap-1">
+              <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
+                {{ card.title }}
+              </strong>
+              <p class="text-sm leading-6 text-slate-600">
+                {{ card.description }}
+              </p>
+            </div>
+
+            <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-slate-600">
+              {{ card.statusLabel }}
+            </span>
           </div>
 
-          <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-slate-600">
-            {{ card.statusLabel }}
-          </span>
-        </div>
+          <div class="flex justify-start xl:justify-end">
+            <AppButton variant="secondary" @click="openSection(card.id, card.stepId)">
+              {{ card.actionLabel }}
+            </AppButton>
+          </div>
+        </article>
+      </div>
+    </template>
 
-        <div class="flex justify-start">
-          <AppButton variant="secondary" @click="openSection(card.id, card.stepId)">
-            {{ card.actionLabel }}
-          </AppButton>
-        </div>
-      </article>
-    </div>
+    <section class="grid gap-3">
+      <AppSectionHeader title="Forecast Need Summary" />
+      <AppStatStrip :items="demandItems" columns="md:grid-cols-3" />
+    </section>
+
+    <section class="grid gap-3">
+      <AppSectionHeader title="Staffing Supply Summary" />
+      <AppStatStrip :items="staffingItems" columns="md:grid-cols-3" />
+    </section>
   </section>
 </template>

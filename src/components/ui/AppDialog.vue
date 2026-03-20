@@ -19,7 +19,7 @@ const props = defineProps({
   },
   allowBackdropClose: {
     type: Boolean,
-    default: true
+    default: false
   },
   maxWidth: {
     type: String,
@@ -50,7 +50,7 @@ const dialogPt = computed(() => buildDialogPt(props.maxWidth))
   >
     <template #header>
       <div class="grid gap-2">
-        <span v-if="props.kicker" class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-sky-700">
+        <span v-if="props.kicker" class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[#15395f]">
           {{ props.kicker }}
         </span>
         <div class="grid gap-1">

@@ -73,7 +73,7 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.text()).toContain('Overview')
   })
 
-  it('switches between overview, forecast need, and plan staffing', async () => {
+  it('switches between overview, direct forecast steps, and staffing plan', async () => {
     const wrapper = mountBuilder({
       draftKey: 'plan-1',
       initialPlan: {
@@ -85,7 +85,7 @@ describe('MonthlyPlanBuilder', () => {
 
     expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(true)
 
-    await wrapper.find('[data-section-id="forecast"]').trigger('click')
+    await wrapper.find('[data-section-id="availability"]').trigger('click')
 
     expect(wrapper.find('[data-test="presence-tab"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(false)

@@ -22,6 +22,7 @@ import {
 import { currentYear, yearOptions } from '../../composables/monthlyPlanBuilder/shared'
 import { computeMonthlyRecords } from '../../planner/demandModel'
 import AppButton from '../ui/AppButton.vue'
+import AppBreadcrumbs from '../ui/AppBreadcrumbs.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import AppMenu from '../ui/AppMenu.vue'
@@ -121,21 +122,11 @@ const resolveNextPlanYear = (group = selectedGroup.value) => {
 }
 
 const availableYearOptions = computed(() => {
-  const yearSet = new Set(yearOptions)
+  const usedYears = new Set((selectedGroup.value?.plans || []).map((plan) => Number(plan.planningYear)))
+  const yearSet = new Set(yearOptions.filter((year) => !usedYears.has(Number(year))))
+  const nextAvailableYear = resolveNextPlanYear(selectedGroup.value)
 
-  selectedGroup.value?.plans.forEach((plan) => {
-    if (plan?.planningYear) {
-      yearSet.add(Number(plan.planningYear))
-    }
-  })
-
-  if (props.selectedYear) {
-    yearSet.add(Number(props.selectedYear))
-  }
-
-  if (newPlanYear.value) {
-    yearSet.add(Number(newPlanYear.value))
-  }
+  yearSet.add(nextAvailableYear)
 
   return [...yearSet]
     .sort((left, right) => right - left)
@@ -242,6 +233,12 @@ const selectedGroupDefaults = computed(() => {
     { label: 'Default Adherence', value: `${formatNumber(selectedGroup.value.defaultAdherencePercent, 1)}%` }
   ]
 })
+
+const breadcrumbItems = computed(() => [
+  { label: 'Home', href: '#home' },
+  { label: 'Call Centers', href: '#planning' },
+  { label: props.center.name }
+])
 
 const createPlanHref = computed(() => {
   if (!selectedGroup.value) {
@@ -412,13 +409,11 @@ const handlePlanMenuSelect = (plan, item) => {
 </script>
 
 <template>
-  <section class="bg-slate-50/80 py-3 md:py-4">
-    <div class="app-frame grid gap-3">
-      <div class="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+  <section class="bg-slate-50/80 py-2">
+    <div class="app-frame grid gap-2.5">
+      <div class="flex flex-col gap-1.5 lg:flex-row lg:items-end lg:justify-between">
         <div class="grid gap-0.5">
-          <a href="#planning" class="planning-breadcrumb-link">
-            Call Centers
-          </a>
+          <AppBreadcrumbs :items="breadcrumbItems" />
           <h1 class="text-[clamp(1.35rem,1.8vw,1.75rem)] font-semibold tracking-[-0.04em] text-slate-950">
             {{ props.center.name }}
           </h1>
@@ -428,7 +423,7 @@ const handlePlanMenuSelect = (plan, item) => {
       </div>
 
       <AppPanel :padded="false">
-        <div class="grid h-[calc(100vh-11rem)] min-h-[38rem] xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
+        <div class="grid h-[calc(100vh-12.5rem)] min-h-[36rem] xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
           <div class="flex min-h-0 flex-col border-b border-slate-200 xl:border-b-0 xl:border-r">
             <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-5 py-3.5 xl:h-[8.75rem]">
               <div class="flex h-full flex-col justify-between gap-2.5">
@@ -459,8 +454,8 @@ const handlePlanMenuSelect = (plan, item) => {
                 <div
                   v-for="group in groupRows"
                   :key="group.id"
-                  class="grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-2 px-3 py-2.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
-                  :class="selectedGroup?.id === group.id ? 'bg-sky-50/70' : 'bg-white hover:bg-slate-50/70'"
+                  class="grid h-16 cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-2 px-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c3d2df]"
+                  :class="selectedGroup?.id === group.id ? 'bg-[#e7eef4]' : 'bg-white hover:bg-slate-50/70'"
                   tabindex="0"
                   role="link"
                   @click="navigateToHash(group.selectionHref)"
@@ -469,7 +464,7 @@ const handlePlanMenuSelect = (plan, item) => {
                 >
                   <span
                     class="h-9 w-1 rounded-full transition"
-                    :class="selectedGroup?.id === group.id ? 'bg-sky-600' : 'bg-transparent'"
+                    :class="selectedGroup?.id === group.id ? 'bg-[#15395f]' : 'bg-transparent'"
                     aria-hidden="true"
                   />
 
@@ -482,7 +477,12 @@ const handlePlanMenuSelect = (plan, item) => {
                     </span>
 
                     <span class="grid min-w-0">
-                      <strong class="truncate text-sm font-semibold text-slate-950">{{ group.name }}</strong>
+                      <strong
+                        class="truncate text-sm font-semibold"
+                        :class="selectedGroup?.id === group.id ? 'text-[#15395f]' : 'text-slate-950'"
+                      >
+                        {{ group.name }}
+                      </strong>
                     </span>
                   </div>
 
@@ -573,7 +573,7 @@ const handlePlanMenuSelect = (plan, item) => {
                   <div
                     v-for="plan in planRows"
                     :key="plan.id"
-                    :class="[planListRowGridClass, 'cursor-pointer px-3 py-2.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200', plan.isSelectedYear ? 'bg-sky-50/70' : 'bg-white hover:bg-slate-50/70']"
+                    :class="[planListRowGridClass, 'h-16 cursor-pointer px-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c3d2df]', plan.isSelectedYear ? 'bg-[#e7eef4]' : 'bg-white hover:bg-slate-50/70']"
                     tabindex="0"
                     role="button"
                     :aria-label="`Select ${plan.planningYear} plan for ${selectedGroup.name}`"
@@ -584,13 +584,16 @@ const handlePlanMenuSelect = (plan, item) => {
                   >
                     <span
                       class="h-9 w-1 rounded-full transition"
-                      :class="plan.isSelectedYear ? 'bg-sky-600' : 'bg-transparent'"
+                      :class="plan.isSelectedYear ? 'bg-[#15395f]' : 'bg-transparent'"
                       aria-hidden="true"
                     />
 
                     <div :class="[planComparisonGridClass, 'rounded-[16px] px-2 py-1.5 text-sm']">
                       <span class="px-3">
-                        <span class="inline-flex min-w-[4.25rem] items-center justify-center rounded-[16px] bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
+                        <span
+                          class="inline-flex min-w-[4.25rem] items-center justify-center rounded-[16px] px-2.5 py-1 font-semibold"
+                          :class="plan.isSelectedYear ? 'bg-white text-[#15395f]' : 'bg-slate-100 text-slate-700'"
+                        >
                           {{ plan.planningYear }}
                         </span>
                       </span>

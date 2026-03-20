@@ -1,5 +1,7 @@
 export const getCenterGroups = (center) => (Array.isArray(center?.groups) ? center.groups : [])
 export const getGroupPlans = (group) => (Array.isArray(group?.plans) ? group.plans : [])
+export const getPlansForYear = (plans, planningYear) =>
+  plans.filter((plan) => Number(plan?.planningYear) === Number(planningYear))
 
 export const getAnnualContacts = (plan) => {
   const summary = plan.summary || {}
@@ -101,10 +103,39 @@ export const summarizeGroup = (group) => {
   }
 }
 
+export const summarizeGroupForYear = (group, planningYear) => {
+  const plans = getPlansForYear(getGroupPlans(group), planningYear)
+
+  return {
+    ...summarizePlanList(plans),
+    name: group?.name || 'Staffing Group'
+  }
+}
+
 export const summarizeCenter = (center) => {
   const groups = getCenterGroups(center)
   const groupSummaries = groups.map((group) => summarizeGroup(group))
   const flattenedPlans = groups.flatMap((group) => getGroupPlans(group))
+  const planSummary = summarizePlanList(flattenedPlans)
+
+  return {
+    ...planSummary,
+    groupCount: groups.length,
+    totalPlanCount: flattenedPlans.length,
+    planCount: groups.length,
+    name: center?.name || 'Call Center',
+    timezone: center?.timezone || '',
+    defaultPaidHoursPerDay: center?.defaultPaidHoursPerDay || 0,
+    defaultOccupancyPercent: center?.defaultOccupancyPercent || 0,
+    defaultAdherencePercent: center?.defaultAdherencePercent || 0,
+    largestGroupPlanCount: groupSummaries.reduce((max, summary) => Math.max(max, summary.planCount), 0)
+  }
+}
+
+export const summarizeCenterForYear = (center, planningYear) => {
+  const groups = getCenterGroups(center)
+  const groupSummaries = groups.map((group) => summarizeGroupForYear(group, planningYear))
+  const flattenedPlans = groups.flatMap((group) => getPlansForYear(getGroupPlans(group), planningYear))
   const planSummary = summarizePlanList(flattenedPlans)
 
   return {
@@ -137,6 +168,38 @@ export const summarizeCenterPortfolio = (centers) => {
   }
 
   const centerSummaries = centers.map((center) => summarizeCenter(center))
+  const annualContacts = centerSummaries.reduce((sum, summary) => sum + summary.annualContacts, 0)
+  const annualWorkloadHours = centerSummaries.reduce((sum, summary) => sum + summary.annualWorkloadHours, 0)
+
+  return {
+    callCenterCount: centers.length,
+    totalGroupCount: centerSummaries.reduce((sum, summary) => sum + summary.groupCount, 0),
+    totalPlanCount: centerSummaries.reduce((sum, summary) => sum + summary.totalPlanCount, 0),
+    annualContacts,
+    averageAhtSeconds: annualContacts > 0 ? (annualWorkloadHours * 3600) / annualContacts : 0,
+    annualWorkloadHours,
+    totalNeededStaffHours: centerSummaries.reduce((sum, summary) => sum + summary.totalNeededStaffHours, 0),
+    totalAvgRequiredHeadcount: centerSummaries.reduce((sum, summary) => sum + summary.totalAvgRequiredHeadcount, 0),
+    totalPeakHeadcount: centerSummaries.reduce((sum, summary) => sum + summary.totalPeakHeadcount, 0)
+  }
+}
+
+export const summarizeCenterPortfolioForYear = (centers, planningYear) => {
+  if (!centers.length) {
+    return {
+      callCenterCount: 0,
+      totalGroupCount: 0,
+      totalPlanCount: 0,
+      annualContacts: 0,
+      averageAhtSeconds: 0,
+      annualWorkloadHours: 0,
+      totalNeededStaffHours: 0,
+      totalAvgRequiredHeadcount: 0,
+      totalPeakHeadcount: 0
+    }
+  }
+
+  const centerSummaries = centers.map((center) => summarizeCenterForYear(center, planningYear))
   const annualContacts = centerSummaries.reduce((sum, summary) => sum + summary.annualContacts, 0)
   const annualWorkloadHours = centerSummaries.reduce((sum, summary) => sum + summary.annualWorkloadHours, 0)
 

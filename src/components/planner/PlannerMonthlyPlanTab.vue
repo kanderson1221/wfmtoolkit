@@ -5,8 +5,6 @@ import AppButton from '../ui/AppButton.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
-import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
-import PlannerMonthlyRequirementChart from './PlannerMonthlyRequirementChart.vue'
 
 const props = defineProps({
   monthlyRecords: {
@@ -16,10 +14,6 @@ const props = defineProps({
   planSummary: {
     type: Object,
     default: null
-  },
-  monthlyChartMax: {
-    type: Number,
-    required: true
   },
   formatWhole: {
     type: Function,
@@ -39,7 +33,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['previous', 'save'])
+const emit = defineEmits(['previous', 'continue'])
 
 const planMonths = defineModel('planMonths', {
   type: Array,
@@ -89,18 +83,14 @@ const summaryItems = computed(() => [
 </script>
 
 <template>
-  <section class="results-panel monthly-tab-panel">
-    <AppSectionHeader
-      title="Review required frontline headcount"
-      description="Enter monthly workload and confirm the frontline requirement before moving into the staffing plan."
-    />
+  <section class="monthly-tab-panel">
+    <AppSectionHeader title="Required Headcount" />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-5" />
 
-    <AppWorkspaceSection
-      title="Required Frontline Headcount"
-      description="Enter workload inputs and review how agent availability, variability buffer, and design factor translate into required staff hours and frontline headcount."
-    >
+    <section class="grid gap-3">
+      <AppSectionHeader title="Monthly Requirement Worksheet" />
+
       <div class="assumption-table-shell">
       <table class="assumption-table assumption-table-plan">
         <thead>
@@ -169,7 +159,7 @@ const summaryItems = computed(() => [
         </tbody>
       </table>
       </div>
-    </AppWorkspaceSection>
+    </section>
 
     <div v-if="selectedMonth.planWarnings?.length" class="monthly-warning-stack">
       <p
@@ -181,18 +171,9 @@ const summaryItems = computed(() => [
       </p>
     </div>
 
-    <PlannerMonthlyRequirementChart
-      v-model:selected-month-index="selectedMonthIndex"
-      :monthly-records="props.monthlyRecords"
-      :monthly-chart-max="props.monthlyChartMax"
-      :format-whole="props.formatWhole"
-      :format-number="props.formatNumber"
-      :format-percent="props.formatPercent"
-    />
-
     <div class="monthly-tab-actions">
       <AppButton variant="secondary" @click="emit('previous')">Back to Variability Buffer</AppButton>
-      <AppButton variant="primary" @click="emit('save')">Save Plan</AppButton>
+      <AppButton variant="primary" @click="emit('continue')">Continue to Staffing Plan</AppButton>
     </div>
   </section>
 </template>

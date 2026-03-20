@@ -14,7 +14,7 @@ describe('AppButton', () => {
     })
 
     expect(wrapper.text()).toContain('Save')
-    expect(wrapper.classes()).toContain('bg-sky-700')
+    expect(wrapper.classes()).toContain('bg-[#15395f]')
   })
 
   it('renders an anchor when href is provided', () => {

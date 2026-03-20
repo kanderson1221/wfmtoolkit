@@ -212,6 +212,7 @@ onMounted(() => {
         <AppPanel class="w-full max-w-xl" :padded="false">
           <div class="grid gap-6 p-6 md:p-8">
             <AppPageHeader
+              :breadcrumbs="[{ label: 'Home', href: '#home' }, { label: 'Workspace Access' }]"
               kicker="Workspace Access"
               :title="authTitle"
               :description="authDescription"
@@ -257,7 +258,7 @@ onMounted(() => {
                 <template #action>
                   <button
                     type="button"
-                    class="text-sm font-semibold text-sky-700 transition hover:text-sky-800"
+                    class="text-sm font-semibold text-blue-900 transition hover:text-blue-950"
                     @click="showResetNotice"
                   >
                     Forgot password?
@@ -388,7 +389,7 @@ onMounted(() => {
                 <span>Don't have an account?</span>
                 <button
                   type="button"
-                  class="font-semibold text-sky-700 transition hover:text-sky-800"
+                  class="font-semibold text-blue-900 transition hover:text-blue-950"
                   @click="switchMode('register')"
                 >
                   Register
@@ -398,7 +399,7 @@ onMounted(() => {
                 <span>Already have an account?</span>
                 <button
                   type="button"
-                  class="font-semibold text-sky-700 transition hover:text-sky-800"
+                  class="font-semibold text-blue-900 transition hover:text-blue-950"
                   @click="switchMode('sign-in')"
                 >
                   Sign in

@@ -82,7 +82,7 @@ const handleSelect = (item) => {
             item.tone === 'danger'
               ? 'border border-transparent text-rose-700 hover:border-rose-100 hover:bg-rose-50'
               : props.activeId === item.id
-                ? 'border border-sky-100 bg-sky-50 text-sky-800'
+                ? 'border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]'
                 : 'border border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
           ]"
           @click="handleSelect(item)"

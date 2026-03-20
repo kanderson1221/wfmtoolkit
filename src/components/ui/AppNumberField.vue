@@ -2,7 +2,7 @@
 import { computed, useAttrs } from 'vue'
 import InputNumber from 'primevue/inputnumber'
 
-import { fieldInputClass } from './primevuePresets'
+import { fieldInputClass, fieldInputCompactClass } from './primevuePresets'
 
 defineOptions({
   inheritAttrs: false
@@ -32,6 +32,10 @@ const props = defineProps({
   placeholder: {
     type: String,
     default: ''
+  },
+  compact: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -46,7 +50,7 @@ const pt = computed(() => ({
     class: 'w-full'
   },
   input: {
-    class: [fieldInputClass, attrs.class]
+    class: [props.compact ? fieldInputCompactClass : fieldInputClass, attrs.class]
   }
 }))
 </script>

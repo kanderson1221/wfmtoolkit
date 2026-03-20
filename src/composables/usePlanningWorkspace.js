@@ -149,7 +149,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     }
 
     if (currentPlan.value?.id) {
-      return `planner-${currentPlan.value.id}-${currentPlan.value.updatedAt || 'draft'}`
+      return `planner-${currentPlan.value.id}`
     }
 
     return `planner-${currentGroup.value?.id || 'no-group'}-new-${currentRoute.value.year || 'default'}`
@@ -215,7 +215,25 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       return
     }
 
-    persistAndSetCenters(upsertPlanningPlan(planningCenters.value, targetCenterId, targetGroupId, planDraft))
+    const nextCenters = upsertPlanningPlan(planningCenters.value, targetCenterId, targetGroupId, planDraft)
+    persistAndSetCenters(nextCenters)
+
+    const savedCenter = findPlanningCenter(nextCenters, targetCenterId)
+    const savedGroup = savedCenter?.groups.find((group) => group.id === targetGroupId)
+    const savedPlan = planDraft.id
+      ? savedGroup?.plans.find((plan) => plan.id === planDraft.id)
+      : savedGroup?.plans.find((plan) => Number(plan.planningYear) === Number(planDraft.planningYear))
+
+    if (savedPlan?.id) {
+      const editorHash = `#planning/center/${targetCenterId}/group/${targetGroupId}/plan/${savedPlan.id}`
+
+      if (window.location.hash !== editorHash) {
+        window.location.hash = editorHash
+      }
+
+      return
+    }
+
     window.location.hash = `#planning/center/${targetCenterId}/group/${targetGroupId}/year/${planDraft.planningYear}`
   }
 

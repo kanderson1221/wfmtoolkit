@@ -18,7 +18,6 @@ import {
   createStaffingMonth,
   createTrainingClass,
   createTrainingSettings,
-  getMonthlyChartMax,
   normalizeWeekdays,
   recommendTrainingClasses,
   summarizePlanRecords,
@@ -30,7 +29,6 @@ import {
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
 import { buildExamplePlannerState } from './monthlyPlanBuilder/examplePlan'
 import {
-  WEEKDAY_OPTIONS,
   autosaveTimeFormatter,
   currentMonthIndex,
   currentYear,
@@ -38,8 +36,7 @@ import {
   formatNumber,
   formatPercent,
   formatWhole,
-  hydrateMonths,
-  yearOptions
+  hydrateMonths
 } from './monthlyPlanBuilder/shared'
 
 export const useMonthlyPlanBuilder = (props, emit) => {
@@ -62,21 +59,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const legacyInitialTab = initialUi.activeTab === 'random' || initialUi.activeTab === 'plan'
     ? initialUi.activeTab
     : 'presence'
-  const normalizedInitialSection = (() => {
-    if (initialUi.activeSection === 'forecast' || initialUi.activeSection === 'staffing' || initialUi.activeSection === 'budget' || initialUi.activeSection === 'review') {
-      return initialUi.activeSection
-    }
-
-    if (initialUi.activeSection === 'overview') {
-      return 'overview'
-    }
-
-    if (initialUi.activeMode === 'staffing') {
-      return 'staffing'
-    }
-
-    return 'overview'
-  })()
   const normalizedInitialForecastStep = (() => {
     if (initialUi.activeForecastStep === 'variability' || initialUi.activeForecastStep === 'requirement') {
       return initialUi.activeForecastStep
@@ -92,10 +74,42 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     return 'availability'
   })()
+  const normalizedInitialSection = (() => {
+    if (
+      initialUi.activeSection === 'overview' ||
+      initialUi.activeSection === 'availability' ||
+      initialUi.activeSection === 'variability' ||
+      initialUi.activeSection === 'requirement' ||
+      initialUi.activeSection === 'staffing'
+    ) {
+      return initialUi.activeSection
+    }
+
+    if (initialUi.activeSection === 'forecast') {
+      return normalizedInitialForecastStep
+    }
+
+    if (initialUi.activeSection === 'budget' || initialUi.activeSection === 'review') {
+      return 'overview'
+    }
+
+    if (initialUi.activeMode === 'staffing') {
+      return 'staffing'
+    }
+
+    if (legacyInitialTab === 'random') {
+      return 'variability'
+    }
+
+    if (legacyInitialTab === 'plan') {
+      return 'requirement'
+    }
+
+    return 'overview'
+  })()
 
   const initialPlanningYear = toNumber(initialPlan.planningYear, hasPrefilledYear ? prefilledYear : currentYear)
   const planningYear = ref(initialPlanningYear)
-  const selectedPlanningYear = ref(initialPlanningYear)
   const activeSection = ref(normalizedInitialSection)
   const activeForecastStep = ref(normalizedInitialForecastStep)
   const selectedMonthIndex = ref(clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1))
@@ -126,19 +140,25 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   )
   const staffingMonths = ref(hydrateMonths(initialPlan.staffingMonths, buildStaffingMonths, createStaffingMonth))
   const trainingClasses = ref(hydratedTrainingClasses)
-  const autosaveState = ref(restoredDraft ? 'restored' : 'idle')
-  const lastAutosavedAt = ref(restoredDraft?.autosavedAt || null)
+  const autosaveState = ref(restoredDraft ? 'restored' : savedPlan?.updatedAt ? 'saved' : 'idle')
+  const lastAutosavedAt = ref(restoredDraft?.autosavedAt || savedPlan?.updatedAt || null)
   const autosaveReady = ref(false)
   const suspendAutosave = ref(false)
 
   let autosaveTimer = null
 
   const setActiveSection = (sectionId) => {
-    activeSection.value = sectionId
+    if (sectionId === 'availability' || sectionId === 'variability' || sectionId === 'requirement') {
+      activeForecastStep.value = sectionId
+      activeSection.value = sectionId
+      return
+    }
+
+    activeSection.value = sectionId === 'budget' || sectionId === 'review' ? 'overview' : sectionId
   }
 
   const setActiveForecastStep = (stepId) => {
-    activeSection.value = 'forecast'
+    activeSection.value = stepId
     activeForecastStep.value = stepId
   }
 
@@ -147,8 +167,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     const currentIndex = steps.indexOf(activeForecastStep.value)
     const nextIndex = clamp(currentIndex + direction, 0, steps.length - 1)
 
-    activeSection.value = 'forecast'
-    activeForecastStep.value = steps[nextIndex]
+    setActiveForecastStep(steps[nextIndex])
   }
 
   const copyPresenceMonthToAll = (monthIndex) => {
@@ -163,13 +182,13 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     presenceMonths.value = copyQuarterForward(presenceMonths.value, monthIndex)
   }
 
-  const handlePresenceCopyAction = (action) => {
+  const handlePresenceCopyAction = ({ monthIndex, action }) => {
     if (action === 'all') {
-      copyPresenceMonthToAll(selectedMonthIndex.value)
+      copyPresenceMonthToAll(monthIndex)
     } else if (action === 'forward') {
-      copyPresenceMonthForward(selectedMonthIndex.value)
+      copyPresenceMonthForward(monthIndex)
     } else if (action === 'quarter') {
-      copyPresenceQuarterForward(selectedMonthIndex.value)
+      copyPresenceQuarterForward(monthIndex)
     }
   }
 
@@ -198,13 +217,13 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     randomMonths.value = copyQuarterForward(randomMonths.value, monthIndex)
   }
 
-  const handleRandomCopyAction = (action) => {
+  const handleRandomCopyAction = ({ monthIndex, action }) => {
     if (action === 'all') {
-      copyRandomMonthToAll(selectedMonthIndex.value)
+      copyRandomMonthToAll(monthIndex)
     } else if (action === 'forward') {
-      copyRandomMonthForward(selectedMonthIndex.value)
+      copyRandomMonthForward(monthIndex)
     } else if (action === 'quarter') {
-      copyRandomQuarterForward(selectedMonthIndex.value)
+      copyRandomQuarterForward(monthIndex)
     }
   }
 
@@ -212,7 +231,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     const examplePlan = buildExamplePlannerState(currentYear + 1)
 
     planningYear.value = currentYear + 1
-    selectedPlanningYear.value = currentYear + 1
     operatingWeekdays.value = examplePlan.operatingWeekdays
     presenceMonths.value = examplePlan.presenceMonths
     randomDefaults.value = examplePlan.randomDefaults
@@ -231,7 +249,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const resetPlanner = () => {
     planningYear.value = currentYear
-    selectedPlanningYear.value = currentYear
     operatingWeekdays.value = centerOperatingWeekdays
     presenceMonths.value = MONTH_LABELS.map(() =>
       createPresenceMonth({
@@ -292,16 +309,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       ...recommendations
     ]
   }
-
-  const operatingWeekdayLabel = computed(() => {
-    if (!operatingWeekdays.value.length) {
-      return 'No days selected'
-    }
-
-    return operatingWeekdays.value
-      .map((value) => WEEKDAY_OPTIONS.find((option) => option.value === value)?.label)
-      .join(', ')
-  })
 
   const displayPlanLabel = computed(() => `${planningYear.value} Plan`)
   const duplicateYearPlan = computed(() => {
@@ -369,9 +376,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       activeForecastStep: activeForecastStep.value,
       activeMode: activeSection.value === 'staffing' ? 'staffing' : 'plan',
       activeTab:
-        activeForecastStep.value === 'variability'
+        activeSection.value === 'variability'
           ? 'random'
-          : activeForecastStep.value === 'requirement'
+          : activeSection.value === 'requirement'
             ? 'plan'
             : 'presence',
       selectedMonthIndex: selectedMonthIndex.value
@@ -438,8 +445,11 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       return
     }
 
+    const savedAt = new Date().toISOString()
     suspendAutosave.value = true
     removeDraft()
+    lastAutosavedAt.value = savedAt
+    autosaveState.value = 'saved'
     emit('save', buildPlanPayload())
   }
 
@@ -448,8 +458,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     emit('cancel')
   }
 
-  const monthlyChartMax = computed(() => getMonthlyChartMax(monthlyRecords.value))
-
   const autosaveStatusMessage = computed(() => {
     if (autosaveState.value === 'saving') {
       return 'Autosaving draft...'
@@ -457,6 +465,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     if (lastAutosavedAt.value) {
       const formattedTime = autosaveTimeFormatter.format(new Date(lastAutosavedAt.value))
+      if (autosaveState.value === 'saved') {
+        return `Saved ${formattedTime}`
+      }
       return autosaveState.value === 'restored'
         ? `Draft restored from ${formattedTime}`
         : `Autosaved ${formattedTime}`
@@ -464,56 +475,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     return 'Autosave ready'
   })
-  const planningYearOptions = computed(() => {
-    const yearSet = new Set(yearOptions)
-    yearSet.add(Number(planningYear.value) || currentYear)
-    yearSet.add(Number(selectedPlanningYear.value) || currentYear)
-
-    ;(props.groupPlans || []).forEach((plan) => {
-      const planYear = Number(plan?.planningYear)
-      if (Number.isFinite(planYear)) {
-        yearSet.add(planYear)
-      }
-    })
-
-    return [...yearSet]
-      .sort((left, right) => right - left)
-      .map((year) => ({
-        label: String(year),
-        value: year
-      }))
-  })
-  const selectedPlanningYearPlan = computed(() =>
-    (props.groupPlans || []).find((plan) => Number(plan?.planningYear) === Number(selectedPlanningYear.value)) || null
-  )
-  const yearSwitchHref = computed(() => {
-    if (!props.centerDefaults?.centerId || !props.centerDefaults?.groupId) {
-      return ''
-    }
-
-    if (Number(selectedPlanningYear.value) === Number(planningYear.value)) {
-      return ''
-    }
-
-    return selectedPlanningYearPlan.value
-      ? `#planning/center/${props.centerDefaults.centerId}/group/${props.centerDefaults.groupId}/plan/${selectedPlanningYearPlan.value.id}`
-      : `#planning/center/${props.centerDefaults.centerId}/group/${props.centerDefaults.groupId}/plan/new/year/${selectedPlanningYear.value}`
-  })
-  const yearSwitchLabel = computed(() => {
-    if (!yearSwitchHref.value) {
-      return ''
-    }
-
-    return selectedPlanningYearPlan.value
-      ? `Open ${selectedPlanningYear.value} Plan`
-      : `Create ${selectedPlanningYear.value} Plan`
-  })
-  const yearSwitchVariant = computed(() => (selectedPlanningYearPlan.value ? 'secondary' : 'primary'))
-
   watch(
     [
       planningYear,
-      selectedPlanningYear,
       activeSection,
       activeForecastStep,
       selectedMonthIndex,
@@ -530,7 +494,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       trainingClasses
     ],
     () => {
-      if (autosaveState.value === 'restored') {
+      if (autosaveState.value === 'restored' || autosaveState.value === 'saved') {
         autosaveState.value = 'idle'
       }
 
@@ -538,10 +502,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     },
     { deep: true }
   )
-
-  watch(planningYear, () => {
-    selectedPlanningYear.value = planningYear.value
-  })
 
   watch(startingHeadcount, (value) => {
     if (startingFrontlineHeadcount.value > value) {
@@ -563,9 +523,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   })
 
   return {
-    planningYearOptions,
     planningYear,
-    selectedPlanningYear,
     activeSection,
     activeForecastStep,
     selectedMonthIndex,
@@ -581,17 +539,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     trainingClasses,
     autosaveState,
     monthlyRecords,
-    operatingWeekdayLabel,
     displayPlanLabel,
-    yearSwitchHref,
-    yearSwitchLabel,
-    yearSwitchVariant,
     presenceSummary,
     randomSummary,
     planSummary,
     staffingSummary,
     staffingRecords,
-    monthlyChartMax,
     autosaveStatusMessage,
     formatNumber,
     formatWhole,

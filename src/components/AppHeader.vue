@@ -84,23 +84,23 @@ const handleMenuItemClick = (item) => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-[60] border-b border-slate-200 bg-white/95 backdrop-blur-xl">
-    <div class="app-frame flex min-h-[74px] items-center gap-4 px-2">
+  <header class="sticky top-0 z-[60] border-b border-slate-900/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(18,52,86,0.96))] shadow-[0_14px_36px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+    <div class="app-frame flex min-h-[78px] items-center gap-4 px-2">
       <a href="#home" class="inline-flex items-center" aria-label="WFMToolkit home">
-        <img :src="logoUrl" alt="WFMToolkit logo" class="block h-14 w-auto" />
+        <img :src="logoUrl" alt="WFMToolkit logo" class="block h-[3.15rem] w-auto" />
       </a>
 
       <div class="ml-auto flex items-center gap-2.5">
         <span
           v-if="!props.isAuthenticated && props.authConfigured"
-          class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-slate-600"
+          class="rounded-2xl border border-white/12 bg-white/5 px-3 py-1.5 text-xs font-semibold tracking-wide text-slate-100"
         >
           Sign in required
         </span>
 
         <span
           v-else-if="!props.isAuthenticated"
-          class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-amber-700"
+          class="rounded-2xl border border-amber-300/30 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-amber-100"
         >
           Auth setup needed
         </span>
@@ -110,6 +110,7 @@ const handleMenuItemClick = (item) => {
             :items="menuItems"
             :active-id="props.currentApp"
             :trigger-icon="mdiMenu"
+            trigger-variant="icon-inverse"
             trigger-label="Open navigation menu"
             @select="handleMenuItemClick"
           />

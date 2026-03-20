@@ -1,38 +1,38 @@
 <svg width="980" height="176" viewBox="0 0 980 176" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WFMToolkit logo">
   <defs>
     <linearGradient id="wfmtoolkit-icon-gradient" x1="18" y1="122" x2="132" y2="18" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7B9F8F"/>
-      <stop offset="0.48" stop-color="#5686A6"/>
-      <stop offset="1" stop-color="#2A4B65"/>
+      <stop stop-color="#8AB29D"/>
+      <stop offset="0.48" stop-color="#78B0D8"/>
+      <stop offset="1" stop-color="#3A6C99"/>
     </linearGradient>
     <linearGradient id="wfmtoolkit-wordmark-gradient" x1="414" y1="28" x2="748" y2="92" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5686A6"/>
-      <stop offset="1" stop-color="#557B69"/>
+      <stop stop-color="#9BD2FF"/>
+      <stop offset="1" stop-color="#9FCAB9"/>
     </linearGradient>
   </defs>
 
   <g transform="translate(18 24)">
-    <rect x="0" y="80" width="30" height="48" rx="9" fill="#7B9F8F"/>
-    <rect x="36" y="62" width="30" height="66" rx="9" fill="#6E9185"/>
-    <rect x="72" y="38" width="30" height="90" rx="10" fill="#5E8297"/>
+    <rect x="0" y="80" width="30" height="48" rx="9" fill="#8AB29D"/>
+    <rect x="36" y="62" width="30" height="66" rx="9" fill="#7DA493"/>
+    <rect x="72" y="38" width="30" height="90" rx="10" fill="#78A7C9"/>
     <rect x="108" y="12" width="30" height="116" rx="10" fill="url(#wfmtoolkit-icon-gradient)"/>
 
-    <circle cx="18" cy="104" r="8" fill="#F6F8F9"/>
-    <circle cx="54" cy="84" r="8" fill="#F6F8F9"/>
-    <circle cx="90" cy="58" r="8" fill="#F6F8F9"/>
-    <circle cx="129" cy="4" r="9" fill="#AA9B72"/>
+    <circle cx="18" cy="104" r="8" fill="#F8FBFF"/>
+    <circle cx="54" cy="84" r="8" fill="#F8FBFF"/>
+    <circle cx="90" cy="58" r="8" fill="#F8FBFF"/>
+    <circle cx="129" cy="4" r="9" fill="#C4B37B"/>
 
-    <circle cx="18" cy="104" r="4" fill="#5686A6"/>
-    <circle cx="54" cy="84" r="4" fill="#5686A6"/>
-    <circle cx="90" cy="58" r="4" fill="#5686A6"/>
+    <circle cx="18" cy="104" r="4" fill="#74ACD5"/>
+    <circle cx="54" cy="84" r="4" fill="#74ACD5"/>
+    <circle cx="90" cy="58" r="4" fill="#74ACD5"/>
 
-    <path d="M18 104C30 99 40 94 54 84C67 75 79 68 90 58C104 45 117 28 129 4" stroke="#F6F8F9" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M18 104C30 99 40 94 54 84C67 75 79 68 90 58C104 45 117 28 129 4" stroke="#F8FBFF" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 
   <g transform="translate(184 34)">
     <text x="0" y="78" font-family="Sora, Manrope, Avenir Next, Segoe UI, sans-serif" font-size="84" font-weight="700" letter-spacing="-3.2">
-      <tspan fill="#1F2B37">WFM</tspan><tspan dx="3" fill="url(#wfmtoolkit-wordmark-gradient)" font-weight="600">Toolkit</tspan>
+      <tspan fill="#F5F8FC">WFM</tspan><tspan dx="3" fill="url(#wfmtoolkit-wordmark-gradient)" font-weight="600">Toolkit</tspan>
     </text>
-    <rect x="2" y="98" width="502" height="3" rx="1.5" fill="#D7DEE5"/>
+    <rect x="2" y="98" width="502" height="3" rx="1.5" fill="#86A6C140"/>
   </g>
 </svg>

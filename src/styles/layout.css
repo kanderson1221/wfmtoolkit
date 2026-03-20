@@ -40,7 +40,7 @@
   }
 
   .answer-card-primary {
-    @apply border-sky-100 bg-sky-50;
+    @apply border-blue-100 bg-blue-50;
   }
 
   .metric-card {
@@ -89,7 +89,7 @@
   }
 
   .pane-kicker {
-    @apply text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-sky-700;
+    @apply text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-blue-900;
   }
 
   .pane-heading h2,

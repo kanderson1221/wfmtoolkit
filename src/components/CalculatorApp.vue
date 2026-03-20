@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue'
+
 import CsvBatchCalculator from './CsvBatchCalculator.vue'
 import ErlangCForm from './ErlangCForm.vue'
 import AppPageHeader from './ui/AppPageHeader.vue'
@@ -22,12 +24,21 @@ const calculatorTabs = [
     description: 'Run scenario-based staffing and batch planning workflows.'
   }
 ]
+
+const activeToolTitle = computed(() =>
+  calculatorTabs.find((tab) => tab.id === props.activeTool)?.title || 'Calculators'
+)
 </script>
 
 <template>
   <section class="bg-slate-50/80 py-3">
     <div class="app-frame grid gap-4">
       <AppPageHeader
+        :breadcrumbs="[
+          { label: 'Home', href: '#home' },
+          { label: 'Calculators', href: '#calculators' },
+          { label: activeToolTitle }
+        ]"
         kicker="Calculator Suite"
         title="Interval and batch workforce calculators"
         description="Keep fast Erlang staffing checks and bulk planning workflows together in one operational workspace, separate from the planning application."
@@ -42,7 +53,7 @@ const calculatorTabs = [
           class="grid gap-1 rounded-[28px] border bg-white px-5 py-4 shadow-sm transition"
           :class="
             props.activeTool === tab.id
-              ? 'border-sky-200 bg-sky-50/70'
+              ? 'border-blue-200 bg-blue-50'
               : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
           "
         >

@@ -21,7 +21,7 @@ const messageClass = computed(() => {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700'
   }
 
-  return 'border-sky-100 bg-sky-50 text-sky-800'
+  return 'border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]'
 })
 
 const resolvedRole = computed(() => props.role || (props.tone === 'error' ? 'alert' : 'status'))

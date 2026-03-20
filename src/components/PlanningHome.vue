@@ -1,23 +1,25 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
+  mdiDotsVertical,
   mdiOfficeBuildingOutline,
-  mdiSitemapOutline,
-  mdiTarget,
-  mdiTrendingUp,
-  mdiPlus
+  mdiPlus,
 } from '@mdi/js'
 
 import CallCenterSettingsModal from './planning/CallCenterSettingsModal.vue'
+import PlanningPortfolioHeadcountChart from './planning/PlanningPortfolioHeadcountChart.vue'
 import AppButton from './ui/AppButton.vue'
 import AppEmptyState from './ui/AppEmptyState.vue'
 import AppIcon from './ui/AppIcon.vue'
+import AppMenu from './ui/AppMenu.vue'
 import AppPageHeader from './ui/AppPageHeader.vue'
 import AppPanel from './ui/AppPanel.vue'
+import AppSelect from './ui/AppSelect.vue'
 import AppStatStrip from './ui/AppStatStrip.vue'
 import AppTableShell from './ui/AppTableShell.vue'
 import { createPlanningCenterDraft } from '../planningStorage'
-import { summarizeCenter, summarizeCenterPortfolio } from '../planningSummary'
+import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
+import { computeMonthlyRecords } from '../planner/demandModel'
 
 const props = defineProps({
   centers: {
@@ -34,6 +36,7 @@ const emit = defineEmits(['save-center', 'delete-center'])
 
 const centerSettingsOpen = ref(false)
 const centerDraft = ref(createPlanningCenterDraft())
+const selectedPlanningYear = ref(new Date().getFullYear())
 
 const formatWhole = (value) =>
   new Intl.NumberFormat('en-US', {
@@ -46,93 +49,240 @@ const formatNumber = (value, digits = 1) =>
     maximumFractionDigits: digits
   }).format(value || 0)
 
-const dashboardSummary = computed(() => summarizeCenterPortfolio(props.centers))
-const centerRows = computed(() =>
-  props.centers.map((center) => ({
-    ...center,
-    summary: summarizeCenter(center)
+const formatAht = (seconds) => {
+  const totalSeconds = Number(seconds) || 0
+  if (totalSeconds <= 0) {
+    return '0m 00s'
+  }
+
+  const minutes = Math.floor(totalSeconds / 60)
+  const remainingSeconds = Math.round(totalSeconds % 60)
+  return `${minutes}m ${String(remainingSeconds).padStart(2, '0')}s`
+}
+
+const availablePlanningYears = computed(() => {
+  const years = new Set()
+
+  props.centers.forEach((center) => {
+    getCenterGroups(center).forEach((group) => {
+      getGroupPlans(group).forEach((plan) => {
+        const planningYear = Number(plan?.planningYear)
+        if (Number.isFinite(planningYear) && planningYear > 0) {
+          years.add(planningYear)
+        }
+      })
+    })
+  })
+
+  if (!years.size) {
+    years.add(new Date().getFullYear())
+  }
+
+  return [...years].sort((left, right) => right - left)
+})
+
+watch(
+  availablePlanningYears,
+  (years) => {
+    const currentCalendarYear = new Date().getFullYear()
+    const preferredYear = years.includes(currentCalendarYear) ? currentCalendarYear : years[0]
+
+    if (!years.includes(Number(selectedPlanningYear.value))) {
+      selectedPlanningYear.value = preferredYear
+      return
+    }
+
+    if (selectedPlanningYear.value == null) {
+      selectedPlanningYear.value = preferredYear
+    }
+  },
+  { immediate: true }
+)
+
+const planningYearOptions = computed(() =>
+  availablePlanningYears.value.map((year) => ({
+    label: String(year),
+    value: year
   }))
 )
 
-const featuredSummaryItems = computed(() => [
+const dashboardSummary = computed(() => summarizeCenterPortfolioForYear(props.centers, selectedPlanningYear.value))
+const centerRows = computed(() =>
+  props.centers
+    .map((center) => ({
+      ...center,
+      summary: summarizeCenterForYear(center, selectedPlanningYear.value)
+    }))
+    .sort((left, right) => {
+      const peakDifference = (Number(right.summary.totalPeakHeadcount) || 0) - (Number(left.summary.totalPeakHeadcount) || 0)
+      if (peakDifference !== 0) {
+        return peakDifference
+      }
+
+      const contactDifference = (Number(right.summary.annualContacts) || 0) - (Number(left.summary.annualContacts) || 0)
+      if (contactDifference !== 0) {
+        return contactDifference
+      }
+
+      return left.name.localeCompare(right.name)
+    })
+)
+
+const modeledCenterCount = computed(() =>
+  centerRows.value.filter((center) => Number(center.summary.totalPlanCount) > 0).length
+)
+
+const centersWithoutPlansCount = computed(() =>
+  Math.max((Number(dashboardSummary.value.callCenterCount) || 0) - Number(modeledCenterCount.value || 0), 0)
+)
+
+const groupsWithoutPlansCount = computed(() =>
+  Math.max((Number(dashboardSummary.value.totalGroupCount) || 0) - (Number(dashboardSummary.value.totalPlanCount) || 0), 0)
+)
+
+const groupPlanCoveragePercent = computed(() => {
+  const totalGroups = Number(dashboardSummary.value.totalGroupCount) || 0
+  if (totalGroups <= 0) {
+    return 0
+  }
+
+  return ((Number(dashboardSummary.value.totalPlanCount) || 0) / totalGroups) * 100
+})
+
+const summaryStripItems = computed(() => [
   {
     label: 'Call Centers',
     value: formatWhole(dashboardSummary.value.callCenterCount),
     meta: 'Configured operations'
   },
   {
+    label: 'Modeled Centers',
+    value: formatWhole(modeledCenterCount.value),
+    meta: 'With saved plans'
+  },
+  {
+    label: 'Without Plans',
+    value: formatWhole(centersWithoutPlansCount.value),
+    meta: 'Without saved plans'
+  },
+  {
     label: 'Staffing Groups',
     value: formatWhole(dashboardSummary.value.totalGroupCount),
-    meta: 'Saved planning groups'
-  }
-])
-
-const detailSummaryItems = computed(() => [
+    meta: 'Planned teams'
+  },
+  {
+    label: 'Annual Plans',
+    value: formatWhole(dashboardSummary.value.totalPlanCount),
+    meta: 'Saved plan years'
+  },
+  {
+    label: 'Plan Coverage',
+    value: `${formatNumber(groupPlanCoveragePercent.value, 1)}%`,
+    meta: `${formatWhole(groupsWithoutPlansCount.value)} groups without saved plans`
+  },
   {
     label: 'Annual Contacts',
     value: formatWhole(dashboardSummary.value.annualContacts),
-    meta: 'Combined demand'
+    meta: 'Modeled demand'
   },
   {
-    label: 'Annual Workload Hours',
+    label: 'Workload Hours',
     value: formatWhole(dashboardSummary.value.annualWorkloadHours),
-    meta: 'Total modeled workload'
+    meta: 'Annual workload'
+  },
+  {
+    label: 'Average AHT',
+    value: formatAht(dashboardSummary.value.averageAhtSeconds),
+    meta: 'Blended handle time'
   },
   {
     label: 'Needed Staff Hours',
     value: formatWhole(dashboardSummary.value.totalNeededStaffHours),
-    meta: 'Combined staffing hours'
+    meta: 'Staffing requirement'
+  },
+  {
+    label: 'Average Required HC',
+    value: formatNumber(dashboardSummary.value.totalAvgRequiredHeadcount, 1),
+    meta: 'Average requirement'
   },
   {
     label: 'Peak Required Headcount',
     value: formatNumber(dashboardSummary.value.totalPeakHeadcount, 1),
-    meta: 'Combined peak headcount'
+    meta: 'Peak headcount'
   }
 ])
 
-const summaryStripItems = computed(() => [
-  ...featuredSummaryItems.value,
-  ...detailSummaryItems.value
-])
+const chartPalette = [
+  '#15395f',
+  '#24527d',
+  '#35689a',
+  '#4a7eaf',
+  '#5f93c1',
+  '#759fd0',
+  '#8aaed8',
+  '#5f7d5a',
+  '#7f8f5d',
+  '#8c6f51',
+  '#7b5f8c',
+  '#4d657e'
+]
 
-const topCenterByMetric = (metric) =>
-  centerRows.value.reduce((best, center) => {
-    if (!best || center.summary[metric] > best.summary[metric]) {
-      return center
-    }
+const portfolioHeadcountSeries = computed(() => {
+  const series = []
 
-    return best
-  }, null)
+  props.centers.forEach((center) => {
+    getCenterGroups(center).forEach((group) => {
+      const plan = getGroupPlans(group).find((item) => Number(item?.planningYear) === Number(selectedPlanningYear.value))
 
-const portfolioHighlights = computed(() => {
-  const highestPeakCenter = topCenterByMetric('totalPeakHeadcount')
-  const highestVolumeCenter = topCenterByMetric('annualContacts')
-  const mostGroupsCenter = topCenterByMetric('groupCount')
+      if (!plan) {
+        return
+      }
 
-  return [
-    {
-      label: 'Highest peak requirement',
-      value: highestPeakCenter
-        ? `${highestPeakCenter.name} · ${formatNumber(highestPeakCenter.summary.totalPeakHeadcount, 1)}`
-        : 'No modeled headcount yet',
-      icon: mdiTarget
-    },
-    {
-      label: 'Largest annual contact load',
-      value: highestVolumeCenter
-        ? `${highestVolumeCenter.name} · ${formatWhole(highestVolumeCenter.summary.annualContacts)}`
-        : 'No modeled demand yet',
-      icon: mdiTrendingUp
-    },
-    {
-      label: 'Most staffing groups',
-      value: mostGroupsCenter
-        ? `${mostGroupsCenter.name} · ${formatWhole(mostGroupsCenter.summary.groupCount)}`
-        : 'No staffing groups saved',
-      icon: mdiSitemapOutline
-    }
-  ]
+      const monthlyRecords = computeMonthlyRecords({
+        planningYear: Number(selectedPlanningYear.value),
+        operatingWeekdays:
+          Array.isArray(plan.operatingWeekdays) && plan.operatingWeekdays.length
+            ? plan.operatingWeekdays
+            : Array.isArray(group.operatingWeekdays) && group.operatingWeekdays.length
+              ? group.operatingWeekdays
+              : [1, 2, 3, 4, 5],
+        presenceMonths: Array.isArray(plan.presenceMonths) ? plan.presenceMonths : [],
+        randomDefaults: plan.randomDefaults || {},
+        useMonthlyRandomOverrides: Boolean(plan.useMonthlyRandomOverrides),
+        randomMonths: Array.isArray(plan.randomMonths) ? plan.randomMonths : [],
+        planMonths: Array.isArray(plan.planMonths) ? plan.planMonths : []
+      })
+
+      const values = monthlyRecords.map((record) => Number(record.requiredHeadcount) || 0)
+      const annualTotal = values.reduce((sum, value) => sum + value, 0)
+
+      if (annualTotal <= 0) {
+        return
+      }
+
+      series.push({
+        id: `${center.id}-${group.id}`,
+        label: `${center.name} · ${group.name}`,
+        values,
+        annualTotal
+      })
+    })
+  })
+
+  return series
+    .sort((left, right) => right.annualTotal - left.annualTotal)
+    .map((item, index) => ({
+      ...item,
+      color: chartPalette[index % chartPalette.length]
+    }))
 })
+
+const centerMenuItems = [
+  {
+    id: 'delete-center',
+    label: 'Delete'
+  }
+]
 
 const openCreateCenter = () => {
   centerDraft.value = createPlanningCenterDraft()
@@ -163,72 +313,60 @@ const confirmDeleteCenter = (center) => {
 
   emit('delete-center', center.id)
 }
+
+const handleCenterMenuSelect = (center, item) => {
+  if (item.id === 'delete-center') {
+    confirmDeleteCenter(center)
+  }
+}
 </script>
 
 <template>
   <section class="bg-slate-50/80 py-4 md:py-5">
     <div class="app-frame grid gap-4">
       <AppPageHeader
+        :breadcrumbs="[
+          { label: 'Home', href: '#home' },
+          { label: 'Call Centers' }
+        ]"
         kicker="Planning Portfolio"
         title="Call Centers"
-        description="Review portfolio demand, staffing hours, and peak headcount before opening a call center to organize staffing groups and review modeled workload."
       />
 
       <AppPanel :padded="false">
-        <div class="grid">
-          <div class="relative overflow-hidden border-b border-slate-200 bg-[linear-gradient(145deg,rgba(14,165,233,0.08),rgba(255,255,255,0)_42%),linear-gradient(180deg,#ffffff,#f8fafc)] px-6 py-6">
-            <div class="absolute -right-10 top-0 h-40 w-40 rounded-full bg-sky-100/60 blur-3xl" />
-            <div class="relative grid gap-6 xl:grid-cols-[1.2fr_0.9fr] xl:gap-8">
-              <div class="grid content-start gap-3">
-                <div class="grid gap-2">
-                  <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-sky-700">
-                    Portfolio Overview
-                  </span>
-                  <h2 class="max-w-2xl text-[clamp(1.25rem,1.9vw,1.7rem)] font-semibold tracking-[-0.04em] text-slate-950">
-                    See where the portfolio is carrying demand before you drill into a single operation.
-                  </h2>
-                  <p class="max-w-2xl text-sm leading-6 text-slate-600">
-                    Each call center organizes the staffing groups planned beneath it. Use this page to compare modeled demand, staff hours, and peak requirement across the portfolio.
-                  </p>
-                </div>
-
-                <div class="grid gap-2.5 text-sm text-slate-600">
-                  <p>
-                    Open a call center to create staffing groups for each queue, line of business, or support team you plan separately.
-                  </p>
-                  <p>
-                    The summary below shows the total modeled workload, staffing hours, and peak requirement across the full portfolio in one place.
-                  </p>
-                </div>
+        <div class="grid gap-0">
+          <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-5 py-4">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div class="grid gap-1">
+                <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[#15395f]">
+                  Executive Summary
+                </span>
+                <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">Portfolio Dashboard</h2>
+                <p class="text-sm text-slate-500">
+                  Combined demand, staffing requirement, and call-center concentration for {{ selectedPlanningYear }}.
+                </p>
               </div>
 
-              <div class="grid content-start gap-2.5">
-                <div class="grid gap-1">
-                  <span class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Portfolio Highlights
-                  </span>
-                  <p class="text-sm leading-6 text-slate-600">
-                    Quick signals to show where the current model is most concentrated.
-                  </p>
+              <div class="grid gap-1.5 lg:justify-items-end">
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <label
+                    for="portfolio-year"
+                    class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                  >
+                    Planning Year
+                  </label>
+                  <AppSelect
+                    id="portfolio-year"
+                    v-model="selectedPlanningYear"
+                    :options="planningYearOptions"
+                    class="w-[6.75rem]"
+                    aria-label="Planning Year"
+                  />
                 </div>
 
-                <div
-                  v-for="item in portfolioHighlights"
-                  :key="item.label"
-                  class="flex items-center gap-3 rounded-[20px] border border-slate-200/80 bg-white/80 px-4 py-3 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.45)]"
-                >
-                  <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700">
-                    <AppIcon :path="item.icon" class="h-4.5 w-4.5" />
-                  </span>
-                  <div class="grid gap-0.5">
-                    <span class="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      {{ item.label }}
-                    </span>
-                    <span class="text-sm font-medium text-slate-900">
-                      {{ item.value }}
-                    </span>
-                  </div>
-                </div>
+                <p class="text-[0.82rem] font-medium leading-5 text-slate-500">
+                  {{ formatWhole(modeledCenterCount) }} of {{ formatWhole(dashboardSummary.callCenterCount) }} call centers have {{ selectedPlanningYear }} plans
+                </p>
               </div>
             </div>
           </div>
@@ -236,19 +374,27 @@ const confirmDeleteCenter = (center) => {
           <div class="px-5 py-4">
             <AppStatStrip :items="summaryStripItems" columns="md:grid-cols-3 xl:grid-cols-6" />
           </div>
+
+          <div class="border-t border-slate-200 px-5 py-4">
+            <PlanningPortfolioHeadcountChart
+              :planning-year="selectedPlanningYear"
+              :series="portfolioHeadcountSeries"
+              :format-number="formatNumber"
+            />
+          </div>
         </div>
       </AppPanel>
 
       <AppTableShell>
         <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-6 py-4">
-          <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex flex-col gap-1.5 lg:flex-row lg:items-end lg:justify-between">
             <div class="grid gap-1">
-              <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-sky-700">
-                Portfolio Detail
+              <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[#15395f]">
+                Call Center Portfolio
               </span>
               <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">All Call Centers</h2>
-              <p class="max-w-3xl text-sm leading-5 text-slate-600">
-                Open a call center to manage staffing groups and review the annual demand and staffing requirement modeled inside that operation.
+              <p class="text-sm text-slate-500">
+                {{ selectedPlanningYear }} plans ranked by peak requirement, then annual contact volume.
               </p>
             </div>
 
@@ -260,10 +406,10 @@ const confirmDeleteCenter = (center) => {
 
         <div v-if="!props.centers.length" class="px-6 py-8">
           <AppEmptyState
-            title="Create the first operation"
-            description="Start by creating a call center, then add staffing groups beneath it for each team or queue you plan separately."
+            title="Create the first call center"
+            description="Start by creating a call center, then add staffing groups and annual plans beneath it."
           >
-            <div class="mb-1 flex h-12 w-12 items-center justify-center rounded-[20px] border border-sky-200 bg-sky-50 text-sky-700">
+            <div class="mb-1 flex h-12 w-12 items-center justify-center rounded-[20px] border border-slate-200 bg-slate-50 text-[#15395f]">
               <AppIcon :path="mdiOfficeBuildingOutline" class="h-6 w-6" />
             </div>
             <AppButton :icon="mdiPlus" variant="primary" @click="openCreateCenter">Create Call Center</AppButton>
@@ -277,17 +423,17 @@ const confirmDeleteCenter = (center) => {
                 <th class="px-6 py-3.5 text-left text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                   Call Center
                 </th>
-                <th class="px-4 py-3.5 text-left text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Time Zone
-                </th>
                 <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Staffing Groups
+                  Annual Plans
                 </th>
                 <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                   Annual Contacts
                 </th>
                 <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                   Needed Staff Hours
+                </th>
+                <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                  Avg HC
                 </th>
                 <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                   Peak Required Headcount
@@ -301,44 +447,54 @@ const confirmDeleteCenter = (center) => {
               <tr
                 v-for="center in centerRows"
                 :key="center.id"
-                class="transition odd:bg-white even:bg-slate-50/40 hover:bg-sky-50/80"
+                class="bg-white transition hover:bg-[#eef4f8]"
               >
                 <td class="px-6 py-4 align-middle">
                   <div class="grid grid-cols-[auto_1fr] items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-[20px] border border-sky-200 bg-sky-50 text-sm font-semibold text-sky-700 shadow-sm">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-[20px] border border-slate-200 bg-slate-50 text-sm font-semibold text-[#15395f] shadow-sm">
                       <AppIcon :path="mdiOfficeBuildingOutline" class="h-5 w-5" />
                     </div>
                     <div class="grid gap-1">
                       <strong class="text-sm font-semibold text-slate-950">{{ center.name }}</strong>
                       <div class="flex flex-wrap gap-2 text-xs text-slate-500">
-                        <span>
-                          {{ center.summary.groupCount === 1 ? '1 staffing group' : `${formatWhole(center.summary.groupCount)} staffing groups` }}
-                        </span>
+                        <span>{{ center.timezone }}</span>
                         <span class="text-slate-300">•</span>
-                        <span>{{ formatNumber(center.summary.totalPeakHeadcount, 1) }} peak required HC</span>
+                        <span v-if="center.summary.totalPlanCount > 0">
+                          {{ center.summary.totalPlanCount === 1 ? `1 plan in ${selectedPlanningYear}` : `${formatWhole(center.summary.totalPlanCount)} plans in ${selectedPlanningYear}` }}
+                        </span>
+                        <span v-else>No {{ selectedPlanningYear }} plan</span>
                       </div>
                     </div>
                   </div>
                 </td>
-                <td class="px-4 py-4 align-middle">
-                  <span class="text-sm font-medium text-slate-700">{{ center.timezone }}</span>
+                <td class="px-4 py-4 text-right align-middle tabular-nums">
+                  {{ formatWhole(center.summary.totalPlanCount) }}
                 </td>
                 <td class="px-4 py-4 text-right align-middle tabular-nums">
-                  {{ formatWhole(center.summary.groupCount) }}
+                  {{ center.summary.totalPlanCount > 0 ? formatWhole(center.summary.annualContacts) : '—' }}
                 </td>
                 <td class="px-4 py-4 text-right align-middle tabular-nums">
-                  {{ formatWhole(center.summary.annualContacts) }}
+                  {{ center.summary.totalPlanCount > 0 ? formatWhole(center.summary.totalNeededStaffHours) : '—' }}
                 </td>
                 <td class="px-4 py-4 text-right align-middle tabular-nums">
-                  {{ formatWhole(center.summary.totalNeededStaffHours) }}
+                  {{ center.summary.totalPlanCount > 0 ? formatNumber(center.summary.totalAvgRequiredHeadcount, 1) : '—' }}
                 </td>
                 <td class="px-4 py-4 text-right align-middle tabular-nums font-medium text-slate-900">
-                  {{ formatNumber(center.summary.totalPeakHeadcount, 1) }}
+                  {{ center.summary.totalPlanCount > 0 ? formatNumber(center.summary.totalPeakHeadcount, 1) : '—' }}
                 </td>
                 <td class="px-6 py-4 align-middle">
                   <div class="flex justify-end gap-2 whitespace-nowrap">
                     <AppButton size="sm" variant="quiet" @click="openCenter(center.id)">Open</AppButton>
-                    <AppButton size="sm" variant="danger" @click="confirmDeleteCenter(center)">Delete</AppButton>
+                    <div @click.stop @keydown.stop>
+                      <AppMenu
+                        :items="centerMenuItems"
+                        :trigger-icon="mdiDotsVertical"
+                        :trigger-label="`Open actions for ${center.name}`"
+                        compact
+                        trigger-variant="icon-quiet"
+                        @select="handleCenterMenuSelect(center, $event)"
+                      />
+                    </div>
                   </div>
                 </td>
               </tr>

@@ -16,7 +16,7 @@ test('opens the planning workspace and creates a call center', async ({ page }) 
   await page.getByLabel('Call Center Name').fill('North America Operations')
   await page.getByRole('button', { name: 'Create Call Center' }).last().click()
 
-  await expect(page.getByText('North America Operations', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'North America Operations' })).toBeVisible()
 })
 
 test('opens the hamburger menu and exposes primary destinations', async ({ page }) => {
@@ -24,9 +24,9 @@ test('opens the hamburger menu and exposes primary destinations', async ({ page 
 
   await page.getByRole('button', { name: 'Open navigation menu' }).click()
 
-  await expect(page.getByText('Home')).toBeVisible()
-  await expect(page.getByText('Calculator Suite')).toBeVisible()
-  await expect(page.getByText('Planning App')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Home' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Calculator Suite' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Planning App' })).toBeVisible()
 })
 
 test('creates a staffing group and opens a new plan from the call-center detail pane', async ({ page }) => {
@@ -51,8 +51,11 @@ test('creates a staffing group and opens a new plan from the call-center detail 
   await page.getByRole('button', { name: 'Create Plan' }).click()
 
   await expect(page.getByRole('heading', { level: 1, name: `${planningYear} Plan` })).toBeVisible()
-  await expect(page.getByLabel('Planning year')).toHaveValue(String(planningYear))
+  await expect(page.getByLabel('Breadcrumb').getByText('Consumer Voice', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save Plan' })).toBeVisible()
   await expect(page.locator('[data-section-id="overview"]')).toBeVisible()
-  await expect(page.locator('[data-section-id="forecast"]')).toBeVisible()
+  await expect(page.locator('[data-section-id="availability"]')).toBeVisible()
+  await expect(page.locator('[data-section-id="variability"]')).toBeVisible()
+  await expect(page.locator('[data-section-id="requirement"]')).toBeVisible()
   await expect(page.locator('[data-section-id="staffing"]')).toBeVisible()
 })

@@ -106,7 +106,7 @@ const assumptionSourceOptions = [
       <div class="flex flex-wrap items-center gap-3">
         <label
           for="batchCsvFile"
-          class="inline-flex w-full cursor-pointer items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800 md:w-auto"
+          class="inline-flex w-full cursor-pointer items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 md:w-auto"
         >
           Choose CSV
         </label>
@@ -120,7 +120,7 @@ const assumptionSourceOptions = [
         <a
           :href="props.currentWorkflow.templateHref"
           download
-          class="inline-flex items-center gap-1 text-sm font-semibold text-sky-700 hover:text-sky-800"
+          class="inline-flex items-center gap-1 text-sm font-semibold text-blue-900 hover:text-blue-950"
         >
           Download {{ props.currentWorkflow.label }} CSV template
         </a>

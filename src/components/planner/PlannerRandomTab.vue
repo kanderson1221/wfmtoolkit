@@ -8,7 +8,6 @@ import AppNumberField from '../ui/AppNumberField.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
-import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 import PlannerCopyMenu from './PlannerCopyMenu.vue'
 
 const props = defineProps({
@@ -43,85 +42,62 @@ const randomMonths = defineModel('randomMonths', {
   default: null
 })
 
-const selectedMonthIndex = defineModel('selectedMonthIndex', {
-  type: Number,
-  required: true
-})
-
-const selectedMonth = computed(
-  () => props.monthlyRecords[selectedMonthIndex.value] ?? props.monthlyRecords[0] ?? { label: 'month' }
-)
-
-const setSelectedMonth = (monthIndex) => {
-  selectedMonthIndex.value = monthIndex
-}
-
-const handleCopyAction = (action) => {
-  emit('copy-action', action)
+const handleCopyAction = (monthIndex, action) => {
+  emit('copy-action', {
+    monthIndex,
+    action
+  })
 }
 
 const handleOverrideModeChange = (value) => {
+  useMonthlyRandomOverrides.value = value
   emit('toggle-override-mode', value)
 }
 
 const summaryItems = computed(() => [
   {
-    label: props.summary.usesMonthlyOverrides ? 'Average Occupancy' : 'Occupancy',
+    label: 'Occupancy',
     value: props.formatPercent(
       props.summary.usesMonthlyOverrides
         ? props.summary.averageOccupancyPercent
         : props.summary.globalOccupancyPercent,
       1
-    ),
-    meta: props.summary.usesMonthlyOverrides
-      ? 'Average monthly occupancy assumption'
-      : 'Global occupancy assumption used across the full year'
+    )
   },
   {
-    label: props.summary.usesMonthlyOverrides ? 'Average Adherence' : 'Adherence',
+    label: 'Adherence',
     value: props.formatPercent(
       props.summary.usesMonthlyOverrides
         ? props.summary.averageAdherencePercent
         : props.summary.globalAdherencePercent,
       1
-    ),
-    meta: props.summary.usesMonthlyOverrides
-      ? 'Average monthly adherence assumption'
-      : 'Global adherence assumption used across the full year'
+    )
   },
   {
-    label: 'Avg Adherence Loss',
-    value: props.formatPercent(props.summary.averageAdherenceLossPercent, 1),
-    meta: 'Average monthly loss applied to scheduled percentage from adherence'
+    label: 'Adherence Loss',
+    value: props.formatPercent(props.summary.averageAdherenceLossPercent, 1)
   },
   {
-    label: 'Avg Occupancy Loss',
-    value: props.formatPercent(props.summary.averageOccupancyLossPercent, 1),
-    meta: 'Average monthly loss applied after adherence loss is removed'
+    label: 'Occupancy Loss',
+    value: props.formatPercent(props.summary.averageOccupancyLossPercent, 1)
   },
   {
-    label: 'Avg Total Scheduled Random Loss',
-    value: props.formatPercent(props.summary.averageRandomLossPercent, 1),
-    meta: 'Adherence loss plus occupancy loss against scheduled percentage'
+    label: 'Total Random Loss',
+    value: props.formatPercent(props.summary.averageRandomLossPercent, 1)
   }
 ])
 </script>
 
 <template>
-  <section class="results-panel monthly-tab-panel">
-    <AppSectionHeader
-      title="Set the variability buffer"
-      description="Use occupancy and adherence assumptions to absorb real-world variability in scheduled time before turning workload into frontline requirement."
-    />
+  <section class="monthly-tab-panel">
+    <AppSectionHeader title="Variability Buffer" />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-5" />
 
-    <AppWorkspaceSection
-      class="random-global-panel"
-      title="Variability Assumptions"
-      description="These assumptions create adherence and occupancy losses against scheduled percentage and flow into the final design factor."
-    >
-      <div class="monthly-global-grid random-global-grid">
+    <section class="grid gap-3">
+      <AppSectionHeader title="Variability Assumptions" />
+
+      <div class="grid gap-3 xl:grid-cols-[minmax(0,12rem)_minmax(0,12rem)_minmax(0,1fr)] xl:items-start">
         <AppFieldGroup
           :label="useMonthlyRandomOverrides ? 'Default Occupancy %' : 'Occupancy %'"
           input-id="global-occupancy"
@@ -130,6 +106,7 @@ const summaryItems = computed(() => [
               ? 'Seeds the monthly override table.'
               : 'Applies across the full plan year.'
           "
+          class="xl:max-w-[12rem]"
         >
           <AppNumberField
             id="global-occupancy"
@@ -139,6 +116,7 @@ const summaryItems = computed(() => [
             step="0.1"
             :min-fraction-digits="1"
             :max-fraction-digits="1"
+            compact
             aria-label="Global occupancy percent"
           />
         </AppFieldGroup>
@@ -151,6 +129,7 @@ const summaryItems = computed(() => [
               ? 'Seeds the monthly override table.'
               : 'Applies across the full plan year.'
           "
+          class="xl:max-w-[12rem]"
         >
           <AppNumberField
             id="global-adherence"
@@ -160,6 +139,7 @@ const summaryItems = computed(() => [
             step="0.1"
             :min-fraction-digits="1"
             :max-fraction-digits="1"
+            compact
             aria-label="Global adherence percent"
           />
         </AppFieldGroup>
@@ -168,7 +148,7 @@ const summaryItems = computed(() => [
           label="Monthly overrides"
           input-id="use-random-overrides"
           help-text="Off for one yearly assumption set. On for month-level edits."
-          class="random-override-field"
+          class="xl:self-end"
         >
           <AppCheckbox
             input-id="use-random-overrides"
@@ -179,31 +159,20 @@ const summaryItems = computed(() => [
           </AppCheckbox>
         </AppFieldGroup>
       </div>
-    </AppWorkspaceSection>
+    </section>
 
-    <AppWorkspaceSection
-      class="random-overrides-panel"
-      title="Monthly Variability Overrides"
-      description="Adjust only the months that need different occupancy or adherence assumptions. Losses are calculated from scheduled percentage from Agent Availability."
-    >
-      <template v-if="useMonthlyRandomOverrides" #actions>
-        <PlannerCopyMenu
-          input-id="random-copy-action"
-          :label="selectedMonth.label"
-          @select="handleCopyAction"
-        />
-      </template>
+    <section class="grid gap-3">
+      <AppSectionHeader title="Monthly Variability Overrides" />
 
-      <div v-if="!useMonthlyRandomOverrides" class="answer-card random-global-note">
-        <h4>Global mode is on</h4>
-        <p>These occupancy and adherence assumptions apply to every month in the plan. Adherence and occupancy losses are calculated from each month’s scheduled % from Agent Availability.</p>
-      </div>
+      <p v-if="!useMonthlyRandomOverrides" class="random-global-note">
+        Global occupancy and adherence assumptions apply to every month in this plan year.
+      </p>
 
       <div v-else class="assumption-table-shell">
         <table class="assumption-table assumption-table-random">
           <thead>
             <tr>
-              <th title="Planning month. Click a month name to highlight that row.">Month</th>
+              <th title="Planning month for the worksheet row.">Month</th>
               <th title="Scheduled percentage flowing in from Step 1.">Scheduled %</th>
               <th title="Expected monthly occupancy assumption used in the random loss build.">Occupancy %</th>
               <th title="Expected monthly adherence assumption used in the random loss build.">Adherence %</th>
@@ -216,16 +185,19 @@ const summaryItems = computed(() => [
             <tr
               v-for="record in props.monthlyRecords"
               :key="record.label"
-              :class="{ selected: selectedMonthIndex === record.monthIndex }"
             >
               <td class="month-cell">
-                <button
-                  type="button"
-                  class="assumption-month-btn"
-                  @click="setSelectedMonth(record.monthIndex)"
-                >
-                  {{ record.fullLabel }}
-                </button>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="inline-flex flex-1 items-center px-2 py-1 text-left font-semibold text-slate-800">
+                    {{ record.fullLabel }}
+                  </span>
+                  <div @click.stop @keydown.stop>
+                    <PlannerCopyMenu
+                      :month-label="record.fullLabel"
+                      @select="handleCopyAction(record.monthIndex, $event)"
+                    />
+                  </div>
+                </div>
               </td>
               <td>{{ props.formatPercent(record.scheduledPercent, 1) }}</td>
               <td>
@@ -257,7 +229,7 @@ const summaryItems = computed(() => [
           </tbody>
         </table>
       </div>
-    </AppWorkspaceSection>
+    </section>
 
     <div class="monthly-tab-actions">
       <AppButton variant="secondary" @click="emit('previous')">Back to Agent Availability</AppButton>

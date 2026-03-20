@@ -27,10 +27,10 @@ const model = defineModel({
       :input-id="props.inputId"
       :disabled="props.disabled"
       :pt="{
-        root: { class: 'mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded border border-slate-300 bg-white data-[p-checked=true]:border-sky-700 data-[p-checked=true]:bg-sky-700 data-[p-disabled=true]:opacity-60' },
-        box: { class: 'flex h-full w-full items-center justify-center rounded-[3px]' },
+        root: { class: 'relative mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border border-slate-300 bg-white transition data-[p-checked=true]:border-[#15395f] data-[p-checked=true]:bg-[#15395f] data-[p-disabled=true]:opacity-60' },
+        box: { class: 'flex h-full w-full items-center justify-center rounded-[4px]' },
         icon: { class: 'h-3 w-3 text-white' },
-        input: { class: 'cursor-pointer' }
+        input: { class: 'absolute inset-0 m-0 h-full w-full cursor-pointer opacity-0' }
       }"
     />
     <span class="leading-6">

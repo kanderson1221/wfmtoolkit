@@ -17,7 +17,7 @@ const props = defineProps({
   },
   allowBackdropClose: {
     type: Boolean,
-    default: true
+    default: false
   }
 })
 
@@ -137,7 +137,7 @@ const concurrentTrainingCapacity = computed(
         </AppFieldGroup>
 
         <AppStatusMessage>
-          <span class="block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-sky-700">
+          <span class="block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[#15395f]">
             Concurrent Training Capacity
           </span>
           <span class="mt-2 block text-3xl font-semibold tracking-[-0.04em] text-slate-950">

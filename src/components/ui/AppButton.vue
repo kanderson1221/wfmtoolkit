@@ -68,7 +68,7 @@ const sizeClasses = {
 
 const variantClasses = computed(() => {
   if (props.variant === 'primary') {
-    return 'border border-sky-800 bg-sky-700 text-white shadow-sm hover:bg-sky-800'
+    return 'border border-[#102f4f] bg-[#15395f] text-white shadow-[0_10px_20px_rgba(16,47,79,0.18)] hover:border-[#0d2742] hover:bg-[#123153]'
   }
 
   if (props.variant === 'danger') {
@@ -77,22 +77,26 @@ const variantClasses = computed(() => {
 
   if (props.variant === 'quiet') {
     return props.active
-      ? 'border border-sky-100 bg-sky-50 text-sky-800'
+      ? 'border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]'
       : 'border border-transparent bg-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50'
   }
 
   if (props.variant === 'tab') {
     return props.active
-      ? 'border border-sky-100 bg-sky-50 text-sky-800'
+      ? 'border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]'
       : 'border border-slate-200 bg-slate-100 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
   }
 
   if (props.variant === 'icon') {
-    return 'h-10 w-10 rounded-2xl border border-slate-300 bg-slate-50 p-0 text-slate-700 shadow-sm hover:border-sky-300 hover:bg-white hover:text-sky-700'
+    return 'h-10 w-10 rounded-2xl border border-slate-300 bg-slate-50 p-0 text-slate-700 shadow-sm hover:border-[#a7bbce] hover:bg-white hover:text-[#15395f]'
   }
 
   if (props.variant === 'icon-quiet') {
     return 'h-10 w-10 rounded-2xl border border-transparent bg-transparent p-0 text-slate-500 shadow-none hover:bg-slate-50 hover:text-slate-800'
+  }
+
+  if (props.variant === 'icon-inverse') {
+    return 'h-10 w-10 rounded-2xl border border-white/12 bg-white/6 p-0 text-slate-100 shadow-none backdrop-blur-sm hover:border-[#9fb4c9]/40 hover:bg-white/10 hover:text-white'
   }
 
   return 'border border-slate-300 bg-white text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50'

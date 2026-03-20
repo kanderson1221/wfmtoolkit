@@ -1,6 +1,6 @@
 <script setup>
+import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
-import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 
 const props = defineProps({
   staffingRecords: {
@@ -50,11 +50,9 @@ const gapClass = (value) => ({
 </script>
 
 <template>
-  <AppWorkspaceSection
-    class="staffing-plan-table-panel"
-    title="Monthly Staffing Supply"
-    description="Review opening supply, monthly movement, and the resulting frontline gap against the demand model."
-  >
+  <section class="grid gap-3">
+    <AppSectionHeader title="Monthly Staffing Supply" />
+
     <div class="assumption-table-shell">
       <table class="assumption-table assumption-table-staffing">
         <thead>
@@ -151,5 +149,5 @@ const gapClass = (value) => ({
         </tbody>
       </table>
     </div>
-  </AppWorkspaceSection>
+  </section>
 </template>

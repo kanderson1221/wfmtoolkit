@@ -1,8 +1,4 @@
 @layer components {
-  .planning-breadcrumb-link {
-    @apply inline-flex items-center text-sm font-semibold text-sky-700;
-  }
-
   .planning-center-shell {
     @apply grid gap-4;
   }
@@ -100,20 +96,8 @@
     @apply p-3;
   }
 
-  .monthly-flow-shell {
-    @apply grid gap-3;
-  }
-
   .monthly-tab-panel {
-    @apply grid gap-4 p-4;
-  }
-
-  .monthly-loss-group {
-    @apply gap-2.5 p-3;
-  }
-
-  .monthly-loss-group .monthly-copy-toolbar {
-    @apply mb-0;
+    @apply grid gap-4;
   }
 
   .monthly-tab-header {
@@ -137,7 +121,7 @@
   }
 
   .monthly-copy-select-input {
-    @apply rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100;
+    @apply rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-[#15395f] focus:ring-2 focus:ring-[#d7e3ec];
   }
 
   .assumption-table-shell {
@@ -160,21 +144,13 @@
     @apply border-b-0;
   }
 
-  .assumption-table tbody tr:nth-child(even) td {
-    @apply bg-slate-50/55;
-  }
-
-  .assumption-table tbody tr:hover td {
-    @apply bg-slate-50;
-  }
-
   .assumption-table tbody tr.selected td {
-    @apply bg-sky-50/70;
+    @apply bg-[#e7eef4];
   }
 
   .assumption-table input:not([type="checkbox"]),
   .assumption-table select {
-    @apply min-w-[5rem] rounded-md border border-slate-200 bg-slate-50/70 px-2 py-1.5 text-center text-sm shadow-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100;
+    @apply min-w-[5rem] rounded-md border border-slate-200 bg-slate-50/70 px-2 py-1.5 text-center text-sm shadow-none transition focus:border-[#15395f] focus:ring-2 focus:ring-[#d7e3ec];
   }
 
   .month-cell {
@@ -187,23 +163,19 @@
 
   .plan-head-label,
   .presence-head-label {
-    @apply inline-block leading-4;
+    @apply inline-grid justify-items-center gap-0.5 leading-4;
+  }
+
+  .presence-head-unit {
+    @apply text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-slate-400;
   }
 
   .assumption-table thead th:first-child {
     @apply sticky left-0 z-20 text-left;
   }
 
-  .assumption-table tbody tr:nth-child(even) td.month-cell {
-    @apply bg-slate-50/55;
-  }
-
-  .assumption-table tbody tr:hover td.month-cell {
-    @apply bg-slate-50;
-  }
-
   .assumption-table tbody tr.selected td.month-cell {
-    @apply bg-sky-50/70;
+    @apply bg-[#e7eef4];
   }
 
   .assumption-table-plan th:first-child,
@@ -221,11 +193,11 @@
   }
 
   .assumption-table-presence-main thead .presence-super-row th {
-    @apply bg-slate-100 px-2 py-2 text-center text-[0.68rem] text-slate-600;
+    @apply border-b border-slate-200 px-2 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-600;
   }
 
   .assumption-table-presence-main thead .presence-super-row th:first-child {
-    @apply text-left;
+    @apply bg-slate-100 text-left text-slate-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-calendar {
@@ -233,23 +205,30 @@
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-presence {
-    @apply bg-sky-50 text-sky-800;
+    @apply border-l border-slate-200 bg-[#eef3f7] text-[#15395f];
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-utilization {
-    @apply bg-emerald-50 text-emerald-800;
+    @apply border-l border-slate-200 bg-[#e7eef4] text-[#15395f];
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-results {
-    @apply bg-violet-50 text-violet-800;
+    @apply border-l border-slate-200 bg-[#dfe8f0] text-[#102f4f];
   }
 
   .assumption-table-presence-main thead .presence-detail-row th {
     @apply bg-white px-2 py-1.5 text-[0.68rem] font-semibold normal-case tracking-normal text-slate-500;
   }
 
+  .assumption-table-presence-main thead .presence-detail-row th:nth-child(1),
+  .assumption-table-presence-main thead .presence-detail-row th:nth-child(4),
+  .assumption-table-presence-main thead .presence-detail-row th:nth-child(7),
+  .assumption-table-presence-main thead .presence-detail-row th:nth-child(12) {
+    @apply border-l border-slate-200;
+  }
+
   .assumption-table-presence-main tbody td {
-    @apply px-2 py-1.5 text-center;
+    @apply px-2 py-1 text-center;
   }
 
   .assumption-table-presence-main tbody td:first-child {
@@ -261,10 +240,13 @@
   }
 
   .presence-col-business,
-  .presence-col-adjust,
   .presence-col-other,
   .presence-col-result {
     width: 4.4rem;
+  }
+
+  .presence-col-adjust {
+    width: 6rem;
   }
 
   .presence-col-paid,
@@ -283,15 +265,46 @@
   }
 
   .assumption-table-presence-main tbody td.presence-result-final {
-    @apply bg-sky-50/70 font-semibold text-sky-900;
+    @apply font-semibold text-[#15395f];
+  }
+
+  .assumption-table-presence-main td .p-inputnumber-input,
+  .assumption-table-presence-main td input[type='date'] {
+    @apply !min-w-0 !rounded-none !border !border-transparent !bg-transparent !px-1.5 !py-1 text-right text-[0.82rem] !shadow-none;
+  }
+
+  .assumption-table-presence-main td .p-inputnumber-input::placeholder,
+  .assumption-table-presence-main td input[type='date']::placeholder {
+    @apply text-slate-300;
+  }
+
+  .assumption-table-presence-main td .p-inputnumber-input:focus,
+  .assumption-table-presence-main td input[type='date']:focus {
+    @apply !rounded-md !border-[#15395f] !bg-white ring-2 ring-[#d7e3ec];
   }
 
   .assumption-table-presence-main input {
-    @apply px-1.5 py-1 text-[0.82rem];
+    @apply px-1.5 py-0.5 text-[0.82rem];
+  }
+
+  .table-number-with-buttons input {
+    @apply min-w-0 rounded-none border-0 bg-transparent px-1.5 py-0.5 text-[0.82rem] text-center shadow-none outline-none focus:ring-0;
+  }
+
+  .table-number-with-buttons-group {
+    @apply grid w-6 shrink-0 border-l border-slate-200 bg-white;
+  }
+
+  .table-number-with-buttons-btn {
+    @apply flex items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-[#15395f];
+  }
+
+  .table-number-with-buttons-btn-increment {
+    @apply border-b border-slate-200;
   }
 
   .assumption-table-presence-main .assumption-month-btn {
-    @apply py-0.5;
+    @apply py-0;
   }
 
   @media (min-width: 1280px) {
@@ -301,15 +314,31 @@
   }
 
   .random-global-note {
-    @apply px-4 py-3 text-sm leading-6 text-slate-600;
+    @apply text-sm leading-6 text-slate-600;
   }
 
   .training-class-toolbar {
     @apply pb-1;
   }
 
+  .training-pipeline-toggle {
+    @apply flex w-full items-center justify-between rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-[#c3d2df] hover:bg-[#f8fafc];
+  }
+
+  .training-pipeline-toggle-icon {
+    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600;
+  }
+
+  .training-pipeline-shell {
+    @apply max-h-[25rem] overflow-auto;
+  }
+
+  .training-pipeline-shell thead th {
+    @apply sticky top-0 z-10 bg-slate-50;
+  }
+
   .training-class-recommended {
-    @apply bg-sky-50/50;
+    @apply bg-[#e7eef4];
   }
 
   .training-status-pill {
@@ -329,7 +358,7 @@
   }
 
   .training-status-graduating {
-    @apply bg-sky-100 text-sky-800;
+    @apply bg-[#dfe8f0] text-[#15395f];
   }
 
   .training-status-frontline {
@@ -342,6 +371,10 @@
 
   .training-empty-state {
     @apply py-8 text-center text-sm leading-6 text-slate-600;
+  }
+
+  .training-action-cell {
+    @apply text-right;
   }
 
   .variance-positive {
@@ -357,7 +390,7 @@
   }
 
   .monthly-chart-panel {
-    @apply grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4;
+    @apply grid gap-3;
   }
 
   .monthly-bars {
@@ -369,7 +402,7 @@
   }
 
   .monthly-bar-column.active {
-    @apply border-sky-200 bg-sky-50;
+    @apply border-[#c3d2df] bg-[#e7eef4];
   }
 
   .monthly-bar-month {
@@ -395,7 +428,7 @@
   }
 
   .monthly-bar-segment {
-    @apply w-full rounded-xl bg-sky-600;
+    @apply w-full rounded-xl bg-[#15395f];
   }
 
   .monthly-bar-tooltip {

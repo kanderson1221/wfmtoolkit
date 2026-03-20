@@ -10,6 +10,7 @@ import {
   findPlanningPlan,
   loadPlanningCenters,
   persistPlanningCenters,
+  upsertPlanningPlan,
   upsertPlanningCenter,
   upsertPlanningGroup
 } from '../../planningStorage'
@@ -182,5 +183,36 @@ describe('usePlanningWorkspace', () => {
     expect(upsertPlanningGroup).toHaveBeenCalledWith(centers, 'center-1', { name: 'Consumer Voice' })
     expect(persistPlanningCenters).toHaveBeenCalledWith(centers, 'user-1')
     expect(window.location.hash).toBe(`#planning/center/center-1/group/group-1/year/${new Date().getFullYear()}`)
+  })
+
+  it('persists plans and keeps the user in the editor route', () => {
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'new',
+      year: 2026
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const hasWorkspaceAccess = computed(() => true)
+    const storageScope = computed(() => currentUser.value.id)
+
+    upsertPlanningPlan.mockReturnValue(centers)
+    window.location.hash = '#planning/center/center-1/group/group-1/plan/new/year/2026'
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      hasWorkspaceAccess,
+      storageScope
+    })
+
+    workspace.loadCentersForScope()
+    workspace.handleSavePlan({ planningYear: 2026 })
+
+    expect(upsertPlanningPlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
+    expect(persistPlanningCenters).toHaveBeenCalledWith(centers, 'user-1')
+    expect(window.location.hash).toBe('#planning/center/center-1/group/group-1/plan/plan-1')
   })
 })

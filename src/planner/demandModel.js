@@ -109,7 +109,7 @@ export const computeMonthlyRecords = ({
     const planInput = createPlanMonth(planMonths?.[monthIndex] || {})
 
     const calendarOpenDays = calculateCalendarOpenDays(planningYear, monthIndex, operatingWeekdays)
-    const dayAdjustment = Math.round(toNumber(presenceInput.dayAdjustment, 0))
+    const dayAdjustment = toNumber(presenceInput.dayAdjustment, 0)
     const openDays = Math.max(calendarOpenDays + dayAdjustment, 0)
     const paidHoursPerDay = clamp(toNumber(presenceInput.paidHoursPerDay, 8), 0, 24)
     const paidHoursPerMonth = openDays * paidHoursPerDay
@@ -296,4 +296,3 @@ export const collectPlannerWarnings = (monthlyRecords) =>
 
 export const getMonthlyChartMax = (monthlyRecords) =>
   Math.max(...monthlyRecords.flatMap((row) => [row.workloadHours, row.requiredStaffHours]), 1)
-

@@ -322,6 +322,11 @@ Prefer:
 - one clear heading per pane
 - compact metadata only when it adds real value
 
+For the current dark-blue theme:
+- use a dark slate-blue marker for the selected row accent, such as `#15395f`
+- use a pale steel-blue wash for stronger selected rows, such as `#e7eef4`
+- keep selected-row fills in the same slate-blue family as the main navigation and primary actions
+
 Avoid:
 - repeated contextual subtitles that restate the page title
 - helper text that explains obvious layout behavior
