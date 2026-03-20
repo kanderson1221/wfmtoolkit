@@ -20,6 +20,7 @@ import AppTableShell from './ui/AppTableShell.vue'
 import { createPlanningCenterDraft } from '../planningStorage'
 import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
 import { computeMonthlyRecords } from '../planner/demandModel'
+import { computeStaffingRecords } from '../planner/staffingModel'
 
 const props = defineProps({
   centers: {
@@ -212,23 +213,10 @@ const summaryStripItems = computed(() => [
   }
 ])
 
-const chartPalette = [
-  '#15395f',
-  '#24527d',
-  '#35689a',
-  '#4a7eaf',
-  '#5f93c1',
-  '#759fd0',
-  '#8aaed8',
-  '#5f7d5a',
-  '#7f8f5d',
-  '#8c6f51',
-  '#7b5f8c',
-  '#4d657e'
-]
-
-const portfolioHeadcountSeries = computed(() => {
-  const series = []
+const portfolioHeadcountChart = computed(() => {
+  const neededTotals = Array.from({ length: 12 }, () => 0)
+  const frontlineTotals = Array.from({ length: 12 }, () => 0)
+  const totalHeadcountTotals = Array.from({ length: 12 }, () => 0)
 
   props.centers.forEach((center) => {
     getCenterGroups(center).forEach((group) => {
@@ -252,29 +240,32 @@ const portfolioHeadcountSeries = computed(() => {
         randomMonths: Array.isArray(plan.randomMonths) ? plan.randomMonths : [],
         planMonths: Array.isArray(plan.planMonths) ? plan.planMonths : []
       })
+      const staffingRecords = computeStaffingRecords(
+        monthlyRecords,
+        Number(selectedPlanningYear.value),
+        Number(plan.startingHeadcount) || 0,
+        Number(plan.startingFrontlineHeadcount) || 0,
+        Array.isArray(plan.staffingMonths) ? plan.staffingMonths : [],
+        Array.isArray(plan.trainingClasses) ? plan.trainingClasses : [],
+        plan.trainingSettings || {}
+      )
 
-      const values = monthlyRecords.map((record) => Number(record.requiredHeadcount) || 0)
-      const annualTotal = values.reduce((sum, value) => sum + value, 0)
+      monthlyRecords.forEach((record, monthIndex) => {
+        neededTotals[monthIndex] += Number(record.requiredHeadcount) || 0
+      })
 
-      if (annualTotal <= 0) {
-        return
-      }
-
-      series.push({
-        id: `${center.id}-${group.id}`,
-        label: `${center.name} · ${group.name}`,
-        values,
-        annualTotal
+      staffingRecords.forEach((record, monthIndex) => {
+        frontlineTotals[monthIndex] += Number(record.endingFrontlineHeadcount) || 0
+        totalHeadcountTotals[monthIndex] += Number(record.endingRosterHeadcount) || 0
       })
     })
   })
 
-  return series
-    .sort((left, right) => right.annualTotal - left.annualTotal)
-    .map((item, index) => ({
-      ...item,
-      color: chartPalette[index % chartPalette.length]
-    }))
+  return {
+    neededTotals,
+    frontlineTotals,
+    totalHeadcountTotals
+  }
 })
 
 const centerMenuItems = [
@@ -378,7 +369,9 @@ const handleCenterMenuSelect = (center, item) => {
           <div class="border-t border-slate-200 px-5 py-4">
             <PlanningPortfolioHeadcountChart
               :planning-year="selectedPlanningYear"
-              :series="portfolioHeadcountSeries"
+              :needed-totals="portfolioHeadcountChart.neededTotals"
+              :frontline-totals="portfolioHeadcountChart.frontlineTotals"
+              :total-headcount-totals="portfolioHeadcountChart.totalHeadcountTotals"
               :format-number="formatNumber"
             />
           </div>

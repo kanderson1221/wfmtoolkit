@@ -10,7 +10,15 @@ const props = defineProps({
     type: Number,
     required: true
   },
-  series: {
+  neededTotals: {
+    type: Array,
+    default: () => []
+  },
+  frontlineTotals: {
+    type: Array,
+    default: () => []
+  },
+  totalHeadcountTotals: {
     type: Array,
     default: () => []
   },
@@ -48,12 +56,19 @@ const tooltipRef = ref(null)
 const activeTooltip = ref(null)
 
 const monthlyTotals = computed(() =>
-  MONTH_LABELS.map((_, monthIndex) =>
-    props.series.reduce((sum, item) => sum + (Number(item.values?.[monthIndex]) || 0), 0)
-  )
+  MONTH_LABELS.map((_, monthIndex) => Number(props.neededTotals?.[monthIndex]) || 0)
 )
 
-const chartMax = computed(() => niceChartMax(Math.max(...monthlyTotals.value, 0)))
+const chartMax = computed(() =>
+  niceChartMax(
+    Math.max(
+      ...monthlyTotals.value,
+      ...(Array.isArray(props.frontlineTotals) ? props.frontlineTotals : []),
+      ...(Array.isArray(props.totalHeadcountTotals) ? props.totalHeadcountTotals : []),
+      0
+    )
+  )
+)
 
 const yTicks = computed(() => {
   const tickCount = 4
@@ -83,43 +98,46 @@ const chartBars = computed(() => {
 
   return MONTH_LABELS.map((label, monthIndex) => {
     const x = chartPadding.left + monthIndex * stepWidth + (stepWidth - barWidth) / 2
-    let runningTotal = 0
-
-    const segments = props.series
-      .map((item) => {
-        const value = Number(item.values?.[monthIndex]) || 0
-        const start = runningTotal
-        runningTotal += value
-
-        if (value <= 0) {
-          return null
-        }
-
-        return {
-          id: `${item.id}-${monthIndex}`,
-          value,
-          x,
-          width: barWidth,
-          y: scaleY(runningTotal),
-          height: Math.max(scaleY(start) - scaleY(runningTotal), 0),
-          color: item.color,
-          label: item.label
-        }
-      })
-      .filter(Boolean)
+    const total = Number(props.neededTotals?.[monthIndex]) || 0
 
     return {
       label,
-      total: runningTotal,
-      totalY: scaleY(runningTotal),
+      monthIndex,
+      total,
+      totalY: scaleY(total),
       totalX: x + barWidth / 2,
       x,
-      segments
+      width: barWidth,
+      y: scaleY(total),
+      height: Math.max(chartHeight - chartPadding.bottom - scaleY(total), 0)
     }
   })
 })
 
-const hasData = computed(() => props.series.length > 0 && monthlyTotals.value.some((value) => value > 0))
+const linePoints = computed(() =>
+  chartBars.value.map((bar) => ({
+    label: bar.label,
+    monthIndex: bar.monthIndex,
+    x: bar.totalX,
+    neededHeadcount: bar.total,
+    neededY: bar.totalY,
+    frontlineHeadcount: Number(props.frontlineTotals?.[bar.monthIndex]) || 0,
+    frontlineY: scaleY(props.frontlineTotals?.[bar.monthIndex] || 0),
+    totalHeadcount: Number(props.totalHeadcountTotals?.[bar.monthIndex]) || 0,
+    totalY: scaleY(props.totalHeadcountTotals?.[bar.monthIndex] || 0)
+  }))
+)
+
+const buildLinePath = (type) =>
+  linePoints.value
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${type === 'frontline' ? point.frontlineY : point.totalY}`)
+    .join(' ')
+
+const hasData = computed(() =>
+  monthlyTotals.value.some((value) => value > 0) ||
+  (Array.isArray(props.frontlineTotals) && props.frontlineTotals.some((value) => Number(value) > 0)) ||
+  (Array.isArray(props.totalHeadcountTotals) && props.totalHeadcountTotals.some((value) => Number(value) > 0))
+)
 
 const updateTooltipPosition = (event) => {
   if (!tooltipRef.value || !activeTooltip.value) {
@@ -149,12 +167,25 @@ const updateTooltipPosition = (event) => {
   }
 }
 
-const showTooltip = (segment, bar, event) => {
+const showSegmentTooltip = (bar, event) => {
   activeTooltip.value = {
     monthLabel: bar.label,
-    segmentLabel: segment.label,
-    segmentValue: segment.value,
-    monthlyTotal: bar.total,
+    neededHeadcount: bar.total,
+    frontlineHeadcount: Number(props.frontlineTotals?.[bar.monthIndex]) || 0,
+    totalHeadcount: Number(props.totalHeadcountTotals?.[bar.monthIndex]) || 0,
+    left: 0,
+    top: 0
+  }
+
+  updateTooltipPosition(event)
+}
+
+const showLineTooltip = (point, event) => {
+  activeTooltip.value = {
+    monthLabel: point.label,
+    neededHeadcount: point.neededHeadcount,
+    frontlineHeadcount: point.frontlineHeadcount,
+    totalHeadcount: point.totalHeadcount,
     left: 0,
     top: 0
   }
@@ -170,7 +201,7 @@ const clearTooltip = () => {
 <template>
   <section class="grid gap-4">
     <AppSectionHeader
-      title="Monthly Required Headcount"
+      title="Monthly Headcount Need vs Staffing"
     />
 
     <AppEmptyState
@@ -196,12 +227,12 @@ const clearTooltip = () => {
             {{ activeTooltip.monthLabel }}
           </p>
           <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            <span>Staffing Group</span>
-            <strong>{{ activeTooltip.segmentLabel }}</strong>
-            <span>Headcount</span>
-            <strong>{{ props.formatNumber(activeTooltip.segmentValue, 1) }}</strong>
-            <span>Month Total</span>
-            <strong>{{ props.formatNumber(activeTooltip.monthlyTotal, 1) }}</strong>
+            <span>Needed Headcount</span>
+            <strong>{{ props.formatNumber(activeTooltip.neededHeadcount, 1) }}</strong>
+            <span>Frontline Headcount</span>
+            <strong>{{ props.formatNumber(activeTooltip.frontlineHeadcount, 1) }}</strong>
+            <span>Total Headcount</span>
+            <strong>{{ props.formatNumber(activeTooltip.totalHeadcount, 1) }}</strong>
           </div>
         </div>
 
@@ -209,7 +240,7 @@ const clearTooltip = () => {
           :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
           class="block min-w-[920px]"
           role="img"
-          :aria-label="`Monthly required headcount stacked by staffing group for ${props.planningYear}`"
+          :aria-label="`Monthly headcount need versus frontline and total staffing for ${props.planningYear}`"
         >
           <line
             v-for="tick in yTicks"
@@ -254,22 +285,20 @@ const clearTooltip = () => {
 
           <g v-for="bar in chartBars" :key="bar.label">
             <rect
-              v-for="segment in bar.segments"
-              :key="segment.id"
-              :x="segment.x"
-              :y="segment.y"
-              :width="segment.width"
-              :height="segment.height"
-              :fill="segment.color"
+              :x="bar.x"
+              :y="bar.y"
+              :width="bar.width"
+              :height="bar.height"
+              fill="#d7e1ec"
               rx="4"
               ry="4"
               tabindex="0"
-              @mouseenter="showTooltip(segment, bar, $event)"
+              @mouseenter="showSegmentTooltip(bar, $event)"
               @mousemove="updateTooltipPosition($event)"
-              @focus="showTooltip(segment, bar, $event)"
+              @focus="showSegmentTooltip(bar, $event)"
               @blur="clearTooltip"
             >
-              <title>{{ segment.label }} | {{ bar.label }} | {{ props.formatNumber(segment.value, 1) }}</title>
+              <title>{{ bar.label }} | Needed headcount {{ props.formatNumber(bar.total, 1) }}</title>
             </rect>
 
             <text
@@ -295,21 +324,70 @@ const clearTooltip = () => {
               {{ bar.label }}
             </text>
           </g>
+
+          <path
+            :d="buildLinePath('total')"
+            fill="none"
+            stroke="#64748b"
+            stroke-width="2.5"
+            stroke-dasharray="6 4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            :d="buildLinePath('frontline')"
+            fill="none"
+            stroke="#15395f"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+
+          <circle
+            v-for="point in linePoints"
+            :key="`total-${point.monthIndex}`"
+            :cx="point.x"
+            :cy="point.totalY"
+            r="4"
+            fill="#64748b"
+            stroke="#ffffff"
+            stroke-width="2"
+            tabindex="0"
+            @mouseenter="showLineTooltip(point, $event)"
+            @mousemove="updateTooltipPosition($event)"
+            @focus="showLineTooltip(point, $event)"
+            @blur="clearTooltip"
+          />
+          <circle
+            v-for="point in linePoints"
+            :key="`frontline-${point.monthIndex}`"
+            :cx="point.x"
+            :cy="point.frontlineY"
+            r="4"
+            fill="#15395f"
+            stroke="#ffffff"
+            stroke-width="2"
+            tabindex="0"
+            @mouseenter="showLineTooltip(point, $event)"
+            @mousemove="updateTooltipPosition($event)"
+            @focus="showLineTooltip(point, $event)"
+            @blur="clearTooltip"
+          />
         </svg>
       </div>
 
       <div class="flex flex-wrap gap-2.5">
-        <div
-          v-for="item in props.series"
-          :key="item.id"
-          class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
-        >
-          <span
-            class="h-2.5 w-2.5 rounded-full"
-            :style="{ backgroundColor: item.color }"
-            aria-hidden="true"
-          />
-          <span class="font-medium text-slate-900">{{ item.label }}</span>
+        <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
+          <span class="h-2.5 w-2.5 rounded-sm bg-[#d7e1ec]" aria-hidden="true" />
+          <span class="font-medium text-slate-900">Needed Headcount</span>
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
+          <span class="h-0 w-5 border-t-2 border-[#15395f]" aria-hidden="true" />
+          <span class="font-medium text-slate-900">Frontline Headcount</span>
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
+          <span class="h-0 w-5 border-t-2 border-dashed border-slate-500" aria-hidden="true" />
+          <span class="font-medium text-slate-900">Total Headcount</span>
         </div>
       </div>
     </div>
