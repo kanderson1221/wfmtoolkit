@@ -8,9 +8,7 @@ import {
   buildRandomMonths,
   buildStaffingMonths,
   buildTrainingClasses,
-  calculateCalendarOpenDays,
   clamp,
-  collectPlannerWarnings,
   computeMonthlyRecords,
   computeStaffingRecords,
   deriveStartingFrontlineHeadcount,
@@ -29,80 +27,27 @@ import {
   summarizeStaffingRecords,
   toNumber
 } from '../plannerModel'
-
-const WEEKDAY_OPTIONS = [
-  { value: 0, label: 'Sun' },
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
-  { value: 6, label: 'Sat' }
-]
-
-const currentYear = new Date().getFullYear()
-const currentMonthIndex = new Date().getMonth()
-const yearOptions = Array.from({ length: 8 }, (_, index) => currentYear - 2 + index)
-const autosaveTimeFormatter = new Intl.DateTimeFormat('en-US', {
-  hour: 'numeric',
-  minute: '2-digit'
-})
-
-const formatNumber = (value, digits = 1) =>
-  new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits
-  }).format(value || 0)
-
-const formatWhole = (value) =>
-  new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: 0
-  }).format(value || 0)
-
-const formatPercent = (value, digits = 1) => `${formatNumber(value, digits)}%`
-const formatFactor = (value, digits = 2) => `${formatNumber(value, digits)}x`
-
-const hydrateMonths = (months, fallbackBuilder, factory) =>
-  Array.isArray(months) && months.length === MONTH_LABELS.length
-    ? months.map((month) => factory(month))
-    : fallbackBuilder()
-
-const createPresenceMonthFromProfile = ({
-  year,
-  monthIndex,
-  weekdays,
-  dayAdjustment = 0,
-  paidHoursPerDay = 8,
-  plannedTimeOffPercent = 0,
-  unplannedTimeOffPercent = 0,
-  leaveTimePercent = 0,
-  meetingsPercent = 0,
-  trainingPercent = 0,
-  coachingPercent = 0,
-  paidBreaksHoursPerDay = 0.5,
-  otherAwayHoursPerDay = 0.1
-}) => {
-  const openDays = Math.max(calculateCalendarOpenDays(year, monthIndex, weekdays) + dayAdjustment, 0)
-  const paidHoursPerMonth = openDays * paidHoursPerDay
-  const convertPercentToHours = (percent) => Number(((paidHoursPerMonth * percent) / 100).toFixed(1))
-
-  return createPresenceMonth({
-    dayAdjustment,
-    paidHoursPerDay,
-    plannedTimeOffHours: convertPercentToHours(plannedTimeOffPercent),
-    unplannedTimeOffHours: convertPercentToHours(unplannedTimeOffPercent),
-    leaveTimeHours: convertPercentToHours(leaveTimePercent),
-    meetingsHours: convertPercentToHours(meetingsPercent),
-    trainingHours: convertPercentToHours(trainingPercent),
-    coachingHours: convertPercentToHours(coachingPercent),
-    paidBreaksHoursPerDay,
-    otherAwayHoursPerDay
-  })
-}
+import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
+import { buildExamplePlannerState } from './monthlyPlanBuilder/examplePlan'
+import {
+  WEEKDAY_OPTIONS,
+  autosaveTimeFormatter,
+  currentMonthIndex,
+  currentYear,
+  formatFactor,
+  formatNumber,
+  formatPercent,
+  formatWhole,
+  hydrateMonths,
+  yearOptions
+} from './monthlyPlanBuilder/shared'
 
 export const useMonthlyPlanBuilder = (props, emit) => {
   const savedPlan = props.initialPlan || null
-  const isNewPlan = !savedPlan
+  const prefilledYear = props.prefilledYear == null || props.prefilledYear === ''
+    ? NaN
+    : toNumber(props.prefilledYear, NaN)
+  const hasPrefilledYear = Number.isFinite(prefilledYear)
   const draftKey = buildPlannerDraftKey(props.draftKey || savedPlan?.id)
   const restoredDraft = loadPlannerDraft(draftKey)
   const initialPlan = restoredDraft?.plan || savedPlan || props.centerDefaults || {}
@@ -114,14 +59,46 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const hydratedTrainingClasses = Array.isArray(initialPlan.trainingClasses)
     ? initialPlan.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass))
     : buildTrainingClasses()
-  const normalizedInitialMode = initialUi.activeMode === 'staffing' ? 'staffing' : 'plan'
+  const legacyInitialTab = initialUi.activeTab === 'random' || initialUi.activeTab === 'plan'
+    ? initialUi.activeTab
+    : 'presence'
+  const normalizedInitialSection = (() => {
+    if (initialUi.activeSection === 'forecast' || initialUi.activeSection === 'staffing' || initialUi.activeSection === 'budget' || initialUi.activeSection === 'review') {
+      return initialUi.activeSection
+    }
 
-  const planName = ref(initialPlan.name?.trim() || '')
-  const planningYear = ref(toNumber(initialPlan.planningYear, currentYear))
-  const activeMode = ref(normalizedInitialMode)
-  const activeTab = ref(initialUi.activeTab || 'presence')
+    if (initialUi.activeSection === 'overview') {
+      return 'overview'
+    }
+
+    if (initialUi.activeMode === 'staffing') {
+      return 'staffing'
+    }
+
+    return 'overview'
+  })()
+  const normalizedInitialForecastStep = (() => {
+    if (initialUi.activeForecastStep === 'variability' || initialUi.activeForecastStep === 'requirement') {
+      return initialUi.activeForecastStep
+    }
+
+    if (legacyInitialTab === 'random') {
+      return 'variability'
+    }
+
+    if (legacyInitialTab === 'plan') {
+      return 'requirement'
+    }
+
+    return 'availability'
+  })()
+
+  const initialPlanningYear = toNumber(initialPlan.planningYear, hasPrefilledYear ? prefilledYear : currentYear)
+  const planningYear = ref(initialPlanningYear)
+  const selectedPlanningYear = ref(initialPlanningYear)
+  const activeSection = ref(normalizedInitialSection)
+  const activeForecastStep = ref(normalizedInitialForecastStep)
   const selectedMonthIndex = ref(clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1))
-  const settingsOpen = ref(savedPlan ? initialUi.settingsOpen ?? false : true)
   const operatingWeekdays = ref(normalizeWeekdays(initialPlan.operatingWeekdays))
   const presenceMonths = ref(hydrateMonths(initialPlan.presenceMonths, buildPresenceMonths, createPresenceMonth))
   const randomDefaults = ref(createRandomMonth(initialPlan.randomDefaults || {}))
@@ -153,43 +130,37 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const lastAutosavedAt = ref(restoredDraft?.autosavedAt || null)
   const autosaveReady = ref(false)
   const suspendAutosave = ref(false)
-  const settingsStatusMessage = ref('')
-  const settingsStatusTone = ref('success')
 
   let autosaveTimer = null
 
-  const setActiveTab = (tabId) => {
-    activeTab.value = tabId
+  const setActiveSection = (sectionId) => {
+    activeSection.value = sectionId
   }
 
-  const moveTab = (direction, tabs) => {
-    const currentIndex = tabs.findIndex((tab) => tab.id === activeTab.value)
-    const nextIndex = clamp(currentIndex + direction, 0, tabs.length - 1)
-    activeTab.value = tabs[nextIndex].id
+  const setActiveForecastStep = (stepId) => {
+    activeSection.value = 'forecast'
+    activeForecastStep.value = stepId
   }
 
-  const clonePresenceMonth = (monthIndex) => ({ ...presenceMonths.value[monthIndex] })
+  const moveForecastStep = (direction) => {
+    const steps = ['availability', 'variability', 'requirement']
+    const currentIndex = steps.indexOf(activeForecastStep.value)
+    const nextIndex = clamp(currentIndex + direction, 0, steps.length - 1)
+
+    activeSection.value = 'forecast'
+    activeForecastStep.value = steps[nextIndex]
+  }
 
   const copyPresenceMonthToAll = (monthIndex) => {
-    const source = clonePresenceMonth(monthIndex)
-    presenceMonths.value = MONTH_LABELS.map(() => ({ ...source }))
+    presenceMonths.value = copyMonthToAll(presenceMonths.value, monthIndex)
   }
 
   const copyPresenceMonthForward = (monthIndex) => {
-    const source = clonePresenceMonth(monthIndex)
-    presenceMonths.value = presenceMonths.value.map((month, index) =>
-      index >= monthIndex ? { ...source } : month
-    )
+    presenceMonths.value = copyMonthForward(presenceMonths.value, monthIndex)
   }
 
   const copyPresenceQuarterForward = (monthIndex) => {
-    const source = clonePresenceMonth(monthIndex)
-    const quarterStart = Math.floor(monthIndex / 3) * 3
-    const quarterEnd = Math.min(quarterStart + 3, MONTH_LABELS.length)
-
-    presenceMonths.value = presenceMonths.value.map((month, index) =>
-      index >= monthIndex && index < quarterEnd ? { ...source } : month
-    )
+    presenceMonths.value = copyQuarterForward(presenceMonths.value, monthIndex)
   }
 
   const handlePresenceCopyAction = (action) => {
@@ -215,28 +186,16 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     }
   }
 
-  const cloneRandomMonth = (monthIndex) => ({ ...randomMonths.value[monthIndex] })
-
   const copyRandomMonthToAll = (monthIndex) => {
-    const source = cloneRandomMonth(monthIndex)
-    randomMonths.value = MONTH_LABELS.map(() => ({ ...source }))
+    randomMonths.value = copyMonthToAll(randomMonths.value, monthIndex)
   }
 
   const copyRandomMonthForward = (monthIndex) => {
-    const source = cloneRandomMonth(monthIndex)
-    randomMonths.value = randomMonths.value.map((month, index) =>
-      index >= monthIndex ? { ...source } : month
-    )
+    randomMonths.value = copyMonthForward(randomMonths.value, monthIndex)
   }
 
   const copyRandomQuarterForward = (monthIndex) => {
-    const source = cloneRandomMonth(monthIndex)
-    const quarterStart = Math.floor(monthIndex / 3) * 3
-    const quarterEnd = Math.min(quarterStart + 3, MONTH_LABELS.length)
-
-    randomMonths.value = randomMonths.value.map((month, index) =>
-      index >= monthIndex && index < quarterEnd ? { ...source } : month
-    )
+    randomMonths.value = copyQuarterForward(randomMonths.value, monthIndex)
   }
 
   const handleRandomCopyAction = (action) => {
@@ -250,80 +209,29 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const loadExamplePlan = () => {
+    const examplePlan = buildExamplePlannerState(currentYear + 1)
+
     planningYear.value = currentYear + 1
-    operatingWeekdays.value = [1, 2, 3, 4, 5]
-
-    presenceMonths.value = [
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 0, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 7, unplannedTimeOffPercent: 3.2, leaveTimePercent: 0.8, meetingsPercent: 1.8, trainingPercent: 1.2, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 1, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 7, unplannedTimeOffPercent: 3.2, leaveTimePercent: 0.8, meetingsPercent: 1.8, trainingPercent: 1.2, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 2, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 8, unplannedTimeOffPercent: 3.4, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 3, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 8, unplannedTimeOffPercent: 3.4, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.12 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 4, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.6, leaveTimePercent: 1, meetingsPercent: 2, trainingPercent: 1.4, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.15 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 5, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 10, unplannedTimeOffPercent: 3.8, leaveTimePercent: 1, meetingsPercent: 2, trainingPercent: 1.5, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.15 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 6, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 12, unplannedTimeOffPercent: 4, leaveTimePercent: 1.2, meetingsPercent: 1.8, trainingPercent: 1.1, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.18 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 7, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 12, unplannedTimeOffPercent: 4, leaveTimePercent: 1.2, meetingsPercent: 1.8, trainingPercent: 1.1, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.18 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 8, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.6, leaveTimePercent: 1, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.14 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 9, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 8.8, unplannedTimeOffPercent: 3.5, leaveTimePercent: 0.9, meetingsPercent: 1.9, trainingPercent: 1.3, coachingPercent: 1.2, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.14 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 10, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 9.5, unplannedTimeOffPercent: 3.7, leaveTimePercent: 1.1, meetingsPercent: 2, trainingPercent: 1.4, coachingPercent: 1.3, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.16 }),
-      createPresenceMonthFromProfile({ year: currentYear + 1, monthIndex: 11, weekdays: [1, 2, 3, 4, 5], plannedTimeOffPercent: 11.5, unplannedTimeOffPercent: 4.2, leaveTimePercent: 1.3, meetingsPercent: 2.2, trainingPercent: 1.5, coachingPercent: 1.4, paidBreaksHoursPerDay: 0.5, otherAwayHoursPerDay: 0.2 })
-    ]
-
-    randomDefaults.value = createRandomMonth({ occupancyPercent: 90, adherencePercent: 95 })
+    selectedPlanningYear.value = currentYear + 1
+    operatingWeekdays.value = examplePlan.operatingWeekdays
+    presenceMonths.value = examplePlan.presenceMonths
+    randomDefaults.value = examplePlan.randomDefaults
     useMonthlyRandomOverrides.value = false
-    syncRandomMonthsToDefaults()
-
-    const exampleContacts = [44000, 42500, 44800, 46200, 47800, 49900, 53100, 54800, 50500, 48200, 47100, 52800]
-    const exampleAht = [315, 312, 310, 305, 302, 300, 298, 300, 304, 308, 312, 320]
-
-    planMonths.value = MONTH_LABELS.map((_, index) =>
-      createPlanMonth({
-        contacts: exampleContacts[index],
-        ahtSeconds: exampleAht[index]
-      })
-    )
-    startingHeadcount.value = 52
-    startingFrontlineHeadcount.value = 52
-    trainingSettings.value = createTrainingSettings({
-      trainingDurationWorkdays: 20,
-      graduationYieldPercent: 85,
-      availableTrainers: 2,
-      maxClassSize: 12,
-      postTrainingNestingDays: 5
-    })
-    staffingMonths.value = MONTH_LABELS.map((_, index) =>
-      createStaffingMonth({
-        frontlineAttritionHeadcount: [1.3, 1.3, 1.5, 1.5, 1.7, 1.7, 1.9, 1.9, 1.7, 1.7, 1.5, 1.5][index]
-      })
-    )
-    trainingClasses.value = [
-      createTrainingClass({
-        id: 'class-spring',
-        hireDate: `${currentYear + 1}-02-10`,
-        hireCount: 8
-      }),
-      createTrainingClass({
-        id: 'class-summer',
-        hireDate: `${currentYear + 1}-06-09`,
-        hireCount: 10
-      }),
-      createTrainingClass({
-        id: 'class-fall',
-        hireDate: `${currentYear + 1}-09-08`,
-        hireCount: 9
-      })
-    ]
-    activeMode.value = 'plan'
-    activeTab.value = 'presence'
+    randomMonths.value = examplePlan.randomMonths
+    planMonths.value = examplePlan.planMonths
+    startingHeadcount.value = examplePlan.startingHeadcount
+    startingFrontlineHeadcount.value = examplePlan.startingFrontlineHeadcount
+    trainingSettings.value = examplePlan.trainingSettings
+    staffingMonths.value = examplePlan.staffingMonths
+    trainingClasses.value = examplePlan.trainingClasses
+    activeSection.value = 'overview'
+    activeForecastStep.value = 'availability'
     selectedMonthIndex.value = 0
-    settingsStatusTone.value = 'success'
-    settingsStatusMessage.value = planName.value.trim()
-      ? 'Sample data loaded.'
-      : 'Sample data loaded. Add a staffing group name to continue.'
   }
 
   const resetPlanner = () => {
-    planName.value = ''
     planningYear.value = currentYear
+    selectedPlanningYear.value = currentYear
     operatingWeekdays.value = centerOperatingWeekdays
     presenceMonths.value = MONTH_LABELS.map(() =>
       createPresenceMonth({
@@ -339,16 +247,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     startingFrontlineHeadcount.value = 0
     staffingMonths.value = buildStaffingMonths()
     trainingClasses.value = buildTrainingClasses()
-    activeMode.value = 'plan'
-    activeTab.value = 'presence'
+    activeSection.value = 'overview'
+    activeForecastStep.value = 'availability'
     selectedMonthIndex.value = currentMonthIndex
-    settingsOpen.value = true
-    settingsStatusTone.value = 'success'
-    settingsStatusMessage.value = ''
-  }
-
-  const openSettings = () => {
-    settingsOpen.value = true
   }
 
   const monthlyRecords = computed(() =>
@@ -392,31 +293,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     ]
   }
 
-  const cancelSettings = () => {
-    if (isNewPlan) {
-      suspendAutosave.value = true
-      removeDraft()
-      emit('cancel')
-      return
-    }
-
-    settingsOpen.value = false
-    settingsStatusMessage.value = ''
-    settingsStatusTone.value = 'success'
-  }
-
-  const closeSettings = () => {
-    if (!planName.value.trim()) {
-      settingsStatusTone.value = 'error'
-      settingsStatusMessage.value = 'Staffing group name is required before you can continue.'
-      settingsOpen.value = true
-      return
-    }
-
-    settingsOpen.value = false
-    settingsStatusMessage.value = ''
-  }
-
   const operatingWeekdayLabel = computed(() => {
     if (!operatingWeekdays.value.length) {
       return 'No days selected'
@@ -427,7 +303,20 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       .join(', ')
   })
 
-  const displayPlanName = computed(() => planName.value.trim() || 'New staffing group')
+  const displayPlanLabel = computed(() => `${planningYear.value} Plan`)
+  const duplicateYearPlan = computed(() => {
+    const targetYear = toNumber(planningYear.value, currentYear)
+    const currentPlanId = savedPlan?.id || initialPlan.id || null
+
+    return (props.groupPlans || []).find(
+      (plan) => plan?.id !== currentPlanId && toNumber(plan?.planningYear, currentYear) === targetYear
+    ) || null
+  })
+  const duplicateYearMessage = computed(() =>
+    duplicateYearPlan.value
+      ? `A ${planningYear.value} plan already exists for ${props.centerDefaults?.groupName || 'this staffing group'}. Open the existing plan or choose another year.`
+      : ''
+  )
   const presenceSummary = computed(() => summarizePresenceRecords(monthlyRecords.value))
   const randomSummary = computed(() =>
     summarizeRandomRecords(monthlyRecords.value, randomDefaults.value, useMonthlyRandomOverrides.value)
@@ -438,7 +327,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const buildPlanPayload = () => ({
     id: savedPlan?.id || initialPlan.id || null,
     createdAt: savedPlan?.createdAt || initialPlan.createdAt || null,
-    name: planName.value.trim(),
+    name: `${planningYear.value} Plan`,
     planningYear: planningYear.value,
     operatingWeekdays: [...operatingWeekdays.value],
     presenceMonths: presenceMonths.value.map((month) => createPresenceMonth(month)),
@@ -476,10 +365,16 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const buildDraftPayload = () => ({
     plan: buildPlanPayload(),
     ui: {
-      activeMode: activeMode.value,
-      activeTab: activeTab.value,
-      selectedMonthIndex: selectedMonthIndex.value,
-      settingsOpen: settingsOpen.value
+      activeSection: activeSection.value,
+      activeForecastStep: activeForecastStep.value,
+      activeMode: activeSection.value === 'staffing' ? 'staffing' : 'plan',
+      activeTab:
+        activeForecastStep.value === 'variability'
+          ? 'random'
+          : activeForecastStep.value === 'requirement'
+            ? 'plan'
+            : 'presence',
+      selectedMonthIndex: selectedMonthIndex.value
     }
   })
 
@@ -529,11 +424,17 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     autosaveState.value = 'idle'
   }
 
+  const validatePlanDetails = () => {
+    if (duplicateYearPlan.value) {
+      window.alert(duplicateYearMessage.value)
+      return false
+    }
+
+    return true
+  }
+
   const savePlan = () => {
-    if (!planName.value.trim()) {
-      settingsOpen.value = true
-      settingsStatusTone.value = 'error'
-      settingsStatusMessage.value = 'Staffing group name is required before you can save this staffing group.'
+    if (!validatePlanDetails()) {
       return
     }
 
@@ -546,15 +447,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     flushAutosave()
     emit('cancel')
   }
-
-  const planWarnings = computed(() => collectPlannerWarnings(monthlyRecords.value))
-  const plannerWarnings = computed(() => {
-    if (activeMode.value === 'staffing') {
-      return []
-    }
-
-    return planWarnings.value
-  })
 
   const monthlyChartMax = computed(() => getMonthlyChartMax(monthlyRecords.value))
 
@@ -572,18 +464,59 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     return 'Autosave ready'
   })
+  const planningYearOptions = computed(() => {
+    const yearSet = new Set(yearOptions)
+    yearSet.add(Number(planningYear.value) || currentYear)
+    yearSet.add(Number(selectedPlanningYear.value) || currentYear)
 
-  const canCloseSettings = computed(() => Boolean(planName.value.trim()))
-  const allowSettingsBackdropClose = computed(() => !isNewPlan && canCloseSettings.value)
+    ;(props.groupPlans || []).forEach((plan) => {
+      const planYear = Number(plan?.planningYear)
+      if (Number.isFinite(planYear)) {
+        yearSet.add(planYear)
+      }
+    })
+
+    return [...yearSet]
+      .sort((left, right) => right - left)
+      .map((year) => ({
+        label: String(year),
+        value: year
+      }))
+  })
+  const selectedPlanningYearPlan = computed(() =>
+    (props.groupPlans || []).find((plan) => Number(plan?.planningYear) === Number(selectedPlanningYear.value)) || null
+  )
+  const yearSwitchHref = computed(() => {
+    if (!props.centerDefaults?.centerId || !props.centerDefaults?.groupId) {
+      return ''
+    }
+
+    if (Number(selectedPlanningYear.value) === Number(planningYear.value)) {
+      return ''
+    }
+
+    return selectedPlanningYearPlan.value
+      ? `#planning/center/${props.centerDefaults.centerId}/group/${props.centerDefaults.groupId}/plan/${selectedPlanningYearPlan.value.id}`
+      : `#planning/center/${props.centerDefaults.centerId}/group/${props.centerDefaults.groupId}/plan/new/year/${selectedPlanningYear.value}`
+  })
+  const yearSwitchLabel = computed(() => {
+    if (!yearSwitchHref.value) {
+      return ''
+    }
+
+    return selectedPlanningYearPlan.value
+      ? `Open ${selectedPlanningYear.value} Plan`
+      : `Create ${selectedPlanningYear.value} Plan`
+  })
+  const yearSwitchVariant = computed(() => (selectedPlanningYearPlan.value ? 'secondary' : 'primary'))
 
   watch(
     [
-      planName,
       planningYear,
-      activeMode,
-      activeTab,
+      selectedPlanningYear,
+      activeSection,
+      activeForecastStep,
       selectedMonthIndex,
-      settingsOpen,
       operatingWeekdays,
       presenceMonths,
       randomDefaults,
@@ -606,11 +539,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     { deep: true }
   )
 
-  watch(planName, (value) => {
-    if (value.trim() && settingsStatusTone.value === 'error') {
-      settingsStatusMessage.value = ''
-      settingsStatusTone.value = 'success'
-    }
+  watch(planningYear, () => {
+    selectedPlanningYear.value = planningYear.value
   })
 
   watch(startingHeadcount, (value) => {
@@ -633,13 +563,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   })
 
   return {
-    yearOptions,
-    planName,
+    planningYearOptions,
     planningYear,
-    activeMode,
-    activeTab,
+    selectedPlanningYear,
+    activeSection,
+    activeForecastStep,
     selectedMonthIndex,
-    settingsOpen,
     presenceMonths,
     randomDefaults,
     useMonthlyRandomOverrides,
@@ -650,36 +579,33 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     startingFrontlineHeadcount,
     staffingMonths,
     trainingClasses,
-    settingsStatusMessage,
-    settingsStatusTone,
     autosaveState,
     monthlyRecords,
     operatingWeekdayLabel,
-    displayPlanName,
+    displayPlanLabel,
+    yearSwitchHref,
+    yearSwitchLabel,
+    yearSwitchVariant,
     presenceSummary,
     randomSummary,
     planSummary,
+    staffingSummary,
     staffingRecords,
     monthlyChartMax,
     autosaveStatusMessage,
-    canCloseSettings,
-    allowSettingsBackdropClose,
-    plannerWarnings,
     formatNumber,
     formatWhole,
     formatPercent,
     formatFactor,
-    setActiveTab,
-    moveTab,
+    setActiveSection,
+    setActiveForecastStep,
+    moveForecastStep,
     handlePresenceCopyAction,
     handleRandomCopyAction,
     setRandomOverrideMode,
     loadExamplePlan,
     resetPlanner,
-    openSettings,
     generateRecommendedTrainingClasses,
-    cancelSettings,
-    closeSettings,
     savePlan,
     cancelEditor
   }

@@ -129,14 +129,52 @@ Planning home:
 - operational table
 
 Call center detail:
-- page header
-- summary/defaults sections
-- staffing-group table
+- compact title row
+- master/detail workspace
+- staffing groups on the left and annual plans on the right
 
 Calculator page:
 - page header
 - control panel
 - results workspace
+
+### Desktop master/detail workspaces
+
+For desktop-first operational pages that manage a parent list and the selected record's child records on the same screen, prefer a split master/detail workspace instead of a chain of intermediate pages.
+
+This pattern is a strong fit for:
+- call center -> staffing groups -> annual plans
+- operational selectors with a list on the left and comparable child records on the right
+
+Master/detail pages should prefer:
+- one compact title row above the workspace
+- a fixed-height split workspace on desktop
+- independent vertical scrolling inside each pane
+- aligned pane headers and first-row starting lines when practical
+- one clear purpose per pane
+
+Pane ownership should stay obvious:
+- left pane owns selection and collection-level actions
+- right pane owns the selected record's detail state and child-level actions
+
+Do not:
+- insert a redundant middle page when the same work can happen in a selected-detail pane
+- split collection actions across both panes without a strong reason
+- add dashboard content above the workspace unless it is clearly useful for the task on that page
+
+### Summary metrics are optional, not automatic
+
+Use `AppStatStrip` only when the metrics are:
+- trustworthy
+- comparable
+- decision-useful for that page
+
+Do not show summary metrics when they:
+- aggregate across incompatible scopes like mixed planning years
+- push the real workspace below the fold
+- repeat what users can already infer from the records below
+
+If a page is primarily a management workspace, it is acceptable to remove the summary band entirely.
 
 ## 5. Surface Hierarchy
 
@@ -244,6 +282,14 @@ Menu items should:
 - use the active state consistently
 - use the danger tone only for destructive actions like sign out or delete
 
+For dense operational lists:
+- keep the primary action visible in the row when it is frequently used
+- move secondary and destructive actions into an overflow menu
+- keep overflow menus compact and calm
+- prefer neutral menu text for hidden destructive actions, then confirm or require intent at the next step if needed
+
+Do not make destructive row actions the loudest visual element in an otherwise calm workspace.
+
 ## 9. Table Standards
 
 ### Operational data tables
@@ -257,6 +303,45 @@ Expected behavior:
 - numeric columns right-aligned
 - action columns right-aligned
 - row actions should stay compact and readable
+
+### Operational row lists
+
+Not every operational list should be a table.
+
+For split workspaces, side panes, and record selectors, prefer divided row lists when they are easier to scan than a full table.
+
+Operational row lists should:
+- read as rows, not stacked cards
+- keep row heights compact and consistent
+- use a shared alignment rhythm across sibling panes when practical
+- use the row itself for structure before adding extra boxes or helper copy
+- keep visible actions minimal
+
+Prefer:
+- a selected-row marker or subtle tint instead of a heavy filled card state
+- one clear heading per pane
+- compact metadata only when it adds real value
+
+Avoid:
+- repeated contextual subtitles that restate the page title
+- helper text that explains obvious layout behavior
+- per-row card containers when a flat row list is sufficient
+
+### Comparable record rows
+
+If users need to compare records across rows:
+- use one shared header row for the comparison fields
+- align values into stable columns
+- keep repeated labels out of each row
+
+For numeric comparison columns:
+- right-align values
+- use consistent column widths between header and rows
+- prefer spacing and alignment over decorative dividers when dividers introduce visual noise
+
+For mixed rows:
+- keep the identity column left-aligned
+- keep action controls on the far right
 
 ### Worksheet tables
 
@@ -277,6 +362,17 @@ The planner has two main modes:
 - `Staffing Plan`
 
 Planner work should stay operational and worksheet-first.
+
+### Selection and open behavior
+
+In dense desktop workspaces, selection and navigation do not have to be the same action.
+
+Prefer:
+- single click to select a row or change context
+- explicit `Open` actions for navigation into deeper work
+- optional double click as a desktop shortcut for opening
+
+Do not make a selected-state marker imply one behavior while the row click does something else.
 
 ### For planner tabs
 

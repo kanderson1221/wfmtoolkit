@@ -91,6 +91,10 @@ const variantClasses = computed(() => {
     return 'h-10 w-10 rounded-2xl border border-slate-300 bg-slate-50 p-0 text-slate-700 shadow-sm hover:border-sky-300 hover:bg-white hover:text-sky-700'
   }
 
+  if (props.variant === 'icon-quiet') {
+    return 'h-10 w-10 rounded-2xl border border-transparent bg-transparent p-0 text-slate-500 shadow-none hover:bg-slate-50 hover:text-slate-800'
+  }
+
   return 'border border-slate-300 bg-white text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50'
 })
 

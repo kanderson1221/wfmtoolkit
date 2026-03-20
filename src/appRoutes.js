@@ -3,7 +3,9 @@ export const defaultRoute = {
   page: 'home',
   tool: null,
   centerId: null,
-  planId: null
+  groupId: null,
+  planId: null,
+  year: null
 }
 
 export const parseHashRoute = (hash) => {
@@ -16,7 +18,9 @@ export const parseHashRoute = (hash) => {
       page: 'tool',
       tool: 'interval',
       centerId: null,
-      planId: null
+      groupId: null,
+      planId: null,
+      year: null
     }
   }
 
@@ -26,7 +30,9 @@ export const parseHashRoute = (hash) => {
       page: 'tool',
       tool: 'batch',
       centerId: null,
-      planId: null
+      groupId: null,
+      planId: null,
+      year: null
     }
   }
 
@@ -36,7 +42,9 @@ export const parseHashRoute = (hash) => {
       page: 'home',
       tool: null,
       centerId: null,
-      planId: null
+      groupId: null,
+      planId: null,
+      year: null
     }
   }
 
@@ -50,7 +58,9 @@ export const parseHashRoute = (hash) => {
       page: 'tool',
       tool: parts[1] === 'batch' ? 'batch' : 'interval',
       centerId: null,
-      planId: null
+      groupId: null,
+      planId: null,
+      year: null
     }
   }
 
@@ -61,17 +71,69 @@ export const parseHashRoute = (hash) => {
         page: 'center',
         tool: null,
         centerId: parts[2],
-        planId: null
+        groupId: null,
+        planId: null,
+        year: null
       }
     }
 
-    if (parts[1] === 'center' && parts[2] && parts[3] === 'new') {
+    if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && !parts[5]) {
+      return {
+        app: 'planning',
+        page: 'center',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: null
+      }
+    }
+
+    if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'year' && parts[6]) {
+      return {
+        app: 'planning',
+        page: 'center',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: Number(parts[6]) || null
+      }
+    }
+
+    if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'plan' && parts[6] === 'new' && parts[7] === 'year' && parts[8]) {
       return {
         app: 'planning',
         page: 'editor',
         tool: null,
         centerId: parts[2],
-        planId: 'new'
+        groupId: parts[4],
+        planId: 'new',
+        year: Number(parts[8]) || null
+      }
+    }
+
+    if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'plan' && parts[6] === 'new') {
+      return {
+        app: 'planning',
+        page: 'editor',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: 'new',
+        year: null
+      }
+    }
+
+    if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'plan' && parts[6]) {
+      return {
+        app: 'planning',
+        page: 'editor',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: parts[6],
+        year: null
       }
     }
 
@@ -81,7 +143,9 @@ export const parseHashRoute = (hash) => {
         page: 'editor',
         tool: null,
         centerId: parts[2],
-        planId: parts[4]
+        groupId: null,
+        planId: parts[4],
+        year: null
       }
     }
 
@@ -91,7 +155,9 @@ export const parseHashRoute = (hash) => {
         page: 'editor',
         tool: null,
         centerId: null,
-        planId: parts[2]
+        groupId: null,
+        planId: parts[2],
+        year: null
       }
     }
 
@@ -100,7 +166,9 @@ export const parseHashRoute = (hash) => {
       page: 'home',
       tool: null,
       centerId: null,
-      planId: null
+      groupId: null,
+      planId: null,
+      year: null
     }
   }
 

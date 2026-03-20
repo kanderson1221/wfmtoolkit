@@ -22,19 +22,17 @@ const handleChange = (event) => {
 </script>
 
 <template>
-  <div class="monthly-copy-toolbar">
-    <label class="monthly-copy-select" :for="props.inputId">
-      <span class="monthly-copy-label">Copy {{ props.label }}</span>
-      <select
-        :id="props.inputId"
-        class="monthly-copy-select-input"
-        @change="handleChange"
-      >
-        <option value="">Choose action</option>
-        <option value="all">To all months</option>
-        <option value="forward">Forward</option>
-        <option value="quarter">Through quarter</option>
-      </select>
-    </label>
-  </div>
+  <label class="monthly-copy-toolbar" :for="props.inputId">
+    <span class="monthly-copy-label">Copy {{ props.label }}</span>
+    <select
+      :id="props.inputId"
+      class="monthly-copy-select-input"
+      @change="handleChange"
+    >
+      <option value="">Choose action</option>
+      <option value="all">To all months</option>
+      <option value="forward">Forward</option>
+      <option value="quarter">Through quarter</option>
+    </select>
+  </label>
 </template>

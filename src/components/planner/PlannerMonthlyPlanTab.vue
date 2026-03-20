@@ -91,15 +91,15 @@ const summaryItems = computed(() => [
 <template>
   <section class="results-panel monthly-tab-panel">
     <AppSectionHeader
-      title="Build the monthly headcount requirement from demand"
-      description="Enter workload by month and review the design-factor-driven staffing requirement before moving into the staffing plan."
+      title="Review required frontline headcount"
+      description="Enter monthly workload and confirm the frontline requirement before moving into the staffing plan."
     />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-5" />
 
     <AppWorkspaceSection
-      title="Monthly Headcount Requirement"
-      description="Enter workload inputs and review how scheduled time, random loss, and design factor translate into required staff hours and headcount."
+      title="Required Frontline Headcount"
+      description="Enter workload inputs and review how agent availability, variability buffer, and design factor translate into required staff hours and frontline headcount."
     >
       <div class="assumption-table-shell">
       <table class="assumption-table assumption-table-plan">
@@ -191,8 +191,8 @@ const summaryItems = computed(() => [
     />
 
     <div class="monthly-tab-actions">
-      <AppButton variant="secondary" @click="emit('previous')">Back to Random</AppButton>
-      <AppButton variant="primary" @click="emit('save')">Save Staffing Group</AppButton>
+      <AppButton variant="secondary" @click="emit('previous')">Back to Variability Buffer</AppButton>
+      <AppButton variant="primary" @click="emit('save')">Save Plan</AppButton>
     </div>
   </section>
 </template>

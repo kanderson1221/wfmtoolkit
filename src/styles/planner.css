@@ -97,15 +97,23 @@
   }
 
   .monthly-flow-card {
-    @apply p-3 md:p-4;
+    @apply p-3;
   }
 
   .monthly-flow-shell {
-    @apply grid gap-4;
+    @apply grid gap-3;
   }
 
   .monthly-tab-panel {
     @apply grid gap-4 p-4;
+  }
+
+  .monthly-loss-group {
+    @apply gap-2.5 p-3;
+  }
+
+  .monthly-loss-group .monthly-copy-toolbar {
+    @apply mb-0;
   }
 
   .monthly-tab-header {
@@ -121,15 +129,15 @@
   }
 
   .monthly-copy-toolbar {
-    @apply flex justify-end;
-  }
-
-  .monthly-copy-select {
-    @apply grid gap-2 text-sm font-medium text-slate-700;
+    @apply inline-flex items-center gap-2 text-sm font-medium text-slate-700;
   }
 
   .monthly-copy-label {
-    @apply text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
+    @apply whitespace-nowrap text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
+  }
+
+  .monthly-copy-select-input {
+    @apply rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100;
   }
 
   .assumption-table-shell {
@@ -141,11 +149,11 @@
   }
 
   .assumption-table thead th {
-    @apply border-b border-slate-200 bg-slate-50 px-3 py-3 align-middle text-center text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-slate-500;
+    @apply border-b border-slate-200 bg-slate-50 px-2.5 py-2.5 align-middle text-center text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-slate-500;
   }
 
   .assumption-table tbody td {
-    @apply border-b border-slate-200 px-3 py-3 text-center align-middle;
+    @apply border-b border-slate-200 px-2.5 py-2.5 text-center align-middle;
   }
 
   .assumption-table tbody tr:last-child td {
@@ -166,7 +174,7 @@
 
   .assumption-table input:not([type="checkbox"]),
   .assumption-table select {
-    @apply min-w-[5.25rem] rounded-xl border border-slate-300 bg-white px-3 py-2 text-center text-sm shadow-sm transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100;
+    @apply min-w-[5rem] rounded-md border border-slate-200 bg-slate-50/70 px-2 py-1.5 text-center text-sm shadow-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100;
   }
 
   .month-cell {
@@ -174,7 +182,7 @@
   }
 
   .assumption-month-btn {
-    @apply inline-flex items-center rounded-xl border border-transparent px-2 py-1 text-left font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50;
+    @apply inline-flex items-center rounded-lg border border-transparent px-2 py-1 text-left font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50;
   }
 
   .plan-head-label,
@@ -213,11 +221,15 @@
   }
 
   .assumption-table-presence-main thead .presence-super-row th {
-    @apply bg-slate-100 text-center text-[0.7rem] text-slate-600;
+    @apply bg-slate-100 px-2 py-2 text-center text-[0.68rem] text-slate-600;
   }
 
   .assumption-table-presence-main thead .presence-super-row th:first-child {
     @apply text-left;
+  }
+
+  .assumption-table-presence-main thead .presence-super-head.presence-super-calendar {
+    @apply bg-slate-100 text-slate-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-presence {
@@ -228,32 +240,64 @@
     @apply bg-emerald-50 text-emerald-800;
   }
 
-  .assumption-table-presence-main thead .presence-group-row th {
-    @apply text-center text-[0.68rem] text-slate-600;
-  }
-
-  .assumption-table-presence-main thead .presence-group-absence {
-    @apply bg-sky-50/80 text-sky-800;
-  }
-
-  .assumption-table-presence-main thead .presence-group-scheduled {
-    @apply bg-emerald-50/80 text-emerald-800;
-  }
-
-  .assumption-table-presence-main thead .presence-group-other {
-    @apply bg-amber-50/80 text-amber-800;
+  .assumption-table-presence-main thead .presence-super-head.presence-super-results {
+    @apply bg-violet-50 text-violet-800;
   }
 
   .assumption-table-presence-main thead .presence-detail-row th {
-    @apply bg-white text-[0.7rem] font-semibold normal-case tracking-normal text-slate-500;
+    @apply bg-white px-2 py-1.5 text-[0.68rem] font-semibold normal-case tracking-normal text-slate-500;
   }
 
   .assumption-table-presence-main tbody td {
-    @apply text-center;
+    @apply px-2 py-1.5 text-center;
   }
 
   .assumption-table-presence-main tbody td:first-child {
     @apply text-left;
+  }
+
+  .presence-col-month {
+    width: 8rem;
+  }
+
+  .presence-col-business,
+  .presence-col-adjust,
+  .presence-col-other,
+  .presence-col-result {
+    width: 4.4rem;
+  }
+
+  .presence-col-paid,
+  .presence-col-absence,
+  .presence-col-utilization,
+  .presence-col-result-wide {
+    width: 4.8rem;
+  }
+
+  .assumption-table-presence-main tbody td.presence-calendar-cell {
+    @apply font-medium text-slate-700;
+  }
+
+  .assumption-table-presence-main tbody td.presence-result-cell {
+    @apply bg-slate-50/80 font-medium text-slate-900;
+  }
+
+  .assumption-table-presence-main tbody td.presence-result-final {
+    @apply bg-sky-50/70 font-semibold text-sky-900;
+  }
+
+  .assumption-table-presence-main input {
+    @apply px-1.5 py-1 text-[0.82rem];
+  }
+
+  .assumption-table-presence-main .assumption-month-btn {
+    @apply py-0.5;
+  }
+
+  @media (min-width: 1280px) {
+    .assumption-table-presence-main {
+      @apply w-full table-fixed;
+    }
   }
 
   .random-global-note {

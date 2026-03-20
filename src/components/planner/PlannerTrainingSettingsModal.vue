@@ -5,7 +5,10 @@ import { createTrainingSettings } from '../../plannerModel'
 import AppButton from '../ui/AppButton.vue'
 import AppCheckbox from '../ui/AppCheckbox.vue'
 import AppDialog from '../ui/AppDialog.vue'
+import AppFieldGroup from '../ui/AppFieldGroup.vue'
 import AppNumberField from '../ui/AppNumberField.vue'
+import AppStatusMessage from '../ui/AppStatusMessage.vue'
+import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 
 const props = defineProps({
   formatNumber: {
@@ -53,29 +56,24 @@ const concurrentTrainingCapacity = computed(
   >
 
     <div class="grid gap-4 lg:grid-cols-[1.15fr_0.92fr]">
-      <section class="grid gap-4 rounded-[28px] border border-slate-200 bg-slate-50/60 p-5">
-        <div class="grid gap-1">
-          <span class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Shared Training Defaults
-          </span>
-          <p class="text-sm text-slate-600">
-            These settings drive every class recommendation and every derived graduation or frontline-ready date in the staffing plan.
-          </p>
-        </div>
-
+      <AppWorkspaceSection
+        kicker="Defaults"
+        title="Shared training defaults"
+        description="These settings drive every class recommendation and every derived graduation or frontline-ready date in the staffing plan."
+      >
         <div class="grid gap-4 md:grid-cols-2">
-          <label class="grid gap-2">
-            <span class="text-sm font-medium text-slate-700">Training Duration (Workdays)</span>
+          <AppFieldGroup label="Training Duration (Workdays)" input-id="training-duration-workdays">
             <AppNumberField
+              input-id="training-duration-workdays"
               v-model="trainingSettings.trainingDurationWorkdays"
               min="1"
               step="1"
             />
-          </label>
+          </AppFieldGroup>
 
-          <label class="grid gap-2">
-            <span class="text-sm font-medium text-slate-700">Graduation Yield (%)</span>
+          <AppFieldGroup label="Graduation Yield (%)" input-id="graduation-yield-percent">
             <AppNumberField
+              input-id="graduation-yield-percent"
               v-model="trainingSettings.graduationYieldPercent"
               min="0"
               max="100"
@@ -83,48 +81,48 @@ const concurrentTrainingCapacity = computed(
               :min-fraction-digits="0"
               :max-fraction-digits="1"
             />
-          </label>
+          </AppFieldGroup>
 
-          <label class="grid gap-2">
-            <span class="text-sm font-medium text-slate-700">Available Trainers</span>
+          <AppFieldGroup label="Available Trainers" input-id="available-trainers">
             <AppNumberField
+              input-id="available-trainers"
               v-model="trainingSettings.availableTrainers"
               min="0"
               step="1"
             />
-          </label>
+          </AppFieldGroup>
 
-          <label class="grid gap-2">
-            <span class="text-sm font-medium text-slate-700">Max Class Size</span>
+          <AppFieldGroup label="Max Class Size" input-id="max-class-size">
             <AppNumberField
+              input-id="max-class-size"
               v-model="trainingSettings.maxClassSize"
               min="0"
               step="1"
             />
-          </label>
+          </AppFieldGroup>
 
-          <label class="grid gap-2 md:col-span-2">
-            <span class="text-sm font-medium text-slate-700">Post Training Nesting Days</span>
+          <AppFieldGroup
+            label="Post Training Nesting Days"
+            input-id="post-training-nesting-days"
+            class="md:col-span-2"
+          >
             <AppNumberField
+              input-id="post-training-nesting-days"
               v-model="trainingSettings.postTrainingNestingDays"
               min="0"
               step="1"
             />
-          </label>
+          </AppFieldGroup>
         </div>
-      </section>
+      </AppWorkspaceSection>
 
-      <section class="grid gap-4 rounded-[28px] border border-slate-200 bg-white p-5">
-        <div class="grid gap-1">
-          <span class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Recommendation Rules
-          </span>
-          <p class="text-sm text-slate-600">
-            Set how recommendations anchor weekly start dates and how much concurrent training capacity the plan can support.
-          </p>
-        </div>
-
-        <div class="rounded-3xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+      <AppWorkspaceSection
+        :subtle="false"
+        kicker="Recommendations"
+        title="Recommendation rules"
+        description="Set how recommendations anchor weekly start dates and how much concurrent training capacity the plan can support."
+      >
+        <AppFieldGroup>
           <AppCheckbox
             input-id="training-settings-first-workday"
             v-model="trainingSettings.startOnFirstBusinessDayOfWeek"
@@ -136,21 +134,21 @@ const concurrentTrainingCapacity = computed(
               </span>
             </span>
           </AppCheckbox>
-        </div>
+        </AppFieldGroup>
 
-        <div class="rounded-[28px] border border-sky-100 bg-sky-50 px-4 py-4">
-          <span class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-sky-700">
+        <AppStatusMessage>
+          <span class="block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-sky-700">
             Concurrent Training Capacity
           </span>
-          <div class="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+          <span class="mt-2 block text-3xl font-semibold tracking-[-0.04em] text-slate-950">
             {{ props.formatNumber(concurrentTrainingCapacity, 0) }}
-          </div>
-          <p class="mt-2 text-sm leading-6 text-slate-600">
+          </span>
+          <span class="mt-2 block text-sm leading-6 text-slate-600">
             {{ props.formatNumber(normalizedTrainingSettings.availableTrainers, 0) }} trainer(s) ×
             {{ props.formatNumber(normalizedTrainingSettings.maxClassSize, 0) }} seats per class
-          </p>
-        </div>
-      </section>
+          </span>
+        </AppStatusMessage>
+      </AppWorkspaceSection>
     </div>
 
     <template #footer>

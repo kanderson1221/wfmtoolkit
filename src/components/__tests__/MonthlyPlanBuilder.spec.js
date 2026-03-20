@@ -3,6 +3,9 @@ import { mount } from '@vue/test-utils'
 import MonthlyPlanBuilder from '../MonthlyPlanBuilder.vue'
 
 const plannerStubs = {
+  PlannerOverviewPanel: {
+    template: '<div data-test="overview-panel">overview</div>'
+  },
   PlannerPresenceTab: {
     template: '<div data-test="presence-tab">presence</div>'
   },
@@ -14,13 +17,13 @@ const plannerStubs = {
   },
   PlannerStaffingPlanTab: {
     template: '<div data-test="staffing-tab">staffing</div>'
-  },
-  PlannerSettingsModal: {
-    template: '<div data-test="settings-modal">settings</div>'
   }
 }
 
 const centerDefaults = {
+  centerId: 'center-1',
+  groupId: 'group-1',
+  groupName: 'Consumer Voice',
   operatingWeekdays: [1, 2, 3, 4, 5],
   presenceMonths: [{ paidHoursPerDay: 8 }],
   randomDefaults: {
@@ -61,16 +64,16 @@ describe('MonthlyPlanBuilder', () => {
     clearPlannerDrafts()
   })
 
-  it('opens new staffing groups with the settings modal visible', () => {
+  it('opens new plans directly in the editor workflow', () => {
     const wrapper = mountBuilder({
-      draftKey: 'new-group'
+      draftKey: 'new-plan',
+      prefilledYear: 2026
     })
 
-    expect(wrapper.find('[data-test="settings-modal"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Demand Model')
+    expect(wrapper.text()).toContain('Overview')
   })
 
-  it('switches between demand model and staffing plan modes', async () => {
+  it('switches between overview, forecast need, and plan staffing', async () => {
     const wrapper = mountBuilder({
       draftKey: 'plan-1',
       initialPlan: {
@@ -80,31 +83,36 @@ describe('MonthlyPlanBuilder', () => {
       }
     })
 
-    expect(wrapper.find('[data-test="presence-tab"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(true)
 
-    await findButtonByText(wrapper, 'Staffing Plan').trigger('click')
+    await wrapper.find('[data-section-id="forecast"]').trigger('click')
+
+    expect(wrapper.find('[data-test="presence-tab"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(false)
+
+    await wrapper.find('[data-section-id="staffing"]').trigger('click')
 
     expect(wrapper.find('[data-test="staffing-tab"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="presence-tab"]').exists()).toBe(false)
   })
 
-  it('emits a saved staffing group payload from the shell action', async () => {
+  it('emits a saved plan payload from the shell action', async () => {
     const wrapper = mountBuilder({
       draftKey: 'plan-1',
       initialPlan: {
         id: 'plan-1',
         createdAt: '2026-01-01T00:00:00.000Z',
-        name: 'Consumer Voice',
+        name: '2026 Plan',
         planningYear: 2026
       }
     })
 
-    await findButtonByText(wrapper, 'Save Staffing Group').trigger('click')
+    await findButtonByText(wrapper, 'Save Plan').trigger('click')
 
     expect(wrapper.emitted('save')).toBeTruthy()
     expect(wrapper.emitted('save')[0][0]).toMatchObject({
       id: 'plan-1',
-      name: 'Consumer Voice',
+      name: '2026 Plan',
       planningYear: 2026
     })
   })

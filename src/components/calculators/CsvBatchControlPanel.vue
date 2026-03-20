@@ -6,6 +6,7 @@ import AppPanel from '../ui/AppPanel.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
+import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 
 const props = defineProps({
   workflows: {
@@ -74,12 +75,10 @@ const assumptionSourceOptions = [
       description="Configure a workflow, upload demand intervals, and generate planning outputs at scale."
     />
 
-    <section class="grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50/60 p-4">
-      <AppSectionHeader
-        title="Workflow Mode"
-        description="Choose the staffing workflow you want to run against the uploaded demand file."
-      />
-
+    <AppWorkspaceSection
+      title="Workflow Mode"
+      description="Choose the staffing workflow you want to run against the uploaded demand file."
+    >
       <div class="flex flex-wrap gap-2" role="tablist" aria-label="Bulk planning workflow mode">
         <AppButton
           v-for="workflow in props.workflows"
@@ -98,14 +97,12 @@ const assumptionSourceOptions = [
       <p class="text-sm leading-6 text-slate-600">
         {{ props.currentWorkflow.summary }}
       </p>
-    </section>
+    </AppWorkspaceSection>
 
-    <section class="grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50/60 p-4">
-      <AppSectionHeader
-        title="Source File"
-        description="Upload the CSV input file for the selected workflow and use the matching template when needed."
-      />
-
+    <AppWorkspaceSection
+      title="Source File"
+      description="Upload the CSV input file for the selected workflow and use the matching template when needed."
+    >
       <div class="flex flex-wrap items-center gap-3">
         <label
           for="batchCsvFile"
@@ -132,17 +129,13 @@ const assumptionSourceOptions = [
       <AppStatusMessage v-if="props.selectedFileName">
         Loaded file: <strong>{{ props.selectedFileName }}</strong> ({{ props.parsedRowCount }} data rows)
       </AppStatusMessage>
-    </section>
+    </AppWorkspaceSection>
 
-    <section
+    <AppWorkspaceSection
       v-if="props.selectedMode === 'daily-plan'"
-      class="grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50/60 p-4"
+      title="Daily Planner Inputs"
+      description="Set shift structure and tell the planner whether to read service assumptions from the file or use one shared override set."
     >
-      <AppSectionHeader
-        title="Daily Planner Inputs"
-        description="Set shift structure and tell the planner whether to read service assumptions from the file or use one shared override set."
-      />
-
       <div class="grid gap-4 md:grid-cols-2">
         <AppFieldGroup label="Interval Length (minutes)" input-id="intervalDurationMinutes">
           <AppNumberField
@@ -276,17 +269,13 @@ const assumptionSourceOptions = [
           />
         </AppFieldGroup>
       </div>
-    </section>
+    </AppWorkspaceSection>
 
-    <section
+    <AppWorkspaceSection
       v-if="props.selectedMode === 'weekly-plan'"
-      class="grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50/60 p-4"
+      title="Weekly Planner Inputs"
+      description="Set the daily staffing assumptions used to convert interval demand into a weekly staffing view."
     >
-      <AppSectionHeader
-        title="Weekly Planner Inputs"
-        description="Set the daily staffing assumptions used to convert interval demand into a weekly staffing view."
-      />
-
       <div class="grid gap-4 md:grid-cols-2">
         <AppFieldGroup label="Shift Length (hours)" input-id="weeklyShiftLength">
           <AppNumberField
@@ -314,14 +303,12 @@ const assumptionSourceOptions = [
       <p class="text-sm leading-6 text-slate-600">
         Weekly plans require at least two distinct service dates in the uploaded file.
       </p>
-    </section>
+    </AppWorkspaceSection>
 
-    <section class="grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50/60 p-4">
-      <AppSectionHeader
-        title="Run Workflow"
-        description="Process the uploaded CSV and generate the output workspace for the selected mode."
-      />
-
+    <AppWorkspaceSection
+      title="Run Workflow"
+      description="Process the uploaded CSV and generate the output workspace for the selected mode."
+    >
       <AppButton
         variant="primary"
         block
@@ -331,7 +318,7 @@ const assumptionSourceOptions = [
       >
         {{ props.isLoading ? 'Processing...' : props.currentWorkflow.runLabel }}
       </AppButton>
-    </section>
+    </AppWorkspaceSection>
 
     <AppStatusMessage v-if="props.parseError" tone="error">
       {{ props.parseError }}

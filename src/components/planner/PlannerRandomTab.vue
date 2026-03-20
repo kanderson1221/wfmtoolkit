@@ -110,15 +110,15 @@ const summaryItems = computed(() => [
 <template>
   <section class="results-panel monthly-tab-panel">
     <AppSectionHeader
-      title="Set occupancy and adherence assumptions"
-      description="Use one global assumption set for the year, and only turn on monthly overrides if a few months need different values."
+      title="Set the variability buffer"
+      description="Use occupancy and adherence assumptions to absorb real-world variability in scheduled time before turning workload into frontline requirement."
     />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-5" />
 
     <AppWorkspaceSection
       class="random-global-panel"
-      title="Random Assumptions"
+      title="Variability Assumptions"
       description="These assumptions create adherence and occupancy losses against scheduled percentage and flow into the final design factor."
     >
       <div class="monthly-global-grid random-global-grid">
@@ -183,19 +183,20 @@ const summaryItems = computed(() => [
 
     <AppWorkspaceSection
       class="random-overrides-panel"
-      title="Monthly Random Overrides"
-      description="Adjust only the months that need different occupancy or adherence assumptions. Losses are calculated from scheduled percentage from Step 1."
+      title="Monthly Variability Overrides"
+      description="Adjust only the months that need different occupancy or adherence assumptions. Losses are calculated from scheduled percentage from Agent Availability."
     >
-      <PlannerCopyMenu
-        v-if="useMonthlyRandomOverrides"
-        input-id="random-copy-action"
-        :label="selectedMonth.label"
-        @select="handleCopyAction"
-      />
+      <template v-if="useMonthlyRandomOverrides" #actions>
+        <PlannerCopyMenu
+          input-id="random-copy-action"
+          :label="selectedMonth.label"
+          @select="handleCopyAction"
+        />
+      </template>
 
       <div v-if="!useMonthlyRandomOverrides" class="answer-card random-global-note">
         <h4>Global mode is on</h4>
-        <p>These occupancy and adherence assumptions apply to every month in the plan. Adherence and occupancy losses are calculated from each month’s scheduled % from Step 1.</p>
+        <p>These occupancy and adherence assumptions apply to every month in the plan. Adherence and occupancy losses are calculated from each month’s scheduled % from Agent Availability.</p>
       </div>
 
       <div v-else class="assumption-table-shell">
@@ -259,8 +260,8 @@ const summaryItems = computed(() => [
     </AppWorkspaceSection>
 
     <div class="monthly-tab-actions">
-      <AppButton variant="secondary" @click="emit('previous')">Back to Presence / Utilization</AppButton>
-      <AppButton variant="primary" @click="emit('continue')">Continue to Headcount Requirement</AppButton>
+      <AppButton variant="secondary" @click="emit('previous')">Back to Agent Availability</AppButton>
+      <AppButton variant="primary" @click="emit('continue')">Continue to Required Headcount</AppButton>
     </div>
   </section>
 </template>

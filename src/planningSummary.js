@@ -1,4 +1,5 @@
-export const getCenterPlans = (center) => (Array.isArray(center?.plans) ? center.plans : [])
+export const getCenterGroups = (center) => (Array.isArray(center?.groups) ? center.groups : [])
+export const getGroupPlans = (group) => (Array.isArray(group?.plans) ? group.plans : [])
 
 export const getAnnualContacts = (plan) => {
   const summary = plan.summary || {}
@@ -91,15 +92,32 @@ export const summarizePlanList = (plans) => {
   }
 }
 
-export const summarizeCenter = (center) => {
-  const plans = getCenterPlans(center)
+export const summarizeGroup = (group) => {
+  const plans = getGroupPlans(group)
+
   return {
     ...summarizePlanList(plans),
+    name: group?.name || 'Staffing Group'
+  }
+}
+
+export const summarizeCenter = (center) => {
+  const groups = getCenterGroups(center)
+  const groupSummaries = groups.map((group) => summarizeGroup(group))
+  const flattenedPlans = groups.flatMap((group) => getGroupPlans(group))
+  const planSummary = summarizePlanList(flattenedPlans)
+
+  return {
+    ...planSummary,
+    groupCount: groups.length,
+    totalPlanCount: flattenedPlans.length,
+    planCount: groups.length,
     name: center?.name || 'Call Center',
     timezone: center?.timezone || '',
     defaultPaidHoursPerDay: center?.defaultPaidHoursPerDay || 0,
     defaultOccupancyPercent: center?.defaultOccupancyPercent || 0,
-    defaultAdherencePercent: center?.defaultAdherencePercent || 0
+    defaultAdherencePercent: center?.defaultAdherencePercent || 0,
+    largestGroupPlanCount: groupSummaries.reduce((max, summary) => Math.max(max, summary.planCount), 0)
   }
 }
 
@@ -107,6 +125,7 @@ export const summarizeCenterPortfolio = (centers) => {
   if (!centers.length) {
     return {
       callCenterCount: 0,
+      totalGroupCount: 0,
       totalPlanCount: 0,
       annualContacts: 0,
       averageAhtSeconds: 0,
@@ -123,7 +142,8 @@ export const summarizeCenterPortfolio = (centers) => {
 
   return {
     callCenterCount: centers.length,
-    totalPlanCount: centerSummaries.reduce((sum, summary) => sum + summary.planCount, 0),
+    totalGroupCount: centerSummaries.reduce((sum, summary) => sum + summary.groupCount, 0),
+    totalPlanCount: centerSummaries.reduce((sum, summary) => sum + summary.totalPlanCount, 0),
     annualContacts,
     averageAhtSeconds: annualContacts > 0 ? (annualWorkloadHours * 3600) / annualContacts : 0,
     annualWorkloadHours,

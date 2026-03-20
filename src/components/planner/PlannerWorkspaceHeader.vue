@@ -1,25 +1,9 @@
 <script setup>
 import { computed } from 'vue'
-
 import AppButton from '../ui/AppButton.vue'
-import AppPageHeader from '../ui/AppPageHeader.vue'
-import AppPanel from '../ui/AppPanel.vue'
-import AppStatStrip from '../ui/AppStatStrip.vue'
-import AppStatusMessage from '../ui/AppStatusMessage.vue'
+import AppSelect from '../ui/AppSelect.vue'
 
 const props = defineProps({
-  title: {
-    type: String,
-    required: true
-  },
-  planningYear: {
-    type: Number,
-    required: true
-  },
-  operatingWeekdayLabel: {
-    type: String,
-    required: true
-  },
   autosaveStatusMessage: {
     type: String,
     default: ''
@@ -28,26 +12,29 @@ const props = defineProps({
     type: String,
     default: 'idle'
   },
-  warningCount: {
+  yearOptions: {
+    type: Array,
+    default: () => []
+  },
+  selectedPlanningYear: {
     type: Number,
-    default: 0
+    required: true
+  },
+  yearActionHref: {
+    type: String,
+    default: ''
+  },
+  yearActionLabel: {
+    type: String,
+    default: ''
+  },
+  yearActionVariant: {
+    type: String,
+    default: 'secondary'
   }
 })
 
-const emit = defineEmits(['open-settings', 'save', 'back'])
-
-const statItems = computed(() => [
-  {
-    label: 'Year',
-    value: String(props.planningYear),
-    meta: 'Planning horizon'
-  },
-  {
-    label: 'Operating Days',
-    value: props.operatingWeekdayLabel,
-    meta: 'Weekly operating pattern'
-  }
-])
+const emit = defineEmits(['update:selectedPlanningYear'])
 
 const autosaveStatusClass = computed(() => {
   if (props.autosaveState === 'saving') {
@@ -60,38 +47,35 @@ const autosaveStatusClass = computed(() => {
 
   return 'text-slate-500'
 })
-
-const description = computed(
-  () => `${props.planningYear} staffing group using ${props.operatingWeekdayLabel} as the operating day pattern.`
-)
 </script>
 
 <template>
-  <AppPanel :padded="false">
-    <div class="grid gap-4 p-5">
-      <AppPageHeader
-        kicker="Staffing Group Settings"
-        :title="props.title"
-        :description="description"
-      >
-        <template #actions>
-          <AppButton variant="secondary" @click="emit('open-settings')">Edit Settings</AppButton>
-          <AppButton variant="primary" @click="emit('save')">Save Staffing Group</AppButton>
-          <AppButton variant="secondary" @click="emit('back')">Back to Staffing Groups</AppButton>
-        </template>
-      </AppPageHeader>
-
-      <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-        <AppStatStrip :items="statItems" columns="sm:grid-cols-2" />
-        <p class="text-sm font-medium xl:justify-self-end" :class="autosaveStatusClass">
-          {{ props.autosaveStatusMessage }}
-        </p>
+  <div class="grid gap-2.5 px-1">
+    <div class="flex flex-col gap-2 border-b border-slate-200/90 pb-3 lg:flex-row lg:items-center lg:justify-between">
+      <div class="grid gap-1">
+        <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Planning Year</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <AppSelect
+            :model-value="props.selectedPlanningYear"
+            :options="props.yearOptions"
+            class="min-w-[132px] text-sm"
+            aria-label="Planning year"
+            @update:model-value="emit('update:selectedPlanningYear', $event)"
+          />
+          <AppButton
+            v-if="props.yearActionHref && props.yearActionLabel"
+            size="sm"
+            :href="props.yearActionHref"
+            :variant="props.yearActionVariant"
+          >
+            {{ props.yearActionLabel }}
+          </AppButton>
+        </div>
       </div>
 
-      <AppStatusMessage v-if="props.warningCount" tone="error">
-        {{ props.warningCount }} monthly warning{{ props.warningCount === 1 ? '' : 's' }} detected.
-        Review the demand model for missing or invalid monthly inputs before finalizing headcount.
-      </AppStatusMessage>
+      <p v-if="props.autosaveStatusMessage" class="text-sm font-medium" :class="autosaveStatusClass">
+        {{ props.autosaveStatusMessage }}
+      </p>
     </div>
-  </AppPanel>
+  </div>
 </template>

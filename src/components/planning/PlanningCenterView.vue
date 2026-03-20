@@ -1,29 +1,44 @@
 <script setup>
 import { computed, ref } from 'vue'
+import {
+  mdiFolderOutline,
+  mdiDotsVertical,
+  mdiPlus
+} from '@mdi/js'
 
 import CallCenterSettingsModal from './CallCenterSettingsModal.vue'
-import { createPlanningCenterDraft } from '../../planningStorage'
+import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
+import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
+import { createPlanningCenterDraft, createPlanningGroupDraft } from '../../planningStorage'
 import {
+  getCenterGroups,
+  getGroupPlans,
   getAnnualContacts,
   getAnnualRequiredStaffHours,
-  getAnnualWorkloadHours,
-  getAverageAhtSeconds,
   getAverageRequiredHeadcount,
-  getMinRequiredHeadcount,
   getPeakRequiredHeadcount,
-  summarizeCenter
+  summarizeGroup
 } from '../../planningSummary'
+import { currentYear, yearOptions } from '../../composables/monthlyPlanBuilder/shared'
+import { computeMonthlyRecords } from '../../planner/demandModel'
 import AppButton from '../ui/AppButton.vue'
-import AppPageHeader from '../ui/AppPageHeader.vue'
-import AppSectionHeader from '../ui/AppSectionHeader.vue'
-import AppStatStrip from '../ui/AppStatStrip.vue'
-import AppTableShell from '../ui/AppTableShell.vue'
-import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
+import AppEmptyState from '../ui/AppEmptyState.vue'
+import AppIcon from '../ui/AppIcon.vue'
+import AppMenu from '../ui/AppMenu.vue'
+import AppPanel from '../ui/AppPanel.vue'
 
 const props = defineProps({
   center: {
     type: Object,
     required: true
+  },
+  selectedGroupId: {
+    type: String,
+    default: ''
+  },
+  selectedYear: {
+    type: Number,
+    default: null
   },
   weekdayOptions: {
     type: Array,
@@ -31,10 +46,14 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['save-center', 'delete-plan'])
+const emit = defineEmits(['save-center', 'save-group', 'delete-group', 'delete-plan'])
 
 const centerSettingsOpen = ref(false)
+const groupSettingsOpen = ref(false)
+const planSettingsOpen = ref(false)
 const centerDraft = ref(createPlanningCenterDraft(props.center))
+const groupDraft = ref(createPlanningGroupDraft())
+const newPlanYear = ref(currentYear)
 
 const formatWhole = (value) =>
   new Intl.NumberFormat('en-US', {
@@ -47,49 +66,206 @@ const formatNumber = (value, digits = 1) =>
     maximumFractionDigits: digits
   }).format(value || 0)
 
-const centerSummary = computed(() => summarizeCenter(props.center))
-const operatingDayLabel = computed(() =>
-  props.center.operatingWeekdays
-    .map((value) => props.weekdayOptions.find((option) => option.value === value)?.label)
-    .filter(Boolean)
-    .join(', ')
+const formatPercent = (value, digits = 1) => `${formatNumber(value, digits)}%`
+
+const planComparisonGridClass =
+  'grid min-w-0 grid-cols-[minmax(6.5rem,0.95fr)_repeat(6,minmax(5.75rem,0.72fr))] items-center'
+
+const planListRowGridClass = 'grid grid-cols-[auto_minmax(0,1fr)_8.25rem] items-center gap-2'
+
+const buildGroupHref = (group, planningYear = null) => {
+  const resolvedYear = Number(planningYear) || Number(group?.latestPlanYear) || currentYear
+  return `#planning/center/${props.center.id}/group/${group.id}/year/${resolvedYear}`
+}
+
+const sortedPlansForGroup = (group) =>
+  [...getGroupPlans(group)].sort((left, right) => Number(right.planningYear || 0) - Number(left.planningYear || 0))
+
+const groupRows = computed(() =>
+  getCenterGroups(props.center).map((group) => {
+    const summary = summarizeGroup(group)
+    const plans = sortedPlansForGroup(group)
+    const latestPlan = plans[0] || null
+    const latestPlanYear = latestPlan?.planningYear || null
+
+    return {
+      ...group,
+      summary,
+      plans,
+      latestPlanYear,
+      selectionHref: buildGroupHref(
+        { ...group, latestPlanYear },
+        props.selectedGroupId === group.id ? props.selectedYear : latestPlanYear
+      )
+    }
+  })
 )
 
-const portfolioItems = computed(() => [
-  {
-    label: 'Staffing Groups',
-    value: formatWhole(centerSummary.value.planCount),
-    meta: 'Saved groups inside this operation'
-  },
-  {
-    label: 'Annual Contacts',
-    value: formatWhole(centerSummary.value.annualContacts),
-    meta: 'Combined annual demand'
-  },
-  {
-    label: 'Needed Staff Hours',
-    value: formatWhole(centerSummary.value.totalNeededStaffHours),
-    meta: 'Combined required staffing hours'
-  },
-  {
-    label: 'Total Required Headcount',
-    value: formatNumber(centerSummary.value.totalAvgRequiredHeadcount, 1),
-    meta: 'Combined modeled headcount'
-  },
-  {
-    label: 'Peak Required Headcount',
-    value: formatNumber(centerSummary.value.totalPeakHeadcount, 1),
-    meta: 'Combined peak monthly requirement'
+const selectedGroup = computed(() => {
+  if (!groupRows.value.length) {
+    return null
   }
-])
 
-const defaultItems = computed(() => [
-  { label: 'Time Zone', value: props.center.timezone },
-  { label: 'Operating Days', value: operatingDayLabel.value },
-  { label: 'Default Paid Hours', value: formatNumber(props.center.defaultPaidHoursPerDay, 1) },
-  { label: 'Default Occupancy', value: `${formatNumber(props.center.defaultOccupancyPercent, 1)}%` },
-  { label: 'Default Adherence', value: `${formatNumber(props.center.defaultAdherencePercent, 1)}%` }
-])
+  return groupRows.value.find((group) => group.id === props.selectedGroupId) || groupRows.value[0]
+})
+
+const resolveNextPlanYear = (group = selectedGroup.value) => {
+  const usedYears = new Set((group?.plans || []).map((plan) => Number(plan.planningYear)))
+  let candidateYear = currentYear
+
+  while (usedYears.has(candidateYear)) {
+    candidateYear += 1
+  }
+
+  return candidateYear
+}
+
+const availableYearOptions = computed(() => {
+  const yearSet = new Set(yearOptions)
+
+  selectedGroup.value?.plans.forEach((plan) => {
+    if (plan?.planningYear) {
+      yearSet.add(Number(plan.planningYear))
+    }
+  })
+
+  if (props.selectedYear) {
+    yearSet.add(Number(props.selectedYear))
+  }
+
+  if (newPlanYear.value) {
+    yearSet.add(Number(newPlanYear.value))
+  }
+
+  return [...yearSet]
+    .sort((left, right) => right - left)
+    .map((year) => ({
+      label: String(year),
+      value: year
+    }))
+})
+
+const selectedYearModel = computed({
+  get: () => {
+    if (!selectedGroup.value) {
+      return currentYear
+    }
+
+    const routeYear = Number(props.selectedYear)
+    if (selectedGroup.value.id === props.selectedGroupId && Number.isFinite(routeYear) && routeYear > 0) {
+      return routeYear
+    }
+
+    return Number(selectedGroup.value.latestPlanYear) || currentYear
+  },
+  set: (value) => {
+    if (!selectedGroup.value) {
+      return
+    }
+
+    window.location.hash = buildGroupHref(selectedGroup.value, Number(value) || currentYear)
+  }
+})
+
+const summarizeAvailability = (plan) => {
+  const summary = plan?.summary || {}
+
+  if (
+    typeof summary.averagePresencePercent === 'number' &&
+    typeof summary.averageUtilizationPercent === 'number'
+  ) {
+    return {
+      averagePresencePercent: summary.averagePresencePercent,
+      averageUtilizationPercent: summary.averageUtilizationPercent
+    }
+  }
+
+  const monthlyRecords = computeMonthlyRecords({
+    planningYear: Number(plan?.planningYear) || currentYear,
+    operatingWeekdays: Array.isArray(plan?.operatingWeekdays) ? plan.operatingWeekdays : [1, 2, 3, 4, 5],
+    presenceMonths: Array.isArray(plan?.presenceMonths) ? plan.presenceMonths : [],
+    randomDefaults: plan?.randomDefaults || {},
+    useMonthlyRandomOverrides: Boolean(plan?.useMonthlyRandomOverrides),
+    randomMonths: Array.isArray(plan?.randomMonths) ? plan.randomMonths : [],
+    planMonths: Array.isArray(plan?.planMonths) ? plan.planMonths : []
+  })
+
+  if (!monthlyRecords.length) {
+    return {
+      averagePresencePercent: 0,
+      averageUtilizationPercent: 0
+    }
+  }
+
+  return {
+    averagePresencePercent:
+      monthlyRecords.reduce((sum, record) => sum + (Number(record.presencePercent) || 0), 0) / monthlyRecords.length,
+    averageUtilizationPercent:
+      monthlyRecords.reduce((sum, record) => sum + (Number(record.utilizationPercent) || 0), 0) / monthlyRecords.length
+  }
+}
+
+const planRows = computed(() =>
+  (selectedGroup.value?.plans || []).map((plan) => {
+    const availability = summarizeAvailability(plan)
+
+    return {
+      ...plan,
+      annualContacts: getAnnualContacts(plan),
+      neededStaffHours: getAnnualRequiredStaffHours(plan),
+      averageRequiredHeadcount: getAverageRequiredHeadcount(plan),
+      averagePresencePercent: availability.averagePresencePercent,
+      averageUtilizationPercent: availability.averageUtilizationPercent,
+      peakRequiredHeadcount: getPeakRequiredHeadcount(plan),
+      openHref: `#planning/center/${props.center.id}/group/${selectedGroup.value.id}/plan/${plan.id}`,
+      isSelectedYear: Number(plan.planningYear) === Number(selectedYearModel.value)
+    }
+  })
+)
+
+const operatingDayLabel = computed(() =>
+  props.weekdayOptions
+    .filter((weekday) => selectedGroup.value?.operatingWeekdays?.includes(weekday.value))
+    .map((weekday) => weekday.label)
+    .join(', ') || 'No operating days selected'
+)
+
+const selectedGroupDefaults = computed(() => {
+  if (!selectedGroup.value) {
+    return []
+  }
+
+  return [
+    { label: 'Operating Days', value: operatingDayLabel.value },
+    { label: 'Paid Hours / Day', value: formatNumber(selectedGroup.value.defaultPaidHoursPerDay, 1) },
+    { label: 'Default Occupancy', value: `${formatNumber(selectedGroup.value.defaultOccupancyPercent, 1)}%` },
+    { label: 'Default Adherence', value: `${formatNumber(selectedGroup.value.defaultAdherencePercent, 1)}%` }
+  ]
+})
+
+const createPlanHref = computed(() => {
+  if (!selectedGroup.value) {
+    return ''
+  }
+
+  return `#planning/center/${props.center.id}/group/${selectedGroup.value.id}/plan/new/year/${newPlanYear.value}`
+})
+
+const existingPlanForDraftYear = computed(() => {
+  if (!selectedGroup.value) {
+    return null
+  }
+
+  return selectedGroup.value.plans.find((plan) => Number(plan.planningYear) === Number(newPlanYear.value)) || null
+})
+
+const existingPlanHref = computed(() => {
+  if (!selectedGroup.value || !existingPlanForDraftYear.value) {
+    return ''
+  }
+
+  return `#planning/center/${props.center.id}/group/${selectedGroup.value.id}/plan/${existingPlanForDraftYear.value.id}`
+})
 
 const openCenterSettings = () => {
   centerDraft.value = createPlanningCenterDraft(props.center)
@@ -108,148 +284,414 @@ const saveCenter = () => {
   centerSettingsOpen.value = false
 }
 
-const confirmDeletePlan = (plan) => {
+const openCreateGroup = () => {
+  groupDraft.value = createPlanningGroupDraft()
+  groupSettingsOpen.value = true
+}
+
+const openPlanSettings = () => {
+  if (!selectedGroup.value) {
+    return
+  }
+
+  newPlanYear.value = resolveNextPlanYear(selectedGroup.value)
+  planSettingsOpen.value = true
+}
+
+const closePlanSettings = () => {
+  planSettingsOpen.value = false
+}
+
+const createPlan = () => {
+  if (!selectedGroup.value || existingPlanForDraftYear.value) {
+    return
+  }
+
+  planSettingsOpen.value = false
+  window.location.hash = createPlanHref.value
+}
+
+const navigateToHash = (href) => {
+  if (!href) {
+    return
+  }
+
+  window.location.hash = href
+}
+
+const selectPlanYear = (planningYear) => {
+  selectedYearModel.value = Number(planningYear) || currentYear
+}
+
+const openEditGroup = (group = selectedGroup.value) => {
+  if (!group) {
+    return
+  }
+
+  groupDraft.value = createPlanningGroupDraft(group)
+  groupSettingsOpen.value = true
+}
+
+const closeGroupSettings = () => {
+  groupSettingsOpen.value = false
+}
+
+const saveGroup = () => {
+  emit('save-group', {
+    ...groupDraft.value
+  })
+  groupSettingsOpen.value = false
+}
+
+const confirmDeleteGroup = (group) => {
   const confirmed = window.confirm(
-    `Delete staffing group "${plan.name}"? This removes its demand model and staffing plan from this call center.`
+    `Delete staffing group "${group.name}"? This removes the group and all ${group.summary.planCount} plan${group.summary.planCount === 1 ? '' : 's'} inside it.`
   )
 
   if (!confirmed) {
     return
   }
 
-  emit('delete-plan', {
+  emit('delete-group', {
     centerId: props.center.id,
-    planId: plan.id
+    groupId: group.id
   })
 }
 
+const confirmDeletePlan = (plan) => {
+  const confirmed = window.confirm(
+    `Delete the ${plan.planningYear} plan from staffing group "${selectedGroup.value?.name}"?`
+  )
+
+  if (!confirmed || !selectedGroup.value) {
+    return
+  }
+
+  emit('delete-plan', {
+    centerId: props.center.id,
+    groupId: selectedGroup.value.id,
+    planId: plan.id,
+    planningYear: Number(plan.planningYear)
+  })
+}
+
+const groupMenuItems = [
+  {
+    id: 'edit-group',
+    label: 'Edit'
+  },
+  {
+    id: 'delete-group',
+    label: 'Delete'
+  }
+]
+
+const planMenuItems = [
+  {
+    id: 'delete-plan',
+    label: 'Delete'
+  }
+]
+
+const handleGroupMenuSelect = (group, item) => {
+  if (item.id === 'edit-group') {
+    openEditGroup(group)
+    return
+  }
+
+  if (item.id === 'delete-group') {
+    confirmDeleteGroup(group)
+  }
+}
+
+const handlePlanMenuSelect = (plan, item) => {
+  if (item.id === 'delete-plan') {
+    confirmDeletePlan(plan)
+  }
+}
 </script>
 
 <template>
-  <section class="bg-slate-50/80 py-3">
+  <section class="bg-slate-50/80 py-3 md:py-4">
     <div class="app-frame grid gap-3">
-      <a href="#planning" class="planning-breadcrumb-link">Call Centers</a>
+      <div class="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+        <div class="grid gap-0.5">
+          <a href="#planning" class="planning-breadcrumb-link">
+            Call Centers
+          </a>
+          <h1 class="text-[clamp(1.35rem,1.8vw,1.75rem)] font-semibold tracking-[-0.04em] text-slate-950">
+            {{ props.center.name }}
+          </h1>
+        </div>
 
-      <AppPageHeader
-        kicker="Call Center"
-        :title="props.center.name"
-        description="Review the staffing portfolio for this operation, then open individual staffing groups to manage demand models and staffing plans."
-      >
-        <template #actions>
-          <AppButton variant="secondary" @click="openCenterSettings">Edit Center</AppButton>
-        </template>
-      </AppPageHeader>
-
-      <div class="grid gap-3 xl:grid-cols-[1.1fr_0.95fr]">
-        <AppWorkspaceSection
-          kicker="Center Portfolio"
-          title="Combined demand and headcount requirement"
-          description="Understand the combined demand and staffing requirement across every staffing group in this call center."
-        >
-          <AppStatStrip :items="portfolioItems" columns="sm:grid-cols-2 xl:grid-cols-3" />
-        </AppWorkspaceSection>
-
-        <AppWorkspaceSection
-          kicker="Center Defaults"
-          title="Inherited operating defaults"
-          description="New staffing groups inherit these defaults unless planners adjust the inputs later."
-        >
-          <div class="grid divide-y divide-slate-200 rounded-[20px] border border-slate-200 bg-white">
-            <div
-              v-for="item in defaultItems"
-              :key="item.label"
-              class="flex items-center justify-between gap-4 px-4 py-3.5 text-sm"
-            >
-              <strong class="font-semibold text-slate-800">{{ item.label }}</strong>
-              <span class="text-right text-slate-600">{{ item.value }}</span>
-            </div>
-          </div>
-        </AppWorkspaceSection>
+        <AppButton size="sm" variant="secondary" @click="openCenterSettings">Edit Center</AppButton>
       </div>
 
-      <AppTableShell>
-        <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-3.5 lg:flex-row lg:items-end lg:justify-between">
-          <AppSectionHeader
-            kicker="Staffing Groups"
-            title="Staffing Groups In This Call Center"
-            description="Each staffing group models one team or queue separately, such as voice, chat, back office, or vendor support."
-          />
+      <AppPanel :padded="false">
+        <div class="grid h-[calc(100vh-11rem)] min-h-[38rem] xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
+          <div class="flex min-h-0 flex-col border-b border-slate-200 xl:border-b-0 xl:border-r">
+            <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-5 py-3.5 xl:h-[8.75rem]">
+              <div class="flex h-full flex-col justify-between gap-2.5">
+                <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">
+                  Staffing Groups
+                </h2>
 
-          <AppButton :href="`#planning/center/${props.center.id}/new`" variant="primary">+ New Group</AppButton>
-        </div>
+                <AppButton
+                  size="sm"
+                  :icon="mdiPlus"
+                  variant="primary"
+                  @click="openCreateGroup"
+                >
+                  New Group
+                </AppButton>
+              </div>
+            </div>
 
-        <div v-if="!props.center.plans.length" class="grid justify-items-start gap-3 px-5 py-7">
-          <div class="grid gap-2">
-            <h3 class="text-xl font-semibold text-slate-950">Create the first staffing group</h3>
-            <p class="max-w-2xl text-sm leading-6 text-slate-600">
-              Start a staffing group for each team you plan separately, then build the demand model and staffing plan for that group.
-            </p>
+            <div v-if="!groupRows.length" class="min-h-0 overflow-y-auto p-5">
+              <AppEmptyState
+                title="Create the first staffing group"
+                description="Start a staffing group for each team or queue you plan separately inside this call center."
+              />
+            </div>
+
+            <div v-else class="min-h-0 overflow-y-auto">
+              <div class="divide-y divide-slate-200">
+                <div
+                  v-for="group in groupRows"
+                  :key="group.id"
+                  class="grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-2 px-3 py-2.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+                  :class="selectedGroup?.id === group.id ? 'bg-sky-50/70' : 'bg-white hover:bg-slate-50/70'"
+                  tabindex="0"
+                  role="link"
+                  @click="navigateToHash(group.selectionHref)"
+                  @keydown.enter.prevent="navigateToHash(group.selectionHref)"
+                  @keydown.space.prevent="navigateToHash(group.selectionHref)"
+                >
+                  <span
+                    class="h-9 w-1 rounded-full transition"
+                    :class="selectedGroup?.id === group.id ? 'bg-sky-600' : 'bg-transparent'"
+                    aria-hidden="true"
+                  />
+
+                  <div
+                    class="flex min-w-0 items-center gap-3 rounded-[16px] px-2 py-1.5"
+                    :aria-label="`Select staffing group ${group.name}`"
+                  >
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-slate-100 text-slate-600">
+                      <AppIcon :path="mdiFolderOutline" class="h-4 w-4" />
+                    </span>
+
+                    <span class="grid min-w-0">
+                      <strong class="truncate text-sm font-semibold text-slate-950">{{ group.name }}</strong>
+                    </span>
+                  </div>
+
+                  <div @click.stop @keydown.stop>
+                    <AppMenu
+                      :items="groupMenuItems"
+                      :trigger-icon="mdiDotsVertical"
+                      :trigger-label="`Open actions for staffing group ${group.name}`"
+                      compact
+                      trigger-variant="icon-quiet"
+                      @select="handleGroupMenuSelect(group, $event)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <AppButton :href="`#planning/center/${props.center.id}/new`" variant="primary">+ New Group</AppButton>
-        </div>
 
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-[1260px] w-full border-collapse text-sm text-slate-700">
-            <thead class="border-b border-slate-200 bg-slate-50/90">
-              <tr>
-                <th class="px-5 py-3 text-left text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Staffing Group</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Year</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Annual Contacts</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">AHT</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Annual Workload</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Needed Staff Hours</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Min Required Headcount</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Avg Required Headcount</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Peak Required Headcount</th>
-                <th class="px-5 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="plan in props.center.plans"
-                :key="plan.id"
-                class="border-b border-slate-200 last:border-b-0 odd:bg-white even:bg-slate-50/40"
-              >
-                <td class="px-5 py-3.5">
-                  <div class="grid gap-1">
-                    <strong class="text-sm font-semibold text-slate-950">{{ plan.name }}</strong>
-                    <span class="text-xs text-slate-500">Demand model and staffing plan</span>
+          <div class="flex min-h-0 flex-col bg-slate-50/30">
+            <div v-if="selectedGroup" class="flex min-h-0 flex-col">
+              <div class="border-b border-slate-200 px-5 py-3.5 xl:h-[8.75rem]">
+                <div class="flex h-full flex-col justify-between gap-2">
+                  <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                    <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">
+                      Annual Plans
+                    </h2>
+
+                    <AppButton
+                      size="sm"
+                      variant="primary"
+                      :icon="mdiPlus"
+                      :aria-label="`Create a new plan for ${selectedGroup.name}`"
+                      @click="openPlanSettings"
+                    >
+                      New Plan
+                    </AppButton>
                   </div>
-                </td>
-                <td class="px-4 py-3.5 text-right">{{ plan.planningYear }}</td>
-                <td class="px-4 py-3.5 text-right">{{ formatWhole(getAnnualContacts(plan)) }}</td>
-                <td class="px-4 py-3.5 text-right">{{ formatWhole(getAverageAhtSeconds(plan)) }}</td>
-                <td class="px-4 py-3.5 text-right">{{ formatWhole(getAnnualWorkloadHours(plan)) }}</td>
-                <td class="px-4 py-3.5 text-right">{{ formatWhole(getAnnualRequiredStaffHours(plan)) }}</td>
-                <td class="px-4 py-3.5 text-right">{{ formatNumber(getMinRequiredHeadcount(plan), 1) }}</td>
-                <td class="px-4 py-3.5 text-right">{{ formatNumber(getAverageRequiredHeadcount(plan), 1) }}</td>
-                <td class="px-4 py-3.5 text-right">{{ formatNumber(getPeakRequiredHeadcount(plan), 1) }}</td>
-                <td class="px-5 py-3.5">
-                  <div class="flex justify-end gap-2">
-                    <AppButton :href="`#planning/center/${props.center.id}/plan/${plan.id}`" variant="secondary">Open Group</AppButton>
-                    <AppButton variant="danger" @click="confirmDeletePlan(plan)">Delete</AppButton>
+
+                  <div class="flex flex-wrap gap-2">
+                    <div
+                      v-for="item in selectedGroupDefaults"
+                      :key="item.label"
+                      class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
+                    >
+                      <span class="mr-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        {{ item.label }}
+                      </span>
+                      <strong class="font-semibold text-slate-950">{{ item.value }}</strong>
+                    </div>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+
+                  <div v-if="planRows.length" :class="[planListRowGridClass, 'pt-0.5']">
+                    <span class="h-9 w-1" aria-hidden="true" />
+
+                    <div :class="[planComparisonGridClass, 'px-2']">
+                      <span class="truncate px-3 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Plan Year
+                      </span>
+                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Contacts
+                      </span>
+                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Staff Hours
+                      </span>
+                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Presence %
+                      </span>
+                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Utilization %
+                      </span>
+                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Peak HC
+                      </span>
+                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Avg HC
+                      </span>
+                    </div>
+
+                    <div class="pr-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                      Actions
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="planRows.length" class="min-h-0 overflow-y-auto">
+                <div class="divide-y divide-slate-200">
+                  <div
+                    v-for="plan in planRows"
+                    :key="plan.id"
+                    :class="[planListRowGridClass, 'cursor-pointer px-3 py-2.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200', plan.isSelectedYear ? 'bg-sky-50/70' : 'bg-white hover:bg-slate-50/70']"
+                    tabindex="0"
+                    role="button"
+                    :aria-label="`Select ${plan.planningYear} plan for ${selectedGroup.name}`"
+                    @click="selectPlanYear(plan.planningYear)"
+                    @dblclick="navigateToHash(plan.openHref)"
+                    @keydown.enter.prevent="navigateToHash(plan.openHref)"
+                    @keydown.space.prevent="selectPlanYear(plan.planningYear)"
+                  >
+                    <span
+                      class="h-9 w-1 rounded-full transition"
+                      :class="plan.isSelectedYear ? 'bg-sky-600' : 'bg-transparent'"
+                      aria-hidden="true"
+                    />
+
+                    <div :class="[planComparisonGridClass, 'rounded-[16px] px-2 py-1.5 text-sm']">
+                      <span class="px-3">
+                        <span class="inline-flex min-w-[4.25rem] items-center justify-center rounded-[16px] bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
+                          {{ plan.planningYear }}
+                        </span>
+                      </span>
+                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                        {{ formatWhole(plan.annualContacts) }}
+                      </span>
+                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                        {{ formatWhole(plan.neededStaffHours) }}
+                      </span>
+                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                        {{ formatPercent(plan.averagePresencePercent, 1) }}
+                      </span>
+                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                        {{ formatPercent(plan.averageUtilizationPercent, 1) }}
+                      </span>
+                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                        {{ formatNumber(plan.peakRequiredHeadcount, 1) }}
+                      </span>
+                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                        {{ formatNumber(plan.averageRequiredHeadcount, 1) }}
+                      </span>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-1.5 whitespace-nowrap" @click.stop @keydown.stop>
+                      <AppButton
+                        size="sm"
+                        variant="quiet"
+                        :href="plan.openHref"
+                        :aria-label="`Open ${plan.planningYear} plan for ${selectedGroup.name}`"
+                      >
+                        Open
+                      </AppButton>
+                      <AppMenu
+                        :items="planMenuItems"
+                        :trigger-icon="mdiDotsVertical"
+                        :trigger-label="`Open actions for ${plan.planningYear} plan`"
+                        compact
+                        trigger-variant="icon-quiet"
+                        @select="handlePlanMenuSelect(plan, $event)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="min-h-0 overflow-y-auto p-5">
+                <AppEmptyState
+                  title="No plans yet"
+                  :description="`Use New Plan to create the first saved plan for ${selectedGroup.name}.`"
+                />
+              </div>
+            </div>
+
+            <div v-else class="min-h-0 overflow-y-auto p-5">
+              <AppEmptyState
+                title="Select a staffing group"
+                description="Choose a staffing group from the left to review its defaults and manage yearly plans."
+              />
+            </div>
+          </div>
         </div>
-      </AppTableShell>
+      </AppPanel>
     </div>
 
     <CallCenterSettingsModal
       v-if="centerSettingsOpen"
       v-model:center-name="centerDraft.name"
       v-model:timezone="centerDraft.timezone"
-      v-model:operating-weekdays="centerDraft.operatingWeekdays"
-      v-model:default-paid-hours-per-day="centerDraft.defaultPaidHoursPerDay"
-      v-model:default-occupancy-percent="centerDraft.defaultOccupancyPercent"
-      v-model:default-adherence-percent="centerDraft.defaultAdherencePercent"
-      :weekday-options="props.weekdayOptions"
       title="Edit Call Center"
       submit-label="Save Call Center"
       @close="closeCenterSettings"
       @save="saveCenter"
+    />
+
+    <PlanningGroupSettingsModal
+      v-if="groupSettingsOpen"
+      v-model:group-name="groupDraft.name"
+      v-model:operating-weekdays="groupDraft.operatingWeekdays"
+      v-model:default-paid-hours-per-day="groupDraft.defaultPaidHoursPerDay"
+      v-model:default-occupancy-percent="groupDraft.defaultOccupancyPercent"
+      v-model:default-adherence-percent="groupDraft.defaultAdherencePercent"
+      :weekday-options="props.weekdayOptions"
+      :title="groupDraft.id ? 'Edit Staffing Group' : 'Create Staffing Group'"
+      :submit-label="groupDraft.id ? 'Save Staffing Group' : 'Create Staffing Group'"
+      @close="closeGroupSettings"
+      @save="saveGroup"
+    />
+
+    <PlannerSettingsModal
+      v-if="planSettingsOpen && selectedGroup"
+      v-model:planning-year="newPlanYear"
+      :year-options="availableYearOptions"
+      :can-close="!existingPlanForDraftYear"
+      :existing-plan-href="existingPlanHref"
+      :status-message="existingPlanForDraftYear ? `This staffing group already has a saved plan for ${newPlanYear}.` : ''"
+      status-tone="warning"
+      title="New Plan"
+      description="Choose the planning year for the new plan. Each staffing group can have only one saved plan per year."
+      submit-label="Create Plan"
+      @cancel="closePlanSettings"
+      @close="createPlan"
     />
   </section>
 </template>

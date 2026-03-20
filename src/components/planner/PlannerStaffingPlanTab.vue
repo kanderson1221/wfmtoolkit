@@ -84,7 +84,7 @@ const trainingSettingsOpen = ref(false)
     />
 
     <div class="monthly-tab-actions">
-      <AppButton variant="primary" @click="emit('save')">Save Staffing Group</AppButton>
+      <AppButton variant="primary" @click="emit('save')">Save Plan</AppButton>
     </div>
 
     <PlannerTrainingSettingsModal

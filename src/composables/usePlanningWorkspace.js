@@ -1,14 +1,19 @@
 import { computed, ref, watch } from 'vue'
 
 import {
+  createPlanningGroupDraft,
   findPlanningCenter,
   findPlanningCenterByPlanId,
+  findPlanningGroup,
+  findPlanningGroupByPlanId,
   findPlanningPlan,
   loadPlanningCenters,
   persistPlanningCenters,
   removePlanningCenter,
+  removePlanningGroup,
   removePlanningPlan,
   upsertPlanningCenter,
+  upsertPlanningGroup,
   upsertPlanningPlan
 } from '../planningStorage'
 
@@ -39,8 +44,24 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       return findPlanningCenter(planningCenters.value, currentRoute.value.centerId)
     }
 
-    if (currentRoute.value.page === 'editor' && currentRoute.value.planId && currentRoute.value.planId !== 'new') {
+    if (currentRoute.value.planId && currentRoute.value.planId !== 'new') {
       return findPlanningCenterByPlanId(planningCenters.value, currentRoute.value.planId)
+    }
+
+    return null
+  })
+
+  const currentGroup = computed(() => {
+    if (currentRoute.value.app !== 'planning') {
+      return null
+    }
+
+    if (currentRoute.value.centerId && currentRoute.value.groupId) {
+      return findPlanningGroup(planningCenters.value, currentRoute.value.centerId, currentRoute.value.groupId)
+    }
+
+    if (currentRoute.value.page === 'editor' && currentRoute.value.planId && currentRoute.value.planId !== 'new') {
+      return findPlanningGroupByPlanId(planningCenters.value, currentRoute.value.planId)
     }
 
     return null
@@ -55,44 +76,71 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       return null
     }
 
-    if (!currentCenter.value || !currentRoute.value.planId) {
+    if (!currentCenter.value || !currentGroup.value || !currentRoute.value.planId) {
       return null
     }
 
-    return findPlanningPlan(planningCenters.value, currentCenter.value.id, currentRoute.value.planId)
+    return findPlanningPlan(
+      planningCenters.value,
+      currentCenter.value.id,
+      currentGroup.value.id,
+      currentRoute.value.planId
+    )
   })
 
   const plannerSeed = computed(() => {
-    if (!currentCenter.value) {
+    if (!currentCenter.value || !currentGroup.value) {
       return null
     }
 
+    const routePlanningYear = Number(currentRoute.value.year)
+    const resolvedPlanningYear = Number.isFinite(routePlanningYear)
+      ? routePlanningYear
+      : currentPlan.value?.planningYear || new Date().getFullYear()
+
     return {
       centerId: currentCenter.value.id,
-      planningYear: new Date().getFullYear(),
-      operatingWeekdays: [...currentCenter.value.operatingWeekdays],
+      centerName: currentCenter.value.name,
+      groupId: currentGroup.value.id,
+      groupName: currentGroup.value.name,
+      timezone: currentCenter.value.timezone,
+      planningYear: resolvedPlanningYear,
+      operatingWeekdays: [...(currentGroup.value.operatingWeekdays || currentCenter.value.operatingWeekdays)],
+      defaultPaidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay,
+      defaultOccupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
+      defaultAdherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent,
       presenceMonths: Array.from({ length: 12 }, () => ({
-        paidHoursPerDay: currentCenter.value.defaultPaidHoursPerDay
+        paidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay
       })),
       randomDefaults: {
-        occupancyPercent: currentCenter.value.defaultOccupancyPercent,
-        adherencePercent: currentCenter.value.defaultAdherencePercent
+        occupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
+        adherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent
       }
     }
+  })
+
+  const groupDraftKey = computed(() => {
+    const scopePrefix = currentUser.value?.id || 'anon'
+
+    if (currentGroup.value?.id) {
+      return `${scopePrefix}:group:${currentGroup.value.id}`
+    }
+
+    return `${scopePrefix}:group:new`
   })
 
   const plannerDraftKey = computed(() => {
     const scopePrefix = currentUser.value?.id || 'anon'
 
     if (currentPlan.value?.id) {
-      return `${scopePrefix}:${currentPlan.value.id}`
+      return `${scopePrefix}:plan:${currentPlan.value.id}`
     }
 
-    if (currentRoute.value.page === 'editor' && currentCenter.value?.id) {
-      return `${scopePrefix}:${currentCenter.value.id}-new`
+    if (currentRoute.value.page === 'editor' && currentGroup.value?.id) {
+      return `${scopePrefix}:${currentGroup.value.id}:plan:new:${currentRoute.value.year || 'default'}`
     }
 
-    return `${scopePrefix}:new`
+    return `${scopePrefix}:plan:new`
   })
 
   const monthlyPlannerKey = computed(() => {
@@ -104,7 +152,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       return `planner-${currentPlan.value.id}-${currentPlan.value.updatedAt || 'draft'}`
     }
 
-    return `planner-${currentCenter.value?.id || 'no-center'}-new`
+    return `planner-${currentGroup.value?.id || 'no-group'}-new-${currentRoute.value.year || 'default'}`
   })
 
   const handleSaveCenter = (centerDraft) => {
@@ -129,23 +177,71 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     window.location.hash = '#planning'
   }
 
-  const handleSavePlan = (planDraft) => {
-    const targetCenterId = currentCenter.value?.id
+  const handleSaveGroup = (groupDraft) => {
+    const targetCenterId = currentCenter.value?.id || currentRoute.value.centerId
     if (!targetCenterId) {
       window.location.hash = '#planning'
       return
     }
 
-    persistAndSetCenters(upsertPlanningPlan(planningCenters.value, targetCenterId, planDraft))
+    const nextCenters = upsertPlanningGroup(planningCenters.value, targetCenterId, groupDraft)
+    persistAndSetCenters(nextCenters)
+
+    const savedCenter = findPlanningCenter(nextCenters, targetCenterId)
+    const savedGroup = groupDraft.id
+      ? savedCenter?.groups.find((group) => group.id === groupDraft.id)
+      : savedCenter?.groups[0]
+
+    if (savedGroup) {
+      const nextYear = currentRoute.value.year || new Date().getFullYear()
+      window.location.hash = `#planning/center/${targetCenterId}/group/${savedGroup.id}/year/${nextYear}`
+      return
+    }
+
     window.location.hash = `#planning/center/${targetCenterId}`
   }
 
-  const handleDeletePlan = ({ centerId, planId }) => {
-    persistAndSetCenters(removePlanningPlan(planningCenters.value, centerId, planId))
+  const handleDeleteGroup = ({ centerId, groupId }) => {
+    persistAndSetCenters(removePlanningGroup(planningCenters.value, centerId, groupId))
     window.location.hash = `#planning/center/${centerId}`
   }
 
+  const handleSavePlan = (planDraft) => {
+    const targetCenterId = currentCenter.value?.id
+    const targetGroupId = currentGroup.value?.id
+
+    if (!targetCenterId || !targetGroupId) {
+      window.location.hash = '#planning'
+      return
+    }
+
+    persistAndSetCenters(upsertPlanningPlan(planningCenters.value, targetCenterId, targetGroupId, planDraft))
+    window.location.hash = `#planning/center/${targetCenterId}/group/${targetGroupId}/year/${planDraft.planningYear}`
+  }
+
+  const handleDeletePlan = ({ centerId, groupId, planId, planningYear }) => {
+    persistAndSetCenters(removePlanningPlan(planningCenters.value, centerId, groupId, planId))
+    if (planningYear) {
+      window.location.hash = `#planning/center/${centerId}/group/${groupId}/year/${planningYear}`
+      return
+    }
+
+    window.location.hash = `#planning/center/${centerId}/group/${groupId}`
+  }
+
   const openPlanningHome = () => {
+    if (currentGroup.value?.id && currentCenter.value?.id) {
+      const returnYear = currentRoute.value.year || currentPlan.value?.planningYear
+
+      if (returnYear) {
+        window.location.hash = `#planning/center/${currentCenter.value.id}/group/${currentGroup.value.id}/year/${returnYear}`
+        return
+      }
+
+      window.location.hash = `#planning/center/${currentCenter.value.id}/group/${currentGroup.value.id}`
+      return
+    }
+
     if (currentCenter.value?.id) {
       window.location.hash = `#planning/center/${currentCenter.value.id}`
       return
@@ -154,6 +250,17 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     window.location.hash = '#planning'
   }
 
+  const groupDraft = computed(() =>
+    createPlanningGroupDraft({
+      id: currentGroup.value?.id || '',
+      name: currentGroup.value?.name || '',
+      operatingWeekdays: currentGroup.value?.operatingWeekdays || currentCenter.value?.operatingWeekdays,
+      defaultPaidHoursPerDay: currentGroup.value?.defaultPaidHoursPerDay ?? currentCenter.value?.defaultPaidHoursPerDay,
+      defaultOccupancyPercent: currentGroup.value?.defaultOccupancyPercent ?? currentCenter.value?.defaultOccupancyPercent,
+      defaultAdherencePercent: currentGroup.value?.defaultAdherencePercent ?? currentCenter.value?.defaultAdherencePercent
+    })
+  )
+
   watch(
     [planningCenters, currentRoute],
     ([centers, route]) => {
@@ -161,9 +268,18 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
         return
       }
 
-      if (route.page === 'center' && route.centerId && !findPlanningCenter(centers, route.centerId)) {
-        window.location.hash = '#planning'
-        return
+      if (route.page === 'center') {
+        const routeCenter = route.centerId ? findPlanningCenter(centers, route.centerId) : null
+
+        if (route.centerId && !routeCenter) {
+          window.location.hash = '#planning'
+          return
+        }
+
+        if (route.groupId && routeCenter && !findPlanningGroup(centers, route.centerId, route.groupId)) {
+          window.location.hash = `#planning/center/${route.centerId}`
+          return
+        }
       }
 
       if (route.page === 'editor') {
@@ -173,13 +289,19 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
             ? findPlanningCenterByPlanId(centers, route.planId)
             : null
 
-        if (!routeCenter) {
+        const routeGroup = route.groupId
+          ? routeCenter && findPlanningGroup(centers, routeCenter.id, route.groupId)
+          : route.planId && route.planId !== 'new'
+            ? findPlanningGroupByPlanId(centers, route.planId)
+            : null
+
+        if (!routeCenter || !routeGroup) {
           window.location.hash = '#planning'
           return
         }
 
-        if (route.planId !== 'new' && !routeCenter.plans.some((plan) => plan.id === route.planId)) {
-          window.location.hash = `#planning/center/${routeCenter.id}`
+        if (route.planId !== 'new' && !routeGroup.plans.some((plan) => plan.id === route.planId)) {
+          window.location.hash = `#planning/center/${routeCenter.id}/group/${routeGroup.id}`
         }
       }
     },
@@ -189,14 +311,19 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
   return {
     planningCenters,
     currentCenter,
+    currentGroup,
     currentPlan,
     plannerSeed,
+    groupDraft,
+    groupDraftKey,
     plannerDraftKey,
     monthlyPlannerKey,
     loadCentersForScope,
     clearCenters,
     handleSaveCenter,
     handleDeleteCenter,
+    handleSaveGroup,
+    handleDeleteGroup,
     handleSavePlan,
     handleDeletePlan,
     openPlanningHome

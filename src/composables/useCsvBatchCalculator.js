@@ -30,6 +30,11 @@ import {
   formatPercent,
   formatVolume
 } from '../calculators/batch/formatters'
+import {
+  createEmptyWorkflowState,
+  extractWorkflowErrorMessage,
+  normalizeWorkflowPayload
+} from '../calculators/batch/workflow'
 
 export const useCsvBatchCalculator = () => {
   const selectedMode = ref('file-processor')
@@ -39,21 +44,21 @@ export const useCsvBatchCalculator = () => {
   const parseError = ref('')
   const submitError = ref('')
   const isLoading = ref(false)
-  const hasSubmitted = ref(false)
-
-  const summary = ref(null)
-  const errors = ref([])
-  const results = ref([])
-  const calculatedRows = ref([])
-  const dailyBreakdown = ref([])
-  const shiftPlan = ref([])
-  const scheduleCoverage = ref([])
-  const agentSchedules = ref([])
-  const exportData = ref({})
-  const activeResultsTab = ref('summary')
-  const focusedRowIndex = ref(null)
-  const activeChartPointIndex = ref(null)
-  const activeSchedulePointIndex = ref(null)
+  const initialWorkflowState = createEmptyWorkflowState()
+  const hasSubmitted = ref(initialWorkflowState.hasSubmitted)
+  const summary = ref(initialWorkflowState.summary)
+  const errors = ref(initialWorkflowState.errors)
+  const results = ref(initialWorkflowState.results)
+  const calculatedRows = ref(initialWorkflowState.calculatedRows)
+  const dailyBreakdown = ref(initialWorkflowState.dailyBreakdown)
+  const shiftPlan = ref(initialWorkflowState.shiftPlan)
+  const scheduleCoverage = ref(initialWorkflowState.scheduleCoverage)
+  const agentSchedules = ref(initialWorkflowState.agentSchedules)
+  const exportData = ref(initialWorkflowState.exportData)
+  const activeResultsTab = ref(initialWorkflowState.activeResultsTab)
+  const focusedRowIndex = ref(initialWorkflowState.focusedRowIndex)
+  const activeChartPointIndex = ref(initialWorkflowState.activeChartPointIndex)
+  const activeSchedulePointIndex = ref(initialWorkflowState.activeSchedulePointIndex)
 
   const dayPlannerInputs = reactive(createDayPlannerInputs())
   const weeklyPlannerInputs = reactive(createWeeklyPlannerInputs())
@@ -249,21 +254,25 @@ export const useCsvBatchCalculator = () => {
     return Array.isArray(exportBlock?.rows) && exportBlock.rows.length > 0
   })
 
+  const applyWorkflowState = (nextState) => {
+    hasSubmitted.value = nextState.hasSubmitted
+    summary.value = nextState.summary
+    errors.value = nextState.errors
+    results.value = nextState.results
+    calculatedRows.value = nextState.calculatedRows
+    dailyBreakdown.value = nextState.dailyBreakdown
+    shiftPlan.value = nextState.shiftPlan
+    scheduleCoverage.value = nextState.scheduleCoverage
+    agentSchedules.value = nextState.agentSchedules
+    exportData.value = nextState.exportData
+    activeResultsTab.value = nextState.activeResultsTab
+    focusedRowIndex.value = nextState.focusedRowIndex
+    activeChartPointIndex.value = nextState.activeChartPointIndex
+    activeSchedulePointIndex.value = nextState.activeSchedulePointIndex
+  }
+
   const resetOutputs = () => {
-    hasSubmitted.value = false
-    summary.value = null
-    errors.value = []
-    results.value = []
-    calculatedRows.value = []
-    dailyBreakdown.value = []
-    shiftPlan.value = []
-    scheduleCoverage.value = []
-    agentSchedules.value = []
-    exportData.value = {}
-    activeResultsTab.value = 'summary'
-    focusedRowIndex.value = null
-    activeChartPointIndex.value = null
-    activeSchedulePointIndex.value = null
+    applyWorkflowState(createEmptyWorkflowState())
   }
 
   const setMode = (mode) => {
@@ -336,55 +345,10 @@ export const useCsvBatchCalculator = () => {
       })
 
       if (!response.ok) {
-        const rawErrorText = await response.text().catch(() => '')
-        let detailText = `Workflow failed (${response.status}).`
-
-        if (rawErrorText) {
-          try {
-            const errorPayload = JSON.parse(rawErrorText)
-            const detail = errorPayload?.detail
-            if (typeof detail === 'string' && detail.trim()) {
-              detailText = detail
-            } else if (Array.isArray(detail) && detail.length > 0) {
-              const firstDetail = detail[0]
-              if (typeof firstDetail === 'string' && firstDetail.trim()) {
-                detailText = firstDetail
-              } else if (firstDetail?.msg) {
-                detailText = String(firstDetail.msg)
-              }
-            }
-          } catch {
-            const flattened = rawErrorText.replace(/\s+/g, ' ').trim()
-            if (flattened.length > 0) {
-              detailText = flattened.slice(0, 220)
-            }
-          }
-        }
-
-        throw new Error(detailText)
+        throw new Error(await extractWorkflowErrorMessage(response))
       }
 
-      const workflowPayload = await response.json()
-      const workflowErrors = workflowPayload.errors ?? []
-      const workflowResults = workflowPayload.results ?? []
-      const workflowCalculatedRows = workflowPayload.calculatedRows ?? workflowResults
-      summary.value = workflowPayload.summary ?? null
-      errors.value = workflowErrors
-      results.value = workflowResults
-      calculatedRows.value = workflowCalculatedRows
-      dailyBreakdown.value = workflowPayload.dailyBreakdown ?? []
-      shiftPlan.value = workflowPayload.shiftPlan ?? []
-      scheduleCoverage.value = workflowPayload.scheduleCoverage ?? []
-      agentSchedules.value = workflowPayload.agentSchedules ?? []
-      exportData.value = workflowPayload.export ?? {}
-      focusedRowIndex.value = null
-      hasSubmitted.value = true
-      activeResultsTab.value =
-        workflowErrors.length > 0 &&
-        workflowResults.length === 0 &&
-        workflowCalculatedRows.length === 0
-          ? 'errors'
-          : 'summary'
+      applyWorkflowState(normalizeWorkflowPayload(await response.json()))
     } catch (error) {
       submitError.value = error instanceof Error ? error.message : 'Unable to run selected workflow.'
     } finally {
