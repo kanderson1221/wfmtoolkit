@@ -50,6 +50,7 @@ describe('ErlangCForm', () => {
     )
     expect(wrapper.text()).toContain('Required Headcount')
     expect(wrapper.text()).toContain('24')
-    expect(wrapper.text()).toContain('Staffing Sensitivity')
+    expect(wrapper.text()).toContain('Recommendation Workspace')
+    expect(wrapper.text()).toContain('Agents')
   })
 })

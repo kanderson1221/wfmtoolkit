@@ -31,38 +31,34 @@ const activeToolTitle = computed(() =>
 </script>
 
 <template>
-  <section class="bg-slate-50/80 py-3">
-    <div class="app-frame grid gap-4">
+  <section class="bg-slate-50/80 py-2">
+    <div class="app-frame grid gap-3">
       <AppPageHeader
         :breadcrumbs="[
           { label: 'Home', href: '#home' },
           { label: 'Calculators', href: '#calculators' },
           { label: activeToolTitle }
         ]"
-        kicker="Calculator Suite"
-        title="Interval and batch workforce calculators"
-        description="Keep fast Erlang staffing checks and bulk planning workflows together in one operational workspace, separate from the planning application."
+        title="Workforce Calculators"
       />
 
-      <nav class="grid gap-3 md:grid-cols-2" aria-label="Calculator suite tools">
+      <nav
+        class="flex flex-wrap items-center gap-2 rounded-[24px] border border-slate-200 bg-white px-3 py-2 shadow-sm"
+        aria-label="Calculator suite tools"
+      >
         <a
           v-for="tab in calculatorTabs"
           :key="tab.id"
           :href="`#calculators/${tab.id}`"
           :aria-current="props.activeTool === tab.id ? 'page' : undefined"
-          class="grid gap-1 rounded-[28px] border bg-white px-5 py-4 shadow-sm transition"
+          class="inline-flex items-center justify-center rounded-[18px] border px-3 py-2 text-sm font-semibold tracking-[-0.02em] transition"
           :class="
             props.activeTool === tab.id
-              ? 'border-blue-200 bg-blue-50'
-              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+              ? 'border-[#cddae7] bg-[#e7eef4] text-[#15395f]'
+              : 'border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
           "
         >
-          <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
-            {{ tab.title }}
-          </strong>
-          <span class="text-sm leading-6 text-slate-600">
-            {{ tab.description }}
-          </span>
+          {{ tab.title }}
         </a>
       </nav>
     </div>

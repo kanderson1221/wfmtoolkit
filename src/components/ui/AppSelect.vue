@@ -1,7 +1,7 @@
 <script setup>
 import { computed, useAttrs } from 'vue'
 
-import { fieldInputClass } from './primevuePresets'
+import { fieldInputClass, fieldInputCompactClass } from './primevuePresets'
 
 defineOptions({
   inheritAttrs: false
@@ -19,6 +19,10 @@ const props = defineProps({
   optionValue: {
     type: String,
     default: 'value'
+  },
+  compact: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -43,7 +47,7 @@ const normalizedOptions = computed(() =>
 <template>
   <select
     v-model="model"
-    :class="[fieldInputClass, attrs.class]"
+    :class="[props.compact ? fieldInputCompactClass : fieldInputClass, attrs.class]"
     v-bind="attrs"
   >
     <option

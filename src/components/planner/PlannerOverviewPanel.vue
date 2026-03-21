@@ -1,7 +1,17 @@
 <script setup>
 import { computed } from 'vue'
+import {
+  mdiAccountGroupOutline,
+  mdiAccountMultipleOutline,
+  mdiChartLine,
+  mdiClockOutline,
+  mdiPhoneOutline,
+  mdiTarget,
+  mdiTuneVariant
+} from '@mdi/js'
 
 import AppButton from '../ui/AppButton.vue'
+import AppIcon from '../ui/AppIcon.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
@@ -38,6 +48,14 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['open-section'])
+
+const sectionIcons = {
+  overview: mdiChartLine,
+  availability: mdiClockOutline,
+  variability: mdiTuneVariant,
+  requirement: mdiTarget,
+  staffing: mdiAccountGroupOutline
+}
 
 const overviewItems = computed(() => [
   {
@@ -98,6 +116,10 @@ const staffingItems = computed(() => [
   }
 ])
 
+const nextRecommendationIcon = computed(
+  () => sectionIcons[props.nextRecommendation?.sectionId] || mdiChartLine
+)
+
 const guidanceTone = computed(() => {
   if (props.nextRecommendation) {
     return 'info'
@@ -124,7 +146,7 @@ const openSection = (sectionId, stepId = '') => {
 
 <template>
   <section class="grid gap-4">
-    <AppSectionHeader title="Overview" />
+    <AppSectionHeader title="Overview" :icon="mdiChartLine" />
 
     <AppStatStrip :items="overviewItems" columns="md:grid-cols-2 xl:grid-cols-4" />
 
@@ -137,17 +159,23 @@ const openSection = (sectionId, stepId = '') => {
         v-if="props.nextRecommendation"
         class="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between"
       >
-        <div class="grid gap-1">
-          <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Next Step
-          </span>
+        <div class="flex items-start gap-3">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]">
+            <AppIcon :path="nextRecommendationIcon" class="h-4.5 w-4.5" />
+          </div>
+
           <div class="grid gap-1">
-            <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
-              {{ props.nextRecommendation.title }}
-            </strong>
-            <p class="text-sm leading-6 text-slate-600">
-              {{ props.nextRecommendation.description }}
-            </p>
+            <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Next Step
+            </span>
+            <div class="grid gap-1">
+              <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
+                {{ props.nextRecommendation.title }}
+              </strong>
+              <p class="text-sm leading-6 text-slate-600">
+                {{ props.nextRecommendation.description }}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -190,12 +218,12 @@ const openSection = (sectionId, stepId = '') => {
     </template>
 
     <section class="grid gap-3">
-      <AppSectionHeader title="Forecast Need Summary" />
+      <AppSectionHeader title="Forecast Need Summary" :icon="mdiPhoneOutline" />
       <AppStatStrip :items="demandItems" columns="md:grid-cols-3" />
     </section>
 
     <section class="grid gap-3">
-      <AppSectionHeader title="Staffing Supply Summary" />
+      <AppSectionHeader title="Staffing Supply Summary" :icon="mdiAccountGroupOutline" />
       <AppStatStrip :items="staffingItems" columns="md:grid-cols-3" />
     </section>
   </section>

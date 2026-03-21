@@ -1,4 +1,6 @@
 <script setup>
+import AppIcon from './AppIcon.vue'
+
 const props = defineProps({
   items: {
     type: Array,
@@ -16,9 +18,17 @@ const props = defineProps({
     <article
       v-for="item in props.items"
       :key="item.label"
-      class="grid gap-1 px-5 py-3.5"
+      class="grid gap-1.5 px-5 py-3.5"
     >
-      <span class="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+      <div v-if="item.icon" class="flex items-center gap-2">
+        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]">
+          <AppIcon :path="item.icon" class="h-3.5 w-3.5" />
+        </div>
+        <span class="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          {{ item.label }}
+        </span>
+      </div>
+      <span v-else class="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
         {{ item.label }}
       </span>
       <strong class="text-lg font-semibold tracking-[-0.03em] text-slate-950">
