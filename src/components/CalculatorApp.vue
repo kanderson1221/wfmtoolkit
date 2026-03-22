@@ -20,8 +20,8 @@ const calculatorTabs = [
   },
   {
     id: 'batch',
-    title: 'Batch Planner',
-    description: 'Run scenario-based staffing and batch planning workflows.'
+    title: 'File Processor',
+    description: 'Upload interval files and export enriched staffing results.'
   }
 ]
 

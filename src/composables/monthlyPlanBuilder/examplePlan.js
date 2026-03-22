@@ -1,4 +1,6 @@
 import {
+  HOLIDAY_CALENDAR_US_FEDERAL,
+  HOLIDAY_SCHEDULE_CLOSED,
   MONTH_LABELS,
   createPlanMonth,
   createRandomMonth,
@@ -31,6 +33,8 @@ export const buildExamplePlannerState = (planningYear) => {
 
   return {
     operatingWeekdays,
+    holidayCalendarId: HOLIDAY_CALENDAR_US_FEDERAL,
+    holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED,
     presenceMonths: monthlyProfiles.map((profile, monthIndex) =>
       createPresenceMonthFromProfile({
         year: planningYear,

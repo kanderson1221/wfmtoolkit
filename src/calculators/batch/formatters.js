@@ -27,18 +27,3 @@ export const formatAsaSeconds = (value) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'Unstable'
   return value.toFixed(1)
 }
-
-export const formatIntervalLabel = (value) => {
-  if (typeof value !== 'string' || !value.trim()) return ''
-  const parsedDate = new Date(value)
-  if (!Number.isNaN(parsedDate.getTime())) {
-    return parsedDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  }
-
-  const timeMatch = value.match(/(\d{1,2}:\d{2}\s*[APMapm]{2})/)
-  if (timeMatch) {
-    return timeMatch[1].toUpperCase()
-  }
-
-  return value
-}

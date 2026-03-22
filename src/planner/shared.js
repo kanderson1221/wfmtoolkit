@@ -42,7 +42,6 @@ export const normalizeWeekdays = (weekdays) =>
     : [...WEEKDAY_FALLBACK]
 
 export const createPresenceMonth = (overrides = {}) => ({
-  dayAdjustment: 0,
   paidHoursPerDay: 8,
   plannedTimeOffHours: 0,
   unplannedTimeOffHours: 0,
@@ -110,4 +109,3 @@ export const buildRandomMonths = () => MONTH_LABELS.map(() => createRandomMonth(
 export const buildPlanMonths = () => MONTH_LABELS.map(() => createPlanMonth())
 export const buildStaffingMonths = () => MONTH_LABELS.map(() => createStaffingMonth())
 export const buildTrainingClasses = () => []
-

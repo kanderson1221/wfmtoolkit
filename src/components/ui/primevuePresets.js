@@ -12,16 +12,16 @@ export const buildDialogPt = (maxWidthClass = 'max-w-4xl') => ({
     class: 'bg-slate-950/60 backdrop-blur-sm p-4'
   },
   root: {
-    class: `w-full ${maxWidthClass} overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_28px_70px_rgba(15,23,42,0.22)]`
+    class: `flex max-h-[calc(100vh-2rem)] w-full ${maxWidthClass} flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_28px_70px_rgba(15,23,42,0.22)]`
   },
   header: {
-    class: 'px-6 pt-6 pb-0'
+    class: 'shrink-0 px-6 pt-6 pb-0'
   },
   content: {
-    class: 'px-6 py-5'
+    class: 'min-h-0 flex-1 overflow-y-auto px-6 py-5'
   },
   footer: {
-    class: 'px-6 pb-6 pt-0'
+    class: 'shrink-0 px-6 pb-6 pt-0'
   }
 })
 

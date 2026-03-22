@@ -46,7 +46,6 @@ export const createPresenceMonthFromProfile = ({
   year,
   monthIndex,
   weekdays,
-  dayAdjustment = 0,
   paidHoursPerDay = 8,
   plannedTimeOffPercent = 0,
   unplannedTimeOffPercent = 0,
@@ -57,12 +56,11 @@ export const createPresenceMonthFromProfile = ({
   paidBreaksHoursPerDay = 0.5,
   otherAwayHoursPerDay = 0.1
 }) => {
-  const openDays = Math.max(calculateCalendarOpenDays(year, monthIndex, weekdays) + dayAdjustment, 0)
+  const openDays = calculateCalendarOpenDays(year, monthIndex, weekdays).calendarOpenDays
   const paidHoursPerMonth = openDays * paidHoursPerDay
   const convertPercentToHours = (percent) => Number(((paidHoursPerMonth * percent) / 100).toFixed(1))
 
   return createPresenceMonth({
-    dayAdjustment,
     paidHoursPerDay,
     plannedTimeOffHours: convertPercentToHours(plannedTimeOffPercent),
     unplannedTimeOffHours: convertPercentToHours(unplannedTimeOffPercent),

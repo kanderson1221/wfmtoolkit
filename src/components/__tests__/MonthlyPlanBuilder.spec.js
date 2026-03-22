@@ -25,6 +25,15 @@ const centerDefaults = {
   groupId: 'group-1',
   groupName: 'Consumer Voice',
   operatingWeekdays: [1, 2, 3, 4, 5],
+  defaultHolidayCalendarId: 'us_federal',
+  disabledHolidayRuleIds: [],
+  customHolidays: [
+    {
+      id: 'new-years-day',
+      label: "New Year's Day",
+      date: '2026-01-01'
+    }
+  ],
   presenceMonths: [{ paidHoursPerDay: 8 }],
   randomDefaults: {
     occupancyPercent: 90,
@@ -103,7 +112,10 @@ describe('MonthlyPlanBuilder', () => {
         id: 'plan-1',
         createdAt: '2026-01-01T00:00:00.000Z',
         name: '2026 Plan',
-        planningYear: 2026
+        planningYear: 2026,
+        operatingWeekdays: [1],
+        holidayCalendarId: 'none',
+        customHolidays: []
       }
     })
 
@@ -113,7 +125,16 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.emitted('save')[0][0]).toMatchObject({
       id: 'plan-1',
       name: '2026 Plan',
-      planningYear: 2026
+      planningYear: 2026,
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      holidayCalendarId: 'us_federal',
+      customHolidays: [
+        {
+          id: 'new-years-day',
+          label: "New Year's Day",
+          date: '2026-01-01'
+        }
+      ]
     })
   })
 })

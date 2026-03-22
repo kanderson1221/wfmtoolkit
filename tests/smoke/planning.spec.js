@@ -29,6 +29,33 @@ test('opens the hamburger menu and exposes primary destinations', async ({ page 
   await expect(page.getByRole('button', { name: 'Planning App' })).toBeVisible()
 })
 
+test('opens and edits an existing call center from the portfolio list', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'New Center' }).first().click()
+  await page.getByLabel('Call Center Name').fill('North America Operations')
+  await page.getByRole('button', { name: 'Create Call Center' }).last().click()
+
+  await page.goto('/#planning')
+
+  await page
+    .getByRole('row', { name: /North America Operations/ })
+    .getByRole('button', { name: 'Open', exact: true })
+    .click()
+  await expect(page.getByRole('heading', { level: 1, name: 'North America Operations' })).toBeVisible()
+
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'Open actions for North America Operations' }).click()
+  await page.getByRole('menuitem', { name: 'Edit' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Edit Call Center' })).toBeVisible()
+  await page.getByLabel('Call Center Name').fill('United States Operations')
+  await page.getByRole('button', { name: 'Save Call Center' }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: 'United States Operations' })).toBeVisible()
+})
+
 test('creates a staffing group and opens a new plan from the call-center detail pane', async ({ page }) => {
   const planningYear = new Date().getFullYear()
 

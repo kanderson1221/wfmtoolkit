@@ -38,6 +38,16 @@ describe('usePlanningWorkspace', () => {
       id: 'center-1',
       name: 'North America Operations',
       timezone: 'America/New_York',
+      defaultHolidayCalendarId: 'us_federal',
+      disabledHolidayRuleIds: ['columbus_day'],
+      customHolidays: [
+        {
+          id: 'company-day',
+          label: 'Company Day',
+          month: 12,
+          day: 26
+        }
+      ],
       operatingWeekdays: [1, 2, 3, 4, 5],
       defaultPaidHoursPerDay: 8,
       defaultOccupancyPercent: 90,
@@ -117,6 +127,18 @@ describe('usePlanningWorkspace', () => {
       centerId: 'center-1',
       groupId: 'group-1',
       groupName: 'Consumer Voice',
+      defaultHolidayCalendarId: 'us_federal',
+      holidayCalendarId: 'us_federal',
+      disabledHolidayRuleIds: ['columbus_day'],
+      customHolidays: [
+        {
+          id: 'company-day',
+          label: 'Company Day',
+          month: 12,
+          day: 26
+        }
+      ],
+      holidayScheduleMode: 'closed',
       randomDefaults: {
         occupancyPercent: 90,
         adherencePercent: 95

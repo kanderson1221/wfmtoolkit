@@ -68,21 +68,17 @@ This repo includes a Render Blueprint config in `render.yaml` and a multi-stage 
 - Frontend (Vue 3) + backend API (FastAPI)
 - Hash-routed pages:
   - `#erlang-c` single-interval calculator
-  - `#csv-batch` Bulk Staffing Planner
+  - `#csv-batch` CSV Staffing File Processor
 - Form posts input values to the calculation API endpoint
 - API returns calculated staffing summary and scenario rows
 - Batch API validates the full CSV and only processes when all rows are valid
 - No database or authentication
 
-## Bulk Staffing Planner workflows
+## CSV Staffing File Processor
 
-The Bulk Staffing Planner (`#csv-batch`) supports three explicit workflows:
+The CSV Staffing File Processor (`#csv-batch`) validates a demand file and returns an enriched export with required agents, required headcount, and core service metrics for every interval row.
 
-1. **File Processor**
-2. **Daily Plan Builder**
-3. **Weekly Plan Builder**
-
-All workflows share the same CSV contract and are all-or-nothing: if any row fails validation, no rows are processed.
+The workflow is all-or-nothing: if any row fails validation, no rows are processed.
 
 ### CSV contract
 
@@ -109,14 +105,7 @@ Value handling:
 
 ### API endpoints
 
-New workflow endpoints:
-
 - `POST /api/erlang-c/batch/file-processor`
-- `POST /api/erlang-c/batch/daily-plan`
-- `POST /api/erlang-c/batch/weekly-plan`
-
-Backward-compatible endpoint:
-
 - `POST /api/erlang-c/batch-calculate` (legacy file-processor shape)
 
 #### File Processor request example
@@ -175,144 +164,18 @@ Backward-compatible endpoint:
 }
 ```
 
-#### Daily Plan request example
-
-```json
-{
-  "shift_length_hours": 8,
-  "productive_hours_per_day": 6.5,
-  "rows": [
-    {
-      "queue_id": "sales",
-      "interval_start": "2026-03-08T09:00:00Z",
-      "calls_offered": 180,
-      "aht_seconds": 240,
-      "mean_patience_seconds": 180,
-      "service_level_threshold": 80,
-      "service_level_target_seconds": 20,
-      "max_occupancy": 85,
-      "shrinkage": 0.3
-    }
-  ]
-}
-```
-
-#### Daily Plan response example (truncated)
-
-```json
-{
-  "mode": "daily-plan",
-  "summary": {
-    "serviceDate": "2026-03-08",
-    "requiredDailyFte": 12,
-    "totalRequiredHeadcountHours": 74.5,
-    "coverageGapHeadcount": 0,
-    "coverageOverageHeadcount": 10
-  },
-  "results": [
-    {
-      "intervalStart": "2026-03-08T09:00:00Z",
-      "requiredHeadcount": 50,
-      "coverageHeadcount": 50
-    }
-  ],
-  "shiftStarts": [],
-  "errors": [],
-  "export": {
-    "dailyPlan": {},
-    "shiftStarts": {}
-  }
-}
-```
-
-#### Weekly Plan request example
-
-```json
-{
-  "shift_length_hours": 8,
-  "productive_hours_per_day": 6.5,
-  "rows": [
-    {
-      "queue_id": "sales",
-      "interval_start": "2026-03-08T09:00:00Z",
-      "calls_offered": 180,
-      "aht_seconds": 240,
-      "mean_patience_seconds": 180,
-      "service_level_threshold": 80,
-      "service_level_target_seconds": 20,
-      "max_occupancy": 85,
-      "shrinkage": 0.3
-    },
-    {
-      "queue_id": "sales",
-      "interval_start": "2026-03-09T09:00:00Z",
-      "calls_offered": 170,
-      "aht_seconds": 240,
-      "mean_patience_seconds": 180,
-      "service_level_threshold": 80,
-      "service_level_target_seconds": 20,
-      "max_occupancy": 85,
-      "shrinkage": 0.3
-    }
-  ]
-}
-```
-
-#### Weekly Plan response example (truncated)
-
-```json
-{
-  "mode": "weekly-plan",
-  "summary": {
-    "dayCount": 2,
-    "totalRequiredHeadcountHours": 132.0,
-    "averageDailyFte": 11.5,
-    "peakDay": "2026-03-09",
-    "staffingVariability": 0.17
-  },
-  "results": [
-    {
-      "serviceDate": "2026-03-08",
-      "requiredHeadcountHours": 64.0,
-      "recommendedDailyFte": 10
-    }
-  ],
-  "dailyBreakdown": [],
-  "errors": [],
-  "export": {
-    "weeklyPlan": {},
-    "dailyBreakdown": {}
-  }
-}
-```
-
-### Planning algorithm
-
-- Erlang interval metrics come from the existing Erlang engine (`staff_for_interval`).
-- Shift planning uses a deterministic greedy latest-start heuristic:
-  - shift starts are evaluated at each interval boundary
-  - if an interval is under-covered, add starts in that interval
-  - objective is lexicographic: minimize understaffing first, then overstaffing
-- Tradeoff: this heuristic is fast, predictable, and dependency-free, but not globally optimal like MILP in every scenario.
-
 ### CSV templates
 
 - `public/erlang_file_processor_template.csv`
-- `public/erlang_daily_plan_template.csv`
-- `public/erlang_weekly_plan_template.csv`
 - (legacy) `public/erlang_batch_template.csv`
 
 ## Manual test checklist (frontend)
 
-1. Switch between File/Daily/Weekly modes and verify mode-specific inputs and export buttons.
-2. Upload each mode template and run processing; verify successful counts and rendered charts.
+1. Open `#csv-batch` and verify the file processor workspace loads.
+2. Upload the file-processor template and run processing; verify processed/succeeded/failed counts.
 3. Remove a required column; verify parse-time schema error before API call.
 4. Create a row with invalid range values (`aht_seconds=0` or `max_occupancy=120`); verify row-level errors and no processing.
-5. Daily mode with multiple dates should fail with a clear mode-level error.
-6. Weekly mode with only one date should fail with a clear mode-level error.
-7. Verify File mode export includes exact appended column names.
-8. Verify Daily mode exports interval demand vs coverage and shift starts.
-9. Verify Weekly mode exports weekly summary and daily breakdown CSV files.
+5. Verify the file export includes the exact appended column names.
 
 ## Run backend tests
 

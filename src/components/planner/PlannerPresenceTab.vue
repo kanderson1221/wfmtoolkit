@@ -84,7 +84,6 @@ const summaryItems = computed(() => [
           <colgroup>
             <col class="presence-col-month" />
             <col class="presence-col-business" />
-            <col class="presence-col-adjust" />
             <col class="presence-col-paid" />
             <col class="presence-col-absence" />
             <col class="presence-col-absence" />
@@ -103,16 +102,15 @@ const summaryItems = computed(() => [
           <thead>
             <tr class="presence-super-row">
               <th rowspan="2" class="presence-sticky-head" title="Planning month for the worksheet row.">Month</th>
-              <th colspan="3" class="presence-super-head presence-super-calendar" title="Calendar and paid time assumptions used to build the month.">Calendar</th>
+              <th colspan="2" class="presence-super-head presence-super-calendar" title="Business days and paid time assumptions used to build the month.">Calendar</th>
               <th colspan="3" class="presence-super-head presence-super-presence" title="Monthly absence hours per agent that reduce presence.">Presence Loss</th>
               <th colspan="5" class="presence-super-head presence-super-utilization" title="Scheduled and daily working-time losses that reduce utilization.">Utilization Loss</th>
               <th colspan="5" class="presence-super-head presence-super-results" title="Calculated monthly paid hours, loss totals, and final availability percentages.">Results</th>
             </tr>
             <tr class="presence-detail-row">
-              <th title="Monthly business days after the weekday pattern and any day adjustment are applied.">
+              <th title="Monthly business days after the call-center operating days and holiday closures are applied.">
                 <span class="presence-head-label">Business<br />Days</span>
               </th>
-              <th title="Day adjustment from the plan calendar.">Day Adj.</th>
               <th title="Full paid hours for one agent in one business day before paid breaks are removed.">
                 <span class="presence-head-label">Daily Paid<br />Hours</span>
               </th>
@@ -193,17 +191,6 @@ const summaryItems = computed(() => [
               </td>
               <td class="presence-calendar-cell">
                 {{ Number.isInteger(record.openDays) ? props.formatWhole(record.openDays) : props.formatNumber(record.openDays, 2) }}
-              </td>
-              <td class="presence-calendar-cell">
-                <AppTableNumberField
-                  v-model.number="presenceMonths[record.monthIndex].dayAdjustment"
-                  show-buttons
-                  button-layout="stacked"
-                  step="1"
-                  :min-fraction-digits="0"
-                  :max-fraction-digits="0"
-                  aria-label="Business day adjustment for the month"
-                />
               </td>
               <td class="presence-calendar-cell">
                 <AppTableNumberField

@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { buildPlannerDraftKey, clearPlannerDraft, loadPlannerDraft, persistPlannerDraft } from '../plannerDraftStorage'
 import {
   MONTH_LABELS,
+  HOLIDAY_CALENDAR_NONE,
+  HOLIDAY_SCHEDULE_CLOSED,
   buildPlanMonths,
   buildPresenceMonths,
   buildRandomMonths,
@@ -18,7 +20,11 @@ import {
   createStaffingMonth,
   createTrainingClass,
   createTrainingSettings,
+  normalizeCustomHolidays,
+  normalizeDisabledHolidayRuleIds,
   normalizeWeekdays,
+  normalizeHolidayCalendarId,
+  normalizeHolidayScheduleMode,
   recommendTrainingClasses,
   summarizePlanRecords,
   summarizePresenceRecords,
@@ -49,9 +55,25 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const restoredDraft = loadPlannerDraft(draftKey)
   const initialPlan = restoredDraft?.plan || savedPlan || props.centerDefaults || {}
   const initialUi = restoredDraft?.ui || {}
-  const centerOperatingWeekdays = normalizeWeekdays(props.centerDefaults?.operatingWeekdays)
-  const centerPaidHoursPerDay = toNumber(props.centerDefaults?.presenceMonths?.[0]?.paidHoursPerDay, 8)
-  const centerRandomDefaults = createRandomMonth(props.centerDefaults?.randomDefaults || {})
+  const centerOperatingWeekdays = computed(() => normalizeWeekdays(props.centerDefaults?.operatingWeekdays))
+  const centerHolidayCalendarId = computed(() =>
+    normalizeHolidayCalendarId(props.centerDefaults?.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE)
+  )
+  const centerDisabledHolidayRuleIds = computed(() =>
+    normalizeDisabledHolidayRuleIds(props.centerDefaults?.disabledHolidayRuleIds)
+  )
+  const centerCustomHolidays = computed(() =>
+    normalizeCustomHolidays(props.centerDefaults?.customHolidays)
+  )
+  const centerHolidayScheduleMode = computed(() =>
+    normalizeHolidayScheduleMode(props.centerDefaults?.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED)
+  )
+  const centerPaidHoursPerDay = computed(() =>
+    toNumber(props.centerDefaults?.presenceMonths?.[0]?.paidHoursPerDay, 8)
+  )
+  const centerRandomDefaults = computed(() =>
+    createRandomMonth(props.centerDefaults?.randomDefaults || {})
+  )
   const initialStartingHeadcount = Math.max(toNumber(initialPlan.startingHeadcount, 0), 0)
   const hydratedTrainingClasses = Array.isArray(initialPlan.trainingClasses)
     ? initialPlan.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass))
@@ -113,7 +135,11 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const activeSection = ref(normalizedInitialSection)
   const activeForecastStep = ref(normalizedInitialForecastStep)
   const selectedMonthIndex = ref(clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1))
-  const operatingWeekdays = ref(normalizeWeekdays(initialPlan.operatingWeekdays))
+  const operatingWeekdays = ref([...centerOperatingWeekdays.value])
+  const holidayCalendarId = ref(centerHolidayCalendarId.value)
+  const disabledHolidayRuleIds = ref([...centerDisabledHolidayRuleIds.value])
+  const customHolidays = ref(centerCustomHolidays.value.map((holiday) => ({ ...holiday })))
+  const holidayScheduleMode = ref(centerHolidayScheduleMode.value)
   const presenceMonths = ref(hydrateMonths(initialPlan.presenceMonths, buildPresenceMonths, createPresenceMonth))
   const randomDefaults = ref(createRandomMonth(initialPlan.randomDefaults || {}))
   const useMonthlyRandomOverrides = ref(Boolean(initialPlan.useMonthlyRandomOverrides))
@@ -232,6 +258,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     planningYear.value = currentYear + 1
     operatingWeekdays.value = examplePlan.operatingWeekdays
+    holidayCalendarId.value = normalizeHolidayCalendarId(examplePlan.holidayCalendarId, HOLIDAY_CALENDAR_NONE)
+    disabledHolidayRuleIds.value = normalizeDisabledHolidayRuleIds(examplePlan.disabledHolidayRuleIds)
+    customHolidays.value = normalizeCustomHolidays(examplePlan.customHolidays)
+    holidayScheduleMode.value = normalizeHolidayScheduleMode(examplePlan.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED)
     presenceMonths.value = examplePlan.presenceMonths
     randomDefaults.value = examplePlan.randomDefaults
     useMonthlyRandomOverrides.value = false
@@ -249,15 +279,19 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const resetPlanner = () => {
     planningYear.value = currentYear
-    operatingWeekdays.value = centerOperatingWeekdays
+    operatingWeekdays.value = [...centerOperatingWeekdays.value]
+    holidayCalendarId.value = centerHolidayCalendarId.value
+    disabledHolidayRuleIds.value = [...centerDisabledHolidayRuleIds.value]
+    customHolidays.value = centerCustomHolidays.value.map((holiday) => ({ ...holiday }))
+    holidayScheduleMode.value = centerHolidayScheduleMode.value
     presenceMonths.value = MONTH_LABELS.map(() =>
       createPresenceMonth({
-        paidHoursPerDay: centerPaidHoursPerDay
+        paidHoursPerDay: centerPaidHoursPerDay.value
       })
     )
-    randomDefaults.value = createRandomMonth(centerRandomDefaults)
+    randomDefaults.value = createRandomMonth(centerRandomDefaults.value)
     useMonthlyRandomOverrides.value = false
-    randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(centerRandomDefaults))
+    randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(centerRandomDefaults.value))
     planMonths.value = buildPlanMonths()
     trainingSettings.value = createTrainingSettings()
     startingHeadcount.value = 0
@@ -273,6 +307,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     computeMonthlyRecords({
       planningYear: planningYear.value,
       operatingWeekdays: operatingWeekdays.value,
+      holidayCalendarId: holidayCalendarId.value,
+      disabledHolidayRuleIds: disabledHolidayRuleIds.value,
+      customHolidays: customHolidays.value,
+      holidayScheduleMode: holidayScheduleMode.value,
       presenceMonths: presenceMonths.value,
       randomDefaults: randomDefaults.value,
       useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
@@ -337,6 +375,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     name: `${planningYear.value} Plan`,
     planningYear: planningYear.value,
     operatingWeekdays: [...operatingWeekdays.value],
+    holidayCalendarId: holidayCalendarId.value,
+    disabledHolidayRuleIds: [...disabledHolidayRuleIds.value],
+    customHolidays: customHolidays.value.map((holiday) => ({ ...holiday })),
+    holidayScheduleMode: holidayScheduleMode.value,
     presenceMonths: presenceMonths.value.map((month) => createPresenceMonth(month)),
     randomDefaults: createRandomMonth(randomDefaults.value),
     useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
@@ -384,6 +426,23 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       selectedMonthIndex: selectedMonthIndex.value
     }
   })
+
+  watch(
+    [
+      centerOperatingWeekdays,
+      centerHolidayCalendarId,
+      centerDisabledHolidayRuleIds,
+      centerCustomHolidays,
+      centerHolidayScheduleMode
+    ],
+    ([nextOperatingWeekdays, nextHolidayCalendarId, nextDisabledHolidayRuleIds, nextCustomHolidays, nextHolidayScheduleMode]) => {
+      operatingWeekdays.value = [...nextOperatingWeekdays]
+      holidayCalendarId.value = nextHolidayCalendarId
+      disabledHolidayRuleIds.value = [...nextDisabledHolidayRuleIds]
+      customHolidays.value = nextCustomHolidays.map((holiday) => ({ ...holiday }))
+      holidayScheduleMode.value = nextHolidayScheduleMode
+    }
+  )
 
   const clearPendingAutosave = () => {
     if (autosaveTimer) {
@@ -482,6 +541,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       activeForecastStep,
       selectedMonthIndex,
       operatingWeekdays,
+      holidayCalendarId,
+      disabledHolidayRuleIds,
+      customHolidays,
+      holidayScheduleMode,
       presenceMonths,
       randomDefaults,
       useMonthlyRandomOverrides,
@@ -527,6 +590,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     activeSection,
     activeForecastStep,
     selectedMonthIndex,
+    holidayCalendarId,
+    disabledHolidayRuleIds,
+    customHolidays,
+    holidayScheduleMode,
     presenceMonths,
     randomDefaults,
     useMonthlyRandomOverrides,

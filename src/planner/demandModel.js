@@ -8,23 +8,59 @@ import {
   createRandomMonth,
   toNumber
 } from './shared'
+import {
+  HOLIDAY_CALENDAR_NONE,
+  HOLIDAY_SCHEDULE_CLOSED,
+  calculateHolidayImpactDays,
+  normalizeCustomHolidays,
+  normalizeDisabledHolidayRuleIds,
+  normalizeHolidayCalendarId,
+  normalizeHolidayScheduleMode
+} from './holidayCalendars'
 
-export const calculateCalendarOpenDays = (year, monthIndex, activeDays) => {
+export const calculateCalendarOpenDays = (
+  year,
+  monthIndex,
+  activeDays,
+  holidayCalendarId = HOLIDAY_CALENDAR_NONE,
+  holidayScheduleMode = HOLIDAY_SCHEDULE_CLOSED,
+  disabledHolidayRuleIds = [],
+  customHolidays = []
+) => {
   if (!activeDays.length) {
-    return 0
+    return {
+      weekdayOpenDays: 0,
+      holidayCount: 0,
+      holidayImpactDays: 0,
+      calendarOpenDays: 0
+    }
   }
 
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
-  let openDays = 0
+  let weekdayOpenDays = 0
 
   for (let day = 1; day <= daysInMonth; day += 1) {
     const weekday = new Date(year, monthIndex, day).getDay()
     if (activeDays.includes(weekday)) {
-      openDays += 1
+      weekdayOpenDays += 1
     }
   }
 
-  return openDays
+  const { holidayCount, holidayImpactDays } = calculateHolidayImpactDays({
+    year,
+    monthIndex,
+    operatingWeekdays: activeDays,
+    holidayCalendarId,
+    disabledHolidayRuleIds,
+    customHolidays
+  })
+
+  return {
+    weekdayOpenDays,
+    holidayCount,
+    holidayImpactDays,
+    calendarOpenDays: Math.max(weekdayOpenDays - holidayImpactDays, 0)
+  }
 }
 
 const buildMonthlyWarnings = ({
@@ -52,7 +88,7 @@ const buildMonthlyWarnings = ({
   }
 
   if (openDays === 0 && operatingWeekdays.length) {
-    presenceWarnings.push('Open days are zero after the monthly day adjustment. Check holidays or temporary closures.')
+    presenceWarnings.push('Open days are zero after applying the operating days and holiday closures. Check the call center schedule.')
     planWarnings.push('Open days are zero for this month, so the plan shows no monthly paid capacity.')
   }
 
@@ -95,6 +131,10 @@ const buildMonthlyWarnings = ({
 export const computeMonthlyRecords = ({
   planningYear,
   operatingWeekdays,
+  holidayCalendarId,
+  disabledHolidayRuleIds,
+  customHolidays,
+  holidayScheduleMode,
   presenceMonths,
   randomDefaults,
   useMonthlyRandomOverrides,
@@ -108,9 +148,21 @@ export const computeMonthlyRecords = ({
       : createRandomMonth(randomDefaults || {})
     const planInput = createPlanMonth(planMonths?.[monthIndex] || {})
 
-    const calendarOpenDays = calculateCalendarOpenDays(planningYear, monthIndex, operatingWeekdays)
-    const dayAdjustment = toNumber(presenceInput.dayAdjustment, 0)
-    const openDays = Math.max(calendarOpenDays + dayAdjustment, 0)
+    const {
+      weekdayOpenDays,
+      holidayCount,
+      holidayImpactDays,
+      calendarOpenDays
+    } = calculateCalendarOpenDays(
+      planningYear,
+      monthIndex,
+      operatingWeekdays,
+      normalizeHolidayCalendarId(holidayCalendarId, HOLIDAY_CALENDAR_NONE),
+      normalizeHolidayScheduleMode(holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
+      normalizeDisabledHolidayRuleIds(disabledHolidayRuleIds),
+      normalizeCustomHolidays(customHolidays)
+    )
+    const openDays = calendarOpenDays
     const paidHoursPerDay = clamp(toNumber(presenceInput.paidHoursPerDay, 8), 0, 24)
     const paidHoursPerMonth = openDays * paidHoursPerDay
 
@@ -188,8 +240,10 @@ export const computeMonthlyRecords = ({
       monthIndex,
       label,
       fullLabel: FULL_MONTH_LABELS[monthIndex],
+      weekdayOpenDays,
+      holidayCount,
+      holidayImpactDays,
       calendarOpenDays,
-      dayAdjustment,
       openDays,
       paidHoursPerDay,
       paidHoursPerMonth,

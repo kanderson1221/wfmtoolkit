@@ -11,6 +11,12 @@ import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
 import { createPlanningCenterDraft, createPlanningGroupDraft } from '../../planningStorage'
 import {
+  HOLIDAY_CALENDAR_NONE,
+  normalizeCustomHolidays,
+  normalizeDisabledHolidayRuleIds,
+  normalizeHolidayCalendarId,
+} from '../../planner/holidayCalendars'
+import {
   getCenterGroups,
   getGroupPlans,
   getAnnualContacts,
@@ -158,7 +164,7 @@ const selectedYearModel = computed({
   }
 })
 
-const summarizeAvailability = (plan) => {
+const summarizeAvailability = (plan, group = selectedGroup.value, center = props.center) => {
   const summary = plan?.summary || {}
 
   if (
@@ -173,7 +179,13 @@ const summarizeAvailability = (plan) => {
 
   const monthlyRecords = computeMonthlyRecords({
     planningYear: Number(plan?.planningYear) || currentYear,
-    operatingWeekdays: Array.isArray(plan?.operatingWeekdays) ? plan.operatingWeekdays : [1, 2, 3, 4, 5],
+    operatingWeekdays:
+      Array.isArray(center?.operatingWeekdays) && center.operatingWeekdays.length
+        ? center.operatingWeekdays
+        : [1, 2, 3, 4, 5],
+    holidayCalendarId: normalizeHolidayCalendarId(center?.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE),
+    disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(center?.disabledHolidayRuleIds),
+    customHolidays: normalizeCustomHolidays(center?.customHolidays),
     presenceMonths: Array.isArray(plan?.presenceMonths) ? plan.presenceMonths : [],
     randomDefaults: plan?.randomDefaults || {},
     useMonthlyRandomOverrides: Boolean(plan?.useMonthlyRandomOverrides),
@@ -198,7 +210,7 @@ const summarizeAvailability = (plan) => {
 
 const planRows = computed(() =>
   (selectedGroup.value?.plans || []).map((plan) => {
-    const availability = summarizeAvailability(plan)
+    const availability = summarizeAvailability(plan, selectedGroup.value, props.center)
 
     return {
       ...plan,
@@ -216,7 +228,7 @@ const planRows = computed(() =>
 
 const operatingDayLabel = computed(() =>
   props.weekdayOptions
-    .filter((weekday) => selectedGroup.value?.operatingWeekdays?.includes(weekday.value))
+    .filter((weekday) => props.center?.operatingWeekdays?.includes(weekday.value))
     .map((weekday) => weekday.label)
     .join(', ') || 'No operating days selected'
 )
@@ -282,7 +294,9 @@ const saveCenter = () => {
 }
 
 const openCreateGroup = () => {
-  groupDraft.value = createPlanningGroupDraft()
+  groupDraft.value = createPlanningGroupDraft({
+    operatingWeekdays: props.center.operatingWeekdays
+  })
   groupSettingsOpen.value = true
 }
 
@@ -335,7 +349,8 @@ const closeGroupSettings = () => {
 
 const saveGroup = () => {
   emit('save-group', {
-    ...groupDraft.value
+    ...groupDraft.value,
+    operatingWeekdays: props.center.operatingWeekdays
   })
   groupSettingsOpen.value = false
 }
@@ -661,7 +676,11 @@ const handlePlanMenuSelect = (plan, item) => {
     <CallCenterSettingsModal
       v-if="centerSettingsOpen"
       v-model:center-name="centerDraft.name"
-      v-model:timezone="centerDraft.timezone"
+      v-model:default-holiday-calendar-id="centerDraft.defaultHolidayCalendarId"
+      v-model:disabled-holiday-rule-ids="centerDraft.disabledHolidayRuleIds"
+      v-model:custom-holidays="centerDraft.customHolidays"
+      v-model:operating-weekdays="centerDraft.operatingWeekdays"
+      :weekday-options="props.weekdayOptions"
       title="Edit Call Center"
       submit-label="Save Call Center"
       @close="closeCenterSettings"
@@ -671,11 +690,9 @@ const handlePlanMenuSelect = (plan, item) => {
     <PlanningGroupSettingsModal
       v-if="groupSettingsOpen"
       v-model:group-name="groupDraft.name"
-      v-model:operating-weekdays="groupDraft.operatingWeekdays"
       v-model:default-paid-hours-per-day="groupDraft.defaultPaidHoursPerDay"
       v-model:default-occupancy-percent="groupDraft.defaultOccupancyPercent"
       v-model:default-adherence-percent="groupDraft.defaultAdherencePercent"
-      :weekday-options="props.weekdayOptions"
       :title="groupDraft.id ? 'Edit Staffing Group' : 'Create Staffing Group'"
       :submit-label="groupDraft.id ? 'Save Staffing Group' : 'Create Staffing Group'"
       @close="closeGroupSettings"

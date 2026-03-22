@@ -7,9 +7,7 @@ from pydantic import BaseModel, Field
 
 from .batch import (
     process_batch_rows,
-    process_daily_plan_rows,
     process_file_processor_rows,
-    process_weekly_plan_rows,
 )
 from .erlang import build_results_payload
 from .models import StaffingInput
@@ -33,21 +31,6 @@ class ErlangCBatchRequest(BaseModel):
 
 class ErlangCFileProcessorRequest(BaseModel):
     rows: list[dict[str, Any]]
-
-
-class ErlangCDailyPlanRequest(BaseModel):
-    rows: list[dict[str, Any]]
-    shift_paid_hours: float = Field(default=8, gt=0)
-    unpaid_lunch_minutes: float = Field(default=30, ge=0)
-    lunch_window_start_hours: float = Field(default=3.5, ge=0)
-    lunch_window_end_hours: float = Field(default=4.5, ge=0)
-    interval_duration_minutes: float = Field(gt=0, default=30)
-
-
-class ErlangCWeeklyPlanRequest(BaseModel):
-    rows: list[dict[str, Any]]
-    shift_length_hours: float = Field(gt=0)
-    productive_hours_per_day: float = Field(gt=0)
 
 
 app = FastAPI(title="WFMToolkit API")
@@ -97,33 +80,6 @@ def file_processor(payload: ErlangCFileProcessorRequest) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="rows must contain at least one item")
 
     return process_file_processor_rows(payload.rows)
-
-
-@app.post("/api/erlang-c/batch/daily-plan")
-def daily_plan(payload: ErlangCDailyPlanRequest) -> dict[str, Any]:
-    if not payload.rows:
-        raise HTTPException(status_code=422, detail="rows must contain at least one item")
-
-    return process_daily_plan_rows(
-        payload.rows,
-        shift_paid_hours=payload.shift_paid_hours,
-        unpaid_lunch_hours=payload.unpaid_lunch_minutes / 60.0,
-        lunch_window_start_hours=payload.lunch_window_start_hours,
-        lunch_window_end_hours=payload.lunch_window_end_hours,
-        interval_duration_minutes=payload.interval_duration_minutes,
-    )
-
-
-@app.post("/api/erlang-c/batch/weekly-plan")
-def weekly_plan(payload: ErlangCWeeklyPlanRequest) -> dict[str, Any]:
-    if not payload.rows:
-        raise HTTPException(status_code=422, detail="rows must contain at least one item")
-
-    return process_weekly_plan_rows(
-        payload.rows,
-        shift_length_hours=payload.shift_length_hours,
-        productive_hours_per_day=payload.productive_hours_per_day,
-    )
 
 
 @app.get("/", include_in_schema=False)

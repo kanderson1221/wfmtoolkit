@@ -49,8 +49,10 @@ const pt = computed(() => ({
   root: {
     class: 'w-full'
   },
-  input: {
-    class: [props.compact ? fieldInputCompactClass : fieldInputClass, attrs.class]
+  pcInputText: {
+    root: {
+      class: [props.compact ? fieldInputCompactClass : fieldInputClass, attrs.class]
+    }
   }
 }))
 </script>

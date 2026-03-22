@@ -1,5 +1,5 @@
 <script setup>
-import { defineAsyncComponent, onBeforeUnmount, onMounted } from 'vue'
+import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
@@ -64,16 +64,62 @@ const {
   storageScope: auth.storageScope
 })
 
+const appMainRef = ref(null)
+let previousScrollRestoration = null
+
+const resetScrollPosition = () => {
+  appMainRef.value?.scrollTo?.({ top: 0, left: 0, behavior: 'auto' })
+
+  if (document.scrollingElement) {
+    document.scrollingElement.scrollTop = 0
+    document.scrollingElement.scrollLeft = 0
+  }
+
+  document.documentElement.scrollTop = 0
+  document.documentElement.scrollLeft = 0
+  document.body.scrollTop = 0
+  document.body.scrollLeft = 0
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+}
+
+const scheduleScrollReset = async () => {
+  await nextTick()
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      resetScrollPosition()
+    })
+  })
+}
+
+watch(
+  currentRoute,
+  () => {
+    void scheduleScrollReset()
+  },
+  { flush: 'post' }
+)
+
 onMounted(() => {
+  if ('scrollRestoration' in window.history) {
+    previousScrollRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+  }
+
   auth.initializeAuth({
     loadCentersForScope,
     clearCenters,
     syncRouteFromHash,
     pendingRouteHash
   })
+
+  void scheduleScrollReset()
 })
 
 onBeforeUnmount(() => {
+  if ('scrollRestoration' in window.history && previousScrollRestoration) {
+    window.history.scrollRestoration = previousScrollRestoration
+  }
+
   auth.disposeAuth()
 })
 </script>
@@ -89,7 +135,7 @@ onBeforeUnmount(() => {
       @sign-out="handleSignOut"
     />
 
-    <main class="app-main">
+    <main ref="appMainRef" class="app-main">
       <AppHome v-if="!authReady || (authGateEnabled && (!isAuthenticated || currentRoute.app === 'home'))" />
 
       <CalculatorApp

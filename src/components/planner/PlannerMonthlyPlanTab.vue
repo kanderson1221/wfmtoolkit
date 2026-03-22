@@ -98,7 +98,7 @@ const summaryItems = computed(() => [
             <th title="Planning month. Click a month name to highlight that row.">Month</th>
             <th title="Monthly contact demand used to create workload hours.">Contacts</th>
             <th title="Average handle time in seconds used to create workload hours.">AHT Sec</th>
-            <th title="Business days flowing in from the presence / utilization step after weekday pattern and day adjustments.">Business Days</th>
+            <th title="Business days flowing in from the call-center operating days and holiday closures.">Business Days</th>
             <th title="Scheduled percentage flowing in from the presence / utilization step.">Scheduled %</th>
             <th title="Total scheduled random loss flowing in from the random step.">
               <span class="plan-head-label">Total Random<br />Loss %</span>

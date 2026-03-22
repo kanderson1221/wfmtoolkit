@@ -1,3 +1,16 @@
+import {
+  createHolidayTemplateHolidays,
+  GROUP_HOLIDAY_CALENDAR_INHERIT,
+  HOLIDAY_CALENDAR_NONE,
+  HOLIDAY_CALENDAR_US_FEDERAL,
+  HOLIDAY_SCHEDULE_CLOSED,
+  normalizeCustomHolidays,
+  normalizeDisabledHolidayRuleIds,
+  normalizeGroupHolidayCalendarId,
+  normalizeHolidayCalendarId,
+  normalizeHolidayScheduleMode
+} from './planner/holidayCalendars'
+
 const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
 const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
 
@@ -90,6 +103,10 @@ const normalizePlan = (draftPlan, timestamp = new Date().toISOString()) => {
     id: planSnapshot.id || createEntityId('plan'),
     name: buildPlanName(resolvedYear),
     planningYear: resolvedYear,
+    holidayCalendarId: normalizeHolidayCalendarId(planSnapshot.holidayCalendarId, HOLIDAY_CALENDAR_NONE),
+    disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),
+    customHolidays: normalizeCustomHolidays(planSnapshot.customHolidays),
+    holidayScheduleMode: normalizeHolidayScheduleMode(planSnapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
     createdAt: planSnapshot.createdAt || timestamp,
     updatedAt: planSnapshot.updatedAt || timestamp
   }
@@ -109,6 +126,8 @@ const normalizeGroup = (draftGroup, timestamp = new Date().toISOString(), defaul
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, defaultPaidHoursPerDay), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, defaultOccupancyPercent), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, defaultAdherencePercent), 1)),
+    holidayCalendarId: normalizeGroupHolidayCalendarId(snapshot.holidayCalendarId, GROUP_HOLIDAY_CALENDAR_INHERIT),
+    holidayScheduleMode: normalizeHolidayScheduleMode(snapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
     createdAt: snapshot.createdAt || timestamp,
     updatedAt: snapshot.updatedAt || timestamp,
     plans: uniquePlansByYear(
@@ -139,7 +158,9 @@ const createGroupFromLegacyPlan = (legacyPlan, timestamp = new Date().toISOStrin
       operatingWeekdays: legacyPlan?.operatingWeekdays,
       defaultPaidHoursPerDay: legacyPlan?.presenceMonths?.[0]?.paidHoursPerDay,
       defaultOccupancyPercent: legacyPlan?.randomDefaults?.occupancyPercent,
-      defaultAdherencePercent: legacyPlan?.randomDefaults?.adherencePercent
+      defaultAdherencePercent: legacyPlan?.randomDefaults?.adherencePercent,
+      holidayCalendarId: GROUP_HOLIDAY_CALENDAR_INHERIT,
+      holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED
     },
     timestamp,
     {
@@ -153,6 +174,15 @@ const createGroupFromLegacyPlan = (legacyPlan, timestamp = new Date().toISOStrin
 
 const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
   const snapshot = clonePlain(draftCenter || {})
+  const normalizedCalendarId = normalizeHolidayCalendarId(snapshot.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE)
+  const normalizedDisabledHolidayRuleIds = normalizeDisabledHolidayRuleIds(snapshot.disabledHolidayRuleIds)
+  const normalizedCustomHolidays = normalizeCustomHolidays(
+    Array.isArray(snapshot.customHolidays) && snapshot.customHolidays.length
+      ? snapshot.customHolidays
+      : normalizedCalendarId === HOLIDAY_CALENDAR_US_FEDERAL
+        ? createHolidayTemplateHolidays(normalizedCalendarId, new Date().getFullYear(), normalizedDisabledHolidayRuleIds)
+        : []
+  )
   const normalizedGroups = Array.isArray(snapshot.groups)
     ? snapshot.groups.map((group) =>
         normalizeGroup(group, timestamp, {
@@ -171,6 +201,9 @@ const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
     id: snapshot.id || createEntityId('center'),
     name: snapshot.name?.trim() || 'Call Center',
     timezone: snapshot.timezone?.trim() || getDefaultTimeZone(),
+    defaultHolidayCalendarId: normalizedCalendarId,
+    disabledHolidayRuleIds: normalizedDisabledHolidayRuleIds,
+    customHolidays: normalizedCustomHolidays,
     operatingWeekdays: normalizeWeekdays(snapshot.operatingWeekdays),
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, 90), 1)),
@@ -232,6 +265,9 @@ const migrateLegacyPlans = (legacyPlans) => {
 export const createPlanningCenterDraft = (overrides = {}) => ({
   name: '',
   timezone: getDefaultTimeZone(),
+  defaultHolidayCalendarId: HOLIDAY_CALENDAR_NONE,
+  disabledHolidayRuleIds: [],
+  customHolidays: [],
   operatingWeekdays: [1, 2, 3, 4, 5],
   defaultPaidHoursPerDay: 8,
   defaultOccupancyPercent: 90,
@@ -245,6 +281,8 @@ export const createPlanningGroupDraft = (overrides = {}) => ({
   defaultPaidHoursPerDay: 8,
   defaultOccupancyPercent: 90,
   defaultAdherencePercent: 95,
+  holidayCalendarId: GROUP_HOLIDAY_CALENDAR_INHERIT,
+  holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED,
   ...overrides
 })
 

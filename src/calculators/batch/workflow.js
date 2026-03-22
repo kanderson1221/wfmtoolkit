@@ -3,43 +3,19 @@ export const createEmptyWorkflowState = () => ({
   summary: null,
   errors: [],
   results: [],
-  calculatedRows: [],
-  dailyBreakdown: [],
-  shiftPlan: [],
-  scheduleCoverage: [],
-  agentSchedules: [],
-  exportData: {},
-  activeResultsTab: 'summary',
-  focusedRowIndex: null,
-  activeChartPointIndex: null,
-  activeSchedulePointIndex: null
+  exportData: {}
 })
 
 export const normalizeWorkflowPayload = (workflowPayload = {}) => {
   const workflowErrors = workflowPayload.errors ?? []
   const workflowResults = workflowPayload.results ?? []
-  const workflowCalculatedRows = workflowPayload.calculatedRows ?? workflowResults
 
   return {
     hasSubmitted: true,
     summary: workflowPayload.summary ?? null,
     errors: workflowErrors,
     results: workflowResults,
-    calculatedRows: workflowCalculatedRows,
-    dailyBreakdown: workflowPayload.dailyBreakdown ?? [],
-    shiftPlan: workflowPayload.shiftPlan ?? [],
-    scheduleCoverage: workflowPayload.scheduleCoverage ?? [],
-    agentSchedules: workflowPayload.agentSchedules ?? [],
-    exportData: workflowPayload.export ?? {},
-    activeResultsTab:
-      workflowErrors.length > 0 &&
-      workflowResults.length === 0 &&
-      workflowCalculatedRows.length === 0
-        ? 'errors'
-        : 'summary',
-    focusedRowIndex: null,
-    activeChartPointIndex: null,
-    activeSchedulePointIndex: null
+    exportData: workflowPayload.export ?? {}
   }
 }
 

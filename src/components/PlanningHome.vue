@@ -19,6 +19,12 @@ import AppStatStrip from './ui/AppStatStrip.vue'
 import AppTableShell from './ui/AppTableShell.vue'
 import { createPlanningCenterDraft } from '../planningStorage'
 import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
+import {
+  HOLIDAY_CALENDAR_NONE,
+  normalizeCustomHolidays,
+  normalizeDisabledHolidayRuleIds,
+  normalizeHolidayCalendarId,
+} from '../planner/holidayCalendars'
 import { computeMonthlyRecords } from '../planner/demandModel'
 import { computeStaffingRecords } from '../planner/staffingModel'
 
@@ -229,11 +235,12 @@ const portfolioHeadcountChart = computed(() => {
       const monthlyRecords = computeMonthlyRecords({
         planningYear: Number(selectedPlanningYear.value),
         operatingWeekdays:
-          Array.isArray(plan.operatingWeekdays) && plan.operatingWeekdays.length
-            ? plan.operatingWeekdays
-            : Array.isArray(group.operatingWeekdays) && group.operatingWeekdays.length
-              ? group.operatingWeekdays
-              : [1, 2, 3, 4, 5],
+          Array.isArray(center.operatingWeekdays) && center.operatingWeekdays.length
+            ? center.operatingWeekdays
+            : [1, 2, 3, 4, 5],
+        holidayCalendarId: normalizeHolidayCalendarId(center.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE),
+        disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(center.disabledHolidayRuleIds),
+        customHolidays: normalizeCustomHolidays(center.customHolidays),
         presenceMonths: Array.isArray(plan.presenceMonths) ? plan.presenceMonths : [],
         randomDefaults: plan.randomDefaults || {},
         useMonthlyRandomOverrides: Boolean(plan.useMonthlyRandomOverrides),
@@ -270,13 +277,45 @@ const portfolioHeadcountChart = computed(() => {
 
 const centerMenuItems = [
   {
+    id: 'edit-center',
+    label: 'Edit'
+  },
+  {
     id: 'delete-center',
     label: 'Delete'
   }
 ]
 
+const isEditingCenter = computed(() => Boolean(centerDraft.value?.id))
+
+const centerSettingsTitle = computed(() =>
+  isEditingCenter.value ? 'Edit Call Center' : 'Create Call Center'
+)
+
+const centerSettingsSubmitLabel = computed(() =>
+  isEditingCenter.value ? 'Save Call Center' : 'Create Call Center'
+)
+
 const openCreateCenter = () => {
   centerDraft.value = createPlanningCenterDraft()
+  centerSettingsOpen.value = true
+}
+
+const openEditCenter = (center) => {
+  centerDraft.value = createPlanningCenterDraft({
+    id: center.id,
+    name: center.name,
+    defaultHolidayCalendarId: center.defaultHolidayCalendarId,
+    disabledHolidayRuleIds: center.disabledHolidayRuleIds,
+    customHolidays: center.customHolidays,
+    operatingWeekdays: center.operatingWeekdays,
+    defaultPaidHoursPerDay: center.defaultPaidHoursPerDay,
+    defaultOccupancyPercent: center.defaultOccupancyPercent,
+    defaultAdherencePercent: center.defaultAdherencePercent,
+    createdAt: center.createdAt,
+    updatedAt: center.updatedAt,
+    groups: center.groups
+  })
   centerSettingsOpen.value = true
 }
 
@@ -306,6 +345,11 @@ const confirmDeleteCenter = (center) => {
 }
 
 const handleCenterMenuSelect = (center, item) => {
+  if (item.id === 'edit-center') {
+    openEditCenter(center)
+    return
+  }
+
   if (item.id === 'delete-center') {
     confirmDeleteCenter(center)
   }
@@ -450,8 +494,6 @@ const handleCenterMenuSelect = (center, item) => {
                     <div class="grid gap-1">
                       <strong class="text-sm font-semibold text-slate-950">{{ center.name }}</strong>
                       <div class="flex flex-wrap gap-2 text-xs text-slate-500">
-                        <span>{{ center.timezone }}</span>
-                        <span class="text-slate-300">•</span>
                         <span v-if="center.summary.totalPlanCount > 0">
                           {{ center.summary.totalPlanCount === 1 ? `1 plan in ${selectedPlanningYear}` : `${formatWhole(center.summary.totalPlanCount)} plans in ${selectedPlanningYear}` }}
                         </span>
@@ -500,10 +542,14 @@ const handleCenterMenuSelect = (center, item) => {
     <CallCenterSettingsModal
       v-if="centerSettingsOpen"
       v-model:center-name="centerDraft.name"
-      v-model:timezone="centerDraft.timezone"
+      v-model:default-holiday-calendar-id="centerDraft.defaultHolidayCalendarId"
+      v-model:disabled-holiday-rule-ids="centerDraft.disabledHolidayRuleIds"
+      v-model:custom-holidays="centerDraft.customHolidays"
+      v-model:operating-weekdays="centerDraft.operatingWeekdays"
+      :weekday-options="props.weekdayOptions"
       :allow-backdrop-close="false"
-      title="Create Call Center"
-      submit-label="Create Call Center"
+      :title="centerSettingsTitle"
+      :submit-label="centerSettingsSubmitLabel"
       @close="closeCreateCenter"
       @save="saveCenter"
     />

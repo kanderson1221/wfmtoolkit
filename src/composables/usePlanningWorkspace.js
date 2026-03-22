@@ -1,4 +1,12 @@
 import { computed, ref, watch } from 'vue'
+import {
+  HOLIDAY_CALENDAR_NONE,
+  HOLIDAY_SCHEDULE_CLOSED,
+  normalizeCustomHolidays,
+  normalizeDisabledHolidayRuleIds,
+  normalizeHolidayCalendarId,
+  normalizeHolidayScheduleMode
+} from '../planner/holidayCalendars'
 
 import {
   createPlanningGroupDraft,
@@ -97,6 +105,10 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     const resolvedPlanningYear = Number.isFinite(routePlanningYear)
       ? routePlanningYear
       : currentPlan.value?.planningYear || new Date().getFullYear()
+    const centerHolidayCalendarId = normalizeHolidayCalendarId(
+      currentCenter.value.defaultHolidayCalendarId,
+      HOLIDAY_CALENDAR_NONE
+    )
 
     return {
       centerId: currentCenter.value.id,
@@ -105,7 +117,12 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       groupName: currentGroup.value.name,
       timezone: currentCenter.value.timezone,
       planningYear: resolvedPlanningYear,
-      operatingWeekdays: [...(currentGroup.value.operatingWeekdays || currentCenter.value.operatingWeekdays)],
+      defaultHolidayCalendarId: centerHolidayCalendarId,
+      holidayCalendarId: centerHolidayCalendarId,
+      disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(currentCenter.value.disabledHolidayRuleIds),
+      customHolidays: normalizeCustomHolidays(currentCenter.value.customHolidays),
+      holidayScheduleMode: normalizeHolidayScheduleMode(HOLIDAY_SCHEDULE_CLOSED),
+      operatingWeekdays: [...currentCenter.value.operatingWeekdays],
       defaultPaidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay,
       defaultOccupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
       defaultAdherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent,
@@ -272,7 +289,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     createPlanningGroupDraft({
       id: currentGroup.value?.id || '',
       name: currentGroup.value?.name || '',
-      operatingWeekdays: currentGroup.value?.operatingWeekdays || currentCenter.value?.operatingWeekdays,
+      operatingWeekdays: currentCenter.value?.operatingWeekdays,
       defaultPaidHoursPerDay: currentGroup.value?.defaultPaidHoursPerDay ?? currentCenter.value?.defaultPaidHoursPerDay,
       defaultOccupancyPercent: currentGroup.value?.defaultOccupancyPercent ?? currentCenter.value?.defaultOccupancyPercent,
       defaultAdherencePercent: currentGroup.value?.defaultAdherencePercent ?? currentCenter.value?.defaultAdherencePercent
