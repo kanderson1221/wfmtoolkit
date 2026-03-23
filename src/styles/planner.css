@@ -192,43 +192,377 @@
     @apply text-left;
   }
 
+  .assumption-table-plan {
+    @apply w-full table-fixed;
+  }
+
+  .assumption-table-plan thead th {
+    @apply px-2 py-2 text-[0.68rem];
+  }
+
+  .assumption-table-plan tbody td {
+    @apply px-2 py-2 tabular-nums;
+  }
+
+  .assumption-table-plan .month-cell {
+    @apply text-left;
+  }
+
+  .assumption-table-plan .assumption-month-btn {
+    @apply px-1.5 py-0.5 text-[0.88rem];
+  }
+
+  .assumption-table-plan input:not([type="checkbox"]) {
+    @apply min-w-0 px-1.5 py-1 text-[0.88rem];
+  }
+
+  .plan-col-month {
+    width: 4.5rem;
+  }
+
+  .plan-col-input,
+  .plan-col-value {
+    width: 4.9rem;
+  }
+
+  .plan-col-input-contacts {
+    width: 4.25rem;
+  }
+
+  .plan-col-input-aht {
+    width: 4rem;
+  }
+
+  .plan-col-input-peak {
+    width: 4.75rem;
+  }
+
+  .plan-col-result {
+    width: 5.4rem;
+  }
+
+  .assumption-table-staffing {
+    @apply w-full table-fixed;
+  }
+
+  .assumption-table-staffing thead th {
+    @apply px-2 py-2 text-[0.68rem];
+  }
+
+  .assumption-table-staffing tbody td {
+    @apply px-2 py-2 tabular-nums;
+  }
+
+  .assumption-table-staffing .month-cell {
+    @apply text-left;
+  }
+
+  .assumption-table-staffing .assumption-month-btn {
+    @apply px-1.5 py-0.5 text-[0.88rem];
+  }
+
+  .assumption-table-staffing input:not([type="checkbox"]) {
+    @apply min-w-0 rounded-none border border-transparent bg-transparent px-1.5 py-1 text-[0.88rem] shadow-none;
+  }
+
+  .assumption-table-staffing input:not([type="checkbox"]):focus {
+    @apply rounded-md border-[#15395f] bg-white ring-2 ring-[#d7e3ec];
+  }
+
+  .staffing-col-month {
+    width: 4.5rem;
+  }
+
+  .staffing-col-requirement,
+  .staffing-col-gap {
+    width: 5rem;
+  }
+
+  .staffing-col-value {
+    width: 5.15rem;
+  }
+
+  .assumption-table-actuals {
+    @apply w-full table-fixed;
+  }
+
+  .assumption-table-actuals thead th {
+    @apply px-2 py-2 text-[0.68rem];
+  }
+
+  .assumption-table-actuals thead .actuals-super-row th {
+    @apply border-b border-slate-200 bg-slate-50 px-2 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-600;
+  }
+
+  .assumption-table-actuals thead .actuals-super-row th:first-child {
+    @apply text-left;
+  }
+
+  .assumption-table-actuals thead .actuals-super-head.actuals-super-workload {
+    @apply bg-[#eef3f7] text-[#15395f];
+  }
+
+  .assumption-table-actuals thead .actuals-super-head.actuals-super-staffing {
+    @apply bg-[#e7eef4] text-[#15395f];
+  }
+
+  .assumption-table-actuals thead th.actuals-adjustable-head {
+    @apply bg-[#f4f8fb] text-[#15395f];
+    box-shadow: inset 0 -1px 0 #c3d2df;
+  }
+
+  .assumption-table-actuals tbody td {
+    @apply px-2 py-2 text-center tabular-nums;
+  }
+
+  .assumption-table-actuals .month-cell {
+    @apply text-left;
+  }
+
+  .actuals-month-label {
+    @apply inline-flex min-h-8 items-center text-[0.88rem] font-semibold text-slate-800;
+  }
+
+  .actuals-head-cell {
+    @apply inline-flex items-start justify-center gap-1.5 text-center;
+  }
+
+  .actuals-head-cell-select {
+    @apply w-full items-center justify-between gap-1.5;
+  }
+
+  .assumption-table-actuals thead .actuals-head-select {
+    @apply min-w-0 flex-1 rounded-none border-0 bg-transparent py-0 pl-0 pr-3 shadow-none outline-none ring-0 focus:border-transparent focus:bg-transparent focus:ring-0;
+    appearance: none;
+    -webkit-appearance: none;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1rem;
+    text-transform: uppercase;
+    color: #5f7892;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%235f7892' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right center;
+    background-repeat: no-repeat;
+    background-size: 10px 6px;
+    text-align: center;
+    text-align-last: center;
+  }
+
+  .assumption-table-actuals thead .actuals-head-select:focus {
+    border: 0;
+    background-color: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+
+  .actuals-head-info {
+    @apply mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-[#15395f];
+  }
+
+  .actuals-value-with-sup {
+    @apply inline-flex items-start gap-1 whitespace-nowrap;
+  }
+
+  .actuals-inline-sup {
+    @apply text-[0.62rem] font-semibold leading-none text-slate-500;
+  }
+
+  .actuals-inline-sup-neutral {
+    @apply text-slate-500;
+  }
+
+  .assumption-table-actuals input:not([type="checkbox"]) {
+    @apply min-w-0 rounded-none border border-transparent bg-transparent px-1.5 py-1 text-[0.88rem] shadow-none;
+  }
+
+  .assumption-table-actuals input:not([type="checkbox"]):focus {
+    @apply rounded-md border-[#15395f] bg-white ring-2 ring-[#d7e3ec];
+  }
+
+  .actuals-col-month {
+    width: 4.5rem;
+  }
+
+  .actuals-col-input,
+  .actuals-col-value {
+    width: 5rem;
+  }
+
+  .actuals-col-contacts {
+    width: 5.1rem;
+  }
+
+  .actuals-col-aht {
+    width: 4.4rem;
+  }
+
+  .actuals-col-hours {
+    width: 4.9rem;
+  }
+
+  .actuals-col-requirement,
+  .actuals-col-variance,
+  .actuals-col-gap {
+    width: 4.85rem;
+  }
+
+  .actuals-col-staffing-lens {
+    width: 7.2rem;
+  }
+
+  .actuals-chart-shell {
+    @apply grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm;
+  }
+
+  .actuals-chart-legend {
+    @apply flex flex-wrap items-center gap-4 text-sm text-slate-600;
+  }
+
+  .actuals-legend-item {
+    @apply inline-flex items-center gap-2;
+  }
+
+  .actuals-legend-swatch {
+    @apply inline-flex h-2.5 w-8 rounded-full;
+  }
+
+  .actuals-legend-swatch-need {
+    @apply bg-[#dfe8f0];
+  }
+
+  .actuals-legend-swatch-plan {
+    @apply border-t-2 border-dashed border-[#15395f] bg-transparent rounded-none h-0 w-8;
+  }
+
+  .actuals-chart-canvas {
+    @apply relative overflow-x-auto;
+  }
+
+  .actuals-chart-svg {
+    @apply h-auto min-w-full;
+  }
+
+  .actuals-chart-axis {
+    stroke: #cbd5e1;
+    stroke-width: 1;
+  }
+
+  .actuals-chart-axis-title {
+    fill: #64748b;
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-anchor: middle;
+    dominant-baseline: middle;
+  }
+
+  .actuals-chart-grid {
+    stroke: #e2e8f0;
+    stroke-dasharray: 3 5;
+    stroke-width: 1;
+  }
+
+  .actuals-chart-tick-label {
+    fill: #64748b;
+    font-size: 10px;
+    font-weight: 600;
+    text-anchor: end;
+  }
+
+  .actuals-chart-bar {
+    fill: #dfe8f0;
+    pointer-events: none;
+  }
+
+  .actuals-chart-hitbox {
+    fill: transparent;
+    pointer-events: all;
+    cursor: default;
+  }
+
+  .actuals-chart-line {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .actuals-chart-line-frontline {
+    stroke: #15395f;
+  }
+
+  .actuals-chart-line-plan {
+    stroke: #15395f;
+    stroke-dasharray: 7 5;
+    pointer-events: none;
+  }
+
+  .actuals-chart-point {
+    stroke: white;
+    stroke-width: 2;
+  }
+
+  .actuals-chart-point-plan {
+    fill: #5f7892;
+    pointer-events: none;
+  }
+
+  .actuals-chart-label {
+    fill: #64748b;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-anchor: middle;
+    pointer-events: none;
+  }
+
+  .actuals-chart-tooltip {
+    @apply pointer-events-none absolute top-2 z-10 min-w-[11rem] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-lg;
+  }
+
+  .actuals-chart-tooltip-title {
+    @apply block pb-1 text-sm font-semibold text-slate-900;
+  }
+
+  .actuals-chart-tooltip-grid {
+    @apply grid grid-cols-[auto_auto] gap-x-3 gap-y-1;
+  }
+
+  .actuals-chart-tooltip-grid strong {
+    @apply text-right font-semibold text-slate-900;
+  }
+
   .assumption-table-presence-main thead .presence-super-row th {
-    @apply border-b border-slate-200 px-2 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-600;
+    @apply border-b border-slate-200 bg-slate-50 px-2 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-600;
   }
 
   .assumption-table-presence-main thead .presence-super-row th:first-child {
-    @apply bg-slate-100 text-left text-slate-700;
+    @apply text-left text-slate-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-calendar {
-    @apply bg-slate-100 text-slate-700;
+    @apply text-slate-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-presence {
-    @apply border-l border-slate-200 bg-[#eef3f7] text-[#15395f];
+    @apply text-slate-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-utilization {
-    @apply border-l border-slate-200 bg-[#e7eef4] text-[#15395f];
+    @apply text-slate-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-results {
-    @apply border-l border-slate-200 bg-[#dfe8f0] text-[#102f4f];
+    @apply text-slate-700;
   }
 
   .assumption-table-presence-main thead .presence-detail-row th {
-    @apply bg-white px-2 py-1.5 text-[0.68rem] font-semibold normal-case tracking-normal text-slate-500;
-  }
-
-  .assumption-table-presence-main thead .presence-detail-row th:nth-child(1),
-  .assumption-table-presence-main thead .presence-detail-row th:nth-child(4),
-  .assumption-table-presence-main thead .presence-detail-row th:nth-child(7),
-  .assumption-table-presence-main thead .presence-detail-row th:nth-child(12) {
-    @apply border-l border-slate-200;
+    @apply bg-white px-2 py-2 text-[0.68rem] font-semibold normal-case tracking-normal text-slate-600;
   }
 
   .assumption-table-presence-main tbody td {
-    @apply px-2 py-1 text-center;
+    @apply px-2 py-1.5 text-center tabular-nums;
   }
 
   .assumption-table-presence-main tbody td:first-child {
@@ -256,8 +590,32 @@
     @apply font-medium text-slate-700;
   }
 
+  .assumption-table-presence-main tbody td.presence-input-cell {
+    @apply bg-white transition-colors;
+  }
+
+  .assumption-table-presence-main tbody td.presence-input-calendar {
+    @apply bg-white;
+  }
+
+  .assumption-table-presence-main tbody td.presence-input-presence {
+    @apply bg-white;
+  }
+
+  .assumption-table-presence-main tbody td.presence-input-utilization {
+    @apply bg-white;
+  }
+
+  .assumption-table-presence-main tbody td.presence-input-other {
+    @apply bg-white;
+  }
+
+  .assumption-table-presence-main tbody td.presence-input-cell:focus-within {
+    @apply bg-white;
+  }
+
   .assumption-table-presence-main tbody td.presence-result-cell {
-    @apply bg-slate-50/80 font-medium text-slate-900;
+    @apply bg-white font-medium text-slate-900 tabular-nums;
   }
 
   .assumption-table-presence-main tbody td.presence-result-final {
@@ -301,6 +659,22 @@
 
   .assumption-table-presence-main .assumption-month-btn {
     @apply py-0;
+  }
+
+  .presence-month-row {
+    @apply flex items-center justify-between gap-2;
+  }
+
+  .presence-month-label {
+    @apply inline-flex min-h-9 flex-1 items-center rounded-lg bg-slate-50 px-2.5 py-1.5 text-left font-semibold text-slate-800;
+  }
+
+  .presence-month-actions {
+    @apply shrink-0;
+  }
+
+  .assumption-table-presence-main .month-cell {
+    box-shadow: none;
   }
 
   @media (min-width: 1280px) {

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive } from 'vue'
 
+import PlannerActualsPanel from './planner/PlannerActualsPanel.vue'
 import PlannerMonthlyPlanTab from './planner/PlannerMonthlyPlanTab.vue'
 import PlannerOverviewPanel from './planner/PlannerOverviewPanel.vue'
 import PlannerPresenceTab from './planner/PlannerPresenceTab.vue'
@@ -57,6 +58,7 @@ const staffingStarted = computed(() =>
 )
 
 const staffingReady = computed(() => staffingStarted.value)
+const actualsStarted = computed(() => builder.actualsSummary.loadedMonthsCount > 0)
 
 const planComplete = computed(() =>
   availabilityReady.value &&
@@ -83,34 +85,52 @@ const forecastEntryStep = computed(() => {
 
 const workflowSections = computed(() => [
   {
-    id: 'overview',
-    title: 'Overview',
-    statusLabel: 'Start here',
-    tone: 'default'
+    id: 'plan',
+    label: 'Plan',
+    items: [
+      {
+        id: 'overview',
+        title: 'Overview',
+        statusLabel: 'Start here',
+        tone: 'default'
+      },
+      {
+        id: 'availability',
+        title: 'Agent Availability',
+        statusLabel: availabilityReady.value ? 'Ready' : 'Needs input',
+        tone: availabilityReady.value ? 'ready' : 'attention'
+      },
+      {
+        id: 'variability',
+        title: 'Variability Buffer',
+        statusLabel: variabilityReady.value ? 'Ready' : 'Needs input',
+        tone: variabilityReady.value ? 'ready' : 'attention'
+      },
+      {
+        id: 'requirement',
+        title: 'Required Headcount',
+        statusLabel: requirementReady.value ? 'Ready' : 'Needs input',
+        tone: requirementReady.value ? 'ready' : 'attention'
+      },
+      {
+        id: 'staffing',
+        title: 'Staffing Plan',
+        statusLabel: staffingReady.value ? 'Ready' : staffingStarted.value ? 'In progress' : 'Not started',
+        tone: staffingReady.value ? 'ready' : staffingStarted.value ? 'attention' : 'default'
+      }
+    ]
   },
   {
-    id: 'availability',
-    title: 'Agent Availability',
-    statusLabel: availabilityReady.value ? 'Ready' : 'Needs input',
-    tone: availabilityReady.value ? 'ready' : 'attention'
-  },
-  {
-    id: 'variability',
-    title: 'Variability Buffer',
-    statusLabel: variabilityReady.value ? 'Ready' : 'Needs input',
-    tone: variabilityReady.value ? 'ready' : 'attention'
-  },
-  {
-    id: 'requirement',
-    title: 'Required Headcount',
-    statusLabel: requirementReady.value ? 'Ready' : 'Needs input',
-    tone: requirementReady.value ? 'ready' : 'attention'
-  },
-  {
-    id: 'staffing',
-    title: 'Staffing Plan',
-    statusLabel: staffingReady.value ? 'Ready' : staffingStarted.value ? 'In progress' : 'Not started',
-    tone: staffingReady.value ? 'ready' : staffingStarted.value ? 'attention' : 'default'
+    id: 'actuals',
+    label: 'Actuals',
+    items: [
+      {
+        id: 'actuals',
+        title: 'Actuals & Variance',
+        statusLabel: actualsStarted.value ? `${builder.actualsSummary.loadedMonthsCount} months` : 'Not started',
+        tone: actualsStarted.value ? 'ready' : 'default'
+      }
+    ]
   }
 ])
 
@@ -233,12 +253,9 @@ const breadcrumbItems = computed(() => {
         <div class="grid xl:grid-cols-[188px_minmax(0,1fr)] xl:items-start">
           <section class="border-b border-slate-200 p-3 xl:sticky xl:top-4 xl:border-b-0 xl:border-r">
             <div class="grid gap-2">
-              <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Plan Flow
-              </span>
               <PlannerSectionNav
                 v-model:active-id="builder.activeSection"
-                :items="workflowSections"
+                :groups="workflowSections"
               />
             </div>
           </section>
@@ -310,6 +327,15 @@ const breadcrumbItems = computed(() => {
                 :format-number="builder.formatNumber"
                 @recommend-classes="builder.generateRecommendedTrainingClasses"
                 @save="builder.savePlan"
+              />
+
+              <PlannerActualsPanel
+                v-else-if="builder.activeSection === 'actuals'"
+                v-model:actuals-months="builder.actualsMonths"
+                :actuals-records="builder.actualsRecords"
+                :actuals-summary="builder.actualsSummary"
+                :format-whole="builder.formatWhole"
+                :format-number="builder.formatNumber"
               />
             </div>
           </section>

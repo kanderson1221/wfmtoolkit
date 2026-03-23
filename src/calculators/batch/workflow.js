@@ -2,20 +2,20 @@ export const createEmptyWorkflowState = () => ({
   hasSubmitted: false,
   summary: null,
   errors: [],
-  results: [],
-  exportData: {}
+  errorCount: 0,
+  downloads: {}
 })
 
 export const normalizeWorkflowPayload = (workflowPayload = {}) => {
-  const workflowErrors = workflowPayload.errors ?? []
-  const workflowResults = workflowPayload.results ?? []
+  const workflowErrors = workflowPayload.errorsPreview ?? []
+  const workflowSummary = workflowPayload.summary ?? null
 
   return {
     hasSubmitted: true,
-    summary: workflowPayload.summary ?? null,
+    summary: workflowSummary,
     errors: workflowErrors,
-    results: workflowResults,
-    exportData: workflowPayload.export ?? {}
+    errorCount: workflowPayload.errorCount ?? workflowErrors.length,
+    downloads: workflowPayload.downloads ?? {}
   }
 }
 

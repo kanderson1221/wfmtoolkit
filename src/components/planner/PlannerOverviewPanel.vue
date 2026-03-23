@@ -95,6 +95,11 @@ const demandItems = computed(() => [
     label: 'Peak Required Headcount',
     value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
     meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
+  },
+  {
+    label: 'Peak Day HC',
+    value: props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1),
+    meta: props.planSummary?.peakDayMonth?.fullLabel || 'Highest modeled peak-day requirement'
   }
 ])
 
@@ -219,7 +224,7 @@ const openSection = (sectionId, stepId = '') => {
 
     <section class="grid gap-3">
       <AppSectionHeader title="Forecast Need Summary" :icon="mdiPhoneOutline" />
-      <AppStatStrip :items="demandItems" columns="md:grid-cols-3" />
+      <AppStatStrip :items="demandItems" columns="md:grid-cols-2 xl:grid-cols-4" />
     </section>
 
     <section class="grid gap-3">

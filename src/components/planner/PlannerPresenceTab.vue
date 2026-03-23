@@ -177,11 +177,11 @@ const summaryItems = computed(() => [
               :key="`presence-main-${record.label}`"
             >
               <td class="month-cell">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="inline-flex flex-1 items-center px-2 py-1 text-left font-semibold text-slate-800">
+                <div class="presence-month-row">
+                  <span class="presence-month-label">
                     {{ record.fullLabel }}
                   </span>
-                  <div @click.stop @keydown.stop>
+                  <div class="presence-month-actions" @click.stop @keydown.stop>
                     <PlannerCopyMenu
                       :month-label="record.fullLabel"
                       @select="handleCopyAction(record.monthIndex, $event)"
@@ -192,7 +192,7 @@ const summaryItems = computed(() => [
               <td class="presence-calendar-cell">
                 {{ Number.isInteger(record.openDays) ? props.formatWhole(record.openDays) : props.formatNumber(record.openDays, 2) }}
               </td>
-              <td class="presence-calendar-cell">
+              <td class="presence-calendar-cell presence-input-cell presence-input-calendar">
                 <AppTableNumberField
                   v-model.number="presenceMonths[record.monthIndex].paidHoursPerDay"
                   min="0"

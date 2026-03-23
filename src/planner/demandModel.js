@@ -216,9 +216,15 @@ export const computeMonthlyRecords = ({
 
     const contacts = Math.max(toNumber(planInput.contacts, 0), 0)
     const ahtSeconds = Math.max(toNumber(planInput.ahtSeconds, 0), 0)
+    const peakDayUpliftPercent = Math.max(toNumber(planInput.peakDayUpliftPercent, 0), 0)
+    const averageDailyContacts = openDays > 0 ? contacts / openDays : 0
+    const peakDayContacts = averageDailyContacts * (1 + peakDayUpliftPercent / 100)
     const workloadHours = (contacts * ahtSeconds) / 3600
+    const peakDayWorkloadHours = (peakDayContacts * ahtSeconds) / 3600
     const requiredStaffHours = workloadHours * workloadStaffingRatio
+    const peakDayRequiredStaffHours = peakDayWorkloadHours * workloadStaffingRatio
     const requiredHeadcount = paidHoursPerMonth > 0 ? requiredStaffHours / paidHoursPerMonth : 0
+    const peakDayRequiredHeadcount = paidHoursPerDay > 0 ? peakDayRequiredStaffHours / paidHoursPerDay : 0
     const roundedHeadcount = requiredHeadcount > 0 ? Math.ceil(requiredHeadcount) : 0
 
     const warnings = buildMonthlyWarnings({
@@ -281,9 +287,15 @@ export const computeMonthlyRecords = ({
       workloadStaffingRatio,
       contacts,
       ahtSeconds,
+      peakDayUpliftPercent,
+      averageDailyContacts,
+      peakDayContacts,
       workloadHours,
+      peakDayWorkloadHours,
       requiredStaffHours,
+      peakDayRequiredStaffHours,
       requiredHeadcount,
+      peakDayRequiredHeadcount,
       roundedHeadcount,
       ...warnings
     }
@@ -311,6 +323,9 @@ export const summarizeRandomRecords = (monthlyRecords, randomDefaults, useMonthl
 
 export const summarizePlanRecords = (monthlyRecords) => {
   const peakMonth = monthlyRecords.reduce((peak, row) => (row.requiredHeadcount > peak.requiredHeadcount ? row : peak))
+  const peakDayMonth = monthlyRecords.reduce((peak, row) =>
+    row.peakDayRequiredHeadcount > peak.peakDayRequiredHeadcount ? row : peak
+  )
   const busiestMonth = monthlyRecords.reduce((busiest, row) =>
     row.workloadHours > busiest.workloadHours ? row : busiest
   )
@@ -330,6 +345,7 @@ export const summarizePlanRecords = (monthlyRecords) => {
 
   return {
     peakMonth,
+    peakDayMonth,
     busiestMonth,
     annualContacts,
     annualWorkloadHours,
@@ -337,7 +353,8 @@ export const summarizePlanRecords = (monthlyRecords) => {
     averageAhtSeconds,
     minimumRequiredHeadcount,
     averageRequiredStaffHours: average(monthlyRecords.map((row) => row.requiredStaffHours)),
-    averageRequiredHeadcount: average(monthlyRecords.map((row) => row.requiredHeadcount))
+    averageRequiredHeadcount: average(monthlyRecords.map((row) => row.requiredHeadcount)),
+    averagePeakRequiredHeadcount: average(monthlyRecords.map((row) => row.peakDayRequiredHeadcount))
   }
 }
 

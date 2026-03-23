@@ -17,6 +17,9 @@ const plannerStubs = {
   },
   PlannerStaffingPlanTab: {
     template: '<div data-test="staffing-tab">staffing</div>'
+  },
+  PlannerActualsPanel: {
+    template: '<div data-test="actuals-tab">actuals</div>'
   }
 }
 
@@ -82,7 +85,7 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.text()).toContain('Overview')
   })
 
-  it('switches between overview, direct forecast steps, and staffing plan', async () => {
+  it('switches between overview, direct forecast steps, staffing plan, and actuals', async () => {
     const wrapper = mountBuilder({
       draftKey: 'plan-1',
       initialPlan: {
@@ -103,6 +106,11 @@ describe('MonthlyPlanBuilder', () => {
 
     expect(wrapper.find('[data-test="staffing-tab"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="presence-tab"]').exists()).toBe(false)
+
+    await wrapper.find('[data-section-id="actuals"]').trigger('click')
+
+    expect(wrapper.find('[data-test="actuals-tab"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="staffing-tab"]').exists()).toBe(false)
   })
 
   it('emits a saved plan payload from the shell action', async () => {

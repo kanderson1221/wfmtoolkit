@@ -75,9 +75,14 @@ const summaryItems = computed(() => [
     meta: 'Average monthly required headcount before rounding'
   },
   {
-    label: 'Peak Required Headcount',
+    label: 'Peak Month HC',
     value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
     meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
+  },
+  {
+    label: 'Peak Day HC',
+    value: props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1),
+    meta: props.planSummary?.peakDayMonth?.fullLabel || 'Highest modeled peak-day requirement'
   }
 ])
 </script>
@@ -86,33 +91,60 @@ const summaryItems = computed(() => [
   <section class="monthly-tab-panel">
     <AppSectionHeader title="Required Headcount" />
 
-    <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-5" />
+    <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-6" />
 
     <section class="grid gap-3">
       <AppSectionHeader title="Monthly Requirement Worksheet" />
 
       <div class="assumption-table-shell">
       <table class="assumption-table assumption-table-plan">
+        <colgroup>
+          <col class="plan-col-month" />
+          <col class="plan-col-input plan-col-input-contacts" />
+          <col class="plan-col-input plan-col-input-aht" />
+          <col class="plan-col-input plan-col-input-peak" />
+          <col class="plan-col-value" />
+          <col class="plan-col-value" />
+          <col class="plan-col-value" />
+          <col class="plan-col-value" />
+          <col class="plan-col-value" />
+          <col class="plan-col-result" />
+          <col class="plan-col-result" />
+          <col class="plan-col-result" />
+          <col class="plan-col-result" />
+        </colgroup>
         <thead>
           <tr>
             <th title="Planning month. Click a month name to highlight that row.">Month</th>
             <th title="Monthly contact demand used to create workload hours.">Contacts</th>
-            <th title="Average handle time in seconds used to create workload hours.">AHT Sec</th>
-            <th title="Business days flowing in from the call-center operating days and holiday closures.">Business Days</th>
+            <th title="Average handle time in seconds used to create workload hours.">AHT</th>
+            <th title="Peak Day Uplift % increases average open-day contacts to represent the busiest day of the month.">
+              <span class="plan-head-label">Peak Day<br />%</span>
+            </th>
+            <th title="Business days flowing in from the call-center operating days and holiday closures.">
+              <span class="plan-head-label">Biz<br />Days</span>
+            </th>
             <th title="Scheduled percentage flowing in from the presence / utilization step.">Scheduled %</th>
             <th title="Total scheduled random loss flowing in from the random step.">
-              <span class="plan-head-label">Total Random<br />Loss %</span>
+              <span class="plan-head-label">Random<br />%</span>
             </th>
-            <th title="Design Factor is calculated as Scheduled % - Total Random Loss %.">Design Factor</th>
+            <th title="Design Factor is calculated as Scheduled % - Total Random Loss %.">
+              <span class="plan-head-label">Design<br />%</span>
+            </th>
             <th title="Workload Staffing Ratio is calculated as 1 / Design Factor.">
-              <span class="plan-head-label">Workload<br />Staffing Ratio</span>
+              <span class="plan-head-label">Staffing<br />Ratio</span>
             </th>
-            <th title="Monthly workload hours calculated from contacts and AHT.">Workload Hours</th>
+            <th title="Monthly workload hours calculated from contacts and AHT.">
+              <span class="plan-head-label">Workload<br />Hrs</span>
+            </th>
             <th title="Required staff hours calculated as Workload Hours x Workload Staffing Ratio.">
-              <span class="plan-head-label">Required Staff<br />Hours</span>
+              <span class="plan-head-label">Required<br />Hrs</span>
             </th>
             <th title="Required headcount calculated as Required Staff Hours / Monthly FTE Paid Hours from the presence / utilization step.">
-              <span class="plan-head-label">Required<br />Headcount</span>
+              <span class="plan-head-label">Avg Req<br />HC</span>
+            </th>
+            <th title="Peak-day headcount calculated from average open-day contacts plus Peak Day Uplift %.">
+              <span class="plan-head-label">Peak<br />HC</span>
             </th>
           </tr>
         </thead>
@@ -126,25 +158,36 @@ const summaryItems = computed(() => [
               <button
                 type="button"
                 class="assumption-month-btn"
+                :title="record.fullLabel"
                 @click="setSelectedMonth(record.monthIndex)"
               >
-                {{ record.fullLabel }}
+                {{ record.label }}
               </button>
             </td>
             <td>
               <AppTableNumberField
                 v-model.number="planMonths[record.monthIndex].contacts"
-                min="0"
-                step="100"
+                :min="0"
+                :step="100"
                 aria-label="Contacts"
               />
             </td>
             <td>
               <AppTableNumberField
                 v-model.number="planMonths[record.monthIndex].ahtSeconds"
-                min="0"
-                step="1"
+                :min="0"
+                :step="1"
                 aria-label="Average handle time in seconds"
+              />
+            </td>
+            <td>
+              <AppTableNumberField
+                v-model.number="planMonths[record.monthIndex].peakDayUpliftPercent"
+                :min="0"
+                :step="1"
+                :max-fraction-digits="1"
+                suffix="%"
+                aria-label="Peak day uplift percent"
               />
             </td>
             <td>{{ props.formatWhole(record.openDays) }}</td>
@@ -155,6 +198,7 @@ const summaryItems = computed(() => [
             <td>{{ props.formatNumber(record.workloadHours, 1) }}</td>
             <td>{{ props.formatNumber(record.requiredStaffHours, 1) }}</td>
             <td>{{ props.formatNumber(record.requiredHeadcount, 1) }}</td>
+            <td>{{ props.formatNumber(record.peakDayRequiredHeadcount, 1) }}</td>
           </tr>
         </tbody>
       </table>

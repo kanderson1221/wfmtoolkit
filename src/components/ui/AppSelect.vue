@@ -23,6 +23,10 @@ const props = defineProps({
   compact: {
     type: Boolean,
     default: false
+  },
+  plain: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -42,12 +46,17 @@ const normalizedOptions = computed(() =>
         }
   )
 )
+
+const inputClass = computed(() => [
+  props.plain ? null : props.compact ? fieldInputCompactClass : fieldInputClass,
+  attrs.class
+])
 </script>
 
 <template>
   <select
     v-model="model"
-    :class="[props.compact ? fieldInputCompactClass : fieldInputClass, attrs.class]"
+    :class="inputClass"
     v-bind="attrs"
   >
     <option

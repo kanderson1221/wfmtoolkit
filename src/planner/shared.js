@@ -63,8 +63,21 @@ export const createRandomMonth = (overrides = {}) => ({
 export const createPlanMonth = (overrides = {}) => ({
   contacts: '',
   ahtSeconds: 300,
+  peakDayUpliftPercent: 0,
   ...overrides
 })
+
+export const createActualsMonth = (overrides = {}) => {
+  const {
+    actualContacts = null,
+    actualAhtSeconds = null
+  } = overrides || {}
+
+  return {
+    actualContacts,
+    actualAhtSeconds
+  }
+}
 
 export const createTrainingSettings = (overrides = {}) => ({
   trainingDurationWorkdays: clamp(Math.round(toNumber(overrides.trainingDurationWorkdays, 20)), 1, 260),
@@ -107,5 +120,6 @@ export const createTrainingClass = (overrides = {}) => {
 export const buildPresenceMonths = () => MONTH_LABELS.map(() => createPresenceMonth())
 export const buildRandomMonths = () => MONTH_LABELS.map(() => createRandomMonth())
 export const buildPlanMonths = () => MONTH_LABELS.map(() => createPlanMonth())
+export const buildActualsMonths = () => MONTH_LABELS.map(() => createActualsMonth())
 export const buildStaffingMonths = () => MONTH_LABELS.map(() => createStaffingMonth())
 export const buildTrainingClasses = () => []

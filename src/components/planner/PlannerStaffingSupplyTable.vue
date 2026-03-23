@@ -55,38 +55,55 @@ const gapClass = (value) => ({
 
     <div class="assumption-table-shell">
       <table class="assumption-table assumption-table-staffing">
+        <colgroup>
+          <col class="staffing-col-month" />
+          <col class="staffing-col-requirement" />
+          <col class="staffing-col-requirement" />
+          <col class="staffing-col-value" />
+          <col class="staffing-col-value" />
+          <col class="staffing-col-value" />
+          <col class="staffing-col-value" />
+          <col class="staffing-col-value" />
+          <col class="staffing-col-value" />
+          <col class="staffing-col-value" />
+          <col class="staffing-col-value" />
+          <col class="staffing-col-gap" />
+        </colgroup>
         <thead>
           <tr>
             <th title="Planning month. Click a month name to highlight that row.">Month</th>
             <th title="Frontline headcount required by the demand model for this month.">
-              <span class="plan-head-label">Required<br />Headcount</span>
+              <span class="plan-head-label">Avg Req<br />HC</span>
+            </th>
+            <th title="Peak-day headcount requirement from the demand model for this month.">
+              <span class="plan-head-label">Peak Req<br />HC</span>
             </th>
             <th title="Total headcount on the roster at the start of the month, before any monthly movement is applied.">
-              <span class="plan-head-label">Starting Total<br />Headcount</span>
+              <span class="plan-head-label">Start Total<br />HC</span>
             </th>
             <th title="Productive frontline headcount available at the start of the month before graduates and attrition are applied.">
-              <span class="plan-head-label">Starting Frontline<br />Headcount</span>
+              <span class="plan-head-label">Start Frontline<br />HC</span>
             </th>
             <th title="Total people hired into training during the month.">
-              <span class="plan-head-label">Hired into<br />Training</span>
+              <span class="plan-head-label">Hired<br />HC</span>
             </th>
             <th title="Full class headcount scheduled to finish training during the month. Graduation yield still affects how many become frontline-ready after nesting.">
-              <span class="plan-head-label">Graduating<br />Headcount</span>
+              <span class="plan-head-label">Graduating<br />HC</span>
             </th>
             <th title="People still in training at the end of the month and therefore not yet available as frontline supply.">
-              <span class="plan-head-label">Still in Training<br />Month End</span>
+              <span class="plan-head-label">In Training<br />Month End</span>
             </th>
             <th title="Planned frontline exits for the month. This reduces both total headcount and frontline headcount.">
-              <span class="plan-head-label">Frontline Attrition<br />Headcount</span>
+              <span class="plan-head-label">Attrition<br />HC</span>
             </th>
             <th title="Total headcount remaining on the roster at the end of the month after hires, fallout, and attrition.">
-              <span class="plan-head-label">Ending Total<br />Headcount</span>
+              <span class="plan-head-label">End Total<br />HC</span>
             </th>
             <th title="Productive frontline headcount available at the end of the month after graduates and attrition are applied.">
-              <span class="plan-head-label">Ending Frontline<br />Headcount</span>
+              <span class="plan-head-label">End Frontline<br />HC</span>
             </th>
             <th title="Starting frontline headcount minus required headcount from the demand model. Negative values indicate the month opens short.">
-              <span class="plan-head-label">Opening Frontline<br />Gap</span>
+              <span class="plan-head-label">Opening<br />Gap</span>
             </th>
           </tr>
         </thead>
@@ -100,18 +117,20 @@ const gapClass = (value) => ({
               <button
                 type="button"
                 class="assumption-month-btn"
+                :title="record.fullLabel"
                 @click="setSelectedMonth(record.monthIndex)"
               >
-                {{ record.fullLabel }}
+                {{ record.label }}
               </button>
             </td>
               <td>{{ props.formatNumber(record.requiredHeadcount, 1) }}</td>
+              <td>{{ props.formatNumber(record.peakDayRequiredHeadcount, 1) }}</td>
               <td>
                 <AppTableNumberField
                   v-if="record.monthIndex === 0"
                   v-model.number="startingHeadcount"
-                  min="0"
-                  step="0.1"
+                  :min="0"
+                  :step="0.1"
                   :max-fraction-digits="1"
                   aria-label="Starting roster headcount for the first month"
                 />
@@ -121,9 +140,9 @@ const gapClass = (value) => ({
                 <AppTableNumberField
                   v-if="record.monthIndex === 0"
                   v-model.number="startingFrontlineHeadcount"
-                  min="0"
+                  :min="0"
                   :max="startingHeadcount"
-                  step="0.1"
+                  :step="0.1"
                   :max-fraction-digits="1"
                   aria-label="Starting frontline headcount for the first month"
                 />
@@ -135,8 +154,8 @@ const gapClass = (value) => ({
               <td>
                 <AppTableNumberField
                   v-model.number="staffingMonths[record.monthIndex].frontlineAttritionHeadcount"
-                  min="0"
-                  step="0.1"
+                  :min="0"
+                  :step="0.1"
                   :max-fraction-digits="1"
                   :title="`Derived attrition: ${props.formatNumber(record.frontlineAttritionPercent, 1)}% of starting frontline HC`"
                   aria-label="Frontline attrition headcount"

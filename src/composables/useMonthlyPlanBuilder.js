@@ -6,15 +6,18 @@ import {
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_SCHEDULE_CLOSED,
   buildPlanMonths,
+  buildActualsMonths,
   buildPresenceMonths,
   buildRandomMonths,
   buildStaffingMonths,
   buildTrainingClasses,
   clamp,
   computeMonthlyRecords,
+  computeActualsRecords,
   computeStaffingRecords,
   deriveStartingFrontlineHeadcount,
   createPlanMonth,
+  createActualsMonth,
   createPresenceMonth,
   createRandomMonth,
   createStaffingMonth,
@@ -27,6 +30,7 @@ import {
   normalizeHolidayScheduleMode,
   recommendTrainingClasses,
   summarizePlanRecords,
+  summarizeActualsRecords,
   summarizePresenceRecords,
   summarizeRandomRecords,
   summarizeStaffingRecords,
@@ -102,7 +106,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       initialUi.activeSection === 'availability' ||
       initialUi.activeSection === 'variability' ||
       initialUi.activeSection === 'requirement' ||
-      initialUi.activeSection === 'staffing'
+      initialUi.activeSection === 'staffing' ||
+      initialUi.activeSection === 'actuals'
     ) {
       return initialUi.activeSection
     }
@@ -145,6 +150,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const useMonthlyRandomOverrides = ref(Boolean(initialPlan.useMonthlyRandomOverrides))
   const randomMonths = ref(hydrateMonths(initialPlan.randomMonths, buildRandomMonths, createRandomMonth))
   const planMonths = ref(hydrateMonths(initialPlan.planMonths, buildPlanMonths, createPlanMonth))
+  const actualsMonths = ref(hydrateMonths(initialPlan.actualsMonths, buildActualsMonths, createActualsMonth))
   const trainingSettings = ref(createTrainingSettings(initialPlan.trainingSettings || {}))
   const startingHeadcount = ref(initialStartingHeadcount)
   const startingFrontlineHeadcount = ref(
@@ -267,6 +273,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides.value = false
     randomMonths.value = examplePlan.randomMonths
     planMonths.value = examplePlan.planMonths
+    actualsMonths.value = buildActualsMonths()
     startingHeadcount.value = examplePlan.startingHeadcount
     startingFrontlineHeadcount.value = examplePlan.startingFrontlineHeadcount
     trainingSettings.value = examplePlan.trainingSettings
@@ -293,6 +300,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides.value = false
     randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(centerRandomDefaults.value))
     planMonths.value = buildPlanMonths()
+    actualsMonths.value = buildActualsMonths()
     trainingSettings.value = createTrainingSettings()
     startingHeadcount.value = 0
     startingFrontlineHeadcount.value = 0
@@ -329,6 +337,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       trainingClasses.value,
       trainingSettings.value
     )
+  )
+
+  const actualsRecords = computed(() =>
+    computeActualsRecords(monthlyRecords.value, staffingRecords.value, actualsMonths.value)
   )
 
   const generateRecommendedTrainingClasses = () => {
@@ -368,6 +380,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   )
   const planSummary = computed(() => summarizePlanRecords(monthlyRecords.value))
   const staffingSummary = computed(() => summarizeStaffingRecords(staffingRecords.value))
+  const actualsSummary = computed(() => summarizeActualsRecords(actualsRecords.value))
 
   const buildPlanPayload = () => ({
     id: savedPlan?.id || initialPlan.id || null,
@@ -384,6 +397,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
     randomMonths: randomMonths.value.map((month) => createRandomMonth(month)),
     planMonths: planMonths.value.map((month) => createPlanMonth(month)),
+    actualsMonths: actualsMonths.value.map((month) => createActualsMonth(month)),
     trainingSettings: createTrainingSettings(trainingSettings.value),
     startingHeadcount: startingHeadcount.value,
     startingFrontlineHeadcount: startingFrontlineHeadcount.value,
@@ -399,6 +413,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       averageRequiredHeadcount: planSummary.value.averageRequiredHeadcount,
       peakRequiredHeadcount: planSummary.value.peakMonth.requiredHeadcount,
       peakMonthLabel: planSummary.value.peakMonth.fullLabel,
+      averagePeakRequiredHeadcount: planSummary.value.averagePeakRequiredHeadcount,
+      peakDayRequiredHeadcount: planSummary.value.peakDayMonth.peakDayRequiredHeadcount,
+      peakDayMonthLabel: planSummary.value.peakDayMonth.fullLabel,
       startingRosterHeadcount: staffingSummary.value.startingRosterHeadcount,
       startingFrontlineHeadcount: staffingSummary.value.startingFrontlineHeadcount,
       endingRosterHeadcount: staffingSummary.value.endingRosterHeadcount,
@@ -550,6 +567,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       useMonthlyRandomOverrides,
       randomMonths,
       planMonths,
+      actualsMonths,
       trainingSettings,
       startingHeadcount,
       startingFrontlineHeadcount,
@@ -599,6 +617,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides,
     randomMonths,
     planMonths,
+    actualsMonths,
     trainingSettings,
     startingHeadcount,
     startingFrontlineHeadcount,
@@ -612,6 +631,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planSummary,
     staffingSummary,
     staffingRecords,
+    actualsRecords,
+    actualsSummary,
     autosaveStatusMessage,
     formatNumber,
     formatWhole,

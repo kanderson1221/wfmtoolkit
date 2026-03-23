@@ -6,20 +6,21 @@ import { useCsvBatchCalculator } from '../composables/useCsvBatchCalculator'
 const {
   currentWorkflow,
   selectedFileName,
+  selectedFileSizeLabel,
   parseError,
   submitError,
   isLoading,
   hasSubmitted,
   summary,
   errors,
-  results,
-  parsedRowCount,
+  errorCount,
   processedCount,
   successfulCount,
   failedCount,
   fileProcessorTotalCalls,
   primaryKpi,
   primaryExportReady,
+  errorReportReady,
   formatCount,
   formatVolume,
   formatDecimal,
@@ -27,7 +28,8 @@ const {
   formatAsaSeconds,
   handleFileSelect,
   runWorkflow,
-  exportPrimary
+  exportPrimary,
+  exportErrorReport
 } = useCsvBatchCalculator()
 </script>
 
@@ -37,7 +39,7 @@ const {
       <CsvBatchControlPanel
         :workflow="currentWorkflow"
         :selected-file-name="selectedFileName"
-        :parsed-row-count="parsedRowCount"
+        :selected-file-size-label="selectedFileSizeLabel"
         :parse-error="parseError"
         :submit-error="submitError"
         :is-loading="isLoading"
@@ -58,14 +60,16 @@ const {
         :summary="summary"
         :file-processor-total-calls="fileProcessorTotalCalls"
         :primary-export-ready="primaryExportReady"
-        :results="results"
+        :error-report-ready="errorReportReady"
         :errors="errors"
+        :error-count="errorCount"
         :format-count="formatCount"
         :format-volume="formatVolume"
         :format-percent="formatPercent"
         :format-asa-seconds="formatAsaSeconds"
         :format-decimal="formatDecimal"
         @export-primary="exportPrimary"
+        @export-error-report="exportErrorReport"
       />
     </div>
   </section>

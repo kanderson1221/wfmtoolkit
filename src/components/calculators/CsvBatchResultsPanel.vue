@@ -56,13 +56,17 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  results: {
-    type: Array,
-    default: () => []
+  errorReportReady: {
+    type: Boolean,
+    default: false
   },
   errors: {
     type: Array,
     default: () => []
+  },
+  errorCount: {
+    type: Number,
+    default: 0
   },
   formatCount: {
     type: Function,
@@ -86,7 +90,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['export-primary'])
+const emit = defineEmits(['export-primary', 'export-error-report'])
 
 const overviewCards = computed(() => [
   props.primaryKpi,
@@ -156,13 +160,13 @@ const metricCards = computed(() => [
     <AppSectionHeader
       kicker="Processed Output"
       title="Output Workspace"
-      description="Review the staffing summary and export the enriched results file."
+      description="Review the staffing summary and download the enriched output file or a full error report."
     />
 
     <AppEmptyState
       v-if="!props.hasSubmitted && !props.isLoading && !props.parseError && !props.submitError"
       title="No processed file yet"
-      description="Upload a CSV and run the file processor to populate this workspace."
+      description="Upload a CSV and run the file processor to populate this summary and download area."
     />
 
     <section v-if="props.hasSubmitted" class="grid gap-4" aria-label="Batch calculation results">
@@ -182,7 +186,7 @@ const metricCards = computed(() => [
       <section class="results-tab-panel">
         <AppSectionHeader
           :title="`${props.workflow.label} Results`"
-          description="Use these metrics to review the processed file before exporting it."
+          description="Use these metrics to review the processed file before downloading the output."
         />
 
         <div class="results-metrics">
@@ -201,13 +205,32 @@ const metricCards = computed(() => [
           >
             {{ props.workflow.exportLabel }}
           </AppButton>
+          <AppButton
+            v-if="props.errorReportReady"
+            variant="secondary"
+            @click="emit('export-error-report')"
+          >
+            {{ props.workflow.errorExportLabel }}
+          </AppButton>
           <p class="text-sm leading-6 text-slate-600">
-            {{ props.formatCount(props.results.length) }} result rows ready for export.
+            <template v-if="props.primaryExportReady">
+              Enriched file ready for {{ props.formatCount(props.processedCount) }} processed rows.
+            </template>
+            <template v-else-if="props.errorReportReady">
+              Download the full error report for {{ props.formatCount(props.errorCount) }} row issues.
+            </template>
+            <template v-else>
+              Review the staffing summary before downloading the processed output.
+            </template>
           </p>
         </div>
       </section>
 
-      <CsvBatchErrorsTab v-if="props.errors.length" :errors="props.errors" />
+      <CsvBatchErrorsTab
+        v-if="props.errors.length"
+        :errors="props.errors"
+        :total-errors="props.errorCount"
+      />
     </section>
   </AppPanel>
 </template>

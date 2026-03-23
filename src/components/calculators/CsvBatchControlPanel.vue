@@ -14,9 +14,9 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  parsedRowCount: {
-    type: Number,
-    default: 0
+  selectedFileSizeLabel: {
+    type: String,
+    default: ''
   },
   parseError: {
     type: String,
@@ -40,12 +40,12 @@ const emit = defineEmits(['file-select', 'run-workflow'])
     <AppSectionHeader
       kicker="File Processor"
       title="CSV Staffing File Processor"
-      description="Upload interval demand and return an enriched staffing file with headcount and service metrics for each row."
+      description="Upload an interval CSV for server-side staffing processing and download the enriched result file when the run completes."
     />
 
     <AppWorkspaceSection
       title="Source File"
-      description="Upload the interval CSV and use the matching template when you need a starter file."
+      description="Choose a CSV up to 50 MB. Large files are processed on the server instead of in the browser."
     >
       <div class="flex flex-wrap items-center gap-3">
         <label
@@ -71,13 +71,15 @@ const emit = defineEmits(['file-select', 'run-workflow'])
       </div>
 
       <AppStatusMessage v-if="props.selectedFileName">
-        Loaded file: <strong>{{ props.selectedFileName }}</strong> ({{ props.parsedRowCount }} data rows)
+        Loaded file:
+        <strong>{{ props.selectedFileName }}</strong>
+        <template v-if="props.selectedFileSizeLabel">({{ props.selectedFileSizeLabel }})</template>
       </AppStatusMessage>
     </AppWorkspaceSection>
 
     <AppWorkspaceSection
       title="Process File"
-      description="Run the staffing processor and generate an exportable output file."
+      description="Run the staffing processor to generate a summary plus a downloadable enriched file or error report."
     >
       <AppButton
         variant="primary"
