@@ -40,6 +40,10 @@ const props = defineProps({
   buttonLayout: {
     type: String,
     default: 'stacked'
+  },
+  useGrouping: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -126,7 +130,7 @@ const pt = computed(() => ({
     :min-fraction-digits="props.minFractionDigits"
     :max-fraction-digits="props.maxFractionDigits"
     :placeholder="props.placeholder"
-    :use-grouping="false"
+    :use-grouping="props.useGrouping"
     :show-buttons="props.showButtons"
     :button-layout="props.buttonLayout"
     :pt="pt"

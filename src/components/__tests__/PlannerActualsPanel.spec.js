@@ -4,6 +4,12 @@ import PlannerActualsPanel from '../planner/PlannerActualsPanel.vue'
 
 describe('PlannerActualsPanel', () => {
   it('renders actuals summary, chart section, and worksheet columns', async () => {
+    const formatNumber = (value, digits = 1) =>
+      Number(value ?? 0).toLocaleString('en-US', {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      })
+
     const wrapper = mount(PlannerActualsPanel, {
       props: {
         actualsMonths: [
@@ -40,7 +46,7 @@ describe('PlannerActualsPanel', () => {
           peakPlannedRequiredHeadcount: 10.4
         },
         formatWhole: (value) => String(value ?? 0),
-        formatNumber: (value) => Number(value ?? 0).toFixed(1)
+        formatNumber
       },
       global: {
         stubs: {
@@ -64,9 +70,13 @@ describe('PlannerActualsPanel', () => {
     expect(wrapper.text()).toContain('Req HCVariance')
     expect(wrapper.text()).not.toContain('Planned HCLens')
     expect(wrapper.text()).toContain('Gap vsActual Req HC')
+    expect(wrapper.text()).toContain('10,000')
+    expect(wrapper.text()).toContain('300')
 
     const metricSelect = wrapper.get('select[aria-label="Planned staffing headcount metric"]')
+    const actualContactsInput = wrapper.get('input[aria-label="Actual contacts"]')
 
+    expect(actualContactsInput.element.value).toBe('10,200')
     expect(wrapper.text()).toContain('12.0')
     expect(wrapper.text()).toContain('0.8')
 

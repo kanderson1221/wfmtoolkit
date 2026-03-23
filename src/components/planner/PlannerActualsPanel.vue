@@ -353,10 +353,13 @@ const infoIconPath = mdiInformationOutline
                   v-model.number="actualsMonths[record.monthIndex].actualContacts"
                   :min="0"
                   :step="100"
+                  :min-fraction-digits="0"
+                  :max-fraction-digits="0"
+                  :use-grouping="true"
                   aria-label="Actual contacts"
                 />
               </td>
-              <td>{{ displayValue(record.plannedAhtSeconds, 1) }}</td>
+              <td>{{ displayValue(record.plannedAhtSeconds, 0) }}</td>
               <td>
                 <AppTableNumberField
                   v-model.number="actualsMonths[record.monthIndex].actualAhtSeconds"
