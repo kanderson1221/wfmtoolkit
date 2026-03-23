@@ -4,14 +4,13 @@ import { computed, watch } from 'vue'
 import AppButton from '../ui/AppButton.vue'
 import AppDialog from '../ui/AppDialog.vue'
 import AppFieldGroup from '../ui/AppFieldGroup.vue'
-import AppSelect from '../ui/AppSelect.vue'
 import AppTextField from '../ui/AppTextField.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 import {
+  HOLIDAY_CALENDAR_NONE,
   HOLIDAY_CALENDAR_US_FEDERAL,
   createCustomHoliday,
-  createHolidayTemplateHolidays,
-  holidayCalendarOptions
+  createHolidayTemplateHolidays
 } from '../../planner/holidayCalendars'
 
 const props = defineProps({
@@ -100,29 +99,29 @@ const toggleWeekday = (weekdayValue) => {
 
 const loadTemplateHolidays = () => {
   customHolidays.value = createHolidayTemplateHolidays(
-    defaultHolidayCalendarId.value,
-    new Date().getFullYear(),
-    disabledHolidayRuleIds.value
+    HOLIDAY_CALENDAR_US_FEDERAL,
+    new Date().getFullYear()
   )
+  defaultHolidayCalendarId.value = HOLIDAY_CALENDAR_NONE
   disabledHolidayRuleIds.value = []
 }
 
 watch(
   defaultHolidayCalendarId,
-  (nextValue, previousValue) => {
+  (nextValue) => {
     if (nextValue !== HOLIDAY_CALENDAR_US_FEDERAL) {
       return
     }
 
-    if (previousValue === HOLIDAY_CALENDAR_US_FEDERAL && customHolidayRows.value.length) {
-      return
+    if (!customHolidayRows.value.length) {
+      customHolidays.value = createHolidayTemplateHolidays(
+        HOLIDAY_CALENDAR_US_FEDERAL,
+        new Date().getFullYear()
+      )
     }
 
-    if (customHolidayRows.value.length) {
-      return
-    }
-
-    loadTemplateHolidays()
+    defaultHolidayCalendarId.value = HOLIDAY_CALENDAR_NONE
+    disabledHolidayRuleIds.value = []
   },
   { immediate: true }
 )
@@ -159,25 +158,15 @@ const removeCustomHoliday = (holidayId) => {
   >
     <div class="grid gap-4">
       <AppWorkspaceSection title="Call Center">
-        <div class="grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-          <AppFieldGroup label="Call Center Name" input-id="call-center-name">
-            <AppTextField
-              id="call-center-name"
-              v-model.trim="centerName"
-              maxlength="80"
-              placeholder="United States"
-              autofocus
-            />
-          </AppFieldGroup>
-
-          <AppFieldGroup label="Holiday Calendar Template" input-id="call-center-holiday-calendar">
-            <AppSelect
-              id="call-center-holiday-calendar"
-              v-model="defaultHolidayCalendarId"
-              :options="holidayCalendarOptions"
-            />
-          </AppFieldGroup>
-        </div>
+        <AppFieldGroup label="Call Center Name" input-id="call-center-name">
+          <AppTextField
+            id="call-center-name"
+            v-model.trim="centerName"
+            maxlength="80"
+            placeholder="United States"
+            autofocus
+          />
+        </AppFieldGroup>
 
         <AppFieldGroup label="Operating Days">
           <div class="flex flex-wrap gap-2">
@@ -206,12 +195,7 @@ const removeCustomHoliday = (holidayId) => {
           </span>
 
           <div class="flex flex-wrap justify-end gap-2">
-            <AppButton
-              v-if="defaultHolidayCalendarId === HOLIDAY_CALENDAR_US_FEDERAL"
-              size="sm"
-              variant="secondary"
-              @click="loadTemplateHolidays"
-            >
+            <AppButton size="sm" variant="secondary" @click="loadTemplateHolidays">
               Load U.S. Holidays
             </AppButton>
             <AppButton size="sm" variant="secondary" @click="addCustomHoliday">
