@@ -146,17 +146,22 @@ const buildCustomHolidayId = ({ month, day, label }) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '') || 'holiday'}`
 
+const getHolidayDefinition = (ruleId) =>
+  usFederalHolidayDefinitions.find((definition) => definition.id === ruleId) || null
+
 export const createCustomHoliday = (overrides = {}) => {
   const normalizedDate = isValidDateValue(overrides.date) ? overrides.date : ''
   const fallbackMonth = Number(overrides.month ?? 1)
   const fallbackDay = Number(overrides.day ?? 1)
   const month = normalizedDate ? Number(normalizedDate.slice(5, 7)) : fallbackMonth
   const day = normalizedDate ? Number(normalizedDate.slice(8, 10)) : fallbackDay
+  const sourceRuleId = getHolidayDefinition(overrides.sourceRuleId)?.id || null
 
   return {
     id: overrides.id || buildCustomHolidayId({ month, day, label: overrides.label }),
     label: typeof overrides.label === 'string' ? overrides.label.trim() : '',
     date: normalizedDate,
+    sourceRuleId,
     month,
     day
   }
@@ -205,9 +210,49 @@ export const createHolidayTemplateHolidays = (
     createCustomHoliday({
       id: holiday.id,
       label: holiday.label,
-      date: dateToInputValue(holiday.date)
+      date: dateToInputValue(holiday.date),
+      sourceRuleId: holiday.id
     })
   )
+}
+
+export const mergeHolidayRowsWithTemplate = (
+  existingHolidays,
+  year = new Date().getFullYear(),
+  disabledHolidayRuleIds = []
+) => {
+  const normalizedExisting = normalizeCustomHolidays(existingHolidays)
+  const templateHolidays = createHolidayTemplateHolidays(
+    HOLIDAY_CALENDAR_US_FEDERAL,
+    year,
+    disabledHolidayRuleIds
+  )
+
+  const seenKeys = new Set(
+    normalizedExisting.map((holiday) => {
+      const ruleKey = holiday.sourceRuleId || holiday.id
+      return `${ruleKey}::${holiday.date || ''}::${holiday.label.toLowerCase()}`
+    })
+  )
+
+  const merged = [...normalizedExisting]
+
+  templateHolidays.forEach((holiday) => {
+    const mergeKeys = [
+      `${holiday.sourceRuleId || holiday.id}::${holiday.date || ''}::${holiday.label.toLowerCase()}`,
+      `${holiday.sourceRuleId || holiday.id}::::`,
+      `${holiday.id}::${holiday.date || ''}::${holiday.label.toLowerCase()}`
+    ]
+
+    if (mergeKeys.some((key) => seenKeys.has(key))) {
+      return
+    }
+
+    seenKeys.add(mergeKeys[0])
+    merged.push(holiday)
+  })
+
+  return merged
 }
 
 export const buildHolidayEntriesForYear = ({
@@ -224,13 +269,15 @@ export const buildHolidayEntriesForYear = ({
     .map((holiday) => ({
       id: holiday.id,
       label: holiday.label,
-      date:
-        holiday.date
+      date: holiday.sourceRuleId
+        ? buildRuleDate(year, getHolidayDefinition(holiday.sourceRuleId))
+        : holiday.date
           ? dateValueToDate(holiday.date)
-          : buildDate(year, holiday.month - 1, holiday.day)
+          : buildDate(year, holiday.month - 1, holiday.day),
+      pinnedToSpecificYear: Boolean(holiday.date) && !holiday.sourceRuleId
     }))
     .filter((entry) => entry.date instanceof Date && !Number.isNaN(entry.date.getTime()))
-    .filter((entry) => entry.date.getFullYear() === year || !normalizedCustomHolidays.find((holiday) => holiday.id === entry.id)?.date)
+    .filter((entry) => entry.date.getFullYear() === year || !entry.pinnedToSpecificYear)
 
   return dedupeEntries(customEntries)
 }

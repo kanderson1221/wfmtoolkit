@@ -164,7 +164,7 @@ const selectedYearModel = computed({
   }
 })
 
-const summarizeAvailability = (plan, group = selectedGroup.value, center = props.center) => {
+const summarizeAvailability = (plan, center = props.center) => {
   const summary = plan?.summary || {}
 
   if (
@@ -210,7 +210,7 @@ const summarizeAvailability = (plan, group = selectedGroup.value, center = props
 
 const planRows = computed(() =>
   (selectedGroup.value?.plans || []).map((plan) => {
-    const availability = summarizeAvailability(plan, selectedGroup.value, props.center)
+    const availability = summarizeAvailability(plan, props.center)
 
     return {
       ...plan,

@@ -113,6 +113,45 @@ class BatchCalculateTests(unittest.TestCase):
         if row["asaSeconds"] is not None:
             self.assertFalse(math.isnan(row["asaSeconds"]))
 
+    def test_summary_kpis_are_weighted_by_calls_offered(self) -> None:
+        rows = [
+            {
+                "queue_id": "high-volume",
+                "interval_start": "2026-03-08T09:00:00Z",
+                "calls_offered": 500,
+                "aht_seconds": 240,
+                "mean_patience_seconds": 180,
+                "service_level_threshold": 80,
+                "service_level_target_seconds": 20,
+                "max_occupancy": 85,
+            },
+            {
+                "queue_id": "low-volume",
+                "interval_start": "2026-03-08T09:30:00Z",
+                "calls_offered": 10,
+                "aht_seconds": 600,
+                "mean_patience_seconds": 30,
+                "service_level_threshold": 80,
+                "service_level_target_seconds": 20,
+                "max_occupancy": 85,
+            },
+        ]
+
+        body = process_batch_rows(rows)
+        results = body["results"]
+        total_calls = sum(row["calls_offered"] for row in rows)
+        expected_service_level = sum(
+            result["serviceLevel"] * source_row["calls_offered"]
+            for result, source_row in zip(results, rows, strict=False)
+        ) / total_calls
+        expected_asa = sum(
+            (result["asaSeconds"] or 0) * source_row["calls_offered"]
+            for result, source_row in zip(results, rows, strict=False)
+        ) / total_calls
+
+        self.assertAlmostEqual(body["summary"]["avgServiceLevel"], expected_service_level)
+        self.assertAlmostEqual(body["summary"]["avgAsaSeconds"], expected_asa)
+
 
 if __name__ == "__main__":
     unittest.main()

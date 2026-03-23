@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import {
   mdiAccountGroupOutline,
-  mdiAccountMultipleOutline,
   mdiChartLine,
   mdiClockOutline,
   mdiPhoneOutline,

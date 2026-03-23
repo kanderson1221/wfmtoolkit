@@ -10,7 +10,7 @@ import {
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_CALENDAR_US_FEDERAL,
   createCustomHoliday,
-  createHolidayTemplateHolidays
+  mergeHolidayRowsWithTemplate
 } from '../../planner/holidayCalendars'
 
 const props = defineProps({
@@ -98,8 +98,8 @@ const toggleWeekday = (weekdayValue) => {
 }
 
 const loadTemplateHolidays = () => {
-  customHolidays.value = createHolidayTemplateHolidays(
-    HOLIDAY_CALENDAR_US_FEDERAL,
+  customHolidays.value = mergeHolidayRowsWithTemplate(
+    customHolidayRows.value,
     new Date().getFullYear()
   )
   defaultHolidayCalendarId.value = HOLIDAY_CALENDAR_NONE
@@ -113,12 +113,11 @@ watch(
       return
     }
 
-    if (!customHolidayRows.value.length) {
-      customHolidays.value = createHolidayTemplateHolidays(
-        HOLIDAY_CALENDAR_US_FEDERAL,
-        new Date().getFullYear()
-      )
-    }
+    customHolidays.value = mergeHolidayRowsWithTemplate(
+      customHolidayRows.value,
+      new Date().getFullYear(),
+      disabledHolidayRuleIds.value
+    )
 
     defaultHolidayCalendarId.value = HOLIDAY_CALENDAR_NONE
     disabledHolidayRuleIds.value = []
@@ -139,7 +138,16 @@ const addCustomHoliday = () => {
 
 const updateCustomHoliday = (holidayId, patch) => {
   customHolidays.value = customHolidayRows.value.map((holiday) =>
-    holiday.id === holidayId ? createCustomHoliday({ ...holiday, ...patch }) : holiday
+    holiday.id === holidayId
+      ? createCustomHoliday({
+          ...holiday,
+          ...patch,
+          sourceRuleId:
+            Object.prototype.hasOwnProperty.call(patch, 'date') && patch.date !== holiday.date
+              ? null
+              : holiday.sourceRuleId
+        })
+      : holiday
   )
 }
 

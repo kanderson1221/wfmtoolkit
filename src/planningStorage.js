@@ -1,9 +1,9 @@
 import {
-  createHolidayTemplateHolidays,
   GROUP_HOLIDAY_CALENDAR_INHERIT,
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_CALENDAR_US_FEDERAL,
   HOLIDAY_SCHEDULE_CLOSED,
+  mergeHolidayRowsWithTemplate,
   normalizeCustomHolidays,
   normalizeDisabledHolidayRuleIds,
   normalizeGroupHolidayCalendarId,
@@ -176,13 +176,14 @@ const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
   const snapshot = clonePlain(draftCenter || {})
   const normalizedCalendarId = normalizeHolidayCalendarId(snapshot.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE)
   const normalizedDisabledHolidayRuleIds = normalizeDisabledHolidayRuleIds(snapshot.disabledHolidayRuleIds)
-  const normalizedCustomHolidays = normalizeCustomHolidays(
-    Array.isArray(snapshot.customHolidays) && snapshot.customHolidays.length
-      ? snapshot.customHolidays
-      : normalizedCalendarId === HOLIDAY_CALENDAR_US_FEDERAL
-        ? createHolidayTemplateHolidays(normalizedCalendarId, new Date().getFullYear(), normalizedDisabledHolidayRuleIds)
-        : []
-  )
+  const migratedFederalTemplate = normalizedCalendarId === HOLIDAY_CALENDAR_US_FEDERAL
+  const normalizedCustomHolidays = migratedFederalTemplate
+    ? mergeHolidayRowsWithTemplate(
+        snapshot.customHolidays,
+        new Date().getFullYear(),
+        normalizedDisabledHolidayRuleIds
+      )
+    : normalizeCustomHolidays(snapshot.customHolidays)
   const normalizedGroups = Array.isArray(snapshot.groups)
     ? snapshot.groups.map((group) =>
         normalizeGroup(group, timestamp, {
@@ -201,8 +202,8 @@ const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
     id: snapshot.id || createEntityId('center'),
     name: snapshot.name?.trim() || 'Call Center',
     timezone: snapshot.timezone?.trim() || getDefaultTimeZone(),
-    defaultHolidayCalendarId: normalizedCalendarId,
-    disabledHolidayRuleIds: normalizedDisabledHolidayRuleIds,
+    defaultHolidayCalendarId: migratedFederalTemplate ? HOLIDAY_CALENDAR_NONE : normalizedCalendarId,
+    disabledHolidayRuleIds: migratedFederalTemplate ? [] : normalizedDisabledHolidayRuleIds,
     customHolidays: normalizedCustomHolidays,
     operatingWeekdays: normalizeWeekdays(snapshot.operatingWeekdays),
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, 8), 0),

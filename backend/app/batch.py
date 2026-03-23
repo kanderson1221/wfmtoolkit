@@ -140,9 +140,9 @@ class FileProcessorUploadPayload(TypedDict):
 @dataclass
 class SummaryAccumulator:
     total_calls_offered: float = 0.0
-    total_service_level: float = 0.0
-    total_asa_seconds: float = 0.0
-    finite_asa_count: int = 0
+    total_service_level_weighted: float = 0.0
+    total_asa_seconds_weighted: float = 0.0
+    finite_asa_calls_offered: float = 0.0
     total_required_staff_minutes_net: float = 0.0
     total_required_staff_minutes_gross: float = 0.0
     peak_staff_net: int = 0
@@ -154,11 +154,12 @@ class SummaryAccumulator:
         interval_duration_seconds: float = DEFAULT_INTERVAL_DURATION_SECONDS,
     ) -> None:
         interval_minutes = interval_duration_seconds / 60.0
-        self.total_calls_offered += row["callsOffered"]
-        self.total_service_level += row["serviceLevel"]
+        calls_offered = row["callsOffered"]
+        self.total_calls_offered += calls_offered
+        self.total_service_level_weighted += row["serviceLevel"] * calls_offered
         if row["asaSeconds"] is not None:
-            self.total_asa_seconds += row["asaSeconds"]
-            self.finite_asa_count += 1
+            self.total_asa_seconds_weighted += row["asaSeconds"] * calls_offered
+            self.finite_asa_calls_offered += calls_offered
         self.total_required_staff_minutes_net += row["requiredStaffNet"] * interval_minutes
         self.total_required_staff_minutes_gross += row["requiredStaffGross"] * interval_minutes
         self.peak_staff_net = max(self.peak_staff_net, row["requiredStaffNet"])
@@ -171,7 +172,9 @@ class SummaryAccumulator:
         failed_rows: int,
     ) -> BatchSummary:
         avg_asa_seconds = (
-            self.total_asa_seconds / self.finite_asa_count if self.finite_asa_count else None
+            self.total_asa_seconds_weighted / self.finite_asa_calls_offered
+            if self.finite_asa_calls_offered
+            else None
         )
         return {
             "processedRows": processed_rows,
@@ -179,7 +182,9 @@ class SummaryAccumulator:
             "failedRows": failed_rows,
             "totalCallsOffered": self.total_calls_offered,
             "avgServiceLevel": (
-                self.total_service_level / successful_rows if successful_rows else 0.0
+                self.total_service_level_weighted / self.total_calls_offered
+                if self.total_calls_offered
+                else 0.0
             ),
             "avgAsaSeconds": avg_asa_seconds,
             "totalRequiredStaffMinutesNet": self.total_required_staff_minutes_net,

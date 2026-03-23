@@ -37,16 +37,7 @@ const roundUpAxisMax = (value) => {
   const magnitude = 10 ** Math.floor(Math.log10(roughStep || 1))
   const normalized = roughStep / magnitude
 
-  let niceStep = 1
-  if (normalized <= 1) {
-    niceStep = 1
-  } else if (normalized <= 2) {
-    niceStep = 2
-  } else if (normalized <= 5) {
-    niceStep = 5
-  } else {
-    niceStep = 10
-  }
+  const niceStep = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
 
   const step = niceStep * magnitude
   return Math.max(step, Math.ceil(value / step) * step)

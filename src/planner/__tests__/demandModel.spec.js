@@ -45,6 +45,25 @@ describe('computeMonthlyRecords holiday calendars', () => {
     expect(customHolidayMonth.calendarOpenDays).toBe(21)
     expect(customHolidayMonth.holidayCount).toBe(1)
   })
+
+  it('keeps U.S.-loaded holidays active when planning a future year', () => {
+    const baselineNovember = computeMonthlyRecords({
+      ...basePayload,
+      planningYear: 2027,
+      holidayCalendarId: 'none',
+      customHolidays: []
+    })[10]
+
+    const migratedTemplateNovember = computeMonthlyRecords({
+      ...basePayload,
+      planningYear: 2027,
+      holidayCalendarId: 'none',
+      customHolidays: createHolidayTemplateHolidays('us_federal', 2026)
+    })[10]
+
+    expect(migratedTemplateNovember.holidayCount).toBeGreaterThan(0)
+    expect(migratedTemplateNovember.calendarOpenDays).toBeLessThan(baselineNovember.calendarOpenDays)
+  })
 })
 
 describe('computeMonthlyRecords peak planning', () => {

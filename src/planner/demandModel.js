@@ -23,7 +23,7 @@ export const calculateCalendarOpenDays = (
   monthIndex,
   activeDays,
   holidayCalendarId = HOLIDAY_CALENDAR_NONE,
-  holidayScheduleMode = HOLIDAY_SCHEDULE_CLOSED,
+  _holidayScheduleMode = HOLIDAY_SCHEDULE_CLOSED,
   disabledHolidayRuleIds = [],
   customHolidays = []
 ) => {
