@@ -1,4 +1,4 @@
-import { normalizeWeekdays } from './shared'
+import { getCurrentCalendarYear, normalizeWeekdays, resolvePlanningYear } from './shared'
 
 export const HOLIDAY_CALENDAR_NONE = 'none'
 export const HOLIDAY_CALENDAR_US_FEDERAL = 'us_federal'
@@ -197,16 +197,17 @@ const buildUsFederalHolidayEntries = (year, disabledRuleIds = []) =>
 
 export const createHolidayTemplateHolidays = (
   holidayCalendarId,
-  year = new Date().getFullYear(),
+  year = getCurrentCalendarYear(),
   disabledHolidayRuleIds = []
 ) => {
+  const resolvedYear = resolvePlanningYear(year)
   const normalizedCalendarId = normalizeHolidayCalendarId(holidayCalendarId, HOLIDAY_CALENDAR_NONE)
 
   if (normalizedCalendarId !== HOLIDAY_CALENDAR_US_FEDERAL) {
     return []
   }
 
-  return buildUsFederalHolidayEntries(year, normalizeDisabledHolidayRuleIds(disabledHolidayRuleIds)).map((holiday) =>
+  return buildUsFederalHolidayEntries(resolvedYear, normalizeDisabledHolidayRuleIds(disabledHolidayRuleIds)).map((holiday) =>
     createCustomHoliday({
       id: holiday.id,
       label: holiday.label,
@@ -218,13 +219,14 @@ export const createHolidayTemplateHolidays = (
 
 export const mergeHolidayRowsWithTemplate = (
   existingHolidays,
-  year = new Date().getFullYear(),
+  year = getCurrentCalendarYear(),
   disabledHolidayRuleIds = []
 ) => {
+  const resolvedYear = resolvePlanningYear(year)
   const normalizedExisting = normalizeCustomHolidays(existingHolidays)
   const templateHolidays = createHolidayTemplateHolidays(
     HOLIDAY_CALENDAR_US_FEDERAL,
-    year,
+    resolvedYear,
     disabledHolidayRuleIds
   )
 
@@ -261,6 +263,7 @@ export const buildHolidayEntriesForYear = ({
   disabledHolidayRuleIds = [],
   customHolidays = []
 }) => {
+  const resolvedYear = resolvePlanningYear(year)
   normalizeHolidayCalendarId(holidayCalendarId, HOLIDAY_CALENDAR_NONE)
   normalizeDisabledHolidayRuleIds(disabledHolidayRuleIds)
   const normalizedCustomHolidays = normalizeCustomHolidays(customHolidays)
@@ -270,14 +273,14 @@ export const buildHolidayEntriesForYear = ({
       id: holiday.id,
       label: holiday.label,
       date: holiday.sourceRuleId
-        ? buildRuleDate(year, getHolidayDefinition(holiday.sourceRuleId))
+        ? buildRuleDate(resolvedYear, getHolidayDefinition(holiday.sourceRuleId))
         : holiday.date
           ? dateValueToDate(holiday.date)
-          : buildDate(year, holiday.month - 1, holiday.day),
+          : buildDate(resolvedYear, holiday.month - 1, holiday.day),
       pinnedToSpecificYear: Boolean(holiday.date) && !holiday.sourceRuleId
     }))
     .filter((entry) => entry.date instanceof Date && !Number.isNaN(entry.date.getTime()))
-    .filter((entry) => entry.date.getFullYear() === year || !entry.pinnedToSpecificYear)
+    .filter((entry) => entry.date.getFullYear() === resolvedYear || !entry.pinnedToSpecificYear)
 
   return dedupeEntries(customEntries)
 }

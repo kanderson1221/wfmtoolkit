@@ -22,7 +22,7 @@
   }
 
   a {
-    @apply text-blue-900 no-underline transition hover:text-blue-950;
+    @apply text-[#15395f] no-underline transition hover:text-[#102f4f];
   }
 
   button,
@@ -41,7 +41,7 @@
   }
 
   :focus-visible {
-    @apply ring-4 ring-blue-100;
+    @apply ring-4 ring-[#d7e3ec];
   }
 
   input[type="checkbox"] {

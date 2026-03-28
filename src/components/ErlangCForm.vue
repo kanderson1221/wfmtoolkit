@@ -148,7 +148,7 @@ const handleSubmit = async () => {
 <template>
   <section id="erlang-c" class="calculator-section workspace-section py-1" aria-labelledby="erlang-c-heading">
     <div class="app-frame">
-      <div class="grid gap-3 xl:grid-cols-[22.5rem_minmax(0,1fr)] xl:h-[calc(100vh-18.5rem)]">
+      <div class="workspace-shell gap-3 xl:grid-cols-[22.5rem_minmax(0,1fr)] xl:h-[calc(100vh-18.5rem)]">
         <AppPanel :padded="false" class="h-full overflow-hidden">
           <div class="flex h-full flex-col">
             <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-4 py-3">
@@ -180,127 +180,129 @@ const handleSubmit = async () => {
             </div>
 
             <form class="flex flex-1 min-h-0 flex-col" @submit.prevent="handleSubmit">
-              <div class="grid gap-4 px-4 py-3">
-                <section class="grid gap-3">
-                  <div class="flex items-center gap-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[#15395f]">
-                    <AppIcon :path="mdiPhoneOutline" class="h-4 w-4" />
-                    <span>Demand</span>
-                  </div>
+              <div data-test="erlang-input-scroll" class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+                <div class="grid gap-4">
+                  <section class="grid gap-3">
+                    <div class="flex items-center gap-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[#15395f]">
+                      <AppIcon :path="mdiPhoneOutline" class="h-4 w-4" />
+                      <span>Demand</span>
+                    </div>
 
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <AppFieldGroup label="Calls Offered" input-id="callsOffered" compact>
-                      <AppNumberField
-                        id="callsOffered"
-                        v-model="form.callsOffered"
-                        :min="0"
-                        :step="1"
-                        compact
-                        inputmode="numeric"
-                        placeholder="420"
-                      />
-                    </AppFieldGroup>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <AppFieldGroup label="Calls Offered" input-id="callsOffered" compact>
+                        <AppNumberField
+                          id="callsOffered"
+                          v-model="form.callsOffered"
+                          :min="0"
+                          :step="1"
+                          compact
+                          inputmode="numeric"
+                          placeholder="420"
+                        />
+                      </AppFieldGroup>
 
-                    <AppFieldGroup label="Interval (min)" input-id="intervalLength" compact>
-                      <AppNumberField
-                        id="intervalLength"
-                        v-model="form.intervalLength"
-                        :min="15"
-                        :step="15"
-                        compact
-                        inputmode="numeric"
-                        placeholder="30"
-                      />
-                    </AppFieldGroup>
+                      <AppFieldGroup label="Interval (min)" input-id="intervalLength" compact>
+                        <AppNumberField
+                          id="intervalLength"
+                          v-model="form.intervalLength"
+                          :min="15"
+                          :step="15"
+                          compact
+                          inputmode="numeric"
+                          placeholder="30"
+                        />
+                      </AppFieldGroup>
 
-                    <AppFieldGroup label="AHT (sec)" input-id="averageHandleTime" compact>
-                      <AppNumberField
-                        id="averageHandleTime"
-                        v-model="form.averageHandleTime"
-                        :min="1"
-                        :step="1"
-                        compact
-                        inputmode="numeric"
-                        placeholder="360"
-                      />
-                    </AppFieldGroup>
+                      <AppFieldGroup label="AHT (sec)" input-id="averageHandleTime" compact>
+                        <AppNumberField
+                          id="averageHandleTime"
+                          v-model="form.averageHandleTime"
+                          :min="1"
+                          :step="1"
+                          compact
+                          inputmode="numeric"
+                          placeholder="360"
+                        />
+                      </AppFieldGroup>
 
-                    <AppFieldGroup label="Patience (sec)" input-id="averageCustomerPatience" compact>
-                      <AppNumberField
-                        id="averageCustomerPatience"
-                        v-model="form.averageCustomerPatience"
-                        :min="1"
-                        :step="1"
-                        compact
-                        inputmode="numeric"
-                        placeholder="180"
-                      />
-                    </AppFieldGroup>
-                  </div>
-                </section>
+                      <AppFieldGroup label="Patience (sec)" input-id="averageCustomerPatience" compact>
+                        <AppNumberField
+                          id="averageCustomerPatience"
+                          v-model="form.averageCustomerPatience"
+                          :min="1"
+                          :step="1"
+                          compact
+                          inputmode="numeric"
+                          placeholder="180"
+                        />
+                      </AppFieldGroup>
+                    </div>
+                  </section>
 
-                <section class="grid gap-3">
-                  <div class="flex items-center gap-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[#15395f]">
-                    <AppIcon :path="mdiTuneVariant" class="h-4 w-4" />
-                    <span>Targets & Constraints</span>
-                  </div>
+                  <section class="grid gap-3">
+                    <div class="flex items-center gap-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[#15395f]">
+                      <AppIcon :path="mdiTuneVariant" class="h-4 w-4" />
+                      <span>Targets & Constraints</span>
+                    </div>
 
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <AppFieldGroup label="Service Goal (%)" input-id="serviceLevelGoal" compact>
-                      <AppNumberField
-                        id="serviceLevelGoal"
-                        v-model="form.serviceLevelGoal"
-                        :min="1"
-                        :max="100"
-                        :step="1"
-                        compact
-                        inputmode="numeric"
-                        placeholder="80"
-                      />
-                    </AppFieldGroup>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <AppFieldGroup label="Service Goal (%)" input-id="serviceLevelGoal" compact>
+                        <AppNumberField
+                          id="serviceLevelGoal"
+                          v-model="form.serviceLevelGoal"
+                          :min="1"
+                          :max="100"
+                          :step="1"
+                          compact
+                          inputmode="numeric"
+                          placeholder="80"
+                        />
+                      </AppFieldGroup>
 
-                    <AppFieldGroup label="Goal Sec" input-id="serviceLevelThreshold" compact>
-                      <AppNumberField
-                        id="serviceLevelThreshold"
-                        v-model="form.serviceLevelThreshold"
-                        :min="1"
-                        :step="1"
-                        compact
-                        inputmode="numeric"
-                        placeholder="20"
-                      />
-                    </AppFieldGroup>
+                      <AppFieldGroup label="Goal Sec" input-id="serviceLevelThreshold" compact>
+                        <AppNumberField
+                          id="serviceLevelThreshold"
+                          v-model="form.serviceLevelThreshold"
+                          :min="1"
+                          :step="1"
+                          compact
+                          inputmode="numeric"
+                          placeholder="20"
+                        />
+                      </AppFieldGroup>
 
-                    <AppFieldGroup label="Max Occupancy (%)" input-id="maxOccupancy" compact>
-                      <AppNumberField
-                        id="maxOccupancy"
-                        v-model="form.maxOccupancy"
-                        :min="1"
-                        :max="100"
-                        :step="1"
-                        compact
-                        inputmode="numeric"
-                        placeholder="85"
-                      />
-                    </AppFieldGroup>
+                      <AppFieldGroup label="Max Occupancy (%)" input-id="maxOccupancy" compact>
+                        <AppNumberField
+                          id="maxOccupancy"
+                          v-model="form.maxOccupancy"
+                          :min="1"
+                          :max="100"
+                          :step="1"
+                          compact
+                          inputmode="numeric"
+                          placeholder="85"
+                        />
+                      </AppFieldGroup>
 
-                    <AppFieldGroup label="Shrinkage (%)" input-id="shrinkageAssumption" compact>
-                      <AppNumberField
-                        id="shrinkageAssumption"
-                        v-model="form.shrinkageAssumption"
-                        :min="0"
-                        :max="99.9"
-                        :step="0.1"
-                        :max-fraction-digits="1"
-                        compact
-                        inputmode="decimal"
-                        placeholder="30"
-                      />
-                    </AppFieldGroup>
-                  </div>
-                </section>
+                      <AppFieldGroup label="Shrinkage (%)" input-id="shrinkageAssumption" compact>
+                        <AppNumberField
+                          id="shrinkageAssumption"
+                          v-model="form.shrinkageAssumption"
+                          :min="0"
+                          :max="99.9"
+                          :step="0.1"
+                          :max-fraction-digits="1"
+                          compact
+                          inputmode="decimal"
+                          placeholder="30"
+                        />
+                      </AppFieldGroup>
+                    </div>
+                  </section>
+                </div>
               </div>
 
-              <div class="mt-auto border-t border-slate-200 bg-slate-50/70 px-4 py-3">
+              <div class="border-t border-slate-200 bg-slate-50/70 px-4 py-3">
                 <AppButton type="submit" variant="primary" block :disabled="isLoading">
                   {{ isLoading ? 'Calculating...' : 'Run Calculation' }}
                 </AppButton>
@@ -330,7 +332,7 @@ const handleSubmit = async () => {
               </div>
             </div>
 
-            <div class="flex-1 min-h-0 p-4">
+            <div data-test="erlang-results-scroll" class="flex-1 min-h-0 overflow-y-auto p-4">
               <AppStatusMessage v-if="isLoading" tone="info">
                 Calculating staffing results...
               </AppStatusMessage>
@@ -360,7 +362,7 @@ const handleSubmit = async () => {
 
               <section
                 v-else
-                class="flex h-full min-h-0 flex-col gap-2"
+                class="flex min-h-0 flex-col gap-2"
                 aria-label="Staffing results preview"
               >
                 <div class="grid gap-2 lg:grid-cols-[1.08fr_0.92fr]">
@@ -462,11 +464,11 @@ const handleSubmit = async () => {
 
                 <section class="flex min-h-0 flex-1 flex-col">
                   <AppTableShell class="flex-1">
-                    <div class="h-full max-h-[28rem] overflow-auto bg-slate-50/95 pt-1">
+                    <div class="h-full max-h-[28rem] overflow-auto bg-slate-50/95">
                       <table class="min-w-[760px] w-full border-separate border-spacing-0 text-sm text-slate-700">
-                        <thead class="sticky top-0 z-10 backdrop-blur-sm">
+                        <thead class="sticky top-0 z-10">
                           <tr>
-                            <th class="rounded-tl-[28px] border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-left text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                            <th class="border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-left text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                               Agents
                             </th>
                             <th class="border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
@@ -484,7 +486,7 @@ const handleSubmit = async () => {
                             <th class="border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                               Occupancy
                             </th>
-                            <th class="rounded-tr-[28px] border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                            <th class="border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                               Abandon
                             </th>
                           </tr>

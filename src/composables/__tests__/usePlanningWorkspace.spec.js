@@ -1,5 +1,13 @@
 import { computed, nextTick, ref } from 'vue'
 
+import {
+  buildPlanningCenterHash,
+  buildPlanningGroupHash,
+  buildPlanningHomeHash,
+  buildPlanningNewPlanHash,
+  buildPlanningPlanHash
+} from '../../appRoutes'
+import { getCurrentCalendarYear } from '../../planner/shared'
 import { usePlanningWorkspace } from '../usePlanningWorkspace'
 import { planningRepository } from '../../planningRepository'
 
@@ -167,7 +175,7 @@ describe('usePlanningWorkspace', () => {
     const storageScope = computed(() => currentUser.value.id)
 
     planningRepository.saveCenter.mockReturnValue(centers)
-    window.location.hash = '#planning'
+    window.location.hash = buildPlanningHomeHash()
 
     const workspace = usePlanningWorkspace({
       currentRoute,
@@ -181,7 +189,7 @@ describe('usePlanningWorkspace', () => {
 
     expect(planningRepository.saveCenter).toHaveBeenCalled()
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
-    expect(window.location.hash).toBe('#planning/center/center-1')
+    expect(window.location.hash).toBe(buildPlanningCenterHash('center-1'))
   })
 
   it('persists staffing groups and routes into the saved group workspace', () => {
@@ -197,7 +205,7 @@ describe('usePlanningWorkspace', () => {
     const storageScope = computed(() => currentUser.value.id)
 
     planningRepository.saveGroup.mockReturnValue(centers)
-    window.location.hash = '#planning/center/center-1'
+    window.location.hash = buildPlanningCenterHash('center-1')
 
     const workspace = usePlanningWorkspace({
       currentRoute,
@@ -211,7 +219,7 @@ describe('usePlanningWorkspace', () => {
 
     expect(planningRepository.saveGroup).toHaveBeenCalledWith(centers, 'center-1', { name: 'Consumer Voice' })
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
-    expect(window.location.hash).toBe(`#planning/center/center-1/group/group-1/year/${new Date().getFullYear()}`)
+    expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', getCurrentCalendarYear()))
   })
 
   it('persists plans and keeps the user in the editor route', () => {
@@ -228,7 +236,7 @@ describe('usePlanningWorkspace', () => {
     const storageScope = computed(() => currentUser.value.id)
 
     planningRepository.savePlan.mockReturnValue(centers)
-    window.location.hash = '#planning/center/center-1/group/group-1/plan/new/year/2026'
+    window.location.hash = buildPlanningNewPlanHash('center-1', 'group-1', 2026)
 
     const workspace = usePlanningWorkspace({
       currentRoute,
@@ -242,7 +250,7 @@ describe('usePlanningWorkspace', () => {
 
     expect(planningRepository.savePlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
-    expect(window.location.hash).toBe('#planning/center/center-1/group/group-1/plan/plan-1')
+    expect(window.location.hash).toBe(buildPlanningPlanHash('center-1', 'group-1', 'plan-1'))
   })
 
   it('persists guest workspace changes to the default local scope', async () => {

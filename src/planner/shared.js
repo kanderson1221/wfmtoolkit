@@ -17,6 +17,25 @@ export const FULL_MONTH_LABELS = [
 
 export const WEEKDAY_FALLBACK = [1, 2, 3, 4, 5]
 
+export const getCurrentCalendarYear = () => new Date().getFullYear()
+export const getCurrentCalendarMonthIndex = () => new Date().getMonth()
+
+export const resolvePlanningYear = (value, fallback = getCurrentCalendarYear()) => {
+  const parsedYear = Number(value)
+
+  if (Number.isInteger(parsedYear) && parsedYear > 0) {
+    return parsedYear
+  }
+
+  const parsedFallback = Number(fallback)
+  return Number.isInteger(parsedFallback) && parsedFallback > 0 ? parsedFallback : getCurrentCalendarYear()
+}
+
+export const buildPlanningYearRange = (anchorYear = getCurrentCalendarYear(), yearsBefore = 2, yearsAfter = 5) => {
+  const resolvedAnchorYear = resolvePlanningYear(anchorYear)
+  return Array.from({ length: yearsBefore + yearsAfter + 1 }, (_, index) => resolvedAnchorYear - yearsBefore + index)
+}
+
 export const toNumber = (value, fallback = 0) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value

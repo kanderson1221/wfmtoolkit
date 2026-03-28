@@ -1,3 +1,4 @@
+import { getCurrentCalendarYear } from '../planner/shared'
 import { createPlanningCenterDraft, loadPlanningCenters, resolveCenterHolidayProfile, upsertPlanningPlan } from '../planningStorage'
 
 const ensurePlanningStorageApi = () => {
@@ -164,7 +165,7 @@ describe('planningStorage', () => {
     )
 
     const centers = loadPlanningCenters('default')
-    const activeHolidayProfile = resolveCenterHolidayProfile(centers[0], new Date().getFullYear())
+    const activeHolidayProfile = resolveCenterHolidayProfile(centers[0], getCurrentCalendarYear())
 
     expect(centers[0].defaultHolidayCalendarId).toBe('none')
     expect(centers[0].disabledHolidayRuleIds).toEqual([])

@@ -45,6 +45,30 @@ export default [
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'confirm',
+          message: 'Use AppConfirmDialog/useConfirmDialog instead of browser-native confirm dialogs.'
+        },
+        {
+          name: 'prompt',
+          message: 'Use AppDialog and wrapped inputs instead of browser-native prompt dialogs.'
+        }
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'confirm',
+          message: 'Use AppConfirmDialog/useConfirmDialog instead of window.confirm.'
+        },
+        {
+          object: 'window',
+          property: 'prompt',
+          message: 'Use AppDialog and wrapped inputs instead of window.prompt.'
+        }
+      ],
       'vue/no-mutating-props': 'off',
       'vue/no-use-v-if-with-v-for': 'warn',
       'vue/multi-word-component-names': 'off'

@@ -11,6 +11,7 @@ import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTextField from '../ui/AppTextField.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import { buildPlanningYearRange, getCurrentCalendarYear, resolvePlanningYear } from '../../planner/shared'
 import { createPlanningHolidayProfile } from '../../planningStorage'
 import {
   HOLIDAY_CALENDAR_US_FEDERAL,
@@ -32,7 +33,7 @@ const props = defineProps({
   },
   displayYear: {
     type: Number,
-    default: () => new Date().getFullYear()
+    default: () => getCurrentCalendarYear()
   },
   submitLabel: {
     type: String,
@@ -70,10 +71,7 @@ const dialogOpen = computed({
   }
 })
 
-const normalizeHolidayYear = (value, fallback = new Date().getFullYear()) => {
-  const parsedYear = Number(value)
-  return Number.isInteger(parsedYear) && parsedYear > 0 ? parsedYear : fallback
-}
+const normalizeHolidayYear = (value, fallback = getCurrentCalendarYear()) => resolvePlanningYear(value, fallback)
 
 const normalizeOperatingWeekdays = (selectedDays) => {
   if (!Array.isArray(selectedDays)) {
@@ -123,9 +121,9 @@ const holidayYearOptions = computed(() => {
   const anchorYear = normalizeHolidayYear(props.displayYear)
   const years = new Set(normalizedHolidayProfiles.value.map((profile) => profile.year))
 
-  for (let offset = -2; offset <= 5; offset += 1) {
-    years.add(anchorYear + offset)
-  }
+  buildPlanningYearRange(anchorYear).forEach((year) => {
+    years.add(year)
+  })
 
   years.add(selectedHolidayYear.value)
 

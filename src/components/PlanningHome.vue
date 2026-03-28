@@ -19,6 +19,7 @@ import AppSectionHeader from './ui/AppSectionHeader.vue'
 import AppSelect from './ui/AppSelect.vue'
 import AppStatStrip from './ui/AppStatStrip.vue'
 import AppTableShell from './ui/AppTableShell.vue'
+import { buildPlanningCenterHash, navigateToHash } from '../appRoutes'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { createPlanningCenterDraft, resolveCenterHolidayProfile } from '../planningStorage'
 import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
@@ -26,6 +27,7 @@ import {
   HOLIDAY_CALENDAR_NONE,
   normalizeHolidayCalendarId,
 } from '../planner/holidayCalendars'
+import { getCurrentCalendarYear } from '../planner/shared'
 import { computeMonthlyRecords } from '../planner/demandModel'
 import { computeStaffingRecords } from '../planner/staffingModel'
 
@@ -44,7 +46,7 @@ const emit = defineEmits(['save-center', 'delete-center'])
 
 const centerSettingsOpen = ref(false)
 const centerDraft = ref(createPlanningCenterDraft())
-const selectedPlanningYear = ref(new Date().getFullYear())
+const selectedPlanningYear = ref(getCurrentCalendarYear())
 const {
   dialogVisible: deleteCenterDialogOpen,
   dialogTitle: deleteCenterDialogTitle,
@@ -91,7 +93,7 @@ const availablePlanningYears = computed(() => {
   })
 
   if (!years.size) {
-    years.add(new Date().getFullYear())
+    years.add(getCurrentCalendarYear())
   }
 
   return [...years].sort((left, right) => right - left)
@@ -100,7 +102,7 @@ const availablePlanningYears = computed(() => {
 watch(
   availablePlanningYears,
   (years) => {
-    const currentCalendarYear = new Date().getFullYear()
+    const currentCalendarYear = getCurrentCalendarYear()
     const preferredYear = years.includes(currentCalendarYear) ? currentCalendarYear : years[0]
 
     if (!years.includes(Number(selectedPlanningYear.value))) {
@@ -347,7 +349,7 @@ const saveCenter = () => {
 }
 
 const openCenter = (centerId) => {
-  window.location.hash = `#planning/center/${centerId}`
+  navigateToHash(buildPlanningCenterHash(centerId))
 }
 
 const requestDeleteCenter = (center) => {

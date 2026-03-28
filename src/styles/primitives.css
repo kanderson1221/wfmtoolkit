@@ -1,39 +1,16 @@
 @layer components {
-  .planner-inputs,
-  .calculator-form {
+  .planner-inputs {
     @apply grid gap-4;
   }
 
-  .planner-inputs h3,
-  .input-group-header h3 {
+  .planner-inputs h3 {
     @apply text-base font-semibold tracking-[-0.03em] text-slate-950;
   }
 
-  .input-groups-grid,
-  .field-grid,
   .planner-grid {
     @apply grid gap-4 md:grid-cols-2;
   }
 
-  .input-group-card-wide {
-    @apply md:col-span-2;
-  }
-
-  .erlang-field-grid-single {
-    @apply md:grid-cols-1;
-  }
-
-  .field-group {
-    @apply grid gap-2;
-  }
-
-  .field-group label {
-    @apply text-sm font-medium text-slate-700;
-  }
-
-  .field-group input:not([type="file"]):not([type="checkbox"]),
-  .field-group select,
-  .field-group textarea,
   .monthly-copy-select-input,
   .calculator-section input[type="date"],
   .calculator-section input[type="number"],
@@ -42,15 +19,7 @@
   .calculator-section input[type="text"],
   .calculator-section select,
   .calculator-section textarea {
-    @apply w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100;
-  }
-
-  .status-message {
-    @apply rounded-3xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900;
-  }
-
-  .status-message.error {
-    @apply border-rose-200 bg-rose-50 text-rose-700;
+    @apply w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-[#15395f] focus:ring-4 focus:ring-[#d7e3ec];
   }
 
   .form-actions,
@@ -94,7 +63,6 @@
   }
 
   .detail-row.highlighted {
-    @apply bg-blue-50;
+    @apply bg-[#eef4f8];
   }
-
 }

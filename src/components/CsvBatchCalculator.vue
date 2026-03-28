@@ -35,7 +35,7 @@ const {
 
 <template>
   <section id="csv-batch" class="calculator-section" aria-label="CSV File Processor">
-    <div class="app-frame grid gap-4 xl:grid-cols-[minmax(22rem,0.84fr)_minmax(0,1.16fr)]">
+    <div class="app-frame workspace-shell xl:grid-cols-[minmax(22rem,0.84fr)_minmax(0,1.16fr)]">
       <CsvBatchControlPanel
         :workflow="currentWorkflow"
         :selected-file-name="selectedFileName"

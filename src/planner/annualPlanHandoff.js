@@ -1,4 +1,11 @@
-import { createNextYearOpening, createTrainingClass, createTrainingSettings, toNumber } from './shared'
+import {
+  createNextYearOpening,
+  createTrainingClass,
+  createTrainingSettings,
+  getCurrentCalendarYear,
+  resolvePlanningYear,
+  toNumber
+} from './shared'
 import { deriveTrainingClassMetrics } from './staffingModel'
 
 const formatDateInput = (date) => {
@@ -30,10 +37,8 @@ const stripTrainingClassOutcomes = (trainingClass) => {
 
 const isFiniteHeadcount = (value) => value !== '' && value != null && Number.isFinite(Number(value))
 
-export const getPlanYear = (plan, fallback = new Date().getFullYear()) => {
-  const parsed = Number(plan?.planningYear)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
+export const getPlanYear = (plan, fallback = getCurrentCalendarYear()) =>
+  resolvePlanningYear(plan?.planningYear, fallback)
 
 export const findLinkedPriorPlan = (plans, planOrContext) => {
   const currentPlanId = planOrContext?.id || null

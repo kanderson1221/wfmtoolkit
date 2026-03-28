@@ -9,6 +9,13 @@ import {
 import CallCenterSettingsModal from './CallCenterSettingsModal.vue'
 import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
+import {
+  buildPlanningGroupHash,
+  buildPlanningHomeHash,
+  buildPlanningNewPlanHash,
+  buildPlanningPlanHash,
+  navigateToHash
+} from '../../appRoutes'
 import { createPlanningCenterDraft, createPlanningGroupDraft, resolveCenterHolidayProfile } from '../../planningStorage'
 import {
   HOLIDAY_CALENDAR_NONE,
@@ -88,11 +95,6 @@ const planComparisonGridClass =
 
 const planListRowGridClass = 'grid grid-cols-[auto_minmax(0,1fr)_8.25rem] items-center gap-2'
 
-const buildGroupHref = (group, planningYear = null) => {
-  const resolvedYear = Number(planningYear) || Number(group?.latestPlanYear) || currentYear
-  return `#planning/center/${props.center.id}/group/${group.id}/year/${resolvedYear}`
-}
-
 const sortedPlansForGroup = (group) =>
   [...getGroupPlans(group)].sort((left, right) => Number(right.planningYear || 0) - Number(left.planningYear || 0))
 
@@ -108,9 +110,10 @@ const groupRows = computed(() =>
       summary,
       plans,
       latestPlanYear,
-      selectionHref: buildGroupHref(
-        { ...group, latestPlanYear },
-        props.selectedGroupId === group.id ? props.selectedYear : latestPlanYear
+      selectionHref: buildPlanningGroupHash(
+        props.center.id,
+        group.id,
+        props.selectedGroupId === group.id ? props.selectedYear : latestPlanYear || currentYear
       )
     }
   })
@@ -168,7 +171,7 @@ const selectedYearModel = computed({
       return
     }
 
-    window.location.hash = buildGroupHref(selectedGroup.value, Number(value) || currentYear)
+    navigateToHash(buildPlanningGroupHash(props.center.id, selectedGroup.value.id, Number(value) || currentYear))
   }
 })
 
@@ -236,7 +239,7 @@ const planRows = computed(() =>
       averagePresencePercent: availability.averagePresencePercent,
       averageUtilizationPercent: availability.averageUtilizationPercent,
       peakRequiredHeadcount: getPeakRequiredHeadcount(plan),
-      openHref: `#planning/center/${props.center.id}/group/${selectedGroup.value.id}/plan/${plan.id}`,
+      openHref: buildPlanningPlanHash(props.center.id, selectedGroup.value.id, plan.id),
       isSelectedYear: Number(plan.planningYear) === Number(selectedYearModel.value)
     }
   })
@@ -264,7 +267,7 @@ const selectedGroupDefaults = computed(() => {
 
 const breadcrumbItems = computed(() => [
   { label: 'Home', href: '#home' },
-  { label: 'Call Centers', href: '#planning' },
+  { label: 'Call Centers', href: buildPlanningHomeHash() },
   { label: props.center.name }
 ])
 
@@ -273,7 +276,7 @@ const createPlanHref = computed(() => {
     return ''
   }
 
-  return `#planning/center/${props.center.id}/group/${selectedGroup.value.id}/plan/new/year/${newPlanYear.value}`
+  return buildPlanningNewPlanHash(props.center.id, selectedGroup.value.id, newPlanYear.value)
 })
 
 const existingPlanForDraftYear = computed(() => {
@@ -289,7 +292,7 @@ const existingPlanHref = computed(() => {
     return ''
   }
 
-  return `#planning/center/${props.center.id}/group/${selectedGroup.value.id}/plan/${existingPlanForDraftYear.value.id}`
+  return buildPlanningPlanHash(props.center.id, selectedGroup.value.id, existingPlanForDraftYear.value.id)
 })
 
 const openCenterSettings = () => {
@@ -335,15 +338,7 @@ const createPlan = () => {
   }
 
   planSettingsOpen.value = false
-  window.location.hash = createPlanHref.value
-}
-
-const navigateToHash = (href) => {
-  if (!href) {
-    return
-  }
-
-  window.location.hash = href
+  navigateToHash(createPlanHref.value)
 }
 
 const selectPlanYear = (planningYear) => {

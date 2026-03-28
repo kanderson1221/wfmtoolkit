@@ -1,10 +1,17 @@
 import { computed, ref, watch } from 'vue'
 import {
+  buildPlanningCenterHash,
+  buildPlanningGroupHash,
+  buildPlanningHomeHash,
+  buildPlanningPlanHash,
+  navigateToHash
+} from '../appRoutes'
+import {
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_SCHEDULE_CLOSED,
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
-import { findLinkedPriorPlan, toNumber } from '../plannerModel'
+import { findLinkedPriorPlan, getCurrentCalendarYear, resolvePlanningYear, toNumber } from '../plannerModel'
 import { resolveCenterHolidayProfile } from '../planningStorage'
 import { planningRepository } from '../planningRepository'
 
@@ -103,10 +110,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       return null
     }
 
-    const routePlanningYear = Number(currentRoute.value.year)
-    const resolvedPlanningYear = Number.isFinite(routePlanningYear)
-      ? routePlanningYear
-      : currentPlan.value?.planningYear || new Date().getFullYear()
+    const resolvedPlanningYear = resolvePlanningYear(currentRoute.value.year, currentPlan.value?.planningYear)
     const linkedPriorPlan = findLinkedPriorPlan(currentGroup.value.plans || [], {
       id: currentPlan.value?.id || null,
       planningYear: resolvedPlanningYear
@@ -202,22 +206,22 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     persistAndSetCenters(nextCenters)
 
     if (savedCenter) {
-      window.location.hash = `#planning/center/${savedCenter.id}`
+      navigateToHash(buildPlanningCenterHash(savedCenter.id))
       return
     }
 
-    window.location.hash = '#planning'
+    navigateToHash(buildPlanningHomeHash())
   }
 
   const handleDeleteCenter = (centerId) => {
     persistAndSetCenters(planningRepository.deleteCenter(planningCenters.value, centerId))
-    window.location.hash = '#planning'
+    navigateToHash(buildPlanningHomeHash())
   }
 
   const handleSaveGroup = (groupDraft) => {
     const targetCenterId = currentCenter.value?.id || currentRoute.value.centerId
     if (!targetCenterId) {
-      window.location.hash = '#planning'
+      navigateToHash(buildPlanningHomeHash())
       return
     }
 
@@ -230,17 +234,17 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       : savedCenter?.groups[0]
 
     if (savedGroup) {
-      const nextYear = currentRoute.value.year || new Date().getFullYear()
-      window.location.hash = `#planning/center/${targetCenterId}/group/${savedGroup.id}/year/${nextYear}`
+      const nextYear = resolvePlanningYear(currentRoute.value.year, getCurrentCalendarYear())
+      navigateToHash(buildPlanningGroupHash(targetCenterId, savedGroup.id, nextYear))
       return
     }
 
-    window.location.hash = `#planning/center/${targetCenterId}`
+    navigateToHash(buildPlanningCenterHash(targetCenterId))
   }
 
   const handleDeleteGroup = ({ centerId, groupId }) => {
     persistAndSetCenters(planningRepository.deleteGroup(planningCenters.value, centerId, groupId))
-    window.location.hash = `#planning/center/${centerId}`
+    navigateToHash(buildPlanningCenterHash(centerId))
   }
 
   const handleSavePlan = (planDraft) => {
@@ -248,7 +252,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     const targetGroupId = currentGroup.value?.id
 
     if (!targetCenterId || !targetGroupId) {
-      window.location.hash = '#planning'
+      navigateToHash(buildPlanningHomeHash())
       return
     }
 
@@ -262,26 +266,21 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       : savedGroup?.plans.find((plan) => Number(plan.planningYear) === Number(planDraft.planningYear))
 
     if (savedPlan?.id) {
-      const editorHash = `#planning/center/${targetCenterId}/group/${targetGroupId}/plan/${savedPlan.id}`
-
-      if (window.location.hash !== editorHash) {
-        window.location.hash = editorHash
-      }
-
+      navigateToHash(buildPlanningPlanHash(targetCenterId, targetGroupId, savedPlan.id))
       return
     }
 
-    window.location.hash = `#planning/center/${targetCenterId}/group/${targetGroupId}/year/${planDraft.planningYear}`
+    navigateToHash(buildPlanningGroupHash(targetCenterId, targetGroupId, planDraft.planningYear))
   }
 
   const handleDeletePlan = ({ centerId, groupId, planId, planningYear }) => {
     persistAndSetCenters(planningRepository.deletePlan(planningCenters.value, centerId, groupId, planId))
     if (planningYear) {
-      window.location.hash = `#planning/center/${centerId}/group/${groupId}/year/${planningYear}`
+      navigateToHash(buildPlanningGroupHash(centerId, groupId, planningYear))
       return
     }
 
-    window.location.hash = `#planning/center/${centerId}/group/${groupId}`
+    navigateToHash(buildPlanningGroupHash(centerId, groupId))
   }
 
   const openPlanningHome = () => {
@@ -289,20 +288,20 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       const returnYear = currentRoute.value.year || currentPlan.value?.planningYear
 
       if (returnYear) {
-        window.location.hash = `#planning/center/${currentCenter.value.id}/group/${currentGroup.value.id}/year/${returnYear}`
+        navigateToHash(buildPlanningGroupHash(currentCenter.value.id, currentGroup.value.id, returnYear))
         return
       }
 
-      window.location.hash = `#planning/center/${currentCenter.value.id}/group/${currentGroup.value.id}`
+      navigateToHash(buildPlanningGroupHash(currentCenter.value.id, currentGroup.value.id))
       return
     }
 
     if (currentCenter.value?.id) {
-      window.location.hash = `#planning/center/${currentCenter.value.id}`
+      navigateToHash(buildPlanningCenterHash(currentCenter.value.id))
       return
     }
 
-    window.location.hash = '#planning'
+    navigateToHash(buildPlanningHomeHash())
   }
 
   const groupDraft = computed(() =>
@@ -331,12 +330,12 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
         const routeCenter = route.centerId ? planningRepository.findCenter(centers, route.centerId) : null
 
         if (route.centerId && !routeCenter) {
-          window.location.hash = '#planning'
+          navigateToHash(buildPlanningHomeHash())
           return
         }
 
         if (route.groupId && routeCenter && !planningRepository.findGroup(centers, route.centerId, route.groupId)) {
-          window.location.hash = `#planning/center/${route.centerId}`
+          navigateToHash(buildPlanningCenterHash(route.centerId))
           return
         }
       }
@@ -355,12 +354,12 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
             : null
 
         if (!routeCenter || !routeGroup) {
-          window.location.hash = '#planning'
+          navigateToHash(buildPlanningHomeHash())
           return
         }
 
         if (route.planId !== 'new' && !routeGroup.plans.some((plan) => plan.id === route.planId)) {
-          window.location.hash = `#planning/center/${routeCenter.id}/group/${routeGroup.id}`
+          navigateToHash(buildPlanningGroupHash(routeCenter.id, routeGroup.id))
         }
       }
     },

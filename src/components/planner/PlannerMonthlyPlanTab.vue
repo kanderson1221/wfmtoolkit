@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import AppButton from '../ui/AppButton.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
+import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
 
 const props = defineProps({
@@ -206,13 +207,13 @@ const summaryItems = computed(() => [
     </section>
 
     <div v-if="selectedMonth.planWarnings?.length" class="monthly-warning-stack">
-      <p
+      <AppStatusMessage
         v-for="warning in selectedMonth.planWarnings"
         :key="warning"
-        class="status-message error"
+        tone="error"
       >
         {{ warning }}
-      </p>
+      </AppStatusMessage>
     </div>
 
     <div class="monthly-tab-actions">

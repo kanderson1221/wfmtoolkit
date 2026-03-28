@@ -383,7 +383,7 @@ watch(visible, (isVisible) => {
                 :icon="signInForm.showPassword ? mdiEyeOffOutline : mdiEyeOutline"
                 :label="signInForm.showPassword ? 'Hide password' : 'Show password'"
                 variant="icon-quiet"
-                class="absolute top-1/2 right-2 h-8 w-8 -translate-y-1/2 rounded-full border-transparent text-slate-400 hover:bg-transparent hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-blue-100"
+                class="absolute top-1/2 right-2 h-8 w-8 -translate-y-1/2 rounded-full border-transparent text-slate-400 hover:bg-transparent hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-[#d7e3ec]"
                 @click="signInForm.showPassword = !signInForm.showPassword"
               />
             </div>
@@ -445,7 +445,7 @@ watch(visible, (isVisible) => {
                 :icon="registerForm.showPassword ? mdiEyeOffOutline : mdiEyeOutline"
                 :label="registerForm.showPassword ? 'Hide password' : 'Show password'"
                 variant="icon-quiet"
-                class="absolute top-1/2 right-2 h-8 w-8 -translate-y-1/2 rounded-full border-transparent text-slate-400 hover:bg-transparent hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-blue-100"
+                class="absolute top-1/2 right-2 h-8 w-8 -translate-y-1/2 rounded-full border-transparent text-slate-400 hover:bg-transparent hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-[#d7e3ec]"
                 @click="registerForm.showPassword = !registerForm.showPassword"
               />
             </div>

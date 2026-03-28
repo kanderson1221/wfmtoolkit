@@ -13,6 +13,7 @@ import PlannerWorkspaceHeader from './planner/PlannerWorkspaceHeader.vue'
 import AppBreadcrumbs from './ui/AppBreadcrumbs.vue'
 import AppButton from './ui/AppButton.vue'
 import AppPanel from './ui/AppPanel.vue'
+import { buildPlanningCenterHash, buildPlanningGroupHash, buildPlanningHomeHash } from '../appRoutes'
 import { useMonthlyPlanBuilder } from '../composables/useMonthlyPlanBuilder'
 
 const props = defineProps({
@@ -331,10 +332,10 @@ const breadcrumbItems = computed(() => {
 
   return [
     { label: 'Home', href: '#home' },
-    { label: 'Call Centers', href: '#planning' },
-    ...(centerId ? [{ label: centerName, href: `#planning/center/${centerId}` }] : []),
+    { label: 'Call Centers', href: buildPlanningHomeHash() },
+    ...(centerId ? [{ label: centerName, href: buildPlanningCenterHash(centerId) }] : []),
     ...(centerId && groupId
-      ? [{ label: groupName, href: `#planning/center/${centerId}/group/${groupId}` }]
+      ? [{ label: groupName, href: buildPlanningGroupHash(centerId, groupId) }]
       : []),
     { label: builder.displayPlanLabel }
   ]

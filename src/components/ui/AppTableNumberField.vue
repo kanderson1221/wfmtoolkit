@@ -92,7 +92,7 @@ const handleLeadingDecimalKeydown = (event) => {
 const pt = computed(() => ({
   root: {
     class: props.showButtons
-      ? 'table-number-with-buttons flex w-full items-stretch overflow-hidden rounded-md border border-slate-200 bg-slate-50/70 transition focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100'
+      ? 'table-number-with-buttons flex w-full items-stretch overflow-hidden rounded-md border border-slate-200 bg-slate-50/70 transition focus-within:border-[#15395f] focus-within:ring-2 focus-within:ring-[#d7e3ec]'
       : 'w-full'
   },
   pcInputText: {

@@ -8,7 +8,63 @@ export const defaultRoute = {
   year: null
 }
 
+const PLANNING_HOME_HASH = '#planning'
+
 export const normalizeHashPath = (hash = '') => hash.replace(/^#\/?/, '')
+
+export const buildPlanningHomeHash = () => PLANNING_HOME_HASH
+
+export const buildPlanningCenterHash = (centerId) => (
+  centerId
+    ? `${PLANNING_HOME_HASH}/center/${centerId}`
+    : buildPlanningHomeHash()
+)
+
+export const buildPlanningGroupHash = (centerId, groupId, year = null) => {
+  if (!centerId) {
+    return buildPlanningHomeHash()
+  }
+
+  if (!groupId) {
+    return buildPlanningCenterHash(centerId)
+  }
+
+  const normalizedYear = Number(year)
+
+  return Number.isInteger(normalizedYear) && normalizedYear > 0
+    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/year/${normalizedYear}`
+    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}`
+}
+
+export const buildPlanningPlanHash = (centerId, groupId, planId) => {
+  if (!centerId || !groupId) {
+    return buildPlanningGroupHash(centerId, groupId)
+  }
+
+  return planId
+    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/${planId}`
+    : buildPlanningGroupHash(centerId, groupId)
+}
+
+export const buildPlanningNewPlanHash = (centerId, groupId, year = null) => {
+  if (!centerId || !groupId) {
+    return buildPlanningGroupHash(centerId, groupId)
+  }
+
+  const normalizedYear = Number(year)
+
+  return Number.isInteger(normalizedYear) && normalizedYear > 0
+    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new/year/${normalizedYear}`
+    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new`
+}
+
+export const navigateToHash = (hash) => {
+  if (typeof window === 'undefined' || !hash || window.location.hash === hash) {
+    return
+  }
+
+  window.location.hash = hash
+}
 
 export const isPublicHomeHash = (hash = '') => {
   const normalizedHash = normalizeHashPath(hash)

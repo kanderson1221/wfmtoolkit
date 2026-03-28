@@ -1,11 +1,11 @@
 export const fieldInputClass =
-  'w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
+  'w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#15395f] focus:ring-4 focus:ring-[#d7e3ec]'
 
 export const fieldInputCompactClass =
   'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#15395f] focus:ring-4 focus:ring-[#d7e3ec]'
 
 export const tableFieldInputClass =
-  'w-full rounded-md border border-slate-200 bg-slate-50/70 px-2 py-1.5 text-center text-sm tabular-nums text-slate-900 shadow-none outline-none transition placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+  'w-full rounded-md border border-slate-200 bg-slate-50/70 px-2 py-1.5 text-center text-sm tabular-nums text-slate-900 shadow-none outline-none transition placeholder:text-slate-400 focus:bg-white focus:border-[#15395f] focus:ring-2 focus:ring-[#d7e3ec]'
 
 export const buildDialogPt = (maxWidthClass = 'max-w-4xl') => ({
   mask: {

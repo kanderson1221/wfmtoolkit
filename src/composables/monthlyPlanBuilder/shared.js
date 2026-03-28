@@ -1,7 +1,10 @@
 import {
   MONTH_LABELS,
+  buildPlanningYearRange,
   calculateCalendarOpenDays,
-  createPresenceMonth
+  createPresenceMonth,
+  getCurrentCalendarMonthIndex,
+  getCurrentCalendarYear
 } from '../../plannerModel'
 
 export const WEEKDAY_OPTIONS = [
@@ -14,9 +17,9 @@ export const WEEKDAY_OPTIONS = [
   { value: 6, label: 'Sat' }
 ]
 
-export const currentYear = new Date().getFullYear()
-export const currentMonthIndex = new Date().getMonth()
-export const yearOptions = Array.from({ length: 8 }, (_, index) => currentYear - 2 + index)
+export const currentYear = getCurrentCalendarYear()
+export const currentMonthIndex = getCurrentCalendarMonthIndex()
+export const yearOptions = buildPlanningYearRange(currentYear)
 
 export const autosaveTimeFormatter = new Intl.DateTimeFormat('en-US', {
   hour: 'numeric',

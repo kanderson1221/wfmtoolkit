@@ -10,7 +10,7 @@ import {
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode
 } from './planner/holidayCalendars'
-import { createNextYearOpening } from './planner/shared'
+import { createNextYearOpening, getCurrentCalendarYear, resolvePlanningYear } from './planner/shared'
 
 const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
 const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
@@ -33,12 +33,8 @@ const normalizeWeekdays = (weekdays) =>
     ? [...new Set(weekdays.map((value) => toNumber(value, 0)))].sort((left, right) => left - right)
     : [1, 2, 3, 4, 5]
 
-const getCurrentCalendarYear = () => new Date().getFullYear()
-
-const normalizeHolidayProfileYear = (value, fallback = getCurrentCalendarYear()) => {
-  const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
-}
+const normalizeHolidayProfileYear = (value, fallback = getCurrentCalendarYear()) =>
+  resolvePlanningYear(value, fallback)
 
 const sortHolidayProfiles = (profiles) =>
   [...profiles].sort((left, right) => normalizeHolidayProfileYear(left?.year) - normalizeHolidayProfileYear(right?.year))
@@ -153,7 +149,7 @@ const sortPlans = (plans) =>
     return rightStamp - leftStamp
   })
 
-const getPlanYear = (plan) => toNumber(plan?.planningYear, new Date().getFullYear())
+const getPlanYear = (plan) => resolvePlanningYear(plan?.planningYear)
 const buildPlanName = (planningYear) => `${getPlanYear({ planningYear })} Plan`
 
 const uniquePlansByYear = (plans) => {
@@ -188,7 +184,7 @@ const sortCenters = (centers) =>
 const normalizePlan = (draftPlan, timestamp = new Date().toISOString()) => {
   const snapshot = clonePlain(draftPlan)
   const { budgets: _discardBudgets, ...planSnapshot } = snapshot
-  const resolvedYear = planSnapshot.planningYear || new Date().getFullYear()
+  const resolvedYear = resolvePlanningYear(planSnapshot.planningYear)
 
   return {
     ...planSnapshot,
