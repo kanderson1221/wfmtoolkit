@@ -171,4 +171,38 @@ describe('planningStorage', () => {
     expect(centers[0].customHolidays.some((holiday) => holiday.sourceRuleId === 'columbus_day')).toBe(false)
     expect(centers[0].customHolidays.some((holiday) => holiday.sourceRuleId === 'thanksgiving_day')).toBe(true)
   })
+
+  it('normalizes next-year opening handoff values on saved plans', () => {
+    const centers = [
+      {
+        id: 'center-1',
+        name: 'North America Operations',
+        timezone: 'America/New_York',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        defaultPaidHoursPerDay: 8,
+        defaultOccupancyPercent: 90,
+        defaultAdherencePercent: 95,
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Consumer Voice',
+            plans: []
+          }
+        ]
+      }
+    ]
+
+    const nextCenters = upsertPlanningPlan(centers, 'center-1', 'group-1', {
+      planningYear: 2026,
+      nextYearOpening: {
+        rosterHeadcount: '',
+        frontlineHeadcount: '36'
+      }
+    })
+
+    expect(nextCenters[0].groups[0].plans[0].nextYearOpening).toEqual({
+      rosterHeadcount: null,
+      frontlineHeadcount: 36
+    })
+  })
 })

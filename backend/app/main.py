@@ -1,9 +1,10 @@
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Literal
 from urllib.parse import unquote
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from .batch import (
@@ -43,11 +44,60 @@ app = FastAPI(title="WFMToolkit API")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DIST_DIR = PROJECT_ROOT / "dist"
+SEO_PATHS = (
+    "/",
+    "/planning-workspace/",
+    "/erlang-tools/",
+)
+
+
+def _build_absolute_url(request: Request, path: str) -> str:
+    base_url = str(request.base_url).rstrip("/")
+    return f"{base_url}{path}"
+
+
+def _resolve_last_modified(relative_path: str) -> str | None:
+    candidate = DIST_DIR / relative_path
+    if not candidate.exists():
+        return None
+
+    modified = datetime.fromtimestamp(candidate.stat().st_mtime, tz=timezone.utc)
+    return modified.date().isoformat()
 
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots(request: Request) -> PlainTextResponse:
+    sitemap_url = _build_absolute_url(request, "/sitemap.xml")
+    return PlainTextResponse(
+        f"User-agent: *\nAllow: /\n\nSitemap: {sitemap_url}\n",
+        media_type="text/plain",
+    )
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap(request: Request) -> Response:
+    urlset_entries: list[str] = []
+
+    for path in SEO_PATHS:
+        relative_path = "index.html" if path == "/" else f"{path.strip('/')}/index.html"
+        last_modified = _resolve_last_modified(relative_path)
+        last_modified_xml = f"<lastmod>{last_modified}</lastmod>" if last_modified else ""
+        urlset_entries.append(
+            f"<url><loc>{_build_absolute_url(request, path)}</loc>{last_modified_xml}</url>"
+        )
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{''.join(urlset_entries)}"
+        "</urlset>"
+    )
+    return Response(content=xml, media_type="application/xml")
 
 
 @app.post("/api/erlang-c/calculate")
@@ -171,5 +221,10 @@ def serve_frontend(full_path: str) -> FileResponse:
     dist_resolved = DIST_DIR.resolve()
     if dist_resolved in candidate.parents and candidate.is_file():
         return FileResponse(candidate)
+
+    if dist_resolved in candidate.parents and candidate.is_dir():
+        directory_index = candidate / "index.html"
+        if directory_index.is_file():
+            return FileResponse(directory_index)
 
     return FileResponse(index_path)

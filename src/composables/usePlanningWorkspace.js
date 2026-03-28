@@ -7,6 +7,7 @@ import {
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
+import { findLinkedPriorPlan, toNumber } from '../plannerModel'
 import { planningRepository } from '../planningRepository'
 
 export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAccess, storageScope }) => {
@@ -108,9 +109,27 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     const resolvedPlanningYear = Number.isFinite(routePlanningYear)
       ? routePlanningYear
       : currentPlan.value?.planningYear || new Date().getFullYear()
+    const linkedPriorPlan = findLinkedPriorPlan(currentGroup.value.plans || [], {
+      id: currentPlan.value?.id || null,
+      planningYear: resolvedPlanningYear
+    })
     const centerHolidayCalendarId = normalizeHolidayCalendarId(
       currentCenter.value.defaultHolidayCalendarId,
       HOLIDAY_CALENDAR_NONE
+    )
+    const seededStartingHeadcount = Math.max(
+      toNumber(linkedPriorPlan?.nextYearOpening?.rosterHeadcount, 0),
+      toNumber(linkedPriorPlan?.nextYearOpening?.frontlineHeadcount, 0),
+      toNumber(linkedPriorPlan?.summary?.endingRosterHeadcount, 0)
+    )
+    const rawSeededStartingFrontlineHeadcount =
+      linkedPriorPlan?.nextYearOpening?.frontlineHeadcount ??
+      linkedPriorPlan?.summary?.endingFrontlineHeadcount ??
+      0
+    const normalizedSeededStartingHeadcount = Math.max(toNumber(seededStartingHeadcount, 0), 0)
+    const normalizedSeededStartingFrontlineHeadcount = Math.min(
+      Math.max(toNumber(rawSeededStartingFrontlineHeadcount, 0), 0),
+      normalizedSeededStartingHeadcount
     )
 
     return {
@@ -129,6 +148,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       defaultPaidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay,
       defaultOccupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
       defaultAdherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent,
+      startingHeadcount: normalizedSeededStartingHeadcount,
+      startingFrontlineHeadcount: normalizedSeededStartingFrontlineHeadcount,
       presenceMonths: Array.from({ length: 12 }, () => ({
         paidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay
       })),

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="index,follow" />
+    <title>Erlang Tools | WFM Toolkit</title>
+    <meta
+      name="description"
+      content="Erlang Tools in WFM Toolkit help workforce teams run Erlang C staffing checks, compare staffing scenarios, and review file-based staffing analysis before work moves into an annual plan."
+    />
+    <link rel="canonical" href="/erlang-tools/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Erlang Tools | WFM Toolkit" />
+    <meta
+      property="og:description"
+      content="Run Erlang C staffing checks, compare staffing scenarios, and review file-based staffing analysis before work moves into an annual plan."
+    />
+    <meta property="og:url" content="/erlang-tools/" />
+    <meta property="og:site_name" content="WFM Toolkit" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Erlang Tools | WFM Toolkit" />
+    <meta
+      name="twitter:description"
+      content="Run Erlang C staffing checks, compare staffing scenarios, and review file-based staffing analysis before work moves into an annual plan."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #13283f;
+        --ink-soft: #51667d;
+        --border: #d7e1ea;
+        --panel: #ffffff;
+        --panel-soft: #f6f9fb;
+        --action: #173b5d;
+        --shadow: 0 20px 40px rgba(15, 23, 42, 0.07);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: #f3f6f9;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        width: min(1120px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      .nav {
+        border-bottom: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(10px);
+      }
+
+      .nav-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 0;
+      }
+
+      .brand {
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        text-decoration: none;
+      }
+
+      .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .nav-links a {
+        text-decoration: none;
+        color: var(--ink-soft);
+      }
+
+      main {
+        padding: 56px 0 72px;
+      }
+
+      .hero,
+      .section {
+        padding: 36px;
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .section {
+        margin-top: 28px;
+      }
+
+      .eyebrow {
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #5e7893;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2.6rem, 5vw, 4.4rem);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 1.24rem;
+        letter-spacing: -0.03em;
+      }
+
+      p,
+      li {
+        margin: 0;
+        color: var(--ink-soft);
+        line-height: 1.85;
+      }
+
+      .grid {
+        display: grid;
+        gap: 28px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 46px;
+        padding: 0 18px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .button-primary {
+        border-color: #173b5d;
+        background: #173b5d;
+        color: #ffffff;
+      }
+
+      .button-secondary {
+        background: var(--panel);
+      }
+
+      .split {
+        display: grid;
+        gap: 28px;
+        grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+        align-items: center;
+      }
+
+      .feature-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .feature-card {
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--panel-soft);
+      }
+
+      .screenshot {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: var(--panel-soft);
+      }
+
+      .screenshot img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .caption {
+        padding: 14px 18px;
+        border-top: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--ink-soft);
+        font-size: 0.92rem;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 10px;
+      }
+
+      footer {
+        margin-top: 28px;
+        color: var(--ink-soft);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 900px) {
+        .feature-grid,
+        .split {
+          grid-template-columns: 1fr;
+        }
+
+        .hero,
+        .section {
+          padding: 24px;
+        }
+
+        main {
+          padding-top: 32px;
+        }
+      }
+    </style>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "WFM Toolkit Erlang Tools",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "Erlang C staffing tools for interval staffing checks, scenario testing, and file-based staffing analysis."
+      }
+    </script>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="shell nav-row">
+        <a class="brand" href="/">WFM Toolkit</a>
+        <nav class="nav-links" aria-label="Erlang Tools page">
+          <a href="/">Home</a>
+          <a href="/planning-workspace/">Planning Workspace</a>
+          <a href="/#calculators/interval">Open App</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="hero grid">
+        <div class="eyebrow">Erlang Tools</div>
+        <h1>Erlang staffing tools for faster operational staffing decisions.</h1>
+        <p>
+          Erlang Tools in WFM Toolkit are designed for the faster side of workforce management work: staffing checks,
+          scenario testing, and repeatable interval analysis before assumptions move into a maintained annual plan.
+          They give planners and operations leaders a direct way to test service level, occupancy, shrinkage, and
+          workload assumptions without rebuilding the problem from scratch every time.
+        </p>
+        <div class="actions">
+          <a class="button button-primary" href="/#calculators/interval">Open Erlang Tools</a>
+          <a class="button button-secondary" href="/planning-workspace/">See Planning Workspace</a>
+        </div>
+      </section>
+
+      <section class="section split">
+        <div class="screenshot">
+          <img
+            src="/landing-erlang-tool.png"
+            alt="Erlang Tools showing interval staffing inputs and recommendation results."
+            loading="lazy"
+          />
+          <div class="caption">Use interval staffing inputs to test service level and staffing outcomes quickly.</div>
+        </div>
+
+        <div class="grid">
+          <div>
+            <div class="eyebrow">What Teams Use It For</div>
+            <h2>Answer near-term staffing questions before they become full planning work.</h2>
+          </div>
+          <p>
+            This toolset supports the common questions that show up before a planner opens an annual headcount plan.
+            How many agents are required for a given interval? What happens if shrinkage changes? What staffing level is
+            needed for a service level goal? How do results move when patience or occupancy assumptions shift? Erlang
+            Tools are built to answer those questions quickly and clearly.
+          </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h2>Interval Staffing Checks</h2>
+            <p>Run Erlang C calculations for offered workload, handle time, service level, patience, and occupancy.</p>
+          </article>
+          <article class="feature-card">
+            <h2>Scenario Testing</h2>
+            <p>Compare staffing outcomes when key assumptions move instead of relying on one fixed point estimate.</p>
+          </article>
+          <article class="feature-card">
+            <h2>File-Driven Analysis</h2>
+            <p>Review multiple intervals together when a planner or analyst needs a repeatable staffing export.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section grid">
+        <div>
+          <div class="eyebrow">How It Fits</div>
+          <h2>Erlang first, planning second when the question is still forming.</h2>
+        </div>
+        <p>
+          Search visitors often look for an Erlang calculator before they look for planning software. This page exists
+          to match that intent. It explains the staffing tools clearly, then gives teams a path into the actual
+          calculator workspace or onward into Planning Workspace if the work needs to become a maintained plan.
+        </p>
+        <ul>
+          <li>Validate staffing assumptions quickly before they affect annual budgets.</li>
+          <li>Test service level and occupancy tradeoffs without rebuilding formulas manually.</li>
+          <li>Move from one-off staffing checks into a maintained planning workflow when needed.</li>
+        </ul>
+      </section>
+
+      <footer>
+        <p>
+          Need a maintained annual planning environment after staffing assumptions are settled?
+          <a href="/planning-workspace/">Open the Planning Workspace overview</a>.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

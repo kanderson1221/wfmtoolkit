@@ -117,6 +117,30 @@ export const createTrainingClass = (overrides = {}) => {
   }
 }
 
+const toNullableHeadcount = (value) => {
+  if (value == null || value === '') {
+    return null
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? Math.max(parsed, 0) : null
+}
+
+export const createNextYearOpening = (overrides = {}) => {
+  const rosterHeadcount = toNullableHeadcount(overrides.rosterHeadcount)
+  const rawFrontlineHeadcount = toNullableHeadcount(overrides.frontlineHeadcount)
+
+  return {
+    rosterHeadcount,
+    frontlineHeadcount:
+      rawFrontlineHeadcount == null
+        ? null
+        : rosterHeadcount == null
+          ? rawFrontlineHeadcount
+          : Math.min(rawFrontlineHeadcount, rosterHeadcount)
+  }
+}
+
 export const buildPresenceMonths = () => MONTH_LABELS.map(() => createPresenceMonth())
 export const buildRandomMonths = () => MONTH_LABELS.map(() => createRandomMonth())
 export const buildPlanMonths = () => MONTH_LABELS.map(() => createPlanMonth())

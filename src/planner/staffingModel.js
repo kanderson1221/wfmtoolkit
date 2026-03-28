@@ -13,6 +13,10 @@ const parseDate = (value) => {
     return null
   }
 
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : new Date(value)
+  }
+
   const parsed = new Date(`${value}T00:00:00`)
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
@@ -86,16 +90,23 @@ const formatDateInput = (date) => {
 }
 
 const roundHeadcount = (value) => Math.round(toNumber(value, 0) * 10) / 10
+const hasExplicitNumericValue = (value) => value !== '' && value != null && Number.isFinite(Number(value))
+const resolveHeadcount = (value, fallback) =>
+  hasExplicitNumericValue(value) ? roundHeadcount(value) : roundHeadcount(fallback)
 
 export const deriveTrainingClassMetrics = (trainingClass, trainingSettings) => {
   const normalizedClass = createTrainingClass(trainingClass)
   const normalizedSettings = createTrainingSettings(trainingSettings)
   const hireDate = parseDate(normalizedClass.hireDate)
-  const graduatingHeadcount = roundHeadcount(normalizedClass.hireCount)
-  const projectedGraduatingHeadcount = roundHeadcount(
+  const graduatingHeadcount = resolveHeadcount(normalizedClass.graduatingHeadcount, normalizedClass.hireCount)
+  const projectedGraduatingHeadcount = resolveHeadcount(
+    normalizedClass.projectedGraduatingHeadcount,
     normalizedClass.hireCount * (normalizedSettings.graduationYieldPercent / 100)
   )
-  const trainingFalloutHeadcount = roundHeadcount(normalizedClass.hireCount - projectedGraduatingHeadcount)
+  const trainingFalloutHeadcount = resolveHeadcount(
+    normalizedClass.trainingFalloutHeadcount,
+    Math.max(graduatingHeadcount - projectedGraduatingHeadcount, 0)
+  )
 
   if (!hireDate) {
     return {
@@ -111,14 +122,16 @@ export const deriveTrainingClassMetrics = (trainingClass, trainingSettings) => {
     }
   }
 
-  const graduationDate = shiftWorkdays(
+  const derivedGraduationDate = shiftWorkdays(
     hireDate,
     Math.max(normalizedSettings.trainingDurationWorkdays - 1, 0)
   )
-  const frontlineReadyDate = shiftWorkdays(
-    graduationDate,
+  const derivedFrontlineReadyDate = shiftWorkdays(
+    derivedGraduationDate,
     normalizedSettings.postTrainingNestingDays
   )
+  const graduationDate = parseDate(normalizedClass.graduationDate) || derivedGraduationDate
+  const frontlineReadyDate = parseDate(normalizedClass.frontlineReadyDate) || derivedFrontlineReadyDate
 
   return {
     hireDate,
@@ -377,7 +390,13 @@ export const recommendTrainingClasses = ({
   startingFrontlineHeadcount,
   staffingMonths,
   trainingClasses,
-  trainingSettings
+  trainingSettings,
+  targetNextYearStartingFrontlineHeadcount = null,
+  minimumHireDate = null,
+  maximumHireDate = null,
+  includeFirstMonth = false,
+  ignoredRecommendationSources = ['recommended'],
+  recommendationSource = 'recommended'
 }) => {
   const normalizedSettings = createTrainingSettings(trainingSettings)
   const yieldShare = normalizedSettings.graduationYieldPercent / 100
@@ -393,9 +412,10 @@ export const recommendTrainingClasses = ({
     return []
   }
 
+  const ignoredSources = new Set(ignoredRecommendationSources)
   const manualClasses = (Array.isArray(trainingClasses) ? trainingClasses : [])
     .map((trainingClass) => createTrainingClass(trainingClass))
-    .filter((trainingClass) => trainingClass.source !== 'recommended')
+    .filter((trainingClass) => !ignoredSources.has(trainingClass.source))
 
   const recommendations = []
   let staffingProjection = computeStaffingRecords(
@@ -407,14 +427,17 @@ export const recommendTrainingClasses = ({
     manualClasses,
     normalizedSettings
   )
-  const planStartDate = moveToWorkdayOnOrAfter(monthStart(planningYear, 0))
+  const parsedMinimumHireDate = parseDate(minimumHireDate) || monthStart(planningYear, 0)
+  const parsedMaximumHireDate = parseDate(maximumHireDate)
+  const planStartDate = moveToWorkdayOnOrAfter(parsedMinimumHireDate)
+  const planEndDate = parsedMaximumHireDate ? moveToWorkdayOnOrBefore(parsedMaximumHireDate) : null
   const totalWorkdayLag = Math.max(
     normalizedSettings.trainingDurationWorkdays - 1 + normalizedSettings.postTrainingNestingDays,
     0
   )
 
   monthlyRecords.forEach((monthlyRecord, monthIndex) => {
-    if (monthIndex === 0) {
+    if (monthIndex === 0 && !includeFirstMonth) {
       return
     }
 
@@ -437,7 +460,7 @@ export const recommendTrainingClasses = ({
       candidateHireDate = moveToFirstWorkdayOfWeek(candidateHireDate)
     }
 
-    if (candidateHireDate < planStartDate) {
+    if (candidateHireDate < planStartDate || (planEndDate && candidateHireDate > planEndDate)) {
       return
     }
 
@@ -496,7 +519,7 @@ export const recommendTrainingClasses = ({
           id: `recommended-class-${planningYear}-${monthIndex + 1}-${recommendations.length + 1}`,
           hireDate: formatDateInput(candidateHireDate),
           hireCount: classHireCount,
-          source: 'recommended'
+          source: recommendationSource
         })
       )
 
@@ -521,6 +544,103 @@ export const recommendTrainingClasses = ({
       )
     }
   })
+
+  const normalizedTargetNextYearStartingFrontlineHeadcount = hasExplicitNumericValue(targetNextYearStartingFrontlineHeadcount)
+    ? Math.max(roundHeadcount(targetNextYearStartingFrontlineHeadcount), 0)
+    : null
+
+  if (normalizedTargetNextYearStartingFrontlineHeadcount != null) {
+    const targetFrontlineReadyDate = moveToWorkdayOnOrBefore(monthEnd(planningYear, 11))
+    let remainingNextYearStartingFrontlineGap = Math.max(
+      normalizedTargetNextYearStartingFrontlineHeadcount - (staffingProjection[staffingProjection.length - 1]?.endingFrontlineHeadcount || 0),
+      0
+    )
+    let candidateHireDate = shiftWorkdays(targetFrontlineReadyDate, -totalWorkdayLag)
+
+    if (normalizedSettings.startOnFirstBusinessDayOfWeek) {
+      candidateHireDate = moveToFirstWorkdayOfWeek(candidateHireDate)
+    }
+
+    let safetyCounter = 0
+
+    while (remainingNextYearStartingFrontlineGap > 0.05 && safetyCounter < 500) {
+      safetyCounter += 1
+
+      if (candidateHireDate < planStartDate || (planEndDate && candidateHireDate > planEndDate)) {
+        break
+      }
+
+      const candidateGraduationDate = shiftWorkdays(
+        candidateHireDate,
+        Math.max(normalizedSettings.trainingDurationWorkdays - 1, 0)
+      )
+      const candidateFrontlineReadyDate = shiftWorkdays(
+        candidateGraduationDate,
+        normalizedSettings.postTrainingNestingDays
+      )
+
+      if (candidateFrontlineReadyDate > targetFrontlineReadyDate) {
+        break
+      }
+
+      const normalizedClasses = buildTrainingClassMonthlySummary(
+        planningYear,
+        [...manualClasses, ...recommendations],
+        normalizedSettings
+      ).classes
+      const concurrentClassCount = normalizedClasses.filter(
+        (trainingClass) =>
+          trainingClass.isValidDateRange &&
+          rangesOverlap(
+            trainingClass.parsedHireDate,
+            trainingClass.parsedGraduationDate,
+            candidateHireDate,
+            candidateGraduationDate
+          )
+      ).length
+
+      if (concurrentClassCount >= normalizedSettings.availableTrainers) {
+        candidateHireDate = normalizedSettings.startOnFirstBusinessDayOfWeek
+          ? moveToFirstWorkdayOfPreviousWeek(candidateHireDate)
+          : shiftWorkdays(candidateHireDate, -1)
+        continue
+      }
+
+      const classHireCount = Math.min(
+        Math.ceil(remainingNextYearStartingFrontlineGap / yieldShare),
+        normalizedSettings.maxClassSize
+      )
+      recommendations.push(
+        createTrainingClass({
+          id: `recommended-class-${planningYear}-next-year-frontline-${recommendations.length + 1}`,
+          hireDate: formatDateInput(candidateHireDate),
+          hireCount: classHireCount,
+          source: recommendationSource
+        })
+      )
+
+      staffingProjection = computeStaffingRecords(
+        monthlyRecords,
+        planningYear,
+        startingHeadcount,
+        startingFrontlineHeadcount,
+        staffingMonths,
+        [...manualClasses, ...recommendations],
+        normalizedSettings
+      )
+
+      remainingNextYearStartingFrontlineGap = Math.max(
+        normalizedTargetNextYearStartingFrontlineHeadcount - (staffingProjection[staffingProjection.length - 1]?.endingFrontlineHeadcount || 0),
+        0
+      )
+
+      if (remainingNextYearStartingFrontlineGap > 0.05) {
+        candidateHireDate = normalizedSettings.startOnFirstBusinessDayOfWeek
+          ? moveToFirstWorkdayOfPreviousWeek(candidateHireDate)
+          : shiftWorkdays(candidateHireDate, -1)
+      }
+    }
+  }
 
   return recommendations
 }

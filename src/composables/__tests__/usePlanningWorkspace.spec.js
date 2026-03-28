@@ -258,4 +258,59 @@ describe('usePlanningWorkspace', () => {
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'default')
     expect(workspace.plannerDraftKey.value).toBe('guest:plan:new')
   })
+
+  it('seeds a new plan from the prior year ending position or explicit next-year frontline target', async () => {
+    const linkedCenters = [
+      {
+        ...centers[0],
+        groups: [
+          {
+            ...centers[0].groups[0],
+            plans: [
+              {
+                id: 'plan-1',
+                name: '2026 Plan',
+                planningYear: 2026,
+                nextYearOpening: {
+                  frontlineHeadcount: 42,
+                },
+                summary: {
+                  endingRosterHeadcount: 40,
+                  endingFrontlineHeadcount: 34
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+
+    planningRepository.loadWorkspace.mockReturnValue(linkedCenters)
+
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'new',
+      year: 2027
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const hasWorkspaceAccess = computed(() => true)
+    const storageScope = computed(() => currentUser.value.id)
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      hasWorkspaceAccess,
+      storageScope
+    })
+
+    await workspace.loadCentersForScope()
+    expect(workspace.plannerSeed.value).toMatchObject({
+      planningYear: 2027,
+      startingHeadcount: 42,
+      startingFrontlineHeadcount: 42
+    })
+  })
 })

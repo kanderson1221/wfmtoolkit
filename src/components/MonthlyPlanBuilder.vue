@@ -182,7 +182,7 @@ const staffingProgress = computed(() => {
     toNumber(builder.startingFrontlineHeadcount, 0) > 0 &&
     toNumber(builder.startingFrontlineHeadcount, 0) <= toNumber(builder.startingHeadcount, 0)
   const movementStarted =
-    builder.trainingClasses.length > 0 ||
+    builder.effectiveTrainingClasses.length > 0 ||
     builder.staffingMonths.some((month) => toNumber(month.frontlineAttritionHeadcount, 0) > 0)
   const requiredInputsComplete = [startingRosterSet, startingFrontlineSet].filter(Boolean).length
   const isReady = startingRosterSet && startingFrontlineSet
@@ -196,9 +196,13 @@ const staffingProgress = computed(() => {
       ? 'Opening roster headcount is still missing.'
       : !startingFrontlineSet
         ? 'Opening frontline headcount is still missing.'
-        : movementStarted
-          ? 'Opening position is set and staffing movement assumptions are in progress.'
-          : 'Opening position is set. Add attrition or training assumptions if the plan needs movement.',
+        : builder.hasNextYearStartingFrontlineTarget && movementStarted
+          ? 'Opening position is set, staffing movement is in progress, and a next January opening frontline target is active.'
+          : builder.hasNextYearStartingFrontlineTarget
+            ? 'Opening position is set and a next January opening frontline target is active.'
+            : movementStarted
+              ? 'Opening position is set and staffing movement assumptions are in progress.'
+              : 'Opening position is set. Add attrition or training assumptions if the plan needs movement.',
     blocker: !startingRosterSet
       ? 'Set starting total headcount for January.'
       : !startingFrontlineSet
@@ -428,11 +432,18 @@ const breadcrumbItems = computed(() => {
                 v-model:starting-headcount="builder.startingHeadcount"
                 v-model:starting-frontline-headcount="builder.startingFrontlineHeadcount"
                 v-model:training-settings="builder.trainingSettings"
+                v-model:next-year-opening="builder.nextYearOpening"
                 v-model:staffing-months="builder.staffingMonths"
                 v-model:training-classes="builder.trainingClasses"
                 v-model:selected-month-index="builder.selectedMonthIndex"
+                :starting-position-inherited="builder.startingPositionInherited"
+                :starting-position-inherited-from-year="builder.startingPositionInheritedFromYear"
+                :inherited-training-classes="builder.inheritedTrainingClasses"
                 :staffing-records="builder.staffingRecords"
                 :format-number="builder.formatNumber"
+                :year-end-target-defaults="{
+                  frontlineHeadcount: builder.staffingSummary.endingFrontlineHeadcount,
+                }"
                 @recommend-classes="builder.generateRecommendedTrainingClasses"
                 @save="builder.savePlan"
               />

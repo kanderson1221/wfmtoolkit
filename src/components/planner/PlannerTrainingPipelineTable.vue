@@ -14,6 +14,10 @@ const props = defineProps({
     type: Number,
     required: true
   },
+  inheritedTrainingClasses: {
+    type: Array,
+    default: () => []
+  },
   formatNumber: {
     type: Function,
     required: true
@@ -42,6 +46,8 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric'
 })
+const planYearMinDate = computed(() => `${props.planningYear}-01-01`)
+const planYearMaxDate = computed(() => `${props.planningYear}-12-31`)
 
 const resolveHireDate = (trainingClass) => createTrainingClass(trainingClass).hireDate
 
@@ -65,8 +71,13 @@ const canRecommendClasses = computed(
     normalizedTrainingSettings.value.trainingDurationWorkdays > 0 &&
     normalizedTrainingSettings.value.graduationYieldPercent > 0
 )
+const isInheritedTrainingClass = (trainingClass) => createTrainingClass(trainingClass).source === 'inherited'
+const combinedTrainingClasses = computed(() => [
+  ...props.inheritedTrainingClasses,
+  ...trainingClasses.value
+])
 const sortedTrainingClasses = computed(() =>
-  [...trainingClasses.value].sort((left, right) => {
+  [...combinedTrainingClasses.value].sort((left, right) => {
     const leftDate = parseSortableDate(resolveHireDate(left))
     const rightDate = parseSortableDate(resolveHireDate(right))
 
@@ -85,12 +96,20 @@ const getTrainingMetrics = (trainingClass) =>
   deriveTrainingClassMetrics(trainingClass, normalizedTrainingSettings.value)
 
 const formatDerivedDate = (date) => (date ? shortDateFormatter.format(date) : '—')
+const formatHireDate = (value) => {
+  const parsed = parseSortableDate(value)
+  return parsed ? shortDateFormatter.format(parsed) : '—'
+}
 
 const getTrainingStatus = (trainingClass) => {
   const metrics = getTrainingMetrics(trainingClass)
 
   if (!metrics.isValid) {
     return { label: 'Invalid Dates', tone: 'invalid' }
+  }
+
+  if (!isInheritedTrainingClass(trainingClass) && metrics.hireDate.getFullYear() !== props.planningYear) {
+    return { label: 'Outside Plan Year', tone: 'invalid' }
   }
 
   if (metrics.frontlineReadyDate >= selectedMonthStart.value && metrics.frontlineReadyDate <= selectedMonthEnd.value) {
@@ -133,14 +152,34 @@ const removeTrainingClass = (classId) => {
 }
 
 const trainingClassSummary = computed(() => {
-  const count = trainingClasses.value.length
+  const localCount = trainingClasses.value.length
+  const inheritedCount = props.inheritedTrainingClasses.length
+  const count = localCount + inheritedCount
 
   if (count === 0) {
     return 'No classes yet'
   }
 
-  return `${count} class${count === 1 ? '' : 'es'}`
+  if (inheritedCount === 0) {
+    return `${count} class${count === 1 ? '' : 'es'}`
+  }
+
+  if (localCount === 0) {
+    return `${inheritedCount} carry-in class${inheritedCount === 1 ? '' : 'es'}`
+  }
+
+  return `${localCount} class${localCount === 1 ? '' : 'es'} + ${inheritedCount} carry-in`
 })
+
+const getInheritedOriginLabel = (trainingClass) => {
+  const inheritedYear = Number(trainingClass?.inheritedFromPlanningYear)
+
+  if (Number.isFinite(inheritedYear)) {
+    return `Inherited from ${inheritedYear} plan`
+  }
+
+  return 'Inherited from prior plan'
+}
 
 const trainingClassMenuItems = [
   {
@@ -157,10 +196,10 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
 </script>
 
 <template>
-  <section class="grid gap-3">
+  <section class="grid gap-0">
     <button
       type="button"
-      class="training-pipeline-toggle"
+      :class="['training-pipeline-toggle', { 'training-pipeline-toggle-open': pipelineOpen }]"
       :aria-expanded="pipelineOpen ? 'true' : 'false'"
       aria-controls="training-pipeline-content"
       @click="pipelineOpen = !pipelineOpen"
@@ -176,7 +215,7 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
       </div>
     </button>
 
-    <div v-if="pipelineOpen" id="training-pipeline-content" class="grid gap-3">
+    <div v-if="pipelineOpen" id="training-pipeline-content" class="training-pipeline-content">
       <div class="training-class-toolbar self-start xl:justify-end">
         <AppButton variant="secondary" @click="emit('open-settings')">Training Settings</AppButton>
         <AppButton variant="secondary" @click="addTrainingClass">Add Training Class</AppButton>
@@ -206,7 +245,7 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
             </tr>
           </thead>
           <tbody>
-            <tr v-if="!trainingClasses.length">
+            <tr v-if="!sortedTrainingClasses.length">
               <td colspan="7" class="training-empty-state">
                 Add a training class or use recommendations to start feeding hire and graduation headcount into the staffing plan.
               </td>
@@ -214,16 +253,30 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
             <tr
               v-for="trainingClass in sortedTrainingClasses"
               :key="trainingClass.id"
-              :class="{ 'training-class-recommended': createTrainingClass(trainingClass).source === 'recommended' }"
+              :class="{
+                'training-class-recommended': ['recommended', 'recommended-cross-year'].includes(createTrainingClass(trainingClass).source),
+                'training-class-inherited': isInheritedTrainingClass(trainingClass),
+              }"
             >
               <td>
+                <div v-if="isInheritedTrainingClass(trainingClass)" class="grid gap-1">
+                  <span class="font-medium text-slate-800">{{ formatHireDate(resolveHireDate(trainingClass)) }}</span>
+                  <span class="training-origin-pill">{{ getInheritedOriginLabel(trainingClass) }}</span>
+                </div>
                 <AppTableDateField
+                  v-else
                   v-model="trainingClass.hireDate"
+                  :min="planYearMinDate"
+                  :max="planYearMaxDate"
                   aria-label="Training class hire date"
                 />
               </td>
               <td>
+                <template v-if="isInheritedTrainingClass(trainingClass)">
+                  {{ props.formatNumber(trainingClass.hireCount, 1) }}
+                </template>
                 <AppTableNumberField
+                  v-else
                   v-model.number="trainingClass.hireCount"
                   min="0"
                   step="1"
@@ -242,7 +295,11 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
                 </span>
               </td>
               <td class="training-action-cell">
+                <span v-if="isInheritedTrainingClass(trainingClass)" class="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
+                  Read only
+                </span>
                 <AppMenu
+                  v-else
                   :items="trainingClassMenuItems"
                   :trigger-icon="mdiDotsVertical"
                   :trigger-label="`Open actions for training class starting ${resolveHireDate(trainingClass) || 'unscheduled'}`"

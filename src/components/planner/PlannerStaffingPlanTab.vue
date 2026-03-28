@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import PlannerStaffingSupplyTable from './PlannerStaffingSupplyTable.vue'
 import PlannerTrainingPipelineTable from './PlannerTrainingPipelineTable.vue'
@@ -12,9 +12,25 @@ const props = defineProps({
     type: Number,
     required: true
   },
+  yearEndTargetDefaults: {
+    type: Object,
+    required: true
+  },
   staffingRecords: {
     type: Array,
     required: true
+  },
+  startingPositionInherited: {
+    type: Boolean,
+    default: false
+  },
+  startingPositionInheritedFromYear: {
+    type: Number,
+    default: null
+  },
+  inheritedTrainingClasses: {
+    type: Array,
+    default: () => []
   },
   formatNumber: {
     type: Function,
@@ -25,6 +41,11 @@ const props = defineProps({
 const emit = defineEmits(['recommend-classes', 'save'])
 
 const trainingSettings = defineModel('trainingSettings', {
+  type: Object,
+  required: true
+})
+
+const nextYearOpening = defineModel('nextYearOpening', {
   type: Object,
   required: true
 })
@@ -55,6 +76,25 @@ const selectedMonthIndex = defineModel('selectedMonthIndex', {
 })
 
 const trainingSettingsOpen = ref(false)
+const yearEndTargetEnabled = computed({
+  get: () => nextYearOpening.value?.frontlineHeadcount != null,
+  set: (enabled) => {
+    nextYearOpening.value = {
+      rosterHeadcount: null,
+      frontlineHeadcount: enabled ? props.yearEndTargetDefaults.frontlineHeadcount : null
+    }
+  }
+})
+
+const yearEndHeadcountTarget = computed({
+  get: () => nextYearOpening.value?.frontlineHeadcount ?? null,
+  set: (value) => {
+    nextYearOpening.value = {
+      rosterHeadcount: null,
+      frontlineHeadcount: value == null ? null : value
+    }
+  }
+})
 </script>
 
 <template>
@@ -64,6 +104,7 @@ const trainingSettingsOpen = ref(false)
     <PlannerTrainingPipelineTable
       v-model:training-settings="trainingSettings"
       v-model:training-classes="trainingClasses"
+      :inherited-training-classes="props.inheritedTrainingClasses"
       :planning-year="props.planningYear"
       :format-number="props.formatNumber"
       :selected-month-index="selectedMonthIndex"
@@ -74,8 +115,12 @@ const trainingSettingsOpen = ref(false)
     <PlannerStaffingSupplyTable
       v-model:starting-headcount="startingHeadcount"
       v-model:starting-frontline-headcount="startingFrontlineHeadcount"
+      v-model:year-end-target-enabled="yearEndTargetEnabled"
+      v-model:year-end-headcount-target="yearEndHeadcountTarget"
       v-model:staffing-months="staffingMonths"
       v-model:selected-month-index="selectedMonthIndex"
+      :starting-position-inherited="props.startingPositionInherited"
+      :starting-position-inherited-from-year="props.startingPositionInheritedFromYear"
       :staffing-records="props.staffingRecords"
       :format-number="props.formatNumber"
     />

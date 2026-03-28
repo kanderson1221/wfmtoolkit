@@ -15,7 +15,9 @@ import {
   computeMonthlyRecords,
   computeActualsRecords,
   computeStaffingRecords,
+  createNextYearOpening,
   deriveStartingFrontlineHeadcount,
+  buildInheritedTrainingClasses,
   createPlanMonth,
   createActualsMonth,
   createPresenceMonth,
@@ -23,11 +25,13 @@ import {
   createStaffingMonth,
   createTrainingClass,
   createTrainingSettings,
+  findLinkedPriorPlan,
   normalizeCustomHolidays,
   normalizeDisabledHolidayRuleIds,
   normalizeWeekdays,
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode,
+  persistTrainingClassOutcomes,
   recommendTrainingClasses,
   summarizePlanRecords,
   summarizeActualsRecords,
@@ -51,6 +55,17 @@ import {
 
 export const useMonthlyPlanBuilder = (props, emit) => {
   const CORE_SECTION_IDS = new Set(['availability', 'variability', 'requirement', 'staffing'])
+  const SAME_YEAR_RECOMMENDATION_SOURCE = 'recommended'
+  const isEditableTrainingClassInPlanYear = (trainingClass, planningYear) => {
+    const hireDate = createTrainingClass(trainingClass).hireDate
+
+    if (!hireDate) {
+      return true
+    }
+
+    const parsedYear = Number(String(hireDate).slice(0, 4))
+    return !Number.isFinite(parsedYear) || parsedYear === planningYear
+  }
   const savedPlan = props.initialPlan || null
   const prefilledYear = props.prefilledYear == null || props.prefilledYear === ''
     ? NaN
@@ -159,6 +174,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const planMonths = ref(hydrateMonths(initialPlan.planMonths, buildPlanMonths, createPlanMonth))
   const actualsMonths = ref(hydrateMonths(initialPlan.actualsMonths, buildActualsMonths, createActualsMonth))
   const trainingSettings = ref(createTrainingSettings(initialPlan.trainingSettings || {}))
+  const nextYearOpening = ref(createNextYearOpening(initialPlan.nextYearOpening || {}))
   const startingHeadcount = ref(initialStartingHeadcount)
   const startingFrontlineHeadcount = ref(
     Math.min(
@@ -296,6 +312,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     startingHeadcount.value = examplePlan.startingHeadcount
     startingFrontlineHeadcount.value = examplePlan.startingFrontlineHeadcount
     trainingSettings.value = examplePlan.trainingSettings
+    nextYearOpening.value = createNextYearOpening(examplePlan.nextYearOpening || {})
     staffingMonths.value = examplePlan.staffingMonths
     trainingClasses.value = examplePlan.trainingClasses
     reviewedSections.value = [...CORE_SECTION_IDS]
@@ -322,6 +339,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planMonths.value = buildPlanMonths()
     actualsMonths.value = buildActualsMonths()
     trainingSettings.value = createTrainingSettings()
+    nextYearOpening.value = createNextYearOpening()
     startingHeadcount.value = 0
     startingFrontlineHeadcount.value = 0
     staffingMonths.value = buildStaffingMonths()
@@ -355,10 +373,65 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       startingHeadcount.value,
       startingFrontlineHeadcount.value,
       staffingMonths.value,
-      trainingClasses.value,
+      effectiveTrainingClasses.value,
       trainingSettings.value
     )
   )
+
+  const linkedPriorPlan = computed(() =>
+    findLinkedPriorPlan(props.groupPlans || [], {
+      id: savedPlan?.id || initialPlan.id || null,
+      planningYear: planningYear.value
+    })
+  )
+
+  const inheritedStartingPosition = computed(() => {
+    if (!linkedPriorPlan.value) {
+      return null
+    }
+
+    const explicitRosterHeadcount = toNumber(linkedPriorPlan.value?.nextYearOpening?.rosterHeadcount, 0)
+    const explicitFrontlineHeadcount = toNumber(linkedPriorPlan.value?.nextYearOpening?.frontlineHeadcount, 0)
+    const endingRosterHeadcount = toNumber(linkedPriorPlan.value?.summary?.endingRosterHeadcount, 0)
+    const endingFrontlineHeadcount = toNumber(linkedPriorPlan.value?.summary?.endingFrontlineHeadcount, 0)
+    const rosterHeadcount = Math.max(explicitRosterHeadcount, explicitFrontlineHeadcount, endingRosterHeadcount, 0)
+    const frontlineHeadcount = Math.min(
+      Math.max(
+        linkedPriorPlan.value?.nextYearOpening?.frontlineHeadcount != null
+          ? explicitFrontlineHeadcount
+          : endingFrontlineHeadcount,
+        0
+      ),
+      rosterHeadcount
+    )
+
+    return {
+      rosterHeadcount,
+      frontlineHeadcount
+    }
+  })
+
+  const startingPositionInherited = computed(() => inheritedStartingPosition.value != null)
+  const startingPositionInheritedFromYear = computed(() => {
+    const linkedPlanningYear = Number(linkedPriorPlan.value?.planningYear)
+    return Number.isFinite(linkedPlanningYear) ? linkedPlanningYear : null
+  })
+
+  const inheritedTrainingClasses = computed(() =>
+    buildInheritedTrainingClasses({
+      priorPlan: linkedPriorPlan.value,
+      planningYear: planningYear.value
+    })
+  )
+
+  const ownedTrainingClasses = computed(() =>
+    trainingClasses.value.filter((trainingClass) => isEditableTrainingClassInPlanYear(trainingClass, planningYear.value))
+  )
+
+  const effectiveTrainingClasses = computed(() => [
+    ...inheritedTrainingClasses.value,
+    ...ownedTrainingClasses.value
+  ])
 
   const actualsRecords = computed(() =>
     computeActualsRecords(monthlyRecords.value, staffingRecords.value, actualsMonths.value)
@@ -371,12 +444,17 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       startingHeadcount: startingHeadcount.value,
       startingFrontlineHeadcount: startingFrontlineHeadcount.value,
       staffingMonths: staffingMonths.value,
-      trainingClasses: trainingClasses.value,
-      trainingSettings: trainingSettings.value
+      trainingClasses: effectiveTrainingClasses.value,
+      trainingSettings: trainingSettings.value,
+      targetNextYearStartingFrontlineHeadcount: nextYearOpening.value.frontlineHeadcount,
+      ignoredRecommendationSources: [SAME_YEAR_RECOMMENDATION_SOURCE],
+      recommendationSource: SAME_YEAR_RECOMMENDATION_SOURCE
     })
 
     trainingClasses.value = [
-      ...trainingClasses.value.filter((trainingClass) => createTrainingClass(trainingClass).source !== 'recommended'),
+      ...trainingClasses.value.filter(
+        (trainingClass) => createTrainingClass(trainingClass).source !== SAME_YEAR_RECOMMENDATION_SOURCE
+      ),
       ...recommendations
     ]
   }
@@ -402,6 +480,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const planSummary = computed(() => summarizePlanRecords(monthlyRecords.value))
   const staffingSummary = computed(() => summarizeStaffingRecords(staffingRecords.value))
   const actualsSummary = computed(() => summarizeActualsRecords(actualsRecords.value))
+  const hasNextYearStartingFrontlineTarget = computed(() => nextYearOpening.value.frontlineHeadcount != null)
 
   const buildPlanPayload = () => ({
     id: savedPlan?.id || initialPlan.id || null,
@@ -420,10 +499,15 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planMonths: planMonths.value.map((month) => createPlanMonth(month)),
     actualsMonths: actualsMonths.value.map((month) => createActualsMonth(month)),
     trainingSettings: createTrainingSettings(trainingSettings.value),
+    nextYearOpening: createNextYearOpening({
+      frontlineHeadcount: nextYearOpening.value.frontlineHeadcount
+    }),
     startingHeadcount: startingHeadcount.value,
     startingFrontlineHeadcount: startingFrontlineHeadcount.value,
     staffingMonths: staffingMonths.value.map((month) => createStaffingMonth(month)),
-    trainingClasses: trainingClasses.value.map((trainingClass) => createTrainingClass(trainingClass)),
+    trainingClasses: ownedTrainingClasses.value.map((trainingClass) =>
+      persistTrainingClassOutcomes(trainingClass, planningYear.value, trainingSettings.value)
+    ),
     summary: {
       annualContacts: planSummary.value.annualContacts,
       annualWorkloadHours: planSummary.value.annualWorkloadHours,
@@ -613,6 +697,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       planMonths,
       actualsMonths,
       trainingSettings,
+      nextYearOpening,
       startingHeadcount,
       startingFrontlineHeadcount,
       staffingMonths,
@@ -633,6 +718,19 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       startingFrontlineHeadcount.value = value
     }
   })
+
+  watch(
+    inheritedStartingPosition,
+    (position) => {
+      if (!position) {
+        return
+      }
+
+      startingHeadcount.value = position.rosterHeadcount
+      startingFrontlineHeadcount.value = position.frontlineHeadcount
+    },
+    { immediate: true }
+  )
 
   onMounted(() => {
     autosaveReady.value = true
@@ -663,10 +761,16 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planMonths,
     actualsMonths,
     trainingSettings,
+    nextYearOpening,
     startingHeadcount,
     startingFrontlineHeadcount,
     staffingMonths,
     trainingClasses,
+    ownedTrainingClasses,
+    startingPositionInherited,
+    startingPositionInheritedFromYear,
+    inheritedTrainingClasses,
+    effectiveTrainingClasses,
     reviewedSections,
     autosaveState,
     monthlyRecords,
@@ -676,6 +780,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planSummary,
     staffingSummary,
     staffingRecords,
+    hasNextYearStartingFrontlineTarget,
     actualsRecords,
     actualsSummary,
     autosaveStatusMessage,

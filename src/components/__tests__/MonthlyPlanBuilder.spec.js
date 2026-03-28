@@ -29,7 +29,8 @@ const plannerStubs = {
     template: '<div data-test="plan-tab">plan</div>'
   },
   PlannerStaffingPlanTab: {
-    template: '<div data-test="staffing-tab">staffing</div>'
+    props: ['inheritedTrainingClasses', 'startingPositionInherited', 'startingPositionInheritedFromYear'],
+    template: '<div data-test="staffing-tab">staffing {{ inheritedTrainingClasses.length }}|{{ startingPositionInherited ? startingPositionInheritedFromYear : "editable" }}</div>'
   },
   PlannerActualsPanel: {
     template: '<div data-test="actuals-tab">actuals</div>'
@@ -144,6 +145,45 @@ describe('MonthlyPlanBuilder', () => {
 
     expect(wrapper.find('[data-test="actuals-tab"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="staffing-tab"]').exists()).toBe(false)
+  })
+
+  it('surfaces prior-year carry-in classes in the next-year staffing tab without copying them into the plan', async () => {
+    const wrapper = mountBuilder({
+      draftKey: 'plan-2027',
+      initialPlan: {
+        id: 'plan-2027',
+        name: '2027 Plan',
+        planningYear: 2027
+      },
+      groupPlans: [
+        {
+          id: 'plan-2026',
+          name: '2026 Plan',
+          planningYear: 2026,
+          trainingSettings: {
+            trainingDurationWorkdays: 10,
+            postTrainingNestingDays: 5,
+            graduationYieldPercent: 90
+          },
+          trainingClasses: [
+            {
+              id: 'carry-in-1',
+              hireDate: '2026-12-18',
+              hireCount: 20,
+              graduationDate: '2027-01-05',
+              frontlineReadyDate: '2027-01-12',
+              graduatingHeadcount: 20,
+              projectedGraduatingHeadcount: 18,
+              trainingFalloutHeadcount: 2
+            }
+          ]
+        }
+      ]
+    })
+
+    await wrapper.find('[data-section-id="staffing"]').trigger('click')
+
+    expect(wrapper.find('[data-test="staffing-tab"]').text()).toContain('1|2026')
   })
 
   it('emits a saved plan payload from the shell action', async () => {

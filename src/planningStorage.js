@@ -10,6 +10,7 @@ import {
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode
 } from './planner/holidayCalendars'
+import { createNextYearOpening } from './planner/shared'
 
 const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
 const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
@@ -107,6 +108,7 @@ const normalizePlan = (draftPlan, timestamp = new Date().toISOString()) => {
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),
     customHolidays: normalizeCustomHolidays(planSnapshot.customHolidays),
     holidayScheduleMode: normalizeHolidayScheduleMode(planSnapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
+    nextYearOpening: createNextYearOpening(planSnapshot.nextYearOpening),
     createdAt: planSnapshot.createdAt || timestamp,
     updatedAt: planSnapshot.updatedAt || timestamp
   }
