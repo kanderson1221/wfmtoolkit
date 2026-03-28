@@ -40,7 +40,7 @@
   }
 
   .answer-card-primary {
-    @apply border-blue-100 bg-blue-50;
+    @apply border-[#d5e0ea] bg-[#eef4f8];
   }
 
   .metric-card {

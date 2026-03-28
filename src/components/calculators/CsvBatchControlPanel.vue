@@ -50,7 +50,7 @@ const emit = defineEmits(['file-select', 'run-workflow'])
       <div class="flex flex-wrap items-center gap-3">
         <label
           for="batchCsvFile"
-          class="inline-flex w-full cursor-pointer items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 md:w-auto"
+          class="inline-flex w-full cursor-pointer items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#c3d2df] hover:bg-[#eef4f8] hover:text-[#15395f] md:w-auto"
         >
           Choose CSV
         </label>
@@ -64,7 +64,7 @@ const emit = defineEmits(['file-select', 'run-workflow'])
         <a
           :href="props.workflow.templateHref"
           download
-          class="inline-flex items-center gap-1 text-sm font-semibold text-blue-900 hover:text-blue-950"
+          class="inline-flex items-center gap-1 text-sm font-semibold text-[#15395f] hover:text-[#102f4f]"
         >
           Download CSV template
         </a>
