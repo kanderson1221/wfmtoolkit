@@ -1,4 +1,4 @@
-import { loadPlanningCenters, upsertPlanningPlan } from '../planningStorage'
+import { createPlanningCenterDraft, loadPlanningCenters, resolveCenterHolidayProfile, upsertPlanningPlan } from '../planningStorage'
 
 const ensurePlanningStorageApi = () => {
   const storage = window.localStorage
@@ -164,12 +164,48 @@ describe('planningStorage', () => {
     )
 
     const centers = loadPlanningCenters('default')
+    const activeHolidayProfile = resolveCenterHolidayProfile(centers[0], new Date().getFullYear())
 
     expect(centers[0].defaultHolidayCalendarId).toBe('none')
     expect(centers[0].disabledHolidayRuleIds).toEqual([])
-    expect(centers[0].customHolidays.length).toBeGreaterThan(0)
-    expect(centers[0].customHolidays.some((holiday) => holiday.sourceRuleId === 'columbus_day')).toBe(false)
-    expect(centers[0].customHolidays.some((holiday) => holiday.sourceRuleId === 'thanksgiving_day')).toBe(true)
+    expect(centers[0].customHolidays).toEqual([])
+    expect(centers[0].holidayProfiles).toHaveLength(1)
+    expect(activeHolidayProfile.customHolidays.length).toBeGreaterThan(0)
+    expect(activeHolidayProfile.customHolidays.some((holiday) => holiday.sourceRuleId === 'columbus_day')).toBe(false)
+    expect(activeHolidayProfile.customHolidays.some((holiday) => holiday.sourceRuleId === 'thanksgiving_day')).toBe(true)
+  })
+
+  it('defaults new call center drafts to Monday through Friday operating days', () => {
+    expect(createPlanningCenterDraft().operatingWeekdays).toEqual([1, 2, 3, 4, 5])
+    expect(createPlanningCenterDraft({ operatingWeekdays: undefined }).operatingWeekdays).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it('keeps year-scoped holiday profiles on center drafts', () => {
+    const draft = createPlanningCenterDraft({
+      holidayProfiles: [
+        {
+          year: 2027,
+          customHolidays: [
+            {
+              id: 'company-day',
+              label: 'Company Day',
+              date: '2027-12-24'
+            }
+          ]
+        }
+      ]
+    })
+
+    expect(resolveCenterHolidayProfile(draft, 2027).customHolidays).toEqual([
+      {
+        id: 'company-day',
+        label: 'Company Day',
+        date: '2027-12-24',
+        sourceRuleId: null,
+        month: 12,
+        day: 24
+      }
+    ])
   })
 
   it('normalizes next-year opening handoff values on saved plans', () => {

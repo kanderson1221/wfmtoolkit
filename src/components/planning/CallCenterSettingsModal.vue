@@ -1,18 +1,22 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import AppButton from '../ui/AppButton.vue'
 import AppDialog from '../ui/AppDialog.vue'
 import AppFieldGroup from '../ui/AppFieldGroup.vue'
 import AppOptionPills from '../ui/AppOptionPills.vue'
+import AppSelect from '../ui/AppSelect.vue'
 import AppTextField from '../ui/AppTextField.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
+import { createPlanningHolidayProfile } from '../../planningStorage'
 import {
-  HOLIDAY_CALENDAR_NONE,
   HOLIDAY_CALENDAR_US_FEDERAL,
+  createHolidayTemplateHolidays,
   createCustomHoliday,
   mergeHolidayRowsWithTemplate
 } from '../../planner/holidayCalendars'
+
+const DEFAULT_OPERATING_WEEKDAYS = [1, 2, 3, 4, 5]
 
 const props = defineProps({
   weekdayOptions: {
@@ -22,6 +26,10 @@ const props = defineProps({
   title: {
     type: String,
     default: 'Call Center Settings'
+  },
+  displayYear: {
+    type: Number,
+    default: () => new Date().getFullYear()
   },
   submitLabel: {
     type: String,
@@ -40,17 +48,7 @@ const centerName = defineModel('centerName', {
   required: true
 })
 
-const defaultHolidayCalendarId = defineModel('defaultHolidayCalendarId', {
-  type: String,
-  required: true
-})
-
-const disabledHolidayRuleIds = defineModel('disabledHolidayRuleIds', {
-  type: Array,
-  required: true
-})
-
-const customHolidays = defineModel('customHolidays', {
+const holidayProfiles = defineModel('holidayProfiles', {
   type: Array,
   required: true
 })
@@ -69,9 +67,75 @@ const dialogOpen = computed({
   }
 })
 
-const customHolidayRows = computed(() =>
-  Array.isArray(customHolidays.value) ? customHolidays.value : []
+const normalizeHolidayYear = (value, fallback = new Date().getFullYear()) => {
+  const parsedYear = Number(value)
+  return Number.isInteger(parsedYear) && parsedYear > 0 ? parsedYear : fallback
+}
+
+const normalizeOperatingWeekdays = (selectedDays) => {
+  if (!Array.isArray(selectedDays)) {
+    return [...DEFAULT_OPERATING_WEEKDAYS]
+  }
+
+  return [...new Set(
+    selectedDays
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
+  )].sort((left, right) => left - right)
+}
+
+const sortHolidayProfiles = (profiles) =>
+  [...profiles].sort((left, right) => normalizeHolidayYear(left?.year) - normalizeHolidayYear(right?.year))
+
+const selectedHolidayYear = ref(normalizeHolidayYear(props.displayYear))
+
+watch(
+  () => props.displayYear,
+  (nextYear) => {
+    selectedHolidayYear.value = normalizeHolidayYear(nextYear)
+  },
+  { immediate: true }
 )
+
+const normalizedHolidayProfiles = computed(() =>
+  sortHolidayProfiles(
+    Array.isArray(holidayProfiles.value)
+      ? holidayProfiles.value.map((profile) =>
+          createPlanningHolidayProfile(profile, normalizeHolidayYear(profile?.year, selectedHolidayYear.value))
+        )
+      : []
+  )
+)
+
+const holidayYearOptions = computed(() => {
+  const anchorYear = normalizeHolidayYear(props.displayYear)
+  const years = new Set(normalizedHolidayProfiles.value.map((profile) => profile.year))
+
+  for (let offset = -2; offset <= 5; offset += 1) {
+    years.add(anchorYear + offset)
+  }
+
+  years.add(selectedHolidayYear.value)
+
+  return [...years]
+    .filter((year) => year > 0)
+    .sort((left, right) => right - left)
+    .map((year) => ({
+      label: String(year),
+      value: year
+    }))
+})
+
+const selectedHolidayProfile = computed(() =>
+  normalizedHolidayProfiles.value.find((profile) => profile.year === selectedHolidayYear.value) ||
+  createPlanningHolidayProfile({ year: selectedHolidayYear.value }, selectedHolidayYear.value)
+)
+
+const hasSelectedHolidayProfile = computed(() =>
+  normalizedHolidayProfiles.value.some((profile) => profile.year === selectedHolidayYear.value)
+)
+
+const customHolidayRows = computed(() => selectedHolidayProfile.value.customHolidays)
 
 const holidayRowErrors = computed(() =>
   customHolidayRows.value.reduce((errors, holiday) => {
@@ -95,69 +159,151 @@ const weekdayPillItems = computed(() =>
 )
 
 const operatingWeekdaySelection = computed({
-  get: () => (Array.isArray(operatingWeekdays.value) ? operatingWeekdays.value : []),
+  get: () => normalizeOperatingWeekdays(operatingWeekdays.value),
   set: (selectedDays) => {
-    operatingWeekdays.value = [...selectedDays].sort((left, right) => left - right)
+    operatingWeekdays.value = normalizeOperatingWeekdays(selectedDays)
   }
 })
 
-const loadTemplateHolidays = () => {
-  customHolidays.value = mergeHolidayRowsWithTemplate(
-    customHolidayRows.value,
-    new Date().getFullYear()
-  )
-  defaultHolidayCalendarId.value = HOLIDAY_CALENDAR_NONE
-  disabledHolidayRuleIds.value = []
-}
-
 watch(
-  defaultHolidayCalendarId,
+  operatingWeekdays,
   (nextValue) => {
-    if (nextValue !== HOLIDAY_CALENDAR_US_FEDERAL) {
+    const normalizedSelection = normalizeOperatingWeekdays(nextValue)
+
+    if (
+      Array.isArray(nextValue) &&
+      nextValue.length === normalizedSelection.length &&
+      nextValue.every((value, index) => value === normalizedSelection[index])
+    ) {
       return
     }
 
-    customHolidays.value = mergeHolidayRowsWithTemplate(
-      customHolidayRows.value,
-      new Date().getFullYear(),
-      disabledHolidayRuleIds.value
-    )
-
-    defaultHolidayCalendarId.value = HOLIDAY_CALENDAR_NONE
-    disabledHolidayRuleIds.value = []
+    operatingWeekdays.value = normalizedSelection
   },
   { immediate: true }
 )
 
+const selectedHolidayYearMinDate = computed(() => `${selectedHolidayYear.value}-01-01`)
+const selectedHolidayYearMaxDate = computed(() => `${selectedHolidayYear.value}-12-31`)
+
+const setHolidayProfilesForYear = (nextCustomHolidays) => {
+  const nextProfile = createPlanningHolidayProfile(
+    {
+      ...selectedHolidayProfile.value,
+      year: selectedHolidayYear.value,
+      customHolidays: nextCustomHolidays
+    },
+    selectedHolidayYear.value
+  )
+
+  holidayProfiles.value = sortHolidayProfiles([
+    ...normalizedHolidayProfiles.value.filter((profile) => profile.year !== selectedHolidayYear.value),
+    nextProfile
+  ])
+}
+
+const loadTemplateHolidays = () => {
+  setHolidayProfilesForYear(
+    mergeHolidayRowsWithTemplate(
+      customHolidayRows.value,
+      selectedHolidayYear.value
+    )
+  )
+}
+
 const addCustomHoliday = () => {
-  customHolidays.value = [
+  setHolidayProfilesForYear([
     ...customHolidayRows.value,
     createCustomHoliday({
       id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       label: '',
       date: ''
     })
-  ]
+  ])
 }
 
 const updateCustomHoliday = (holidayId, patch) => {
-  customHolidays.value = customHolidayRows.value.map((holiday) =>
-    holiday.id === holidayId
-      ? createCustomHoliday({
-          ...holiday,
-          ...patch,
-          sourceRuleId:
-            Object.prototype.hasOwnProperty.call(patch, 'date') && patch.date !== holiday.date
-              ? null
-              : holiday.sourceRuleId
-        })
-      : holiday
+  setHolidayProfilesForYear(
+    customHolidayRows.value.map((holiday) =>
+      holiday.id === holidayId
+        ? createCustomHoliday({
+            ...holiday,
+            ...patch,
+            sourceRuleId:
+              Object.prototype.hasOwnProperty.call(patch, 'date') && patch.date !== holiday.date
+                ? null
+                : holiday.sourceRuleId
+          })
+        : holiday
+    )
   )
 }
 
 const removeCustomHoliday = (holidayId) => {
-  customHolidays.value = customHolidayRows.value.filter((holiday) => holiday.id !== holidayId)
+  setHolidayProfilesForYear(customHolidayRows.value.filter((holiday) => holiday.id !== holidayId))
 }
+
+const priorYearProfile = computed(() =>
+  normalizedHolidayProfiles.value.find((profile) => profile.year === selectedHolidayYear.value - 1) || null
+)
+
+const copyPriorYearLabel = computed(() =>
+  priorYearProfile.value ? `Copy ${priorYearProfile.value.year}` : 'Copy Prior Year'
+)
+
+const cloneHolidayRowsToYear = (holidayRows, targetYear) => {
+  const projectedTemplateLookup = new Map(
+    createHolidayTemplateHolidays(HOLIDAY_CALENDAR_US_FEDERAL, targetYear).map((holiday) => [holiday.sourceRuleId || holiday.id, holiday])
+  )
+
+  return holidayRows.map((holiday) => {
+    const normalizedHoliday = createCustomHoliday(holiday)
+
+    if (normalizedHoliday.sourceRuleId) {
+      const projectedHoliday = projectedTemplateLookup.get(normalizedHoliday.sourceRuleId)
+
+      return createCustomHoliday({
+        ...normalizedHoliday,
+        date: projectedHoliday?.date || normalizedHoliday.date
+      })
+    }
+
+    return createCustomHoliday({
+      ...normalizedHoliday,
+      date: `${targetYear}-${String(normalizedHoliday.month).padStart(2, '0')}-${String(normalizedHoliday.day).padStart(2, '0')}`
+    })
+  })
+}
+
+const copyPriorYear = () => {
+  if (!priorYearProfile.value) {
+    return
+  }
+
+  if (customHolidayRows.value.length) {
+    const confirmed = window.confirm(
+      `Replace the ${selectedHolidayYear.value} holiday schedule with a copy of ${priorYearProfile.value.year}?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+  }
+
+  setHolidayProfilesForYear(cloneHolidayRowsToYear(priorYearProfile.value.customHolidays, selectedHolidayYear.value))
+}
+
+const holidayYearStatusMessage = computed(() => {
+  if (customHolidayRows.value.length) {
+    return `${customHolidayRows.value.length} holiday row${customHolidayRows.value.length === 1 ? '' : 's'} configured for ${selectedHolidayYear.value}.`
+  }
+
+  if (hasSelectedHolidayProfile.value) {
+    return `No closed dates are currently configured for ${selectedHolidayYear.value}. Load U.S. holidays, add holidays manually, or copy the prior year.`
+  }
+
+  return `No holiday schedule saved for ${selectedHolidayYear.value}. Load U.S. holidays, add holidays manually, or copy the prior year.`
+})
 </script>
 
 <template>
@@ -191,70 +337,94 @@ const removeCustomHoliday = (holidayId) => {
         </AppFieldGroup>
       </AppWorkspaceSection>
 
-      <AppWorkspaceSection title="Closed Dates">
-        <div class="flex items-center justify-between gap-3">
-          <span class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Holiday Schedule
-          </span>
-
-          <div class="flex flex-wrap justify-end gap-2">
-            <AppButton size="sm" variant="secondary" @click="loadTemplateHolidays">
-              Load U.S. Holidays
-            </AppButton>
-            <AppButton size="sm" variant="secondary" @click="addCustomHoliday">
-              Add Holiday
-            </AppButton>
-          </div>
-        </div>
-
-        <div v-if="customHolidayRows.length" class="grid gap-3">
-          <div
-            v-for="holiday in customHolidayRows"
-            :key="holiday.id"
-            class="grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
-          >
-            <AppFieldGroup
-              :label="`Holiday Name`"
-              :input-id="`custom-holiday-label-${holiday.id}`"
-              :error="holidayRowErrors[holiday.id]?.label"
-            >
-              <AppTextField
-                :id="`custom-holiday-label-${holiday.id}`"
-                :model-value="holiday.label"
-                maxlength="80"
-                placeholder="Company holiday"
-                @update:model-value="updateCustomHoliday(holiday.id, { label: $event })"
+      <AppWorkspaceSection
+        title="Closed Dates"
+        :description="`Year-specific holiday defaults for ${selectedHolidayYear}. Saved plans keep their own holiday snapshot.`"
+      >
+        <div class="grid gap-4">
+          <div class="grid gap-3 rounded-[20px] border border-slate-200 bg-slate-50/70 p-4 lg:grid-cols-[minmax(0,12rem)_1fr] lg:items-end">
+            <AppFieldGroup label="Holiday Year" input-id="holiday-year">
+              <AppSelect
+                id="holiday-year"
+                v-model="selectedHolidayYear"
+                :options="holidayYearOptions"
+                class="max-w-[12rem]"
               />
             </AppFieldGroup>
 
-            <AppFieldGroup
-              :label="`Date`"
-              :input-id="`custom-holiday-date-${holiday.id}`"
-              :error="holidayRowErrors[holiday.id]?.date"
-            >
-              <AppTextField
-                :id="`custom-holiday-date-${holiday.id}`"
-                type="date"
-                :model-value="holiday.date || ''"
-                @update:model-value="updateCustomHoliday(holiday.id, { date: $event })"
-              />
-            </AppFieldGroup>
-
-            <div class="flex items-end justify-end">
-              <AppButton size="sm" variant="quiet" @click="removeCustomHoliday(holiday.id)">
-                Delete
+            <div class="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+              <AppButton
+                size="sm"
+                variant="secondary"
+                :disabled="!priorYearProfile"
+                @click="copyPriorYear"
+              >
+                {{ copyPriorYearLabel }}
+              </AppButton>
+              <AppButton size="sm" variant="secondary" @click="loadTemplateHolidays">
+                Load U.S. Holidays
+              </AppButton>
+              <AppButton size="sm" variant="secondary" @click="addCustomHoliday">
+                Add Holiday
               </AppButton>
             </div>
           </div>
+
+          <p class="text-sm leading-6 text-slate-600">
+            {{ holidayYearStatusMessage }}
+          </p>
+
+          <div v-if="customHolidayRows.length" class="grid gap-3">
+            <div
+              v-for="holiday in customHolidayRows"
+              :key="holiday.id"
+              class="grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
+            >
+              <AppFieldGroup
+                :label="`Holiday Name`"
+                :input-id="`custom-holiday-label-${holiday.id}`"
+                :error="holidayRowErrors[holiday.id]?.label"
+              >
+                <AppTextField
+                  :id="`custom-holiday-label-${holiday.id}`"
+                  :model-value="holiday.label"
+                  maxlength="80"
+                  placeholder="Company holiday"
+                  @update:model-value="updateCustomHoliday(holiday.id, { label: $event })"
+                />
+              </AppFieldGroup>
+
+              <AppFieldGroup
+                :label="`Date`"
+                :input-id="`custom-holiday-date-${holiday.id}`"
+                :error="holidayRowErrors[holiday.id]?.date"
+              >
+                <AppTextField
+                  :id="`custom-holiday-date-${holiday.id}`"
+                  type="date"
+                  :min="selectedHolidayYearMinDate"
+                  :max="selectedHolidayYearMaxDate"
+                  :model-value="holiday.date || ''"
+                  @update:model-value="updateCustomHoliday(holiday.id, { date: $event })"
+                />
+              </AppFieldGroup>
+
+              <div class="flex items-end justify-end">
+                <AppButton size="sm" variant="quiet" @click="removeCustomHoliday(holiday.id)">
+                  Delete
+                </AppButton>
+              </div>
+            </div>
+          </div>
+
+          <p v-else class="text-sm leading-6 text-slate-500">
+            No closed dates added for {{ selectedHolidayYear }}.
+          </p>
+
+          <p v-if="hasHolidayValidationErrors" class="text-sm font-medium text-rose-700">
+            Complete each holiday name and date before saving.
+          </p>
         </div>
-
-        <p v-else class="text-sm leading-6 text-slate-500">
-          No closed dates added.
-        </p>
-
-        <p v-if="hasHolidayValidationErrors" class="text-sm font-medium text-rose-700">
-          Complete each holiday name and date before saving.
-        </p>
       </AppWorkspaceSection>
     </div>
 

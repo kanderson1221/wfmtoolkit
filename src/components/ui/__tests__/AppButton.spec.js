@@ -30,4 +30,19 @@ describe('AppButton', () => {
     expect(wrapper.element.tagName).toBe('A')
     expect(wrapper.attributes('href')).toBe('#planning')
   })
+
+  it('renders active tab buttons with the dark blue selected styling', () => {
+    const wrapper = mount(AppButton, {
+      props: {
+        variant: 'tab',
+        active: true
+      },
+      slots: {
+        default: 'Selected'
+      }
+    })
+
+    expect(wrapper.classes()).toContain('bg-[#15395f]')
+    expect(wrapper.classes()).toContain('text-white')
+  })
 })

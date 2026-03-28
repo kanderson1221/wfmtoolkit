@@ -18,7 +18,8 @@ describe('AppOptionPills', () => {
 
     await wrapper.get('button:nth-of-type(2)').trigger('click')
 
-    expect(wrapper.get('button:nth-of-type(2)').attributes('class')).toContain('bg-[#eef4f8]')
+    expect(wrapper.get('button:nth-of-type(2)').attributes('class')).toContain('bg-[#15395f]')
+    expect(wrapper.get('button:nth-of-type(2)').attributes('class')).toContain('text-white')
   })
 
   it('toggles multiple selections', async () => {

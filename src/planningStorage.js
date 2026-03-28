@@ -33,6 +33,97 @@ const normalizeWeekdays = (weekdays) =>
     ? [...new Set(weekdays.map((value) => toNumber(value, 0)))].sort((left, right) => left - right)
     : [1, 2, 3, 4, 5]
 
+const getCurrentCalendarYear = () => new Date().getFullYear()
+
+const normalizeHolidayProfileYear = (value, fallback = getCurrentCalendarYear()) => {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const sortHolidayProfiles = (profiles) =>
+  [...profiles].sort((left, right) => normalizeHolidayProfileYear(left?.year) - normalizeHolidayProfileYear(right?.year))
+
+export const createPlanningHolidayProfile = (overrides = {}, fallbackYear = getCurrentCalendarYear()) => {
+  const snapshot = clonePlain(overrides || {})
+  const resolvedYear = normalizeHolidayProfileYear(snapshot.year, fallbackYear)
+  const normalizedCalendarId = normalizeHolidayCalendarId(snapshot.holidayCalendarId, HOLIDAY_CALENDAR_NONE)
+  const normalizedDisabledHolidayRuleIds = normalizeDisabledHolidayRuleIds(snapshot.disabledHolidayRuleIds)
+  const migratedFederalTemplate = normalizedCalendarId === HOLIDAY_CALENDAR_US_FEDERAL
+  const normalizedCustomHolidays = migratedFederalTemplate
+    ? mergeHolidayRowsWithTemplate(
+        snapshot.customHolidays,
+        resolvedYear,
+        normalizedDisabledHolidayRuleIds
+      )
+    : normalizeCustomHolidays(snapshot.customHolidays)
+
+  return {
+    year: resolvedYear,
+    holidayCalendarId: migratedFederalTemplate ? HOLIDAY_CALENDAR_NONE : normalizedCalendarId,
+    disabledHolidayRuleIds: migratedFederalTemplate ? [] : normalizedDisabledHolidayRuleIds,
+    customHolidays: normalizedCustomHolidays
+  }
+}
+
+const buildLegacyHolidayProfiles = (draftCenter = {}) => {
+  const snapshot = clonePlain(draftCenter || {})
+  const fallbackYear = getCurrentCalendarYear()
+  const normalizedCalendarId = normalizeHolidayCalendarId(snapshot.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE)
+  const normalizedDisabledHolidayRuleIds = normalizeDisabledHolidayRuleIds(snapshot.disabledHolidayRuleIds)
+  const normalizedCustomHolidays = normalizeCustomHolidays(snapshot.customHolidays)
+  const groupedHolidaysByYear = new Map()
+
+  normalizedCustomHolidays.forEach((holiday) => {
+    const resolvedYear = holiday.date
+      ? normalizeHolidayProfileYear(String(holiday.date).slice(0, 4), fallbackYear)
+      : fallbackYear
+    const existingHolidays = groupedHolidaysByYear.get(resolvedYear) || []
+
+    groupedHolidaysByYear.set(resolvedYear, [...existingHolidays, holiday])
+  })
+
+  if (!groupedHolidaysByYear.size && normalizedCalendarId !== HOLIDAY_CALENDAR_NONE) {
+    groupedHolidaysByYear.set(fallbackYear, [])
+  }
+
+  return sortHolidayProfiles(
+    [...groupedHolidaysByYear.entries()].map(([year, customHolidays]) =>
+      createPlanningHolidayProfile(
+        {
+          year,
+          holidayCalendarId: normalizedCalendarId,
+          disabledHolidayRuleIds: normalizedDisabledHolidayRuleIds,
+          customHolidays
+        },
+        year
+      )
+    )
+  )
+}
+
+export const normalizeCenterHolidayProfiles = (holidayProfiles, legacyCenter = {}) => {
+  const sourceProfiles = Array.isArray(holidayProfiles) && holidayProfiles.length
+    ? holidayProfiles
+    : buildLegacyHolidayProfiles(legacyCenter)
+  const chosenByYear = new Map()
+
+  sourceProfiles.forEach((profile) => {
+    const normalizedProfile = createPlanningHolidayProfile(profile, normalizeHolidayProfileYear(profile?.year))
+    chosenByYear.set(normalizedProfile.year, normalizedProfile)
+  })
+
+  return sortHolidayProfiles([...chosenByYear.values()])
+}
+
+export const resolveCenterHolidayProfile = (center, planningYear = getCurrentCalendarYear()) => {
+  const resolvedYear = normalizeHolidayProfileYear(planningYear)
+  const matchedProfile = normalizeCenterHolidayProfiles(center?.holidayProfiles, center).find(
+    (profile) => profile.year === resolvedYear
+  )
+
+  return matchedProfile || createPlanningHolidayProfile({ year: resolvedYear }, resolvedYear)
+}
+
 const createEntityId = (prefix) => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -176,16 +267,7 @@ const createGroupFromLegacyPlan = (legacyPlan, timestamp = new Date().toISOStrin
 
 const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
   const snapshot = clonePlain(draftCenter || {})
-  const normalizedCalendarId = normalizeHolidayCalendarId(snapshot.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE)
-  const normalizedDisabledHolidayRuleIds = normalizeDisabledHolidayRuleIds(snapshot.disabledHolidayRuleIds)
-  const migratedFederalTemplate = normalizedCalendarId === HOLIDAY_CALENDAR_US_FEDERAL
-  const normalizedCustomHolidays = migratedFederalTemplate
-    ? mergeHolidayRowsWithTemplate(
-        snapshot.customHolidays,
-        new Date().getFullYear(),
-        normalizedDisabledHolidayRuleIds
-      )
-    : normalizeCustomHolidays(snapshot.customHolidays)
+  const normalizedHolidayProfiles = normalizeCenterHolidayProfiles(snapshot.holidayProfiles, snapshot)
   const normalizedGroups = Array.isArray(snapshot.groups)
     ? snapshot.groups.map((group) =>
         normalizeGroup(group, timestamp, {
@@ -204,9 +286,10 @@ const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
     id: snapshot.id || createEntityId('center'),
     name: snapshot.name?.trim() || 'Call Center',
     timezone: snapshot.timezone?.trim() || getDefaultTimeZone(),
-    defaultHolidayCalendarId: migratedFederalTemplate ? HOLIDAY_CALENDAR_NONE : normalizedCalendarId,
-    disabledHolidayRuleIds: migratedFederalTemplate ? [] : normalizedDisabledHolidayRuleIds,
-    customHolidays: normalizedCustomHolidays,
+    defaultHolidayCalendarId: HOLIDAY_CALENDAR_NONE,
+    disabledHolidayRuleIds: [],
+    customHolidays: [],
+    holidayProfiles: normalizedHolidayProfiles,
     operatingWeekdays: normalizeWeekdays(snapshot.operatingWeekdays),
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, 90), 1)),
@@ -266,16 +349,17 @@ const migrateLegacyPlans = (legacyPlans) => {
 }
 
 export const createPlanningCenterDraft = (overrides = {}) => ({
-  name: '',
-  timezone: getDefaultTimeZone(),
+  ...clonePlain(overrides || {}),
+  name: overrides?.name ?? '',
+  timezone: overrides?.timezone ?? getDefaultTimeZone(),
   defaultHolidayCalendarId: HOLIDAY_CALENDAR_NONE,
   disabledHolidayRuleIds: [],
   customHolidays: [],
-  operatingWeekdays: [1, 2, 3, 4, 5],
-  defaultPaidHoursPerDay: 8,
-  defaultOccupancyPercent: 90,
-  defaultAdherencePercent: 95,
-  ...overrides
+  holidayProfiles: normalizeCenterHolidayProfiles(overrides?.holidayProfiles, overrides),
+  operatingWeekdays: normalizeWeekdays(overrides?.operatingWeekdays),
+  defaultPaidHoursPerDay: Math.max(toNumber(overrides?.defaultPaidHoursPerDay, 8), 0),
+  defaultOccupancyPercent: Math.min(100, Math.max(toNumber(overrides?.defaultOccupancyPercent, 90), 1)),
+  defaultAdherencePercent: Math.min(100, Math.max(toNumber(overrides?.defaultAdherencePercent, 95), 1))
 })
 
 export const createPlanningGroupDraft = (overrides = {}) => ({

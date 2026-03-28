@@ -87,8 +87,8 @@ const variantClasses = computed(() => {
 
   if (props.variant === 'tab') {
     return props.active
-      ? 'border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]'
-      : 'border border-slate-200 bg-slate-100 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+      ? 'border border-[#102f4f] bg-[#15395f] text-white shadow-[0_10px_20px_rgba(16,47,79,0.18)] hover:border-[#0d2742] hover:bg-[#123153]'
+      : 'border border-slate-300 bg-white text-slate-700 shadow-sm hover:border-[#a7bbce] hover:bg-slate-50 hover:text-[#15395f]'
   }
 
   if (props.variant === 'icon') {

@@ -2,12 +2,10 @@ import { computed, ref, watch } from 'vue'
 import {
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_SCHEDULE_CLOSED,
-  normalizeCustomHolidays,
-  normalizeDisabledHolidayRuleIds,
-  normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
 import { findLinkedPriorPlan, toNumber } from '../plannerModel'
+import { resolveCenterHolidayProfile } from '../planningStorage'
 import { planningRepository } from '../planningRepository'
 
 export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAccess, storageScope }) => {
@@ -113,10 +111,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       id: currentPlan.value?.id || null,
       planningYear: resolvedPlanningYear
     })
-    const centerHolidayCalendarId = normalizeHolidayCalendarId(
-      currentCenter.value.defaultHolidayCalendarId,
-      HOLIDAY_CALENDAR_NONE
-    )
+    const centerHolidayProfile = resolveCenterHolidayProfile(currentCenter.value, resolvedPlanningYear)
+    const centerHolidayCalendarId = centerHolidayProfile.holidayCalendarId || HOLIDAY_CALENDAR_NONE
     const seededStartingHeadcount = Math.max(
       toNumber(linkedPriorPlan?.nextYearOpening?.rosterHeadcount, 0),
       toNumber(linkedPriorPlan?.nextYearOpening?.frontlineHeadcount, 0),
@@ -141,8 +137,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       planningYear: resolvedPlanningYear,
       defaultHolidayCalendarId: centerHolidayCalendarId,
       holidayCalendarId: centerHolidayCalendarId,
-      disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(currentCenter.value.disabledHolidayRuleIds),
-      customHolidays: normalizeCustomHolidays(currentCenter.value.customHolidays),
+      disabledHolidayRuleIds: [...centerHolidayProfile.disabledHolidayRuleIds],
+      customHolidays: centerHolidayProfile.customHolidays.map((holiday) => ({ ...holiday })),
       holidayScheduleMode: normalizeHolidayScheduleMode(HOLIDAY_SCHEDULE_CLOSED),
       operatingWeekdays: [...currentCenter.value.operatingWeekdays],
       defaultPaidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay,

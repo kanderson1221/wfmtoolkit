@@ -29,14 +29,29 @@ describe('usePlanningWorkspace', () => {
       id: 'center-1',
       name: 'North America Operations',
       timezone: 'America/New_York',
-      defaultHolidayCalendarId: 'us_federal',
-      disabledHolidayRuleIds: ['columbus_day'],
-      customHolidays: [
+      defaultHolidayCalendarId: 'none',
+      disabledHolidayRuleIds: [],
+      customHolidays: [],
+      holidayProfiles: [
         {
-          id: 'company-day',
-          label: 'Company Day',
-          month: 12,
-          day: 26
+          year: 2026,
+          customHolidays: [
+            {
+              id: 'company-day-2026',
+              label: 'Company Day',
+              date: '2026-12-26'
+            }
+          ]
+        },
+        {
+          year: 2027,
+          customHolidays: [
+            {
+              id: 'company-day-2027',
+              label: 'Company Day',
+              date: '2027-12-24'
+            }
+          ]
         }
       ],
       operatingWeekdays: [1, 2, 3, 4, 5],
@@ -120,15 +135,14 @@ describe('usePlanningWorkspace', () => {
       centerId: 'center-1',
       groupId: 'group-1',
       groupName: 'Consumer Voice',
-      defaultHolidayCalendarId: 'us_federal',
-      holidayCalendarId: 'us_federal',
-      disabledHolidayRuleIds: ['columbus_day'],
+      defaultHolidayCalendarId: 'none',
+      holidayCalendarId: 'none',
+      disabledHolidayRuleIds: [],
       customHolidays: [
         {
-          id: 'company-day',
+          id: 'company-day-2026',
           label: 'Company Day',
-          month: 12,
-          day: 26
+          date: '2026-12-26'
         }
       ],
       holidayScheduleMode: 'closed',
@@ -310,7 +324,14 @@ describe('usePlanningWorkspace', () => {
     expect(workspace.plannerSeed.value).toMatchObject({
       planningYear: 2027,
       startingHeadcount: 42,
-      startingFrontlineHeadcount: 42
+      startingFrontlineHeadcount: 42,
+      customHolidays: [
+        {
+          id: 'company-day-2027',
+          label: 'Company Day',
+          date: '2027-12-24'
+        }
+      ]
     })
   })
 })

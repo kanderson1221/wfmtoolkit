@@ -18,12 +18,10 @@ import AppSectionHeader from './ui/AppSectionHeader.vue'
 import AppSelect from './ui/AppSelect.vue'
 import AppStatStrip from './ui/AppStatStrip.vue'
 import AppTableShell from './ui/AppTableShell.vue'
-import { createPlanningCenterDraft } from '../planningStorage'
+import { createPlanningCenterDraft, resolveCenterHolidayProfile } from '../planningStorage'
 import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
 import {
   HOLIDAY_CALENDAR_NONE,
-  normalizeCustomHolidays,
-  normalizeDisabledHolidayRuleIds,
   normalizeHolidayCalendarId,
 } from '../planner/holidayCalendars'
 import { computeMonthlyRecords } from '../planner/demandModel'
@@ -233,15 +231,26 @@ const portfolioHeadcountChart = computed(() => {
         return
       }
 
+      const centerHolidayProfile = resolveCenterHolidayProfile(center, selectedPlanningYear.value)
+
       const monthlyRecords = computeMonthlyRecords({
         planningYear: Number(selectedPlanningYear.value),
         operatingWeekdays:
-          Array.isArray(center.operatingWeekdays) && center.operatingWeekdays.length
-            ? center.operatingWeekdays
+          Array.isArray(plan.operatingWeekdays) && plan.operatingWeekdays.length
+            ? plan.operatingWeekdays
+            : Array.isArray(center.operatingWeekdays) && center.operatingWeekdays.length
+              ? center.operatingWeekdays
             : [1, 2, 3, 4, 5],
-        holidayCalendarId: normalizeHolidayCalendarId(center.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE),
-        disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(center.disabledHolidayRuleIds),
-        customHolidays: normalizeCustomHolidays(center.customHolidays),
+        holidayCalendarId: normalizeHolidayCalendarId(
+          plan.holidayCalendarId,
+          centerHolidayProfile.holidayCalendarId || HOLIDAY_CALENDAR_NONE
+        ),
+        disabledHolidayRuleIds: Array.isArray(plan.disabledHolidayRuleIds)
+          ? plan.disabledHolidayRuleIds
+          : centerHolidayProfile.disabledHolidayRuleIds,
+        customHolidays: Array.isArray(plan.customHolidays)
+          ? plan.customHolidays
+          : centerHolidayProfile.customHolidays,
         presenceMonths: Array.isArray(plan.presenceMonths) ? plan.presenceMonths : [],
         randomDefaults: plan.randomDefaults || {},
         useMonthlyRandomOverrides: Boolean(plan.useMonthlyRandomOverrides),
@@ -306,9 +315,7 @@ const openEditCenter = (center) => {
   centerDraft.value = createPlanningCenterDraft({
     id: center.id,
     name: center.name,
-    defaultHolidayCalendarId: center.defaultHolidayCalendarId,
-    disabledHolidayRuleIds: center.disabledHolidayRuleIds,
-    customHolidays: center.customHolidays,
+    holidayProfiles: center.holidayProfiles,
     operatingWeekdays: center.operatingWeekdays,
     defaultPaidHoursPerDay: center.defaultPaidHoursPerDay,
     defaultOccupancyPercent: center.defaultOccupancyPercent,
@@ -532,10 +539,9 @@ const handleCenterMenuSelect = (center, item) => {
     <CallCenterSettingsModal
       v-if="centerSettingsOpen"
       v-model:center-name="centerDraft.name"
-      v-model:default-holiday-calendar-id="centerDraft.defaultHolidayCalendarId"
-      v-model:disabled-holiday-rule-ids="centerDraft.disabledHolidayRuleIds"
-      v-model:custom-holidays="centerDraft.customHolidays"
+      v-model:holiday-profiles="centerDraft.holidayProfiles"
       v-model:operating-weekdays="centerDraft.operatingWeekdays"
+      :display-year="selectedPlanningYear"
       :weekday-options="props.weekdayOptions"
       :allow-backdrop-close="false"
       :title="centerSettingsTitle"

@@ -9,11 +9,9 @@ import {
 import CallCenterSettingsModal from './CallCenterSettingsModal.vue'
 import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
-import { createPlanningCenterDraft, createPlanningGroupDraft } from '../../planningStorage'
+import { createPlanningCenterDraft, createPlanningGroupDraft, resolveCenterHolidayProfile } from '../../planningStorage'
 import {
   HOLIDAY_CALENDAR_NONE,
-  normalizeCustomHolidays,
-  normalizeDisabledHolidayRuleIds,
   normalizeHolidayCalendarId,
 } from '../../planner/holidayCalendars'
 import {
@@ -166,6 +164,8 @@ const selectedYearModel = computed({
 
 const summarizeAvailability = (plan, center = props.center) => {
   const summary = plan?.summary || {}
+  const planningYear = Number(plan?.planningYear) || currentYear
+  const centerHolidayProfile = resolveCenterHolidayProfile(center, planningYear)
 
   if (
     typeof summary.averagePresencePercent === 'number' &&
@@ -178,14 +178,20 @@ const summarizeAvailability = (plan, center = props.center) => {
   }
 
   const monthlyRecords = computeMonthlyRecords({
-    planningYear: Number(plan?.planningYear) || currentYear,
+    planningYear,
     operatingWeekdays:
-      Array.isArray(center?.operatingWeekdays) && center.operatingWeekdays.length
-        ? center.operatingWeekdays
-        : [1, 2, 3, 4, 5],
-    holidayCalendarId: normalizeHolidayCalendarId(center?.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE),
-    disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(center?.disabledHolidayRuleIds),
-    customHolidays: normalizeCustomHolidays(center?.customHolidays),
+      Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
+        ? plan.operatingWeekdays
+        : Array.isArray(center?.operatingWeekdays) && center.operatingWeekdays.length
+          ? center.operatingWeekdays
+          : [1, 2, 3, 4, 5],
+    holidayCalendarId: normalizeHolidayCalendarId(plan?.holidayCalendarId, centerHolidayProfile.holidayCalendarId || HOLIDAY_CALENDAR_NONE),
+    disabledHolidayRuleIds: Array.isArray(plan?.disabledHolidayRuleIds)
+      ? plan.disabledHolidayRuleIds
+      : centerHolidayProfile.disabledHolidayRuleIds,
+    customHolidays: Array.isArray(plan?.customHolidays)
+      ? plan.customHolidays
+      : centerHolidayProfile.customHolidays,
     presenceMonths: Array.isArray(plan?.presenceMonths) ? plan.presenceMonths : [],
     randomDefaults: plan?.randomDefaults || {},
     useMonthlyRandomOverrides: Boolean(plan?.useMonthlyRandomOverrides),
@@ -676,10 +682,9 @@ const handlePlanMenuSelect = (plan, item) => {
     <CallCenterSettingsModal
       v-if="centerSettingsOpen"
       v-model:center-name="centerDraft.name"
-      v-model:default-holiday-calendar-id="centerDraft.defaultHolidayCalendarId"
-      v-model:disabled-holiday-rule-ids="centerDraft.disabledHolidayRuleIds"
-      v-model:custom-holidays="centerDraft.customHolidays"
+      v-model:holiday-profiles="centerDraft.holidayProfiles"
       v-model:operating-weekdays="centerDraft.operatingWeekdays"
+      :display-year="selectedYearModel"
       :weekday-options="props.weekdayOptions"
       title="Edit Call Center"
       submit-label="Save Call Center"
