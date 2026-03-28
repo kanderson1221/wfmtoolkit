@@ -1,35 +1,26 @@
 import { computed, nextTick, ref } from 'vue'
 
 import { usePlanningWorkspace } from '../usePlanningWorkspace'
-import {
-  createPlanningGroupDraft,
-  findPlanningCenter,
-  findPlanningCenterByPlanId,
-  findPlanningGroup,
-  findPlanningGroupByPlanId,
-  findPlanningPlan,
-  loadPlanningCenters,
-  persistPlanningCenters,
-  upsertPlanningPlan,
-  upsertPlanningCenter,
-  upsertPlanningGroup
-} from '../../planningStorage'
+import { planningRepository } from '../../planningRepository'
 
-vi.mock('../../planningStorage', () => ({
-  createPlanningGroupDraft: vi.fn(),
-  findPlanningCenter: vi.fn(),
-  findPlanningCenterByPlanId: vi.fn(),
-  findPlanningGroup: vi.fn(),
-  findPlanningGroupByPlanId: vi.fn(),
-  findPlanningPlan: vi.fn(),
-  loadPlanningCenters: vi.fn(),
-  persistPlanningCenters: vi.fn(),
-  removePlanningCenter: vi.fn(),
-  removePlanningGroup: vi.fn(),
-  removePlanningPlan: vi.fn(),
-  upsertPlanningCenter: vi.fn(),
-  upsertPlanningGroup: vi.fn(),
-  upsertPlanningPlan: vi.fn()
+vi.mock('../../planningRepository', () => ({
+  planningRepository: {
+    createGroupDraft: vi.fn(),
+    findCenter: vi.fn(),
+    findCenterByPlanId: vi.fn(),
+    findGroup: vi.fn(),
+    findGroupByPlanId: vi.fn(),
+    findPlan: vi.fn(),
+    hydrateWorkspace: vi.fn(),
+    loadWorkspace: vi.fn(),
+    persistWorkspace: vi.fn(),
+    deleteCenter: vi.fn(),
+    deleteGroup: vi.fn(),
+    deletePlan: vi.fn(),
+    saveCenter: vi.fn(),
+    saveGroup: vi.fn(),
+    savePlan: vi.fn()
+  }
 }))
 
 describe('usePlanningWorkspace', () => {
@@ -72,24 +63,26 @@ describe('usePlanningWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    createPlanningGroupDraft.mockImplementation((overrides = {}) => ({
+    planningRepository.createGroupDraft.mockImplementation((overrides = {}) => ({
       name: '',
       ...overrides
     }))
-    loadPlanningCenters.mockReturnValue(centers)
-    findPlanningCenter.mockImplementation((list, centerId) => list.find((center) => center.id === centerId) || null)
-    findPlanningGroup.mockImplementation(
+    planningRepository.hydrateWorkspace.mockResolvedValue(undefined)
+    planningRepository.loadWorkspace.mockReturnValue(centers)
+    planningRepository.persistWorkspace.mockImplementation((nextCenters) => nextCenters)
+    planningRepository.findCenter.mockImplementation((list, centerId) => list.find((center) => center.id === centerId) || null)
+    planningRepository.findGroup.mockImplementation(
       (list, centerId, groupId) => list.find((center) => center.id === centerId)?.groups.find((group) => group.id === groupId) || null
     )
-    findPlanningCenterByPlanId.mockImplementation(
+    planningRepository.findCenterByPlanId.mockImplementation(
       (list, planId) =>
         list.find((center) => center.groups.some((group) => group.plans.some((plan) => plan.id === planId))) || null
     )
-    findPlanningGroupByPlanId.mockImplementation(
+    planningRepository.findGroupByPlanId.mockImplementation(
       (list, planId) =>
         list.flatMap((center) => center.groups).find((group) => group.plans.some((plan) => plan.id === planId)) || null
     )
-    findPlanningPlan.mockImplementation(
+    planningRepository.findPlan.mockImplementation(
       (list, centerId, groupId, planId) =>
         list
           .find((center) => center.id === centerId)
@@ -117,7 +110,7 @@ describe('usePlanningWorkspace', () => {
       storageScope
     })
 
-    workspace.loadCentersForScope()
+    await workspace.loadCentersForScope()
     await nextTick()
 
     expect(workspace.currentCenter.value?.id).toBe('center-1')
@@ -159,7 +152,7 @@ describe('usePlanningWorkspace', () => {
     const hasWorkspaceAccess = computed(() => true)
     const storageScope = computed(() => currentUser.value.id)
 
-    upsertPlanningCenter.mockReturnValue(centers)
+    planningRepository.saveCenter.mockReturnValue(centers)
     window.location.hash = '#planning'
 
     const workspace = usePlanningWorkspace({
@@ -169,11 +162,11 @@ describe('usePlanningWorkspace', () => {
       storageScope
     })
 
-    workspace.loadCentersForScope()
+    void workspace.loadCentersForScope()
     workspace.handleSaveCenter({ name: 'North America Operations' })
 
-    expect(upsertPlanningCenter).toHaveBeenCalled()
-    expect(persistPlanningCenters).toHaveBeenCalledWith(centers, 'user-1')
+    expect(planningRepository.saveCenter).toHaveBeenCalled()
+    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
     expect(window.location.hash).toBe('#planning/center/center-1')
   })
 
@@ -189,7 +182,7 @@ describe('usePlanningWorkspace', () => {
     const hasWorkspaceAccess = computed(() => true)
     const storageScope = computed(() => currentUser.value.id)
 
-    upsertPlanningGroup.mockReturnValue(centers)
+    planningRepository.saveGroup.mockReturnValue(centers)
     window.location.hash = '#planning/center/center-1'
 
     const workspace = usePlanningWorkspace({
@@ -199,11 +192,11 @@ describe('usePlanningWorkspace', () => {
       storageScope
     })
 
-    workspace.loadCentersForScope()
+    void workspace.loadCentersForScope()
     workspace.handleSaveGroup({ name: 'Consumer Voice' })
 
-    expect(upsertPlanningGroup).toHaveBeenCalledWith(centers, 'center-1', { name: 'Consumer Voice' })
-    expect(persistPlanningCenters).toHaveBeenCalledWith(centers, 'user-1')
+    expect(planningRepository.saveGroup).toHaveBeenCalledWith(centers, 'center-1', { name: 'Consumer Voice' })
+    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
     expect(window.location.hash).toBe(`#planning/center/center-1/group/group-1/year/${new Date().getFullYear()}`)
   })
 
@@ -220,7 +213,7 @@ describe('usePlanningWorkspace', () => {
     const hasWorkspaceAccess = computed(() => true)
     const storageScope = computed(() => currentUser.value.id)
 
-    upsertPlanningPlan.mockReturnValue(centers)
+    planningRepository.savePlan.mockReturnValue(centers)
     window.location.hash = '#planning/center/center-1/group/group-1/plan/new/year/2026'
 
     const workspace = usePlanningWorkspace({
@@ -230,11 +223,39 @@ describe('usePlanningWorkspace', () => {
       storageScope
     })
 
-    workspace.loadCentersForScope()
+    void workspace.loadCentersForScope()
     workspace.handleSavePlan({ planningYear: 2026 })
 
-    expect(upsertPlanningPlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
-    expect(persistPlanningCenters).toHaveBeenCalledWith(centers, 'user-1')
+    expect(planningRepository.savePlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
+    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
     expect(window.location.hash).toBe('#planning/center/center-1/group/group-1/plan/plan-1')
+  })
+
+  it('persists guest workspace changes to the default local scope', async () => {
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'home',
+      centerId: null,
+      groupId: null,
+      planId: null
+    })
+    const currentUser = ref(null)
+    const hasWorkspaceAccess = computed(() => true)
+    const storageScope = computed(() => 'default')
+
+    planningRepository.saveCenter.mockReturnValue(centers)
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      hasWorkspaceAccess,
+      storageScope
+    })
+
+    await workspace.loadCentersForScope()
+    workspace.handleSaveCenter({ name: 'North America Operations' })
+
+    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'default')
+    expect(workspace.plannerDraftKey.value).toBe('guest:plan:new')
   })
 })

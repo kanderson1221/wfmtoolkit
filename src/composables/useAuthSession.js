@@ -3,63 +3,86 @@ import { computed, ref } from 'vue'
 import { AUTH_BYPASS_ENABLED } from '../authMode'
 import { isSupabaseConfigured, supabase } from '../supabaseClient'
 
+const GUEST_STORAGE_SCOPE = 'default'
+const PUBLIC_HOME_HASHES = new Set(['', '#home'])
+
 export const useAuthSession = () => {
   const authReady = ref(false)
   const authSession = ref(null)
   let authSubscription = null
 
   const currentUser = computed(() => authSession.value?.user || null)
-  const authGateEnabled = computed(() => isSupabaseConfigured && !AUTH_BYPASS_ENABLED)
+  const authEnabled = computed(() => isSupabaseConfigured && !AUTH_BYPASS_ENABLED)
+  const authGateEnabled = computed(() => false)
   const isAuthenticated = computed(() => Boolean(currentUser.value))
-  const hasWorkspaceAccess = computed(() => AUTH_BYPASS_ENABLED || isAuthenticated.value)
-  const storageScope = computed(() => currentUser.value?.id || 'default')
+  const hasWorkspaceAccess = computed(() => true)
+  const storageScope = computed(() => currentUser.value?.id || GUEST_STORAGE_SCOPE)
+
+  const restoreSignedInRoute = (pendingRouteHash) => {
+    const targetHash = pendingRouteHash.value || ''
+    pendingRouteHash.value = ''
+
+    if (!targetHash || PUBLIC_HOME_HASHES.has(targetHash)) {
+      return false
+    }
+
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash
+      return true
+    }
+
+    return false
+  }
+
+  const syncWorkspaceForSession = async (session, loadCentersForScope) => {
+    const nextScope = session?.user?.id || GUEST_STORAGE_SCOPE
+    const loadOptions = session?.user
+      ? { seedScope: GUEST_STORAGE_SCOPE }
+      : {}
+
+    await loadCentersForScope(nextScope, loadOptions)
+  }
 
   const initializeAuth = ({
     loadCentersForScope,
-    clearCenters,
     syncRouteFromHash,
     pendingRouteHash
   }) => {
-    if (!authGateEnabled.value || !supabase) {
-      loadCentersForScope(storageScope.value)
-      authReady.value = true
-      syncRouteFromHash()
+    if (!authEnabled.value || !supabase) {
+      void Promise.resolve(loadCentersForScope(GUEST_STORAGE_SCOPE))
+        .catch(() => {})
+        .finally(() => {
+          authReady.value = true
+          syncRouteFromHash()
+        })
       return
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      authSession.value = data.session
-      if (data.session?.user) {
-        loadCentersForScope(data.session.user.id)
-      } else {
-        clearCenters()
-      }
-      authReady.value = true
-      syncRouteFromHash()
-    })
+    supabase.auth.getSession()
+      .then(async ({ data }) => {
+        authSession.value = data.session
+        await syncWorkspaceForSession(data.session, loadCentersForScope)
+        authReady.value = true
 
-    const authListener = supabase.auth.onAuthStateChange((_event, session) => {
+        if (data.session?.user && restoreSignedInRoute(pendingRouteHash)) {
+          return
+        }
+
+        syncRouteFromHash()
+      })
+      .catch(async () => {
+        authSession.value = null
+        await syncWorkspaceForSession(null, loadCentersForScope)
+        authReady.value = true
+        syncRouteFromHash()
+      })
+
+    const authListener = supabase.auth.onAuthStateChange(async (_event, session) => {
       authSession.value = session
 
-      if (session?.user) {
-        loadCentersForScope(session.user.id)
-      } else {
-        clearCenters()
-      }
+      await syncWorkspaceForSession(session, loadCentersForScope)
 
-      if (!session?.user && window.location.hash !== '#home') {
-        pendingRouteHash.value = window.location.hash
-        window.location.hash = '#home'
-        return
-      }
-
-      if (session?.user && (window.location.hash === '#home' || !window.location.hash)) {
-        const targetHash =
-          pendingRouteHash.value && pendingRouteHash.value !== '#home'
-            ? pendingRouteHash.value
-            : '#planning'
-        pendingRouteHash.value = ''
-        window.location.hash = targetHash
+      if (session?.user && restoreSignedInRoute(pendingRouteHash)) {
         return
       }
 

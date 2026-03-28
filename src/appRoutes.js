@@ -1,5 +1,5 @@
 export const defaultRoute = {
-  app: 'home',
+  app: 'planning',
   page: 'home',
   tool: null,
   centerId: null,

@@ -6,7 +6,16 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test('opens the planning workspace and creates a call center', async ({ page }) => {
+test('opens the public landing page and highlights the available tools', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+  await expect(page.getByRole('main').getByText('Planning Workspace', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByText('Erlang Tools', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Planning Workspace' }).first()).toBeVisible()
+})
+
+test('opens the planning workspace directly and creates a call center', async ({ page }) => {
   await page.goto('/#planning')
 
   await expect(page.getByRole('heading', { level: 1, name: 'Call Centers' })).toBeVisible()
@@ -25,8 +34,31 @@ test('opens the hamburger menu and exposes primary destinations', async ({ page 
   await page.getByRole('button', { name: 'Open navigation menu' }).click()
 
   await expect(page.getByRole('button', { name: 'Home' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Calculator Suite' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Planning App' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Planning Workspace' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Erlang Calculators' })).toBeVisible()
+})
+
+test('opens the home route as the public landing page', async ({ page }) => {
+  await page.goto('/#home')
+
+  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+})
+
+test('returns to the public landing page from the app logo', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('link', { name: 'WFMToolkit home' }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+})
+
+test('opens the sign-in dialog from the header', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'Sign In' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Save Planning Data to Your Account' })).toBeVisible()
+  await expect(page.getByText('Guest mode keeps planning data in this browser.')).toBeVisible()
 })
 
 test('opens and edits an existing call center from the portfolio list', async ({ page }) => {

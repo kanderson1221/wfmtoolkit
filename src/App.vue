@@ -1,5 +1,5 @@
 <script setup>
-import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
@@ -9,11 +9,12 @@ import { useHashNavigation } from './composables/useHashNavigation'
 import { usePlanningWorkspace } from './composables/usePlanningWorkspace'
 import { isSupabaseConfigured } from './supabaseClient'
 
-const AppHome = defineAsyncComponent(() => import('./components/AppHome.vue'))
 const CalculatorApp = defineAsyncComponent(() => import('./components/CalculatorApp.vue'))
 const MonthlyPlanBuilder = defineAsyncComponent(() => import('./components/MonthlyPlanBuilder.vue'))
 const PlanningCenterView = defineAsyncComponent(() => import('./components/planning/PlanningCenterView.vue'))
 const PlanningHome = defineAsyncComponent(() => import('./components/PlanningHome.vue'))
+const PublicLandingPage = defineAsyncComponent(() => import('./components/PublicLandingPage.vue'))
+const authAvailable = isSupabaseConfigured && !AUTH_BYPASS_ENABLED
 
 const WEEKDAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -27,18 +28,12 @@ const WEEKDAY_OPTIONS = [
 
 const auth = useAuthSession()
 const {
-  authReady,
   currentUser,
-  authGateEnabled,
   isAuthenticated,
   hasWorkspaceAccess,
   handleSignOut
 } = auth
-const { currentRoute, pendingRouteHash, syncRouteFromHash } = useHashNavigation({
-  authReady,
-  authGateEnabled,
-  isAuthenticated
-})
+const { currentHash, currentRoute, pendingRouteHash, syncRouteFromHash } = useHashNavigation()
 
 const {
   planningCenters,
@@ -66,6 +61,7 @@ const {
 
 const appMainRef = ref(null)
 let previousScrollRestoration = null
+const showPublicLanding = computed(() => !currentHash.value || currentHash.value === '#home')
 
 const resetScrollPosition = () => {
   appMainRef.value?.scrollTo?.({ top: 0, left: 0, behavior: 'auto' })
@@ -125,21 +121,26 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <PublicLandingPage
+    v-if="showPublicLanding"
+    :auth-configured="authAvailable"
+    :is-authenticated="isAuthenticated"
+    :user-email="currentUser?.email || ''"
+  />
+
+  <div v-else class="app-shell">
     <AppHeader
       :current-app="currentRoute.app"
-      :is-authenticated="hasWorkspaceAccess"
+      :is-authenticated="isAuthenticated"
       :user-email="currentUser?.email || ''"
-      :auth-configured="isSupabaseConfigured"
+      :auth-configured="authAvailable"
       :auth-bypass-enabled="AUTH_BYPASS_ENABLED"
       @sign-out="handleSignOut"
     />
 
     <main ref="appMainRef" class="app-main">
-      <AppHome v-if="!authReady || (authGateEnabled && (!isAuthenticated || currentRoute.app === 'home'))" />
-
       <CalculatorApp
-        v-else-if="currentRoute.app === 'calculators'"
+        v-if="currentRoute.app === 'calculators'"
         :active-tool="currentRoute.tool || 'interval'"
       />
 

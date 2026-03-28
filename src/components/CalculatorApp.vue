@@ -15,7 +15,7 @@ const props = defineProps({
 const calculatorTabs = [
   {
     id: 'interval',
-    title: 'Interval Calculator',
+    title: 'Erlang C Calculator',
     description: 'Use Erlang-based interval staffing and service assumptions.'
   },
   {
@@ -26,7 +26,7 @@ const calculatorTabs = [
 ]
 
 const activeToolTitle = computed(() =>
-  calculatorTabs.find((tab) => tab.id === props.activeTool)?.title || 'Calculators'
+  calculatorTabs.find((tab) => tab.id === props.activeTool)?.title || 'Erlang Calculators'
 )
 </script>
 
@@ -36,15 +36,15 @@ const activeToolTitle = computed(() =>
       <AppPageHeader
         :breadcrumbs="[
           { label: 'Home', href: '#home' },
-          { label: 'Calculators', href: '#calculators' },
+          { label: 'Erlang Calculators', href: '#calculators' },
           { label: activeToolTitle }
         ]"
-        title="Workforce Calculators"
+        title="Erlang Calculators"
       />
 
       <nav
         class="flex flex-wrap items-center gap-2 rounded-[24px] border border-slate-200 bg-white px-3 py-2 shadow-sm"
-        aria-label="Calculator suite tools"
+        aria-label="Erlang calculator tools"
       >
         <a
           v-for="tab in calculatorTabs"

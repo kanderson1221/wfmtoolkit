@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-import { buildPlannerDraftKey, clearPlannerDraft, loadPlannerDraft, persistPlannerDraft } from '../plannerDraftStorage'
+import { plannerDraftRepository } from '../plannerDraftRepository'
 import {
   MONTH_LABELS,
   HOLIDAY_CALENDAR_NONE,
@@ -55,8 +55,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     ? NaN
     : toNumber(props.prefilledYear, NaN)
   const hasPrefilledYear = Number.isFinite(prefilledYear)
-  const draftKey = buildPlannerDraftKey(props.draftKey || savedPlan?.id)
-  const restoredDraft = loadPlannerDraft(draftKey)
+  const draftKey = plannerDraftRepository.buildDraftKey(props.draftKey || savedPlan?.id)
+  const restoredDraft = plannerDraftRepository.loadDraft(draftKey)
   const initialPlan = restoredDraft?.plan || savedPlan || props.centerDefaults || {}
   const initialUi = restoredDraft?.ui || {}
   const centerOperatingWeekdays = computed(() => normalizeWeekdays(props.centerDefaults?.operatingWeekdays))
@@ -473,7 +473,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       return
     }
 
-    const nextDraft = persistPlannerDraft(draftKey, buildDraftPayload())
+    const nextDraft = plannerDraftRepository.persistDraft(draftKey, buildDraftPayload())
     lastAutosavedAt.value = nextDraft.autosavedAt
     autosaveState.value = 'saved'
   }
@@ -502,7 +502,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const removeDraft = () => {
     clearPendingAutosave()
-    clearPlannerDraft(draftKey)
+    plannerDraftRepository.clearDraft(draftKey)
     lastAutosavedAt.value = null
     autosaveState.value = 'idle'
   }

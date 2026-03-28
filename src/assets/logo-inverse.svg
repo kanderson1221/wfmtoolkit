@@ -19,7 +19,7 @@
 
   <g transform="translate(184 34)">
     <text x="0" y="78" font-family="Sora, Manrope, Avenir Next, Segoe UI, sans-serif" font-size="84" font-weight="700" letter-spacing="-3.2">
-      <tspan fill="#15395F">WFM</tspan><tspan dx="3" fill="#5F7892" font-weight="600">Toolkit</tspan>
+      <tspan fill="#F5F8FC">WFM</tspan><tspan dx="3" fill="#BFD0E0" font-weight="600">Toolkit</tspan>
     </text>
   </g>
 </svg>

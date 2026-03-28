@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test('opens the interval calculator workspace', async ({ page }) => {
   await page.goto('/#calculators/interval')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Workforce Calculators' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Erlang Calculators' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Run Calculation' })).toBeVisible()
   await expect(page.getByText('Recommendation Workspace')).toBeVisible()
 })
