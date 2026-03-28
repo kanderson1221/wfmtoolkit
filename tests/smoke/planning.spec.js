@@ -94,6 +94,32 @@ test('opens and edits an existing call center from the portfolio list', async ({
   await expect(page.getByRole('heading', { level: 1, name: 'United States Operations' })).toBeVisible()
 })
 
+test('confirms before deleting a call center from the portfolio list', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'New Center' }).first().click()
+  await page.getByLabel('Call Center Name').fill('North America Operations')
+  await page.getByRole('button', { name: 'Create Call Center' }).last().click()
+
+  await page.goto('/#planning')
+
+  const centerRow = page.getByRole('row', { name: /North America Operations/ })
+  await expect(centerRow).toBeVisible()
+
+  await page.getByRole('button', { name: 'Open actions for North America Operations' }).click()
+  await page.getByRole('menuitem', { name: 'Delete' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Delete Call Center?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(centerRow).toBeVisible()
+
+  await page.getByRole('button', { name: 'Open actions for North America Operations' }).click()
+  await page.getByRole('menuitem', { name: 'Delete' }).click()
+  await page.getByRole('button', { name: 'Delete Call Center' }).click()
+
+  await expect(page.getByRole('row', { name: /North America Operations/ })).toHaveCount(0)
+})
+
 test('creates a staffing group and opens a new plan from the call-center detail pane', async ({ page }) => {
   const planningYear = new Date().getFullYear()
 

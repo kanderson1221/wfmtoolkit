@@ -5,7 +5,15 @@ import { createHolidayTemplateHolidays } from '../../planner/holidayCalendars'
 
 const AppDialogStub = {
   name: 'AppDialog',
-  template: '<div class="dialog-stub"><slot /><slot name="footer" /></div>'
+  props: ['title', 'description'],
+  template: `
+    <div class="dialog-stub">
+      <h2 v-if="title">{{ title }}</h2>
+      <p v-if="description">{{ description }}</p>
+      <slot />
+      <slot name="footer" />
+    </div>
+  `
 }
 
 const mountModal = (props = {}) => {
@@ -124,5 +132,54 @@ describe('CallCenterSettingsModal', () => {
     expect(copiedProfile).toBeTruthy()
     expect(copiedProfile.customHolidays.find((holiday) => holiday.id === 'thanksgiving_day')?.date).toBe('2027-11-25')
     expect(copiedProfile.customHolidays.find((holiday) => holiday.id === 'company-day')?.date).toBe('2027-12-26')
+  })
+
+  it('confirms before replacing an existing holiday schedule with the prior year copy', async () => {
+    const wrapper = mountModal({
+      displayYear: 2027,
+      holidayProfiles: [
+        {
+          year: 2026,
+          customHolidays: [
+            {
+              id: 'company-day-prior',
+              label: 'Company Day',
+              date: '2026-12-26'
+            }
+          ]
+        },
+        {
+          year: 2027,
+          customHolidays: [
+            {
+              id: 'existing-day',
+              label: 'Existing Day',
+              date: '2027-06-15'
+            }
+          ]
+        }
+      ]
+    })
+
+    await findButtonByText(wrapper, 'Copy 2026').trigger('click')
+
+    expect(wrapper.text()).toContain('Replace 2027 Holiday Schedule?')
+    expect(wrapper.props('holidayProfiles').find((profile) => profile.year === 2027)?.customHolidays).toEqual([
+      expect.objectContaining({
+        id: 'existing-day',
+        label: 'Existing Day',
+        date: '2027-06-15'
+      })
+    ])
+
+    await findButtonByText(wrapper, 'Replace Holiday Schedule').trigger('click')
+
+    expect(wrapper.props('holidayProfiles').find((profile) => profile.year === 2027)?.customHolidays).toEqual([
+      expect.objectContaining({
+        id: 'company-day-prior',
+        label: 'Company Day',
+        date: '2027-12-26'
+      })
+    ])
   })
 })

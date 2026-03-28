@@ -27,6 +27,7 @@ import { currentYear, yearOptions } from '../../composables/monthlyPlanBuilder/s
 import { computeMonthlyRecords } from '../../planner/demandModel'
 import AppButton from '../ui/AppButton.vue'
 import AppBreadcrumbs from '../ui/AppBreadcrumbs.vue'
+import AppConfirmDialog from '../ui/AppConfirmDialog.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import AppMenu from '../ui/AppMenu.vue'
@@ -59,6 +60,7 @@ const planSettingsOpen = ref(false)
 const centerDraft = ref(createPlanningCenterDraft(props.center))
 const groupDraft = ref(createPlanningGroupDraft())
 const newPlanYear = ref(currentYear)
+const pendingConfirmation = ref(null)
 
 const formatWhole = (value) =>
   new Intl.NumberFormat('en-US', {
@@ -361,35 +363,68 @@ const saveGroup = () => {
   groupSettingsOpen.value = false
 }
 
-const confirmDeleteGroup = (group) => {
-  const confirmed = window.confirm(
-    `Delete staffing group "${group.name}"? This removes the group and all ${group.summary.planCount} plan${group.summary.planCount === 1 ? '' : 's'} inside it.`
-  )
-
-  if (!confirmed) {
-    return
+const confirmationDialogOpen = computed({
+  get: () => Boolean(pendingConfirmation.value),
+  set: (value) => {
+    if (!value) {
+      pendingConfirmation.value = null
+    }
   }
+})
 
-  emit('delete-group', {
-    centerId: props.center.id,
-    groupId: group.id
+const confirmationDialogTitle = computed(() => pendingConfirmation.value?.title || '')
+const confirmationDialogDescription = computed(() => pendingConfirmation.value?.description || '')
+const confirmationDialogConfirmLabel = computed(() => pendingConfirmation.value?.confirmLabel || 'Confirm')
+
+const requestConfirmation = ({ title, description, confirmLabel, onConfirm }) => {
+  pendingConfirmation.value = {
+    title,
+    description,
+    confirmLabel,
+    onConfirm
+  }
+}
+
+const runPendingConfirmation = () => {
+  const confirmAction = pendingConfirmation.value?.onConfirm
+  pendingConfirmation.value = null
+  confirmAction?.()
+}
+
+const confirmDeleteGroup = (group) => {
+  requestConfirmation({
+    title: 'Delete Staffing Group?',
+    description: `Delete staffing group "${group.name}"? This removes the group and all ${group.summary.planCount} plan${group.summary.planCount === 1 ? '' : 's'} inside it.`,
+    confirmLabel: 'Delete Staffing Group',
+    onConfirm: () => {
+      emit('delete-group', {
+        centerId: props.center.id,
+        groupId: group.id
+      })
+    }
   })
 }
 
 const confirmDeletePlan = (plan) => {
-  const confirmed = window.confirm(
-    `Delete the ${plan.planningYear} plan from staffing group "${selectedGroup.value?.name}"?`
-  )
-
-  if (!confirmed || !selectedGroup.value) {
+  if (!selectedGroup.value) {
     return
   }
 
-  emit('delete-plan', {
-    centerId: props.center.id,
-    groupId: selectedGroup.value.id,
-    planId: plan.id,
-    planningYear: Number(plan.planningYear)
+  const groupId = selectedGroup.value.id
+  const groupName = selectedGroup.value.name
+
+  requestConfirmation({
+    title: 'Delete Plan?',
+    description: `Delete the ${plan.planningYear} plan from staffing group "${groupName}"?`,
+    confirmLabel: 'Delete Plan',
+    onConfirm: () => {
+      emit('delete-plan', {
+        centerId: props.center.id,
+        groupId,
+        planId: plan.id,
+        planningYear: Number(plan.planningYear)
+      })
+    }
   })
 }
 
@@ -717,6 +752,14 @@ const handlePlanMenuSelect = (plan, item) => {
       submit-label="Create Plan"
       @cancel="closePlanSettings"
       @close="createPlan"
+    />
+
+    <AppConfirmDialog
+      v-model:visible="confirmationDialogOpen"
+      :title="confirmationDialogTitle"
+      :description="confirmationDialogDescription"
+      :confirm-label="confirmationDialogConfirmLabel"
+      @confirm="runPendingConfirmation"
     />
   </section>
 </template>

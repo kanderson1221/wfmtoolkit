@@ -9,6 +9,7 @@ import {
 import CallCenterSettingsModal from './planning/CallCenterSettingsModal.vue'
 import PlanningPortfolioHeadcountChart from './planning/PlanningPortfolioHeadcountChart.vue'
 import AppButton from './ui/AppButton.vue'
+import AppConfirmDialog from './ui/AppConfirmDialog.vue'
 import AppEmptyState from './ui/AppEmptyState.vue'
 import AppIcon from './ui/AppIcon.vue'
 import AppMenu from './ui/AppMenu.vue'
@@ -43,6 +44,7 @@ const emit = defineEmits(['save-center', 'delete-center'])
 const centerSettingsOpen = ref(false)
 const centerDraft = ref(createPlanningCenterDraft())
 const selectedPlanningYear = ref(new Date().getFullYear())
+const pendingDeleteCenter = ref(null)
 
 const formatWhole = (value) =>
   new Intl.NumberFormat('en-US', {
@@ -340,16 +342,36 @@ const openCenter = (centerId) => {
   window.location.hash = `#planning/center/${centerId}`
 }
 
-const confirmDeleteCenter = (center) => {
-  const confirmed = window.confirm(
-    `Delete "${center.name}"? This removes the call center and all ${center.summary.groupCount} staffing group${center.summary.groupCount === 1 ? '' : 's'} inside it.`
-  )
+const deleteCenterDialogOpen = computed({
+  get: () => Boolean(pendingDeleteCenter.value),
+  set: (value) => {
+    if (!value) {
+      pendingDeleteCenter.value = null
+    }
+  }
+})
 
-  if (!confirmed) {
+const deleteCenterDialogDescription = computed(() => {
+  const center = pendingDeleteCenter.value
+
+  if (!center) {
+    return ''
+  }
+
+  return `Delete "${center.name}"? This removes the call center and all ${center.summary.groupCount} staffing group${center.summary.groupCount === 1 ? '' : 's'} inside it.`
+})
+
+const requestDeleteCenter = (center) => {
+  pendingDeleteCenter.value = center
+}
+
+const confirmDeleteCenter = () => {
+  if (!pendingDeleteCenter.value) {
     return
   }
 
-  emit('delete-center', center.id)
+  emit('delete-center', pendingDeleteCenter.value.id)
+  pendingDeleteCenter.value = null
 }
 
 const handleCenterMenuSelect = (center, item) => {
@@ -359,7 +381,7 @@ const handleCenterMenuSelect = (center, item) => {
   }
 
   if (item.id === 'delete-center') {
-    confirmDeleteCenter(center)
+    requestDeleteCenter(center)
   }
 }
 </script>
@@ -548,6 +570,14 @@ const handleCenterMenuSelect = (center, item) => {
       :submit-label="centerSettingsSubmitLabel"
       @close="closeCreateCenter"
       @save="saveCenter"
+    />
+
+    <AppConfirmDialog
+      v-model:visible="deleteCenterDialogOpen"
+      title="Delete Call Center?"
+      :description="deleteCenterDialogDescription"
+      confirm-label="Delete Call Center"
+      @confirm="confirmDeleteCenter"
     />
   </section>
 </template>

@@ -2,10 +2,12 @@
 import { computed, ref, watch } from 'vue'
 
 import AppButton from '../ui/AppButton.vue'
+import AppConfirmDialog from '../ui/AppConfirmDialog.vue'
 import AppDialog from '../ui/AppDialog.vue'
 import AppFieldGroup from '../ui/AppFieldGroup.vue'
 import AppOptionPills from '../ui/AppOptionPills.vue'
 import AppSelect from '../ui/AppSelect.vue'
+import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTextField from '../ui/AppTextField.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 import { createPlanningHolidayProfile } from '../../planningStorage'
@@ -88,6 +90,7 @@ const sortHolidayProfiles = (profiles) =>
   [...profiles].sort((left, right) => normalizeHolidayYear(left?.year) - normalizeHolidayYear(right?.year))
 
 const selectedHolidayYear = ref(normalizeHolidayYear(props.displayYear))
+const copyPriorYearConfirmOpen = ref(false)
 
 watch(
   () => props.displayYear,
@@ -275,22 +278,29 @@ const cloneHolidayRowsToYear = (holidayRows, targetYear) => {
   })
 }
 
+const applyPriorYearCopy = () => {
+  if (!priorYearProfile.value) {
+    return
+  }
+
+  setHolidayProfilesForYear(cloneHolidayRowsToYear(priorYearProfile.value.customHolidays, selectedHolidayYear.value))
+}
+
 const copyPriorYear = () => {
   if (!priorYearProfile.value) {
     return
   }
 
   if (customHolidayRows.value.length) {
-    const confirmed = window.confirm(
-      `Replace the ${selectedHolidayYear.value} holiday schedule with a copy of ${priorYearProfile.value.year}?`
-    )
-
-    if (!confirmed) {
-      return
-    }
+    copyPriorYearConfirmOpen.value = true
+    return
   }
 
-  setHolidayProfilesForYear(cloneHolidayRowsToYear(priorYearProfile.value.customHolidays, selectedHolidayYear.value))
+  applyPriorYearCopy()
+}
+
+const confirmCopyPriorYear = () => {
+  applyPriorYearCopy()
 }
 
 const holidayYearStatusMessage = computed(() => {
@@ -303,6 +313,16 @@ const holidayYearStatusMessage = computed(() => {
   }
 
   return `No holiday schedule saved for ${selectedHolidayYear.value}. Load U.S. holidays, add holidays manually, or copy the prior year.`
+})
+
+const copyPriorYearConfirmTitle = computed(() => `Replace ${selectedHolidayYear.value} Holiday Schedule?`)
+
+const copyPriorYearConfirmDescription = computed(() => {
+  if (!priorYearProfile.value) {
+    return ''
+  }
+
+  return `This replaces the current ${selectedHolidayYear.value} closed dates with a projected copy of ${priorYearProfile.value.year}.`
 })
 </script>
 
@@ -370,9 +390,9 @@ const holidayYearStatusMessage = computed(() => {
             </div>
           </div>
 
-          <p class="text-sm leading-6 text-slate-600">
+          <AppStatusMessage>
             {{ holidayYearStatusMessage }}
-          </p>
+          </AppStatusMessage>
 
           <div v-if="customHolidayRows.length" class="grid gap-3">
             <div
@@ -417,13 +437,9 @@ const holidayYearStatusMessage = computed(() => {
             </div>
           </div>
 
-          <p v-else class="text-sm leading-6 text-slate-500">
-            No closed dates added for {{ selectedHolidayYear }}.
-          </p>
-
-          <p v-if="hasHolidayValidationErrors" class="text-sm font-medium text-rose-700">
+          <AppStatusMessage v-if="hasHolidayValidationErrors" tone="error">
             Complete each holiday name and date before saving.
-          </p>
+          </AppStatusMessage>
         </div>
       </AppWorkspaceSection>
     </div>
@@ -437,4 +453,12 @@ const holidayYearStatusMessage = computed(() => {
       </div>
     </template>
   </AppDialog>
+
+  <AppConfirmDialog
+    v-model:visible="copyPriorYearConfirmOpen"
+    :title="copyPriorYearConfirmTitle"
+    :description="copyPriorYearConfirmDescription"
+    confirm-label="Replace Holiday Schedule"
+    @confirm="confirmCopyPriorYear"
+  />
 </template>
