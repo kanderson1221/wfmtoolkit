@@ -5,10 +5,8 @@ import {
   MONTH_LABELS,
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_SCHEDULE_CLOSED,
-  buildPlanMonths,
   buildActualsMonths,
-  buildPresenceMonths,
-  buildRandomMonths,
+  buildPlanMonths,
   buildStaffingMonths,
   buildTrainingClasses,
   clamp,
@@ -16,7 +14,6 @@ import {
   computeActualsRecords,
   computeStaffingRecords,
   createNextYearOpening,
-  deriveStartingFrontlineHeadcount,
   buildInheritedTrainingClasses,
   createPlanMonth,
   createActualsMonth,
@@ -28,11 +25,11 @@ import {
   findLinkedPriorPlan,
   normalizeCustomHolidays,
   normalizeDisabledHolidayRuleIds,
-  normalizeWeekdays,
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode,
   persistTrainingClassOutcomes,
   recommendTrainingClasses,
+  resolveLinkedOpeningPosition,
   summarizePlanRecords,
   summarizeActualsRecords,
   summarizePresenceRecords,
@@ -50,7 +47,8 @@ import {
   formatNumber,
   formatPercent,
   formatWhole,
-  hydrateMonths
+  buildPlannerSeedDefaults,
+  resolvePlannerInitialState
 } from './monthlyPlanBuilder/shared'
 
 export const useMonthlyPlanBuilder = (props, emit) => {
@@ -74,36 +72,22 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const resolvedDraftKey = computed(() => plannerDraftRepository.buildDraftKey(props.draftKey || savedPlan?.id))
   const activeDraftKey = ref(resolvedDraftKey.value)
   const restoredDraft = plannerDraftRepository.loadDraft(activeDraftKey.value)
-  const initialPlan = restoredDraft?.plan || savedPlan || props.centerDefaults || {}
+  const sourcePlan = restoredDraft?.plan || savedPlan || null
+  const initialPlan = sourcePlan || props.centerDefaults || {}
   const initialUi = restoredDraft?.ui || {}
   const initialReviewedSections = Array.isArray(initialUi.reviewedSections)
     ? initialUi.reviewedSections.filter((sectionId) => CORE_SECTION_IDS.has(sectionId))
-    : savedPlan?.id || initialPlan.id
+    : sourcePlan?.id || initialPlan.id
       ? [...CORE_SECTION_IDS]
       : []
-  const centerOperatingWeekdays = computed(() => normalizeWeekdays(props.centerDefaults?.operatingWeekdays))
-  const centerHolidayCalendarId = computed(() =>
-    normalizeHolidayCalendarId(props.centerDefaults?.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE)
+  const plannerSeedDefaults = computed(() =>
+    buildPlannerSeedDefaults(props.centerDefaults, hasPrefilledYear ? prefilledYear : currentYear)
   )
-  const centerDisabledHolidayRuleIds = computed(() =>
-    normalizeDisabledHolidayRuleIds(props.centerDefaults?.disabledHolidayRuleIds)
-  )
-  const centerCustomHolidays = computed(() =>
-    normalizeCustomHolidays(props.centerDefaults?.customHolidays)
-  )
-  const centerHolidayScheduleMode = computed(() =>
-    normalizeHolidayScheduleMode(props.centerDefaults?.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED)
-  )
-  const centerPaidHoursPerDay = computed(() =>
-    toNumber(props.centerDefaults?.presenceMonths?.[0]?.paidHoursPerDay, 8)
-  )
-  const centerRandomDefaults = computed(() =>
-    createRandomMonth(props.centerDefaults?.randomDefaults || {})
-  )
-  const initialStartingHeadcount = Math.max(toNumber(initialPlan.startingHeadcount, 0), 0)
-  const hydratedTrainingClasses = Array.isArray(initialPlan.trainingClasses)
-    ? initialPlan.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass))
-    : buildTrainingClasses()
+  const initialState = resolvePlannerInitialState({
+    sourcePlan,
+    centerDefaults: props.centerDefaults,
+    prefilledYear
+  })
   const legacyInitialTab = initialUi.activeTab === 'random' || initialUi.activeTab === 'plan'
     ? initialUi.activeTab
     : 'presence'
@@ -157,44 +141,27 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     return 'overview'
   })()
 
-  const initialPlanningYear = toNumber(initialPlan.planningYear, hasPrefilledYear ? prefilledYear : currentYear)
-  const planningYear = ref(initialPlanningYear)
+  const planningYear = ref(initialState.planningYear)
   const activeSection = ref(normalizedInitialSection)
   const activeForecastStep = ref(normalizedInitialForecastStep)
   const selectedMonthIndex = ref(clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1))
-  const operatingWeekdays = ref([...centerOperatingWeekdays.value])
-  const holidayCalendarId = ref(centerHolidayCalendarId.value)
-  const disabledHolidayRuleIds = ref([...centerDisabledHolidayRuleIds.value])
-  const customHolidays = ref(centerCustomHolidays.value.map((holiday) => ({ ...holiday })))
-  const holidayScheduleMode = ref(centerHolidayScheduleMode.value)
-  const presenceMonths = ref(hydrateMonths(initialPlan.presenceMonths, buildPresenceMonths, createPresenceMonth))
-  const randomDefaults = ref(createRandomMonth(initialPlan.randomDefaults || {}))
-  const useMonthlyRandomOverrides = ref(Boolean(initialPlan.useMonthlyRandomOverrides))
-  const randomMonths = ref(hydrateMonths(initialPlan.randomMonths, buildRandomMonths, createRandomMonth))
-  const planMonths = ref(hydrateMonths(initialPlan.planMonths, buildPlanMonths, createPlanMonth))
-  const actualsMonths = ref(hydrateMonths(initialPlan.actualsMonths, buildActualsMonths, createActualsMonth))
-  const trainingSettings = ref(createTrainingSettings(initialPlan.trainingSettings || {}))
-  const nextYearOpening = ref(createNextYearOpening(initialPlan.nextYearOpening || {}))
-  const startingHeadcount = ref(initialStartingHeadcount)
-  const startingFrontlineHeadcount = ref(
-    Math.min(
-      Math.max(
-        toNumber(
-          initialPlan.startingFrontlineHeadcount,
-          deriveStartingFrontlineHeadcount(
-            toNumber(initialPlan.planningYear, currentYear),
-            initialStartingHeadcount,
-            hydratedTrainingClasses,
-            trainingSettings.value
-          )
-        ),
-        0
-      ),
-      initialStartingHeadcount
-    )
-  )
-  const staffingMonths = ref(hydrateMonths(initialPlan.staffingMonths, buildStaffingMonths, createStaffingMonth))
-  const trainingClasses = ref(hydratedTrainingClasses)
+  const operatingWeekdays = ref([...initialState.operatingWeekdays])
+  const holidayCalendarId = ref(initialState.holidayCalendarId)
+  const disabledHolidayRuleIds = ref([...initialState.disabledHolidayRuleIds])
+  const customHolidays = ref(initialState.customHolidays.map((holiday) => ({ ...holiday })))
+  const holidayScheduleMode = ref(initialState.holidayScheduleMode)
+  const presenceMonths = ref(initialState.presenceMonths.map((month) => createPresenceMonth(month)))
+  const randomDefaults = ref(createRandomMonth(initialState.randomDefaults))
+  const useMonthlyRandomOverrides = ref(initialState.useMonthlyRandomOverrides)
+  const randomMonths = ref(initialState.randomMonths.map((month) => createRandomMonth(month)))
+  const planMonths = ref(initialState.planMonths.map((month) => createPlanMonth(month)))
+  const actualsMonths = ref(initialState.actualsMonths.map((month) => createActualsMonth(month)))
+  const trainingSettings = ref(createTrainingSettings(initialState.trainingSettings))
+  const nextYearOpening = ref(createNextYearOpening(initialState.nextYearOpening))
+  const startingHeadcount = ref(initialState.startingHeadcount)
+  const startingFrontlineHeadcount = ref(initialState.startingFrontlineHeadcount)
+  const staffingMonths = ref(initialState.staffingMonths.map((month) => createStaffingMonth(month)))
+  const trainingClasses = ref(initialState.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass)))
   const reviewedSections = ref([...new Set(initialReviewedSections)])
   const autosaveState = ref(restoredDraft ? 'restored' : savedPlan?.updatedAt ? 'saved' : 'idle')
   const lastAutosavedAt = ref(restoredDraft?.autosavedAt || savedPlan?.updatedAt || null)
@@ -322,26 +289,22 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const resetPlanner = () => {
-    planningYear.value = currentYear
-    operatingWeekdays.value = [...centerOperatingWeekdays.value]
-    holidayCalendarId.value = centerHolidayCalendarId.value
-    disabledHolidayRuleIds.value = [...centerDisabledHolidayRuleIds.value]
-    customHolidays.value = centerCustomHolidays.value.map((holiday) => ({ ...holiday }))
-    holidayScheduleMode.value = centerHolidayScheduleMode.value
-    presenceMonths.value = MONTH_LABELS.map(() =>
-      createPresenceMonth({
-        paidHoursPerDay: centerPaidHoursPerDay.value
-      })
-    )
-    randomDefaults.value = createRandomMonth(centerRandomDefaults.value)
+    planningYear.value = plannerSeedDefaults.value.planningYear
+    operatingWeekdays.value = [...plannerSeedDefaults.value.operatingWeekdays]
+    holidayCalendarId.value = plannerSeedDefaults.value.holidayCalendarId
+    disabledHolidayRuleIds.value = [...plannerSeedDefaults.value.disabledHolidayRuleIds]
+    customHolidays.value = plannerSeedDefaults.value.customHolidays.map((holiday) => ({ ...holiday }))
+    holidayScheduleMode.value = plannerSeedDefaults.value.holidayScheduleMode
+    presenceMonths.value = plannerSeedDefaults.value.presenceMonths.map((month) => createPresenceMonth(month))
+    randomDefaults.value = createRandomMonth(plannerSeedDefaults.value.randomDefaults)
     useMonthlyRandomOverrides.value = false
-    randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(centerRandomDefaults.value))
+    randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(plannerSeedDefaults.value.randomDefaults))
     planMonths.value = buildPlanMonths()
     actualsMonths.value = buildActualsMonths()
     trainingSettings.value = createTrainingSettings()
     nextYearOpening.value = createNextYearOpening()
-    startingHeadcount.value = 0
-    startingFrontlineHeadcount.value = 0
+    startingHeadcount.value = plannerSeedDefaults.value.startingHeadcount
+    startingFrontlineHeadcount.value = plannerSeedDefaults.value.startingFrontlineHeadcount
     staffingMonths.value = buildStaffingMonths()
     trainingClasses.value = buildTrainingClasses()
     reviewedSections.value = []
@@ -380,7 +343,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const linkedPriorPlan = computed(() =>
     findLinkedPriorPlan(props.groupPlans || [], {
-      id: savedPlan?.id || initialPlan.id || null,
+      id: sourcePlan?.id || initialPlan.id || null,
       planningYear: planningYear.value
     })
   )
@@ -390,25 +353,11 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       return null
     }
 
-    const explicitRosterHeadcount = toNumber(linkedPriorPlan.value?.nextYearOpening?.rosterHeadcount, 0)
-    const explicitFrontlineHeadcount = toNumber(linkedPriorPlan.value?.nextYearOpening?.frontlineHeadcount, 0)
-    const endingRosterHeadcount = toNumber(linkedPriorPlan.value?.summary?.endingRosterHeadcount, 0)
-    const endingFrontlineHeadcount = toNumber(linkedPriorPlan.value?.summary?.endingFrontlineHeadcount, 0)
-    const rosterHeadcount = Math.max(explicitRosterHeadcount, explicitFrontlineHeadcount, endingRosterHeadcount, 0)
-    const frontlineHeadcount = Math.min(
-      Math.max(
-        linkedPriorPlan.value?.nextYearOpening?.frontlineHeadcount != null
-          ? explicitFrontlineHeadcount
-          : endingFrontlineHeadcount,
-        0
-      ),
-      rosterHeadcount
-    )
-
-    return {
-      rosterHeadcount,
-      frontlineHeadcount
-    }
+    return resolveLinkedOpeningPosition({
+      priorPlan: linkedPriorPlan.value,
+      startingHeadcount: startingHeadcount.value,
+      startingFrontlineHeadcount: startingFrontlineHeadcount.value
+    })
   })
 
   const startingPositionInherited = computed(() => inheritedStartingPosition.value != null)
@@ -462,7 +411,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const displayPlanLabel = computed(() => `${planningYear.value} Plan`)
   const duplicateYearPlan = computed(() => {
     const targetYear = toNumber(planningYear.value, currentYear)
-    const currentPlanId = savedPlan?.id || initialPlan.id || null
+    const currentPlanId = sourcePlan?.id || initialPlan.id || null
 
     return (props.groupPlans || []).find(
       (plan) => plan?.id !== currentPlanId && toNumber(plan?.planningYear, currentYear) === targetYear
@@ -483,8 +432,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const hasNextYearStartingFrontlineTarget = computed(() => nextYearOpening.value.frontlineHeadcount != null)
 
   const buildPlanPayload = () => ({
-    id: savedPlan?.id || initialPlan.id || null,
-    createdAt: savedPlan?.createdAt || initialPlan.createdAt || null,
+    id: sourcePlan?.id || initialPlan.id || null,
+    createdAt: sourcePlan?.createdAt || initialPlan.createdAt || null,
     name: `${planningYear.value} Plan`,
     planningYear: planningYear.value,
     operatingWeekdays: [...operatingWeekdays.value],
@@ -550,22 +499,17 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     }
   })
 
-  watch(
-    [
-      centerOperatingWeekdays,
-      centerHolidayCalendarId,
-      centerDisabledHolidayRuleIds,
-      centerCustomHolidays,
-      centerHolidayScheduleMode
-    ],
-    ([nextOperatingWeekdays, nextHolidayCalendarId, nextDisabledHolidayRuleIds, nextCustomHolidays, nextHolidayScheduleMode]) => {
-      operatingWeekdays.value = [...nextOperatingWeekdays]
-      holidayCalendarId.value = nextHolidayCalendarId
-      disabledHolidayRuleIds.value = [...nextDisabledHolidayRuleIds]
-      customHolidays.value = nextCustomHolidays.map((holiday) => ({ ...holiday }))
-      holidayScheduleMode.value = nextHolidayScheduleMode
+  watch(plannerSeedDefaults, (nextSeedDefaults) => {
+    if (sourcePlan) {
+      return
     }
-  )
+
+    operatingWeekdays.value = [...nextSeedDefaults.operatingWeekdays]
+    holidayCalendarId.value = nextSeedDefaults.holidayCalendarId
+    disabledHolidayRuleIds.value = [...nextSeedDefaults.disabledHolidayRuleIds]
+    customHolidays.value = nextSeedDefaults.customHolidays.map((holiday) => ({ ...holiday }))
+    holidayScheduleMode.value = nextSeedDefaults.holidayScheduleMode
+  })
 
   watch(activeSection, (sectionId) => {
     markSectionReviewed(sectionId)

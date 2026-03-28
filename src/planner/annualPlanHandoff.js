@@ -84,8 +84,11 @@ export const resolveLinkedOpeningPosition = ({
 
   const explicitOpening = createNextYearOpening(priorPlan.nextYearOpening || {})
   const summary = priorPlan.summary || {}
-  const rosterHeadcount =
-    explicitOpening.rosterHeadcount ?? Math.max(toNumber(summary.endingRosterHeadcount, localRosterHeadcount), 0)
+  const rosterHeadcount = explicitOpening.rosterHeadcount ?? Math.max(
+    toNumber(summary.endingRosterHeadcount, localRosterHeadcount),
+    toNumber(explicitOpening.frontlineHeadcount, localFrontlineHeadcount),
+    0
+  )
   const unresolvedFrontlineHeadcount =
     explicitOpening.frontlineHeadcount ?? Math.max(toNumber(summary.endingFrontlineHeadcount, localFrontlineHeadcount), 0)
 

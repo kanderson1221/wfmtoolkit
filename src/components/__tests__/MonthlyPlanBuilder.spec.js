@@ -41,7 +41,9 @@ const centerDefaults = {
   centerId: 'center-1',
   groupId: 'group-1',
   groupName: 'Consumer Voice',
+  planningYear: 2026,
   operatingWeekdays: [1, 2, 3, 4, 5],
+  holidayCalendarId: 'us_federal',
   defaultHolidayCalendarId: 'us_federal',
   disabledHolidayRuleIds: [],
   customHolidays: [
@@ -51,11 +53,13 @@ const centerDefaults = {
       date: '2026-01-01'
     }
   ],
-  presenceMonths: [{ paidHoursPerDay: 8 }],
+  presenceMonths: Array.from({ length: 12 }, () => ({ paidHoursPerDay: 8 })),
   randomDefaults: {
     occupancyPercent: 90,
     adherencePercent: 95
-  }
+  },
+  startingHeadcount: 18,
+  startingFrontlineHeadcount: 16
 }
 
 const clearPlannerDrafts = () => {
@@ -186,7 +190,7 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.find('[data-test="staffing-tab"]').text()).toContain('1|2026')
   })
 
-  it('emits a saved plan payload from the shell action', async () => {
+  it('preserves saved plan values instead of re-defaulting them from the workspace seed', async () => {
     const wrapper = mountBuilder({
       draftKey: 'plan-1',
       initialPlan: {
@@ -207,6 +211,25 @@ describe('MonthlyPlanBuilder', () => {
       id: 'plan-1',
       name: '2026 Plan',
       planningYear: 2026,
+      operatingWeekdays: [1],
+      holidayCalendarId: 'none',
+      customHolidays: []
+    })
+  })
+
+  it('seeds new plans from the workspace defaults when no saved plan exists', async () => {
+    const wrapper = mountBuilder({
+      draftKey: 'new-plan',
+      prefilledYear: 2026
+    })
+
+    await findButtonByText(wrapper, 'Save Plan').trigger('click')
+
+    expect(wrapper.emitted('save')).toBeTruthy()
+    expect(wrapper.emitted('save')[0][0]).toMatchObject({
+      id: null,
+      name: '2026 Plan',
+      planningYear: 2026,
       operatingWeekdays: [1, 2, 3, 4, 5],
       holidayCalendarId: 'us_federal',
       customHolidays: [
@@ -215,7 +238,9 @@ describe('MonthlyPlanBuilder', () => {
           label: "New Year's Day",
           date: '2026-01-01'
         }
-      ]
+      ],
+      startingHeadcount: 18,
+      startingFrontlineHeadcount: 16
     })
   })
 

@@ -50,6 +50,30 @@ describe('annualPlanHandoff', () => {
     })
   })
 
+  it('keeps roster headcount at or above an explicit frontline handoff when roster is omitted', () => {
+    const opening = resolveLinkedOpeningPosition({
+      priorPlan: {
+        planningYear: 2026,
+        nextYearOpening: {
+          frontlineHeadcount: 42
+        },
+        summary: {
+          endingRosterHeadcount: 40,
+          endingFrontlineHeadcount: 34
+        }
+      },
+      startingHeadcount: 10,
+      startingFrontlineHeadcount: 8
+    })
+
+    expect(opening).toMatchObject({
+      rosterHeadcount: 42,
+      frontlineHeadcount: 42,
+      isInherited: true,
+      usesExplicitHandoff: true
+    })
+  })
+
   it('filters inherited classes so only prior-year carry-in remains visible in January', () => {
     const inheritedClasses = buildInheritedTrainingClasses({
       planningYear: 2027,
