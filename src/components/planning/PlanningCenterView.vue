@@ -32,6 +32,7 @@ import AppEmptyState from '../ui/AppEmptyState.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import AppMenu from '../ui/AppMenu.vue'
 import AppPanel from '../ui/AppPanel.vue'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 const props = defineProps({
   center: {
@@ -60,7 +61,14 @@ const planSettingsOpen = ref(false)
 const centerDraft = ref(createPlanningCenterDraft(props.center))
 const groupDraft = ref(createPlanningGroupDraft())
 const newPlanYear = ref(currentYear)
-const pendingConfirmation = ref(null)
+const {
+  dialogVisible: confirmationDialogOpen,
+  dialogTitle: confirmationDialogTitle,
+  dialogDescription: confirmationDialogDescription,
+  dialogConfirmLabel: confirmationDialogConfirmLabel,
+  requestConfirmation,
+  confirmPendingAction: runPendingConfirmation
+} = useConfirmDialog()
 
 const formatWhole = (value) =>
   new Intl.NumberFormat('en-US', {
@@ -361,34 +369,6 @@ const saveGroup = () => {
     operatingWeekdays: props.center.operatingWeekdays
   })
   groupSettingsOpen.value = false
-}
-
-const confirmationDialogOpen = computed({
-  get: () => Boolean(pendingConfirmation.value),
-  set: (value) => {
-    if (!value) {
-      pendingConfirmation.value = null
-    }
-  }
-})
-
-const confirmationDialogTitle = computed(() => pendingConfirmation.value?.title || '')
-const confirmationDialogDescription = computed(() => pendingConfirmation.value?.description || '')
-const confirmationDialogConfirmLabel = computed(() => pendingConfirmation.value?.confirmLabel || 'Confirm')
-
-const requestConfirmation = ({ title, description, confirmLabel, onConfirm }) => {
-  pendingConfirmation.value = {
-    title,
-    description,
-    confirmLabel,
-    onConfirm
-  }
-}
-
-const runPendingConfirmation = () => {
-  const confirmAction = pendingConfirmation.value?.onConfirm
-  pendingConfirmation.value = null
-  confirmAction?.()
 }
 
 const confirmDeleteGroup = (group) => {

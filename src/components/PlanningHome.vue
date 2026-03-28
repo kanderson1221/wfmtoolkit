@@ -19,6 +19,7 @@ import AppSectionHeader from './ui/AppSectionHeader.vue'
 import AppSelect from './ui/AppSelect.vue'
 import AppStatStrip from './ui/AppStatStrip.vue'
 import AppTableShell from './ui/AppTableShell.vue'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { createPlanningCenterDraft, resolveCenterHolidayProfile } from '../planningStorage'
 import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
 import {
@@ -44,7 +45,14 @@ const emit = defineEmits(['save-center', 'delete-center'])
 const centerSettingsOpen = ref(false)
 const centerDraft = ref(createPlanningCenterDraft())
 const selectedPlanningYear = ref(new Date().getFullYear())
-const pendingDeleteCenter = ref(null)
+const {
+  dialogVisible: deleteCenterDialogOpen,
+  dialogTitle: deleteCenterDialogTitle,
+  dialogDescription: deleteCenterDialogDescription,
+  dialogConfirmLabel: deleteCenterDialogConfirmLabel,
+  requestConfirmation: requestDeleteCenterConfirmation,
+  confirmPendingAction: confirmDeleteCenter
+} = useConfirmDialog()
 
 const formatWhole = (value) =>
   new Intl.NumberFormat('en-US', {
@@ -342,36 +350,15 @@ const openCenter = (centerId) => {
   window.location.hash = `#planning/center/${centerId}`
 }
 
-const deleteCenterDialogOpen = computed({
-  get: () => Boolean(pendingDeleteCenter.value),
-  set: (value) => {
-    if (!value) {
-      pendingDeleteCenter.value = null
-    }
-  }
-})
-
-const deleteCenterDialogDescription = computed(() => {
-  const center = pendingDeleteCenter.value
-
-  if (!center) {
-    return ''
-  }
-
-  return `Delete "${center.name}"? This removes the call center and all ${center.summary.groupCount} staffing group${center.summary.groupCount === 1 ? '' : 's'} inside it.`
-})
-
 const requestDeleteCenter = (center) => {
-  pendingDeleteCenter.value = center
-}
-
-const confirmDeleteCenter = () => {
-  if (!pendingDeleteCenter.value) {
-    return
-  }
-
-  emit('delete-center', pendingDeleteCenter.value.id)
-  pendingDeleteCenter.value = null
+  requestDeleteCenterConfirmation({
+    title: 'Delete Call Center?',
+    description: `Delete "${center.name}"? This removes the call center and all ${center.summary.groupCount} staffing group${center.summary.groupCount === 1 ? '' : 's'} inside it.`,
+    confirmLabel: 'Delete Call Center',
+    onConfirm: () => {
+      emit('delete-center', center.id)
+    }
+  })
 }
 
 const handleCenterMenuSelect = (center, item) => {
@@ -574,9 +561,9 @@ const handleCenterMenuSelect = (center, item) => {
 
     <AppConfirmDialog
       v-model:visible="deleteCenterDialogOpen"
-      title="Delete Call Center?"
+      :title="deleteCenterDialogTitle"
       :description="deleteCenterDialogDescription"
-      confirm-label="Delete Call Center"
+      :confirm-label="deleteCenterDialogConfirmLabel"
       @confirm="confirmDeleteCenter"
     />
   </section>
