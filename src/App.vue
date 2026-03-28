@@ -4,6 +4,7 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
 import { AUTH_BYPASS_ENABLED } from './authMode'
+import { isPublicHomeHash } from './appRoutes'
 import { useAuthSession } from './composables/useAuthSession'
 import { useHashNavigation } from './composables/useHashNavigation'
 import { usePlanningWorkspace } from './composables/usePlanningWorkspace'
@@ -33,7 +34,7 @@ const {
   hasWorkspaceAccess,
   handleSignOut
 } = auth
-const { currentHash, currentRoute, pendingRouteHash, syncRouteFromHash } = useHashNavigation()
+const { currentHash, currentRoute, syncRouteFromHash } = useHashNavigation()
 
 const {
   planningCenters,
@@ -44,7 +45,6 @@ const {
   plannerDraftKey,
   monthlyPlannerKey,
   loadCentersForScope,
-  clearCenters,
   handleSaveCenter,
   handleDeleteCenter,
   handleSaveGroup,
@@ -61,7 +61,7 @@ const {
 
 const appMainRef = ref(null)
 let previousScrollRestoration = null
-const showPublicLanding = computed(() => !currentHash.value || currentHash.value === '#home')
+const showPublicLanding = computed(() => isPublicHomeHash(currentHash.value))
 
 const resetScrollPosition = () => {
   appMainRef.value?.scrollTo?.({ top: 0, left: 0, behavior: 'auto' })
@@ -103,9 +103,7 @@ onMounted(() => {
 
   auth.initializeAuth({
     loadCentersForScope,
-    clearCenters,
-    syncRouteFromHash,
-    pendingRouteHash
+    syncRouteFromHash
   })
 
   void scheduleScrollReset()

@@ -8,7 +8,9 @@ const readDraftMap = () => {
   }
 
   try {
-    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY)
+    const raw = typeof window.localStorage.getItem === 'function'
+      ? window.localStorage.getItem(DRAFT_STORAGE_KEY)
+      : window.localStorage?.[DRAFT_STORAGE_KEY]
     if (!raw) {
       return {}
     }
@@ -25,7 +27,20 @@ const writeDraftMap = (draftMap) => {
     return
   }
 
-  window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftMap))
+  const serializedDraftMap = JSON.stringify(draftMap)
+
+  if (typeof window.localStorage.setItem === 'function') {
+    window.localStorage.setItem(DRAFT_STORAGE_KEY, serializedDraftMap)
+    return
+  }
+
+  if (window.localStorage && typeof window.localStorage === 'object') {
+    try {
+      window.localStorage[DRAFT_STORAGE_KEY] = serializedDraftMap
+    } catch {
+      // Some test shims expose localStorage without writable property traps.
+    }
+  }
 }
 
 export const buildPlannerDraftKey = (planId) => String(planId || 'new')

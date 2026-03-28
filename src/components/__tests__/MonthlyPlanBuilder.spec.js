@@ -1,10 +1,23 @@
 import { mount } from '@vue/test-utils'
 
 import MonthlyPlanBuilder from '../MonthlyPlanBuilder.vue'
+import { plannerDraftRepository } from '../../plannerDraftRepository'
 
 const plannerStubs = {
   PlannerOverviewPanel: {
-    template: '<div data-test="overview-panel">overview</div>'
+    props: ['sectionCards', 'nextRecommendation'],
+    template: `
+      <div data-test="overview-panel">
+        <div data-test="next-recommendation">{{ nextRecommendation?.title || '' }}</div>
+        <div
+          v-for="card in sectionCards"
+          :key="card.id"
+          :data-card-id="card.id"
+        >
+          {{ card.statusLabel }}
+        </div>
+      </div>
+    `
   },
   PlannerPresenceTab: {
     template: '<div data-test="presence-tab">presence</div>'
@@ -76,13 +89,33 @@ describe('MonthlyPlanBuilder', () => {
     clearPlannerDrafts()
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('opens new plans directly in the editor workflow', () => {
     const wrapper = mountBuilder({
       draftKey: 'new-plan',
       prefilledYear: 2026
     })
 
-    expect(wrapper.text()).toContain('Overview')
+    expect(wrapper.text()).toContain('Plan Status')
+  })
+
+  it('treats inherited defaults as pending review until the section is opened', async () => {
+    const wrapper = mountBuilder({
+      draftKey: 'new-plan',
+      prefilledYear: 2026
+    })
+
+    expect(wrapper.find('[data-test="next-recommendation"]').text()).toBe('Agent Availability')
+    expect(wrapper.find('[data-card-id="availability"]').text()).toBe('Using defaults')
+    expect(wrapper.find('[data-card-id="variability"]').text()).toBe('Using defaults')
+
+    await wrapper.find('[data-section-id="availability"]').trigger('click')
+    await wrapper.find('[data-section-id="overview"]').trigger('click')
+
+    expect(wrapper.find('[data-card-id="availability"]').text()).toBe('12/12 months')
   })
 
   it('switches between overview, direct forecast steps, staffing plan, and actuals', async () => {
@@ -144,5 +177,21 @@ describe('MonthlyPlanBuilder', () => {
         }
       ]
     })
+  })
+
+  it('moves autosave drafts into the active draft scope when the scope changes mid-edit', async () => {
+    const persistDraftSpy = vi.spyOn(plannerDraftRepository, 'persistDraft').mockReturnValue({
+      autosavedAt: '2026-01-01T00:00:00.000Z'
+    })
+    const wrapper = mountBuilder({
+      draftKey: 'guest:plan:new',
+      prefilledYear: 2026
+    })
+
+    await wrapper.setProps({
+      draftKey: 'user-1:plan:new'
+    })
+
+    expect(persistDraftSpy).toHaveBeenCalledWith('user-1:plan:new', expect.any(Object))
   })
 })

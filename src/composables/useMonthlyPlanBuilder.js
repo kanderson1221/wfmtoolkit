@@ -50,15 +50,22 @@ import {
 } from './monthlyPlanBuilder/shared'
 
 export const useMonthlyPlanBuilder = (props, emit) => {
+  const CORE_SECTION_IDS = new Set(['availability', 'variability', 'requirement', 'staffing'])
   const savedPlan = props.initialPlan || null
   const prefilledYear = props.prefilledYear == null || props.prefilledYear === ''
     ? NaN
     : toNumber(props.prefilledYear, NaN)
   const hasPrefilledYear = Number.isFinite(prefilledYear)
-  const draftKey = plannerDraftRepository.buildDraftKey(props.draftKey || savedPlan?.id)
-  const restoredDraft = plannerDraftRepository.loadDraft(draftKey)
+  const resolvedDraftKey = computed(() => plannerDraftRepository.buildDraftKey(props.draftKey || savedPlan?.id))
+  const activeDraftKey = ref(resolvedDraftKey.value)
+  const restoredDraft = plannerDraftRepository.loadDraft(activeDraftKey.value)
   const initialPlan = restoredDraft?.plan || savedPlan || props.centerDefaults || {}
   const initialUi = restoredDraft?.ui || {}
+  const initialReviewedSections = Array.isArray(initialUi.reviewedSections)
+    ? initialUi.reviewedSections.filter((sectionId) => CORE_SECTION_IDS.has(sectionId))
+    : savedPlan?.id || initialPlan.id
+      ? [...CORE_SECTION_IDS]
+      : []
   const centerOperatingWeekdays = computed(() => normalizeWeekdays(props.centerDefaults?.operatingWeekdays))
   const centerHolidayCalendarId = computed(() =>
     normalizeHolidayCalendarId(props.centerDefaults?.defaultHolidayCalendarId, HOLIDAY_CALENDAR_NONE)
@@ -172,6 +179,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   )
   const staffingMonths = ref(hydrateMonths(initialPlan.staffingMonths, buildStaffingMonths, createStaffingMonth))
   const trainingClasses = ref(hydratedTrainingClasses)
+  const reviewedSections = ref([...new Set(initialReviewedSections)])
   const autosaveState = ref(restoredDraft ? 'restored' : savedPlan?.updatedAt ? 'saved' : 'idle')
   const lastAutosavedAt = ref(restoredDraft?.autosavedAt || savedPlan?.updatedAt || null)
   const autosaveReady = ref(false)
@@ -179,17 +187,28 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   let autosaveTimer = null
 
+  const markSectionReviewed = (sectionId) => {
+    if (!CORE_SECTION_IDS.has(sectionId) || reviewedSections.value.includes(sectionId)) {
+      return
+    }
+
+    reviewedSections.value = [...reviewedSections.value, sectionId]
+  }
+
   const setActiveSection = (sectionId) => {
     if (sectionId === 'availability' || sectionId === 'variability' || sectionId === 'requirement') {
+      markSectionReviewed(sectionId)
       activeForecastStep.value = sectionId
       activeSection.value = sectionId
       return
     }
 
+    markSectionReviewed(sectionId)
     activeSection.value = sectionId === 'budget' || sectionId === 'review' ? 'overview' : sectionId
   }
 
   const setActiveForecastStep = (stepId) => {
+    markSectionReviewed(stepId)
     activeSection.value = stepId
     activeForecastStep.value = stepId
   }
@@ -279,6 +298,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     trainingSettings.value = examplePlan.trainingSettings
     staffingMonths.value = examplePlan.staffingMonths
     trainingClasses.value = examplePlan.trainingClasses
+    reviewedSections.value = [...CORE_SECTION_IDS]
     activeSection.value = 'overview'
     activeForecastStep.value = 'availability'
     selectedMonthIndex.value = 0
@@ -306,6 +326,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     startingFrontlineHeadcount.value = 0
     staffingMonths.value = buildStaffingMonths()
     trainingClasses.value = buildTrainingClasses()
+    reviewedSections.value = []
     activeSection.value = 'overview'
     activeForecastStep.value = 'availability'
     selectedMonthIndex.value = currentMonthIndex
@@ -440,7 +461,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
           : activeSection.value === 'requirement'
             ? 'plan'
             : 'presence',
-      selectedMonthIndex: selectedMonthIndex.value
+      selectedMonthIndex: selectedMonthIndex.value,
+      reviewedSections: [...reviewedSections.value]
     }
   })
 
@@ -461,6 +483,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     }
   )
 
+  watch(activeSection, (sectionId) => {
+    markSectionReviewed(sectionId)
+  })
+
   const clearPendingAutosave = () => {
     if (autosaveTimer) {
       window.clearTimeout(autosaveTimer)
@@ -473,7 +499,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       return
     }
 
-    const nextDraft = plannerDraftRepository.persistDraft(draftKey, buildDraftPayload())
+    const nextDraft = plannerDraftRepository.persistDraft(activeDraftKey.value, buildDraftPayload())
     lastAutosavedAt.value = nextDraft.autosavedAt
     autosaveState.value = 'saved'
   }
@@ -502,10 +528,28 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const removeDraft = () => {
     clearPendingAutosave()
-    plannerDraftRepository.clearDraft(draftKey)
+    plannerDraftRepository.clearDraft(activeDraftKey.value)
     lastAutosavedAt.value = null
     autosaveState.value = 'idle'
   }
+
+  watch(resolvedDraftKey, (nextDraftKey, previousDraftKey) => {
+    if (!nextDraftKey || nextDraftKey === previousDraftKey) {
+      return
+    }
+
+    activeDraftKey.value = nextDraftKey
+
+    if (!autosaveReady.value || suspendAutosave.value) {
+      return
+    }
+
+    clearPendingAutosave()
+
+    const nextDraft = plannerDraftRepository.persistDraft(nextDraftKey, buildDraftPayload())
+    lastAutosavedAt.value = nextDraft.autosavedAt
+    autosaveState.value = 'saved'
+  })
 
   const validatePlanDetails = () => {
     if (duplicateYearPlan.value) {
@@ -623,6 +667,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     startingFrontlineHeadcount,
     staffingMonths,
     trainingClasses,
+    reviewedSections,
     autosaveState,
     monthlyRecords,
     displayPlanLabel,

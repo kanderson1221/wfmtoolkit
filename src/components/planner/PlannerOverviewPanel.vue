@@ -56,21 +56,24 @@ const sectionIcons = {
   staffing: mdiAccountGroupOutline
 }
 
+const readySectionCount = computed(() => props.sectionCards.filter((card) => card.isReady).length)
+const blockerCount = computed(() => props.sectionCards.filter((card) => !card.isReady).length)
+
 const overviewItems = computed(() => [
+  {
+    label: 'Core Sections Ready',
+    value: `${readySectionCount.value}/${props.sectionCards.length || 0}`,
+    meta: blockerCount.value > 0 ? `${blockerCount.value} still need attention` : 'All core sections are in place'
+  },
+  {
+    label: 'Current Blockers',
+    value: String(blockerCount.value),
+    meta: props.nextRecommendation ? `Next: ${props.nextRecommendation.title}` : 'No blocking steps remain'
+  },
   {
     label: 'Peak Required Headcount',
     value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
     meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
-  },
-  {
-    label: 'Average Required Headcount',
-    value: props.formatNumber(props.planSummary?.averageRequiredHeadcount, 1),
-    meta: 'Average monthly frontline requirement'
-  },
-  {
-    label: 'Starting Frontline Headcount',
-    value: props.formatNumber(props.staffingSummary?.startingFrontlineHeadcount, 1),
-    meta: 'Opening productive headcount in the staffing plan'
   },
   {
     label: 'Average Frontline Gap',
@@ -125,20 +128,34 @@ const nextRecommendationIcon = computed(
 )
 
 const guidanceTone = computed(() => {
-  if (props.nextRecommendation) {
+  if (!props.planComplete) {
     return 'info'
   }
 
-  return (props.staffingSummary?.averageGapToRequirement ?? 0) >= 0 ? 'success' : 'info'
+  return 'success'
 })
 
 const guidanceMessage = computed(() => {
   if (props.nextRecommendation) {
-    return 'Use this page to track progress across the plan and move through the next recommended step.'
+    return blockerCount.value === 1
+      ? `1 core section still needs attention. Start with ${props.nextRecommendation.title}.`
+      : `${blockerCount.value} core sections still need attention. Start with ${props.nextRecommendation.title}.`
   }
 
-  return 'The core inputs are in place. Finish the staffing plan to turn this into the final annual dashboard.'
+  return 'All core plan sections are in place. Use this page to reopen any section and review the final staffing outlook.'
 })
+
+const statusClass = (card) => {
+  if (card.tone === 'ready') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+
+  if (card.tone === 'attention') {
+    return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+
+  return 'border-slate-200 bg-slate-50 text-slate-600'
+}
 
 const openSection = (sectionId, stepId = '') => {
   emit('open-section', {
@@ -150,76 +167,84 @@ const openSection = (sectionId, stepId = '') => {
 
 <template>
   <section class="grid gap-4">
-    <AppSectionHeader title="Overview" :icon="mdiChartLine" />
+    <AppSectionHeader title="Plan Status" :icon="mdiChartLine" />
 
     <AppStatStrip :items="overviewItems" columns="md:grid-cols-2 xl:grid-cols-4" />
 
-    <template v-if="!props.planComplete">
-      <AppStatusMessage :tone="guidanceTone">
-        {{ guidanceMessage }}
-      </AppStatusMessage>
+    <AppStatusMessage :tone="guidanceTone">
+      {{ guidanceMessage }}
+    </AppStatusMessage>
 
-      <section
-        v-if="props.nextRecommendation"
-        class="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between"
-      >
-        <div class="flex items-start gap-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]">
-            <AppIcon :path="nextRecommendationIcon" class="h-4.5 w-4.5" />
-          </div>
-
-          <div class="grid gap-1">
-            <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Next Step
-            </span>
-            <div class="grid gap-1">
-              <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
-                {{ props.nextRecommendation.title }}
-              </strong>
-              <p class="text-sm leading-6 text-slate-600">
-                {{ props.nextRecommendation.description }}
-              </p>
-            </div>
-          </div>
+    <section
+      v-if="props.nextRecommendation"
+      class="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between"
+    >
+      <div class="flex items-start gap-3">
+        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]">
+          <AppIcon :path="nextRecommendationIcon" class="h-4.5 w-4.5" />
         </div>
 
-        <AppButton
-          variant="primary"
-          @click="openSection(props.nextRecommendation.sectionId || 'availability', props.nextRecommendation.stepId || '')"
-        >
-          {{ props.nextRecommendation.actionLabel || 'Open Agent Availability' }}
-        </AppButton>
-      </section>
-
-      <div class="grid divide-y divide-slate-200">
-        <article
-          v-for="card in props.sectionCards"
-          :key="card.id"
-          class="flex flex-col gap-3 py-4 xl:flex-row xl:items-center xl:justify-between"
-        >
-          <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between xl:flex-1">
-            <div class="grid gap-1">
-              <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
-                {{ card.title }}
-              </strong>
-              <p class="text-sm leading-6 text-slate-600">
-                {{ card.description }}
-              </p>
-            </div>
-
-            <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-slate-600">
-              {{ card.statusLabel }}
-            </span>
+        <div class="grid gap-1">
+          <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Next Step
+          </span>
+          <div class="grid gap-1">
+            <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
+              {{ props.nextRecommendation.title }}
+            </strong>
+            <p class="text-sm leading-6 text-slate-600">
+              {{ props.nextRecommendation.description }}
+            </p>
           </div>
-
-          <div class="flex justify-start xl:justify-end">
-            <AppButton variant="secondary" @click="openSection(card.id, card.stepId)">
-              {{ card.actionLabel }}
-            </AppButton>
-          </div>
-        </article>
+        </div>
       </div>
-    </template>
+
+      <AppButton
+        variant="primary"
+        class="w-24 justify-center"
+        @click="openSection(props.nextRecommendation.sectionId || 'availability', props.nextRecommendation.stepId || '')"
+      >
+        Open
+      </AppButton>
+    </section>
+
+    <div class="grid divide-y divide-slate-200">
+      <article
+        v-for="card in props.sectionCards"
+        :key="card.id"
+        class="flex flex-col gap-3 py-4 xl:flex-row xl:items-center xl:justify-between"
+      >
+        <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between xl:flex-1">
+          <div class="grid gap-1.5">
+            <strong class="text-base font-semibold tracking-[-0.03em] text-slate-950">
+              {{ card.title }}
+            </strong>
+            <p class="text-sm leading-6 text-slate-600">
+              {{ card.description }}
+            </p>
+            <p v-if="card.detail" class="text-[0.82rem] leading-6 text-slate-500">
+              {{ card.detail }}
+            </p>
+            <p v-if="card.blocker" class="text-[0.82rem] leading-6 text-amber-700">
+              {{ card.blocker }}
+            </p>
+          </div>
+
+          <span
+            class="inline-flex rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em]"
+            :class="statusClass(card)"
+          >
+            {{ card.statusLabel }}
+          </span>
+        </div>
+
+        <div class="flex justify-start xl:min-w-[6rem] xl:justify-end">
+          <AppButton class="w-24 justify-center" variant="secondary" @click="openSection(card.id, card.stepId)">
+            Open
+          </AppButton>
+        </div>
+      </article>
+    </div>
 
     <section class="grid gap-3">
       <AppSectionHeader title="Forecast Need Summary" :icon="mdiPhoneOutline" />

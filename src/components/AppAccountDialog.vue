@@ -2,11 +2,13 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js'
 
+import { isPublicHomeHash } from '../appRoutes'
 import { isSupabaseConfigured, supabase, supabaseConfigError } from '../supabaseClient'
-import AppIcon from './ui/AppIcon.vue'
 import AppButton from './ui/AppButton.vue'
 import AppDialog from './ui/AppDialog.vue'
 import AppFieldGroup from './ui/AppFieldGroup.vue'
+import AppIconButton from './ui/AppIconButton.vue'
+import AppOptionPills from './ui/AppOptionPills.vue'
 import AppStatusMessage from './ui/AppStatusMessage.vue'
 import AppTextField from './ui/AppTextField.vue'
 
@@ -59,6 +61,16 @@ const registerErrors = reactive({
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const authAvailable = computed(() => props.authConfigured && isSupabaseConfigured)
+const authModeOptions = [
+  {
+    id: 'sign-in',
+    label: 'Sign In'
+  },
+  {
+    id: 'register',
+    label: 'Register'
+  }
+]
 
 const formTitle = computed(() => (mode.value === 'sign-in' ? 'Sign In' : 'Register'))
 const formDescription = computed(() =>
@@ -140,19 +152,8 @@ const validateRegister = () => {
   return valid
 }
 
-const switchMode = (nextMode) => {
-  mode.value = nextMode
-  resetTransientState()
-}
-
-const getAuthModeButtonClass = (targetMode) => (
-  mode.value === targetMode
-    ? 'border-[#c6d4e3] bg-[#e7eef4] text-[#173b5d] shadow-sm hover:border-[#bdcddd] hover:bg-[#dfe8f1]'
-    : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-[#c6d4e3] hover:bg-[#f3f6f9] hover:text-slate-900'
-)
-
 const buildAuthRedirectUrl = () => {
-  const currentHash = window.location.hash && window.location.hash !== '#home'
+  const currentHash = window.location.hash && !isPublicHomeHash(window.location.hash)
     ? window.location.hash
     : '#planning'
 
@@ -273,6 +274,7 @@ const handleDialogClose = () => {
 }
 
 watch(mode, () => {
+  resetTransientState()
   void focusActiveEmailField()
 })
 
@@ -306,24 +308,13 @@ watch(visible, (isVisible) => {
       </AppStatusMessage>
 
       <div v-if="authAvailable" class="grid gap-4">
-        <div class="grid gap-2 rounded-[22px] border border-slate-200 bg-slate-50 p-1.5 sm:grid-cols-2">
-          <AppButton
-            variant="quiet"
-            block
-            :class="getAuthModeButtonClass('sign-in')"
-            @click="switchMode('sign-in')"
-          >
-            Sign In
-          </AppButton>
-          <AppButton
-            variant="quiet"
-            block
-            :class="getAuthModeButtonClass('register')"
-            @click="switchMode('register')"
-          >
-            Register
-          </AppButton>
-        </div>
+        <AppOptionPills
+          v-model="mode"
+          aria-label="Account form mode"
+          :items="authModeOptions"
+          container-class="grid gap-2 rounded-[22px] border border-slate-200 bg-slate-50 p-1.5 sm:grid-cols-2"
+          item-class="w-full justify-center"
+        />
 
         <div class="grid gap-1">
           <h2 class="text-xl font-semibold tracking-[-0.03em] text-slate-950">
@@ -388,14 +379,13 @@ watch(visible, (isVisible) => {
                 class="pr-12"
                 :aria-invalid="signInErrors.password ? 'true' : 'false'"
               />
-              <button
-                type="button"
-                class="absolute top-1/2 right-3 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-slate-400 transition hover:bg-transparent hover:text-[#173b5d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
-                :aria-label="signInForm.showPassword ? 'Hide password' : 'Show password'"
+              <AppIconButton
+                :icon="signInForm.showPassword ? mdiEyeOffOutline : mdiEyeOutline"
+                :label="signInForm.showPassword ? 'Hide password' : 'Show password'"
+                variant="icon-quiet"
+                class="absolute top-1/2 right-2 h-8 w-8 -translate-y-1/2 rounded-full border-transparent text-slate-400 hover:bg-transparent hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-blue-100"
                 @click="signInForm.showPassword = !signInForm.showPassword"
-              >
-                <AppIcon :path="signInForm.showPassword ? mdiEyeOffOutline : mdiEyeOutline" :size="18" />
-              </button>
+              />
             </div>
           </AppFieldGroup>
 
@@ -451,14 +441,13 @@ watch(visible, (isVisible) => {
                 class="pr-12"
                 :aria-invalid="registerErrors.password ? 'true' : 'false'"
               />
-              <button
-                type="button"
-                class="absolute top-1/2 right-3 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-slate-400 transition hover:bg-transparent hover:text-[#173b5d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
-                :aria-label="registerForm.showPassword ? 'Hide password' : 'Show password'"
+              <AppIconButton
+                :icon="registerForm.showPassword ? mdiEyeOffOutline : mdiEyeOutline"
+                :label="registerForm.showPassword ? 'Hide password' : 'Show password'"
+                variant="icon-quiet"
+                class="absolute top-1/2 right-2 h-8 w-8 -translate-y-1/2 rounded-full border-transparent text-slate-400 hover:bg-transparent hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-blue-100"
                 @click="registerForm.showPassword = !registerForm.showPassword"
-              >
-                <AppIcon :path="registerForm.showPassword ? mdiEyeOffOutline : mdiEyeOutline" :size="18" />
-              </button>
+              />
             </div>
           </AppFieldGroup>
 

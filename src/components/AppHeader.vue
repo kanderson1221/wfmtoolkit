@@ -126,8 +126,8 @@ watch(
 </script>
 
 <template>
-  <header class="sticky top-0 z-[60] border-b border-slate-900/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(18,52,86,0.96))] shadow-[0_14px_36px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-    <div class="app-frame flex min-h-[78px] items-center gap-4 px-2">
+  <header class="sticky top-0 z-[60] border-b border-[#0d2742] bg-[#102f4f]">
+    <div class="app-frame flex min-h-[72px] items-center gap-4">
       <a
         href="/"
         class="inline-flex items-center"
@@ -146,9 +146,9 @@ watch(
 
         <AppButton
           v-if="showSignInButton"
-          variant="quiet"
+          variant="secondary-inverse"
           size="sm"
-          class="rounded-xl border border-white/[0.22] bg-white/[0.14] px-2.5 py-1.5 text-[0.72rem] font-semibold tracking-[0.08em] text-white shadow-none backdrop-blur-sm hover:border-white/[0.34] hover:bg-white/[0.2] hover:text-white"
+          class="px-3"
           @click="openAccountDialog"
         >
           Sign In

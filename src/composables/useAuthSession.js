@@ -4,7 +4,6 @@ import { AUTH_BYPASS_ENABLED } from '../authMode'
 import { isSupabaseConfigured, supabase } from '../supabaseClient'
 
 const GUEST_STORAGE_SCOPE = 'default'
-const PUBLIC_HOME_HASHES = new Set(['', '#home'])
 
 export const useAuthSession = () => {
   const authReady = ref(false)
@@ -18,22 +17,6 @@ export const useAuthSession = () => {
   const hasWorkspaceAccess = computed(() => true)
   const storageScope = computed(() => currentUser.value?.id || GUEST_STORAGE_SCOPE)
 
-  const restoreSignedInRoute = (pendingRouteHash) => {
-    const targetHash = pendingRouteHash.value || ''
-    pendingRouteHash.value = ''
-
-    if (!targetHash || PUBLIC_HOME_HASHES.has(targetHash)) {
-      return false
-    }
-
-    if (window.location.hash !== targetHash) {
-      window.location.hash = targetHash
-      return true
-    }
-
-    return false
-  }
-
   const syncWorkspaceForSession = async (session, loadCentersForScope) => {
     const nextScope = session?.user?.id || GUEST_STORAGE_SCOPE
     const loadOptions = session?.user
@@ -45,8 +28,7 @@ export const useAuthSession = () => {
 
   const initializeAuth = ({
     loadCentersForScope,
-    syncRouteFromHash,
-    pendingRouteHash
+    syncRouteFromHash
   }) => {
     if (!authEnabled.value || !supabase) {
       void Promise.resolve(loadCentersForScope(GUEST_STORAGE_SCOPE))
@@ -64,10 +46,6 @@ export const useAuthSession = () => {
         await syncWorkspaceForSession(data.session, loadCentersForScope)
         authReady.value = true
 
-        if (data.session?.user && restoreSignedInRoute(pendingRouteHash)) {
-          return
-        }
-
         syncRouteFromHash()
       })
       .catch(async () => {
@@ -81,10 +59,6 @@ export const useAuthSession = () => {
       authSession.value = session
 
       await syncWorkspaceForSession(session, loadCentersForScope)
-
-      if (session?.user && restoreSignedInRoute(pendingRouteHash)) {
-        return
-      }
 
       syncRouteFromHash()
     })

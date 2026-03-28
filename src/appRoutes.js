@@ -8,8 +8,17 @@ export const defaultRoute = {
   year: null
 }
 
+export const normalizeHashPath = (hash = '') => hash.replace(/^#\/?/, '')
+
+export const isPublicHomeHash = (hash = '') => {
+  const normalizedHash = normalizeHashPath(hash)
+  const parts = normalizedHash.split('/').filter(Boolean)
+
+  return !parts.length || parts[0] === 'apps' || parts[0] === 'home'
+}
+
 export const parseHashRoute = (hash) => {
-  const normalizedHash = hash.replace(/^#\/?/, '')
+  const normalizedHash = normalizeHashPath(hash)
   const parts = normalizedHash.split('/').filter(Boolean)
 
   if (normalizedHash === 'erlang-c' || normalizedHash === 'erlang') {
@@ -48,7 +57,7 @@ export const parseHashRoute = (hash) => {
     }
   }
 
-  if (!parts.length || parts[0] === 'apps' || parts[0] === 'home') {
+  if (isPublicHomeHash(hash)) {
     return defaultRoute
   }
 

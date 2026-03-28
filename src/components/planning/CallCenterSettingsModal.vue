@@ -4,6 +4,7 @@ import { computed, watch } from 'vue'
 import AppButton from '../ui/AppButton.vue'
 import AppDialog from '../ui/AppDialog.vue'
 import AppFieldGroup from '../ui/AppFieldGroup.vue'
+import AppOptionPills from '../ui/AppOptionPills.vue'
 import AppTextField from '../ui/AppTextField.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 import {
@@ -86,16 +87,19 @@ const hasHolidayValidationErrors = computed(() =>
   Object.values(holidayRowErrors.value).some((error) => error.label || error.date)
 )
 
-const toggleWeekday = (weekdayValue) => {
-  const activeDays = Array.isArray(operatingWeekdays.value) ? operatingWeekdays.value : []
+const weekdayPillItems = computed(() =>
+  props.weekdayOptions.map((weekday) => ({
+    id: weekday.value,
+    label: weekday.label
+  }))
+)
 
-  if (activeDays.includes(weekdayValue)) {
-    operatingWeekdays.value = activeDays.filter((value) => value !== weekdayValue)
-    return
+const operatingWeekdaySelection = computed({
+  get: () => (Array.isArray(operatingWeekdays.value) ? operatingWeekdays.value : []),
+  set: (selectedDays) => {
+    operatingWeekdays.value = [...selectedDays].sort((left, right) => left - right)
   }
-
-  operatingWeekdays.value = [...activeDays, weekdayValue].sort((left, right) => left - right)
-}
+})
 
 const loadTemplateHolidays = () => {
   customHolidays.value = mergeHolidayRowsWithTemplate(
@@ -177,22 +181,13 @@ const removeCustomHoliday = (holidayId) => {
         </AppFieldGroup>
 
         <AppFieldGroup label="Operating Days">
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="weekday in props.weekdayOptions"
-              :key="weekday.value"
-              type="button"
-              class="inline-flex min-w-14 items-center justify-center rounded-2xl border px-3 py-2 text-sm font-semibold transition"
-              :class="
-                operatingWeekdays.includes(weekday.value)
-                  ? 'border-[#15395f] bg-[#15395f] text-white shadow-sm'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-[#a7bbce] hover:text-[#15395f]'
-              "
-              @click="toggleWeekday(weekday.value)"
-            >
-              {{ weekday.label }}
-            </button>
-          </div>
+          <AppOptionPills
+            v-model="operatingWeekdaySelection"
+            aria-label="Operating days"
+            :items="weekdayPillItems"
+            multiple
+            item-class="min-w-14 justify-center"
+          />
         </AppFieldGroup>
       </AppWorkspaceSection>
 

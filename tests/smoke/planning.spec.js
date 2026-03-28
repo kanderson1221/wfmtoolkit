@@ -38,9 +38,15 @@ test('opens the hamburger menu and exposes primary destinations', async ({ page 
   await expect(page.getByRole('button', { name: 'Erlang Calculators' })).toBeVisible()
 })
 
-test('opens the home route as the public landing page', async ({ page }) => {
+test('opens home-like hashes as the public landing page', async ({ page }) => {
   await page.goto('/#home')
 
+  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+
+  await page.goto('/#/home')
+  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+
+  await page.goto('/#/apps')
   await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
 })
 

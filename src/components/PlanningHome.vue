@@ -14,6 +14,7 @@ import AppIcon from './ui/AppIcon.vue'
 import AppMenu from './ui/AppMenu.vue'
 import AppPageHeader from './ui/AppPageHeader.vue'
 import AppPanel from './ui/AppPanel.vue'
+import AppSectionHeader from './ui/AppSectionHeader.vue'
 import AppSelect from './ui/AppSelect.vue'
 import AppStatStrip from './ui/AppStatStrip.vue'
 import AppTableShell from './ui/AppTableShell.vue'
@@ -366,90 +367,49 @@ const handleCenterMenuSelect = (center, item) => {
         ]"
         kicker="Planning Portfolio"
         title="Call Centers"
-      />
-
-      <AppPanel :padded="false">
-        <div class="grid gap-0">
-          <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-5 py-4">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div class="grid gap-1">
-                <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[#15395f]">
-                  Executive Summary
-                </span>
-                <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">Portfolio Dashboard</h2>
-                <p class="text-sm text-slate-500">
-                  Combined demand, staffing requirement, and call-center concentration for {{ selectedPlanningYear }}.
-                </p>
-              </div>
-
-              <div class="grid gap-1.5 lg:justify-items-end">
-                <div class="flex flex-wrap items-center gap-2.5">
-                  <label
-                    for="portfolio-year"
-                    class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                  >
-                    Planning Year
-                  </label>
-                  <AppSelect
-                    id="portfolio-year"
-                    v-model="selectedPlanningYear"
-                    :options="planningYearOptions"
-                    class="w-[6.75rem]"
-                    aria-label="Planning Year"
-                  />
-                </div>
-
-                <p class="text-[0.82rem] font-medium leading-5 text-slate-500">
-                  {{ formatWhole(modeledCenterCount) }} of {{ formatWhole(dashboardSummary.callCenterCount) }} call centers have {{ selectedPlanningYear }} plans
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="px-5 py-4">
-            <AppStatStrip :items="summaryStripItems" columns="md:grid-cols-3 xl:grid-cols-6" />
-          </div>
-
-          <div class="border-t border-slate-200 px-5 py-4">
-            <PlanningPortfolioHeadcountChart
-              :planning-year="selectedPlanningYear"
-              :needed-totals="portfolioHeadcountChart.neededTotals"
-              :frontline-totals="portfolioHeadcountChart.frontlineTotals"
-              :total-headcount-totals="portfolioHeadcountChart.totalHeadcountTotals"
-              :format-number="formatNumber"
-            />
-          </div>
-        </div>
-      </AppPanel>
-
-      <AppTableShell>
-        <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-6 py-4">
-          <div class="flex flex-col gap-1.5 lg:flex-row lg:items-end lg:justify-between">
-            <div class="grid gap-1">
-              <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[#15395f]">
-                Call Center Portfolio
-              </span>
-              <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">All Call Centers</h2>
-              <p class="text-sm text-slate-500">
-                {{ selectedPlanningYear }} plans ranked by peak requirement, then annual contact volume.
-              </p>
+        description="Manage call centers, staffing groups, and saved annual plans."
+      >
+        <template #actions>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <label
+                for="portfolio-year"
+                class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
+              >
+                Planning Year
+              </label>
+              <AppSelect
+                id="portfolio-year"
+                v-model="selectedPlanningYear"
+                :options="planningYearOptions"
+                class="w-[6.75rem]"
+                aria-label="Planning Year"
+              />
             </div>
 
-            <AppButton class="self-start" size="sm" :icon="mdiPlus" variant="primary" @click="openCreateCenter">
+            <AppButton size="sm" :icon="mdiPlus" variant="primary" @click="openCreateCenter">
               New Center
             </AppButton>
           </div>
+        </template>
+      </AppPageHeader>
+
+      <AppTableShell>
+        <div class="border-b border-slate-200 px-6 py-4">
+          <div class="grid gap-1">
+            <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">All Call Centers</h2>
+            <p class="text-sm text-slate-500">
+              {{ selectedPlanningYear }} plans ranked by peak requirement, then annual contact volume.
+            </p>
+          </div>
         </div>
 
-        <div v-if="!props.centers.length" class="px-6 py-8">
+        <div v-if="!props.centers.length" class="px-6 py-6">
           <AppEmptyState
+            class="gap-1.5 px-5 py-5"
             title="Create the first call center"
-            description="Start by creating a call center, then add staffing groups and annual plans beneath it."
+            description="Use New Center to create your first call center, then add staffing groups and annual plans beneath it."
           >
-            <div class="mb-1 flex h-12 w-12 items-center justify-center rounded-[20px] border border-slate-200 bg-slate-50 text-[#15395f]">
-              <AppIcon :path="mdiOfficeBuildingOutline" class="h-6 w-6" />
-            </div>
-            <AppButton :icon="mdiPlus" variant="primary" @click="openCreateCenter">Create Call Center</AppButton>
           </AppEmptyState>
         </div>
 
@@ -484,11 +444,11 @@ const handleCenterMenuSelect = (center, item) => {
               <tr
                 v-for="center in centerRows"
                 :key="center.id"
-                class="bg-white transition hover:bg-[#eef4f8]"
+                class="bg-white transition hover:bg-slate-50"
               >
                 <td class="px-6 py-4 align-middle">
                   <div class="grid grid-cols-[auto_1fr] items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-[20px] border border-slate-200 bg-slate-50 text-sm font-semibold text-[#15395f] shadow-sm">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-[20px] border border-slate-200 bg-slate-50 text-sm font-semibold text-[#15395f]">
                       <AppIcon :path="mdiOfficeBuildingOutline" class="h-5 w-5" />
                     </div>
                     <div class="grid gap-1">
@@ -537,6 +497,36 @@ const handleCenterMenuSelect = (center, item) => {
           </table>
         </div>
       </AppTableShell>
+
+      <AppPanel :padded="false">
+        <div class="grid gap-0">
+          <div class="border-b border-slate-200 px-5 py-4">
+            <div class="grid gap-2">
+              <AppSectionHeader
+                title="Portfolio Summary"
+                :description="`Combined demand and staffing requirement for ${selectedPlanningYear} across saved plans.`"
+              />
+              <p class="text-[0.82rem] font-medium leading-5 text-slate-500">
+                {{ formatWhole(modeledCenterCount) }} of {{ formatWhole(dashboardSummary.callCenterCount) }} call centers have {{ selectedPlanningYear }} plans
+              </p>
+            </div>
+          </div>
+
+          <div class="px-5 py-4">
+            <AppStatStrip :items="summaryStripItems" columns="md:grid-cols-3 xl:grid-cols-6" />
+          </div>
+
+          <div class="border-t border-slate-200 px-5 py-4">
+            <PlanningPortfolioHeadcountChart
+              :planning-year="selectedPlanningYear"
+              :needed-totals="portfolioHeadcountChart.neededTotals"
+              :frontline-totals="portfolioHeadcountChart.frontlineTotals"
+              :total-headcount-totals="portfolioHeadcountChart.totalHeadcountTotals"
+              :format-number="formatNumber"
+            />
+          </div>
+        </div>
+      </AppPanel>
     </div>
 
     <CallCenterSettingsModal

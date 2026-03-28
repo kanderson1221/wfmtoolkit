@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive } from 'vue'
+import { FULL_MONTH_LABELS, toNumber } from '../plannerModel'
 
 import PlannerActualsPanel from './planner/PlannerActualsPanel.vue'
 import PlannerMonthlyPlanTab from './planner/PlannerMonthlyPlanTab.vue'
@@ -41,31 +42,190 @@ const emit = defineEmits(['save', 'cancel'])
 
 const builder = reactive(useMonthlyPlanBuilder(props, emit))
 
-const availabilityReady = computed(() =>
-  builder.monthlyRecords.every((record) => record.paidHoursPerMonth > 0 && record.scheduledPercent > 0)
-)
+const TOTAL_PLAN_MONTHS = FULL_MONTH_LABELS.length
+const reviewedSections = computed(() => new Set(builder.reviewedSections))
 
-const variabilityReady = computed(() => builder.randomSummary.averageRandomLossPercent > 0)
+const formatMonthCoverage = (count) => `${count}/${TOTAL_PLAN_MONTHS} months`
 
-const requirementReady = computed(() =>
-  builder.planSummary.annualContacts > 0 && builder.planSummary.averageRequiredHeadcount > 0
-)
+const getFirstMissingMonthLabel = (items, predicate) => {
+  const monthIndex = items.findIndex((item, index) => !predicate(item, index))
+  return monthIndex === -1 ? '' : FULL_MONTH_LABELS[monthIndex]
+}
 
-const staffingStarted = computed(() =>
-  builder.startingHeadcount > 0 ||
-  builder.trainingClasses.length > 0 ||
-  builder.staffingMonths.some((month) => month.frontlineAttritionHeadcount > 0)
-)
+const availabilityProgress = computed(() => {
+  const configuredCount = builder.monthlyRecords.filter(
+    (record) => record.openDays > 0 && record.paidHoursPerMonth > 0 && record.scheduledPercent > 0
+  ).length
+  const firstMissingMonthLabel = getFirstMissingMonthLabel(
+    builder.monthlyRecords,
+    (record) => record.openDays > 0 && record.paidHoursPerMonth > 0 && record.scheduledPercent > 0
+  )
+  const defaultsPendingReview = configuredCount === TOTAL_PLAN_MONTHS && !reviewedSections.value.has('availability')
+  const isReady = configuredCount === TOTAL_PLAN_MONTHS && reviewedSections.value.has('availability')
 
-const staffingReady = computed(() => staffingStarted.value)
+  return {
+    id: 'availability',
+    title: 'Agent Availability',
+    description: 'Set paid time, absence, and off-phone losses so one FTE has realistic scheduled capacity.',
+    statusLabel: defaultsPendingReview ? 'Using defaults' : formatMonthCoverage(configuredCount),
+    detail: isReady
+      ? 'Scheduled capacity is modeled across the full year.'
+      : defaultsPendingReview
+        ? 'Monthly paid time and off-phone assumptions are still using the starting defaults.'
+      : `Scheduled capacity is incomplete in ${firstMissingMonthLabel}.`,
+    blocker: isReady
+      ? ''
+      : defaultsPendingReview
+        ? 'Open Agent Availability and confirm the default paid time and loss assumptions.'
+        : `Open days or scheduled capacity drop to zero in ${firstMissingMonthLabel}.`,
+    tone: isReady ? 'ready' : defaultsPendingReview || configuredCount > 0 ? 'attention' : 'default',
+    isReady,
+    isStarted: reviewedSections.value.has('availability'),
+    nextTitle: 'Agent Availability',
+    nextDescription: defaultsPendingReview
+      ? 'Review the default paid time and off-phone assumptions before treating the yearly capacity model as complete.'
+      : 'Confirm monthly paid time and off-phone losses so the model knows how much scheduled time one FTE can deliver.'
+  }
+})
+
+const variabilityProgress = computed(() => {
+  if (builder.useMonthlyRandomOverrides) {
+    const configuredCount = builder.randomMonths.filter(
+      (month) => toNumber(month.occupancyPercent, 0) > 0 && toNumber(month.adherencePercent, 0) > 0
+    ).length
+    const firstMissingMonthLabel = getFirstMissingMonthLabel(
+      builder.randomMonths,
+      (month) => toNumber(month.occupancyPercent, 0) > 0 && toNumber(month.adherencePercent, 0) > 0
+    )
+    const isReady = configuredCount === TOTAL_PLAN_MONTHS
+
+    return {
+      id: 'variability',
+      title: 'Variability Buffer',
+      description: 'Apply adherence and occupancy assumptions before the requirement is finalized.',
+      statusLabel: formatMonthCoverage(configuredCount),
+      detail: isReady
+        ? 'Monthly occupancy and adherence overrides are set across the full year.'
+        : `Occupancy or adherence is missing in ${firstMissingMonthLabel}.`,
+      blocker: isReady ? '' : `Set occupancy and adherence assumptions for ${firstMissingMonthLabel}.`,
+      tone: isReady ? 'ready' : configuredCount > 0 ? 'attention' : 'default',
+      isReady,
+      isStarted: configuredCount > 0,
+      nextTitle: 'Variability Buffer',
+      nextDescription: 'Set the occupancy and adherence assumptions that convert scheduled time into a usable design factor.'
+    }
+  }
+
+  const defaultsConfigured =
+    toNumber(builder.randomDefaults.occupancyPercent, 0) > 0 &&
+    toNumber(builder.randomDefaults.adherencePercent, 0) > 0
+  const defaultsPendingReview = defaultsConfigured && !reviewedSections.value.has('variability')
+  const isReady = defaultsConfigured && reviewedSections.value.has('variability')
+
+  return {
+    id: 'variability',
+    title: 'Variability Buffer',
+    description: 'Apply adherence and occupancy assumptions before the requirement is finalized.',
+    statusLabel: defaultsPendingReview ? 'Using defaults' : defaultsConfigured ? 'Defaults confirmed' : 'Needs review',
+    detail: isReady
+      ? `Shared occupancy and adherence defaults apply across all ${TOTAL_PLAN_MONTHS} months.`
+      : defaultsPendingReview
+        ? `Shared occupancy and adherence defaults are in place, but they still need review before the design factor is considered complete.`
+      : 'Occupancy and adherence defaults are still missing.',
+    blocker: isReady
+      ? ''
+      : defaultsPendingReview
+        ? 'Open Variability Buffer and confirm the default occupancy and adherence assumptions.'
+        : 'Set occupancy and adherence defaults before finalizing requirement.',
+    tone: isReady ? 'ready' : defaultsConfigured ? 'attention' : 'default',
+    isReady,
+    isStarted: reviewedSections.value.has('variability'),
+    nextTitle: 'Variability Buffer',
+    nextDescription: defaultsPendingReview
+      ? 'Review the default occupancy and adherence assumptions before locking in the design factor.'
+      : 'Set the occupancy and adherence assumptions that convert scheduled time into a usable design factor.'
+  }
+})
+
+const requirementProgress = computed(() => {
+  const configuredCount = builder.planMonths.filter(
+    (month) => toNumber(month.contacts, 0) > 0 && toNumber(month.ahtSeconds, 0) > 0
+  ).length
+  const firstMissingMonthLabel = getFirstMissingMonthLabel(
+    builder.planMonths,
+    (month) => toNumber(month.contacts, 0) > 0 && toNumber(month.ahtSeconds, 0) > 0
+  )
+  const isReady = configuredCount === TOTAL_PLAN_MONTHS
+
+  return {
+    id: 'requirement',
+    title: 'Required Headcount',
+    description: 'Turn contacts and AHT into the frontline headcount the staffing plan needs to cover.',
+    statusLabel: formatMonthCoverage(configuredCount),
+    detail: isReady
+      ? 'Contacts and AHT are populated for every month.'
+      : configuredCount > 0
+        ? `Demand inputs are modeled for ${configuredCount} months so far.`
+        : 'Demand inputs are still blank across the plan.',
+    blocker: isReady ? '' : `Enter contacts and AHT for ${firstMissingMonthLabel} to complete the requirement model.`,
+    tone: isReady ? 'ready' : configuredCount > 0 ? 'attention' : 'default',
+    isReady,
+    isStarted: configuredCount > 0,
+    nextTitle: 'Required Headcount',
+    nextDescription: 'Enter monthly contacts and AHT so the planner can translate workload into required frontline headcount.'
+  }
+})
+
+const staffingProgress = computed(() => {
+  const startingRosterSet = toNumber(builder.startingHeadcount, 0) > 0
+  const startingFrontlineSet =
+    toNumber(builder.startingFrontlineHeadcount, 0) > 0 &&
+    toNumber(builder.startingFrontlineHeadcount, 0) <= toNumber(builder.startingHeadcount, 0)
+  const movementStarted =
+    builder.trainingClasses.length > 0 ||
+    builder.staffingMonths.some((month) => toNumber(month.frontlineAttritionHeadcount, 0) > 0)
+  const requiredInputsComplete = [startingRosterSet, startingFrontlineSet].filter(Boolean).length
+  const isReady = startingRosterSet && startingFrontlineSet
+
+  return {
+    id: 'staffing',
+    title: 'Staffing Plan',
+    description: 'Layer in starting position, hiring, training, and attrition against the requirement.',
+    statusLabel: `${requiredInputsComplete}/2 required`,
+    detail: !startingRosterSet
+      ? 'Opening roster headcount is still missing.'
+      : !startingFrontlineSet
+        ? 'Opening frontline headcount is still missing.'
+        : movementStarted
+          ? 'Opening position is set and staffing movement assumptions are in progress.'
+          : 'Opening position is set. Add attrition or training assumptions if the plan needs movement.',
+    blocker: !startingRosterSet
+      ? 'Set starting total headcount for January.'
+      : !startingFrontlineSet
+        ? 'Set starting frontline headcount for January.'
+        : '',
+    tone: isReady ? 'ready' : requiredInputsComplete > 0 || movementStarted ? 'attention' : 'default',
+    isReady,
+    isStarted: requiredInputsComplete > 0 || movementStarted,
+    nextTitle: 'Staffing Plan',
+    nextDescription: 'Set opening roster and frontline headcount, then add attrition or training assumptions as needed.'
+  }
+})
+
+const coreSectionCards = computed(() => [
+  availabilityProgress.value,
+  variabilityProgress.value,
+  requirementProgress.value,
+  staffingProgress.value
+])
+
+const availabilityReady = computed(() => availabilityProgress.value.isReady)
+const variabilityReady = computed(() => variabilityProgress.value.isReady)
+const requirementReady = computed(() => requirementProgress.value.isReady)
 const actualsStarted = computed(() => builder.actualsSummary.loadedMonthsCount > 0)
 
-const planComplete = computed(() =>
-  availabilityReady.value &&
-  variabilityReady.value &&
-  requirementReady.value &&
-  staffingReady.value
-)
+const planComplete = computed(() => coreSectionCards.value.every((section) => section.isReady))
+const readyCoreSectionCount = computed(() => coreSectionCards.value.filter((section) => section.isReady).length)
 
 const forecastEntryStep = computed(() => {
   if (!availabilityReady.value) {
@@ -90,33 +250,33 @@ const workflowSections = computed(() => [
     items: [
       {
         id: 'overview',
-        title: 'Overview',
-        statusLabel: 'Start here',
-        tone: 'default'
+        title: 'Plan Status',
+        statusLabel: planComplete.value ? 'All core sections ready' : `${readyCoreSectionCount.value}/${coreSectionCards.value.length} ready`,
+        tone: planComplete.value ? 'ready' : 'default'
       },
       {
         id: 'availability',
         title: 'Agent Availability',
-        statusLabel: availabilityReady.value ? 'Ready' : 'Needs input',
-        tone: availabilityReady.value ? 'ready' : 'attention'
+        statusLabel: availabilityProgress.value.statusLabel,
+        tone: availabilityProgress.value.tone
       },
       {
         id: 'variability',
         title: 'Variability Buffer',
-        statusLabel: variabilityReady.value ? 'Ready' : 'Needs input',
-        tone: variabilityReady.value ? 'ready' : 'attention'
+        statusLabel: variabilityProgress.value.statusLabel,
+        tone: variabilityProgress.value.tone
       },
       {
         id: 'requirement',
         title: 'Required Headcount',
-        statusLabel: requirementReady.value ? 'Ready' : 'Needs input',
-        tone: requirementReady.value ? 'ready' : 'attention'
+        statusLabel: requirementProgress.value.statusLabel,
+        tone: requirementProgress.value.tone
       },
       {
         id: 'staffing',
         title: 'Staffing Plan',
-        statusLabel: staffingReady.value ? 'Ready' : staffingStarted.value ? 'In progress' : 'Not started',
-        tone: staffingReady.value ? 'ready' : staffingStarted.value ? 'attention' : 'default'
+        statusLabel: staffingProgress.value.statusLabel,
+        tone: staffingProgress.value.tone
       }
     ]
   },
@@ -134,70 +294,18 @@ const workflowSections = computed(() => [
   }
 ])
 
-const overviewCards = computed(() => [
-  {
-    id: 'availability',
-    title: 'Agent Availability',
-    description: 'Set paid time, absence, and off-phone losses so one FTE has realistic scheduled capacity.',
-    statusLabel: availabilityReady.value ? 'Ready' : 'Needs input',
-    actionLabel: 'Open Agent Availability'
-  },
-  {
-    id: 'variability',
-    title: 'Variability Buffer',
-    description: 'Apply adherence and occupancy assumptions before the requirement is finalized.',
-    statusLabel: variabilityReady.value ? 'Ready' : 'Needs input',
-    actionLabel: 'Open Variability Buffer'
-  },
-  {
-    id: 'requirement',
-    title: 'Required Headcount',
-    description: 'Turn contacts and AHT into the frontline headcount the staffing plan needs to cover.',
-    statusLabel: requirementReady.value ? 'Ready' : 'Needs input',
-    actionLabel: 'Open Required Headcount'
-  },
-  {
-    id: 'staffing',
-    title: 'Staffing Plan',
-    description: 'Layer in starting position, hiring, training, and attrition against the requirement.',
-    statusLabel: staffingReady.value ? 'Ready' : staffingStarted.value ? 'In progress' : 'Not started',
-    actionLabel: 'Open Staffing Plan'
-  }
-])
+const overviewCards = computed(() => coreSectionCards.value)
 
 const nextRecommendation = computed(() => {
-  if (planComplete.value) {
-    return null
-  }
+  const nextSection = coreSectionCards.value.find((section) => !section.isReady)
 
-  if (!availabilityReady.value) {
-    return {
-      title: 'Forecast Need: Agent Availability',
-      description: 'Start by setting paid time, absence, and off-phone losses so the model knows how much scheduled time one FTE can actually deliver.',
-      sectionId: 'availability',
-      actionLabel: 'Open Agent Availability'
-    }
-  }
-
-  if (!requirementReady.value) {
-    return {
-      title: 'Forecast Need: Required Frontline Headcount',
-      description: 'Enter contacts and AHT so the planner can translate workload into the frontline headcount you need each month.',
-      sectionId: 'requirement',
-      actionLabel: 'Open Required Headcount'
-    }
-  }
-
-  if (!staffingStarted.value) {
-    return {
-      title: 'Plan Staffing',
-      description: 'Now turn that requirement into a hiring, training, attrition, and frontline supply plan.',
-      sectionId: 'staffing',
-      actionLabel: 'Open Staffing Plan'
-    }
-  }
-
-  return null
+  return nextSection
+    ? {
+        title: nextSection.nextTitle || nextSection.title,
+        description: nextSection.nextDescription || nextSection.blocker || nextSection.detail || nextSection.description,
+        sectionId: nextSection.id
+      }
+    : null
 })
 
 const openWorkflowDestination = ({ sectionId, stepId } = {}) => {

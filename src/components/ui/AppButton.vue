@@ -75,6 +75,10 @@ const variantClasses = computed(() => {
     return 'border border-rose-200 bg-rose-50 text-rose-700 shadow-sm hover:border-rose-300 hover:bg-rose-100'
   }
 
+  if (props.variant === 'secondary-inverse') {
+    return 'border border-white/16 bg-white/8 text-white shadow-none hover:border-white/28 hover:bg-white/12'
+  }
+
   if (props.variant === 'quiet') {
     return props.active
       ? 'border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]'

@@ -17,7 +17,6 @@ const resolveCurrentHash = () => (
 export const useHashNavigation = () => {
   const currentRoute = ref(resolveCurrentRoute())
   const currentHash = ref(resolveCurrentHash())
-  const pendingRouteHash = ref('')
 
   const syncRouteFromHash = () => {
     currentHash.value = resolveCurrentHash()
@@ -36,7 +35,6 @@ export const useHashNavigation = () => {
   return {
     currentHash,
     currentRoute,
-    pendingRouteHash,
     syncRouteFromHash
   }
 }
