@@ -22,7 +22,8 @@ describe('PublicLandingPage', () => {
 
     const italicNotes = wrapper.findAll('p.italic')
 
-    expect(wrapper.text()).toContain('Practical workforce planning tools, shared free.')
+    expect(wrapper.text()).toContain('Practical workforce planning tools, shared')
+    expect(wrapper.text()).toContain('free.')
     expect(wrapper.text()).toContain('Built by a workforce manager, WFM Toolkit is an independent project')
     expect(wrapper.text()).toContain('WFMToolkit is provided for decision support and estimation only')
     expect(italicNotes).toHaveLength(2)
@@ -43,7 +44,8 @@ describe('PublicLandingPage', () => {
       userEmail: 'planner@example.com'
     })
 
-    expect(wrapper.text()).toContain('Practical workforce planning tools, shared free.')
+    expect(wrapper.text()).toContain('Practical workforce planning tools, shared')
+    expect(wrapper.text()).toContain('free.')
     expect(wrapper.text()).not.toContain('Sign In')
   })
 })

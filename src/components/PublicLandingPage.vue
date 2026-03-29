@@ -90,7 +90,10 @@ const scrollToSection = (sectionId) => {
       <section class="app-frame landing-frame py-14 lg:py-18">
         <div class="grid max-w-[74rem] gap-7 lg:gap-8">
           <h1 class="max-w-6xl text-balance text-[clamp(2.9rem,5.3vw,4.75rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-slate-950">
-            Practical workforce planning tools, shared free.
+            Practical workforce planning tools, shared
+            <span class="text-[#15395f] underline decoration-[#15395f] decoration-[0.08em] underline-offset-[0.12em]">
+              free.
+            </span>
           </h1>
           <p class="max-w-4xl text-[1.05rem] leading-8 text-slate-700">
             Built by a workforce manager, WFM Toolkit is an independent project that helps teams explore staffing
