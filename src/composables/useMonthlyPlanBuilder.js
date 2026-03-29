@@ -54,6 +54,20 @@ import {
 export const useMonthlyPlanBuilder = (props, emit) => {
   const CORE_SECTION_IDS = new Set(['availability', 'variability', 'requirement', 'staffing'])
   const SAME_YEAR_RECOMMENDATION_SOURCE = 'recommended'
+  const syncUnsavedDraftScheduleWithSeed = (draftPlan) => ({
+    ...draftPlan,
+    operatingWeekdays: Array.isArray(props.centerDefaults?.operatingWeekdays)
+      ? [...props.centerDefaults.operatingWeekdays]
+      : draftPlan?.operatingWeekdays,
+    holidayCalendarId: props.centerDefaults?.holidayCalendarId,
+    disabledHolidayRuleIds: Array.isArray(props.centerDefaults?.disabledHolidayRuleIds)
+      ? [...props.centerDefaults.disabledHolidayRuleIds]
+      : [],
+    customHolidays: Array.isArray(props.centerDefaults?.customHolidays)
+      ? props.centerDefaults.customHolidays.map((holiday) => ({ ...holiday }))
+      : [],
+    holidayScheduleMode: props.centerDefaults?.holidayScheduleMode
+  })
   const isEditableTrainingClassInPlanYear = (trainingClass, planningYear) => {
     const hireDate = createTrainingClass(trainingClass).hireDate
 
@@ -65,6 +79,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     return !Number.isFinite(parsedYear) || parsedYear === planningYear
   }
   const savedPlan = props.initialPlan || null
+  const hasSavedPlan = Boolean(savedPlan?.id)
   const prefilledYear = props.prefilledYear == null || props.prefilledYear === ''
     ? NaN
     : toNumber(props.prefilledYear, NaN)
@@ -72,7 +87,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const resolvedDraftKey = computed(() => plannerDraftRepository.buildDraftKey(props.draftKey || savedPlan?.id))
   const activeDraftKey = ref(resolvedDraftKey.value)
   const restoredDraft = plannerDraftRepository.loadDraft(activeDraftKey.value)
-  const sourcePlan = restoredDraft?.plan || savedPlan || null
+  const sourcePlan =
+    !hasSavedPlan && restoredDraft?.plan
+      ? syncUnsavedDraftScheduleWithSeed(restoredDraft.plan)
+      : restoredDraft?.plan || savedPlan || null
   const initialPlan = sourcePlan || props.centerDefaults || {}
   const initialUi = restoredDraft?.ui || {}
   const initialReviewedSections = Array.isArray(initialUi.reviewedSections)
@@ -500,7 +518,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   })
 
   watch(plannerSeedDefaults, (nextSeedDefaults) => {
-    if (sourcePlan) {
+    if (hasSavedPlan) {
       return
     }
 

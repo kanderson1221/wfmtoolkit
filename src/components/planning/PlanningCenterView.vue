@@ -16,11 +16,7 @@ import {
   buildPlanningPlanHash,
   navigateToHash
 } from '../../appRoutes'
-import { createPlanningCenterDraft, createPlanningGroupDraft, resolveCenterHolidayProfile } from '../../planningStorage'
-import {
-  HOLIDAY_CALENDAR_NONE,
-  normalizeHolidayCalendarId,
-} from '../../planner/holidayCalendars'
+import { createPlanningCenterDraft, createPlanningGroupDraft, resolvePlanHolidaySnapshot } from '../../planningStorage'
 import {
   getCenterGroups,
   getGroupPlans,
@@ -178,7 +174,7 @@ const selectedYearModel = computed({
 const summarizeAvailability = (plan, center = props.center) => {
   const summary = plan?.summary || {}
   const planningYear = Number(plan?.planningYear) || currentYear
-  const centerHolidayProfile = resolveCenterHolidayProfile(center, planningYear)
+  const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
 
   if (
     typeof summary.averagePresencePercent === 'number' &&
@@ -198,13 +194,9 @@ const summarizeAvailability = (plan, center = props.center) => {
         : Array.isArray(center?.operatingWeekdays) && center.operatingWeekdays.length
           ? center.operatingWeekdays
           : [1, 2, 3, 4, 5],
-    holidayCalendarId: normalizeHolidayCalendarId(plan?.holidayCalendarId, centerHolidayProfile.holidayCalendarId || HOLIDAY_CALENDAR_NONE),
-    disabledHolidayRuleIds: Array.isArray(plan?.disabledHolidayRuleIds)
-      ? plan.disabledHolidayRuleIds
-      : centerHolidayProfile.disabledHolidayRuleIds,
-    customHolidays: Array.isArray(plan?.customHolidays)
-      ? plan.customHolidays
-      : centerHolidayProfile.customHolidays,
+    holidayCalendarId: holidaySnapshot.holidayCalendarId,
+    disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
+    customHolidays: holidaySnapshot.customHolidays,
     presenceMonths: Array.isArray(plan?.presenceMonths) ? plan.presenceMonths : [],
     randomDefaults: plan?.randomDefaults || {},
     useMonthlyRandomOverrides: Boolean(plan?.useMonthlyRandomOverrides),

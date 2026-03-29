@@ -69,10 +69,7 @@ export const hydrateMonths = (months, fallbackBuilder, factory) =>
 export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYear = currentYear) => {
   const planningYear = toNumber(centerDefaults?.planningYear, fallbackPlanningYear)
   const operatingWeekdays = normalizeWeekdays(centerDefaults?.operatingWeekdays)
-  const holidayCalendarId = normalizeHolidayCalendarId(
-    centerDefaults?.holidayCalendarId ?? centerDefaults?.defaultHolidayCalendarId,
-    HOLIDAY_CALENDAR_NONE
-  )
+  const holidayCalendarId = normalizeHolidayCalendarId(centerDefaults?.holidayCalendarId, HOLIDAY_CALENDAR_NONE)
   const disabledHolidayRuleIds = normalizeDisabledHolidayRuleIds(centerDefaults?.disabledHolidayRuleIds)
   const customHolidays = normalizeCustomHolidays(centerDefaults?.customHolidays)
   const holidayScheduleMode = normalizeHolidayScheduleMode(centerDefaults?.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED)

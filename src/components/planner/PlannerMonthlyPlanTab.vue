@@ -123,7 +123,7 @@ const summaryItems = computed(() => [
               <span class="plan-head-label">Peak Day<br />%</span>
             </th>
             <th title="Business days flowing in from the call-center operating days and holiday closures.">
-              <span class="plan-head-label">Biz<br />Days</span>
+              <span class="plan-head-label">Business<br />Days</span>
             </th>
             <th title="Scheduled percentage flowing in from the presence / utilization step.">Scheduled %</th>
             <th title="Total scheduled random loss flowing in from the random step.">

@@ -61,6 +61,7 @@ describe('PlannerMonthlyPlanTab', () => {
 
     expect(wrapper.text()).toContain('Peak Day HC')
     expect(wrapper.text()).toContain('Peak Day%')
+    expect(wrapper.text()).toContain('BusinessDays')
     expect(wrapper.text()).toContain('PeakHC')
   })
 

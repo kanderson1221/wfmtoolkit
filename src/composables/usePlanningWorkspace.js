@@ -130,7 +130,6 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       groupName: currentGroup.value.name,
       timezone: currentCenter.value.timezone,
       planningYear: resolvedPlanningYear,
-      defaultHolidayCalendarId: centerHolidayCalendarId,
       holidayCalendarId: centerHolidayCalendarId,
       disabledHolidayRuleIds: [...centerHolidayProfile.disabledHolidayRuleIds],
       customHolidays: centerHolidayProfile.customHolidays.map((holiday) => ({ ...holiday })),

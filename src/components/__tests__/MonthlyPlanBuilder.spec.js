@@ -37,6 +37,11 @@ const plannerStubs = {
   }
 }
 
+const plannerBusinessDayStub = {
+  props: ['monthlyRecords'],
+  template: '<div data-test="plan-tab">{{ monthlyRecords[0]?.openDays ?? 0 }}</div>'
+}
+
 const centerDefaults = {
   centerId: 'center-1',
   groupId: 'group-1',
@@ -44,7 +49,6 @@ const centerDefaults = {
   planningYear: 2026,
   operatingWeekdays: [1, 2, 3, 4, 5],
   holidayCalendarId: 'us_federal',
-  defaultHolidayCalendarId: 'us_federal',
   disabledHolidayRuleIds: [],
   customHolidays: [
     {
@@ -258,5 +262,52 @@ describe('MonthlyPlanBuilder', () => {
     })
 
     expect(persistDraftSpy).toHaveBeenCalledWith('user-1:plan:new', expect.any(Object))
+  })
+
+  it('keeps unsaved draft business days aligned to current center holidays', async () => {
+    plannerDraftRepository.persistDraft('new-plan', {
+      plan: {
+        planningYear: 2026,
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        holidayCalendarId: 'none',
+        disabledHolidayRuleIds: [],
+        customHolidays: []
+      },
+      ui: {}
+    })
+
+    const wrapper = mount(MonthlyPlanBuilder, {
+      props: {
+        centerDefaults,
+        draftKey: 'new-plan',
+        prefilledYear: 2026
+      },
+      global: {
+        stubs: {
+          ...plannerStubs,
+          PlannerMonthlyPlanTab: plannerBusinessDayStub
+        }
+      }
+    })
+
+    await wrapper.find('[data-section-id="requirement"]').trigger('click')
+
+    expect(wrapper.get('[data-test="plan-tab"]').text()).toBe('21')
+
+    await wrapper.setProps({
+      centerDefaults: {
+        ...centerDefaults,
+        customHolidays: [
+          ...centerDefaults.customHolidays,
+          {
+            id: 'company-closure',
+            label: 'Company Closure',
+            date: '2026-01-02'
+          }
+        ]
+      }
+    })
+
+    expect(wrapper.get('[data-test="plan-tab"]').text()).toBe('20')
   })
 })

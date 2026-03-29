@@ -1,5 +1,11 @@
 import { getCurrentCalendarYear } from '../planner/shared'
-import { createPlanningCenterDraft, loadPlanningCenters, resolveCenterHolidayProfile, upsertPlanningPlan } from '../planningStorage'
+import {
+  createPlanningCenterDraft,
+  loadPlanningCenters,
+  resolveCenterHolidayProfile,
+  resolvePlanHolidaySnapshot,
+  upsertPlanningPlan
+} from '../planningStorage'
 
 const ensurePlanningStorageApi = () => {
   const storage = window.localStorage
@@ -167,9 +173,9 @@ describe('planningStorage', () => {
     const centers = loadPlanningCenters('default')
     const activeHolidayProfile = resolveCenterHolidayProfile(centers[0], getCurrentCalendarYear())
 
-    expect(centers[0].defaultHolidayCalendarId).toBe('none')
-    expect(centers[0].disabledHolidayRuleIds).toEqual([])
-    expect(centers[0].customHolidays).toEqual([])
+    expect(centers[0]).not.toHaveProperty('defaultHolidayCalendarId')
+    expect(centers[0]).not.toHaveProperty('disabledHolidayRuleIds')
+    expect(centers[0]).not.toHaveProperty('customHolidays')
     expect(centers[0].holidayProfiles).toHaveLength(1)
     expect(activeHolidayProfile.customHolidays.length).toBeGreaterThan(0)
     expect(activeHolidayProfile.customHolidays.some((holiday) => holiday.sourceRuleId === 'columbus_day')).toBe(false)
@@ -207,6 +213,53 @@ describe('planningStorage', () => {
         day: 24
       }
     ])
+  })
+
+  it('prefers the saved plan holiday snapshot over center year defaults', () => {
+    const center = {
+      id: 'center-1',
+      holidayProfiles: [
+        {
+          year: 2027,
+          holidayCalendarId: 'none',
+          disabledHolidayRuleIds: [],
+          customHolidays: [
+            {
+              id: 'company-day',
+              label: 'Company Day',
+              date: '2027-12-24'
+            }
+          ]
+        }
+      ]
+    }
+    const plan = {
+      planningYear: 2027,
+      holidayCalendarId: 'us_federal',
+      disabledHolidayRuleIds: ['columbus_day'],
+      customHolidays: [
+        {
+          id: 'team-day',
+          label: 'Team Day',
+          date: '2027-06-18'
+        }
+      ]
+    }
+
+    expect(resolvePlanHolidaySnapshot(plan, center, 2027)).toEqual({
+      holidayCalendarId: 'us_federal',
+      disabledHolidayRuleIds: ['columbus_day'],
+      customHolidays: [
+        {
+          id: 'team-day',
+          label: 'Team Day',
+          date: '2027-06-18',
+          sourceRuleId: null,
+          month: 6,
+          day: 18
+        }
+      ]
+    })
   })
 
   it('normalizes next-year opening handoff values on saved plans', () => {

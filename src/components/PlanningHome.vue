@@ -21,12 +21,8 @@ import AppStatStrip from './ui/AppStatStrip.vue'
 import AppTableShell from './ui/AppTableShell.vue'
 import { buildPlanningCenterHash, navigateToHash } from '../appRoutes'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
-import { createPlanningCenterDraft, resolveCenterHolidayProfile } from '../planningStorage'
+import { createPlanningCenterDraft, resolvePlanHolidaySnapshot } from '../planningStorage'
 import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
-import {
-  HOLIDAY_CALENDAR_NONE,
-  normalizeHolidayCalendarId,
-} from '../planner/holidayCalendars'
 import { getCurrentCalendarYear } from '../planner/shared'
 import { computeMonthlyRecords } from '../planner/demandModel'
 import { computeStaffingRecords } from '../planner/staffingModel'
@@ -243,7 +239,7 @@ const portfolioHeadcountChart = computed(() => {
         return
       }
 
-      const centerHolidayProfile = resolveCenterHolidayProfile(center, selectedPlanningYear.value)
+      const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, selectedPlanningYear.value)
 
       const monthlyRecords = computeMonthlyRecords({
         planningYear: Number(selectedPlanningYear.value),
@@ -253,16 +249,9 @@ const portfolioHeadcountChart = computed(() => {
             : Array.isArray(center.operatingWeekdays) && center.operatingWeekdays.length
               ? center.operatingWeekdays
             : [1, 2, 3, 4, 5],
-        holidayCalendarId: normalizeHolidayCalendarId(
-          plan.holidayCalendarId,
-          centerHolidayProfile.holidayCalendarId || HOLIDAY_CALENDAR_NONE
-        ),
-        disabledHolidayRuleIds: Array.isArray(plan.disabledHolidayRuleIds)
-          ? plan.disabledHolidayRuleIds
-          : centerHolidayProfile.disabledHolidayRuleIds,
-        customHolidays: Array.isArray(plan.customHolidays)
-          ? plan.customHolidays
-          : centerHolidayProfile.customHolidays,
+        holidayCalendarId: holidaySnapshot.holidayCalendarId,
+        disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
+        customHolidays: holidaySnapshot.customHolidays,
         presenceMonths: Array.isArray(plan.presenceMonths) ? plan.presenceMonths : [],
         randomDefaults: plan.randomDefaults || {},
         useMonthlyRandomOverrides: Boolean(plan.useMonthlyRandomOverrides),

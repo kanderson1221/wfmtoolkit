@@ -37,9 +37,6 @@ describe('usePlanningWorkspace', () => {
       id: 'center-1',
       name: 'North America Operations',
       timezone: 'America/New_York',
-      defaultHolidayCalendarId: 'none',
-      disabledHolidayRuleIds: [],
-      customHolidays: [],
       holidayProfiles: [
         {
           year: 2026,
@@ -143,7 +140,6 @@ describe('usePlanningWorkspace', () => {
       centerId: 'center-1',
       groupId: 'group-1',
       groupName: 'Consumer Voice',
-      defaultHolidayCalendarId: 'none',
       holidayCalendarId: 'none',
       disabledHolidayRuleIds: [],
       customHolidays: [
