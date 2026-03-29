@@ -542,23 +542,39 @@
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-calendar {
-    @apply text-slate-700;
+    @apply bg-slate-100 text-slate-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-presence {
-    @apply text-slate-700;
+    @apply bg-rose-50 text-rose-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-utilization {
-    @apply text-slate-700;
+    @apply bg-amber-50 text-amber-700;
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-results {
-    @apply text-slate-700;
+    @apply bg-[#d7e3ec] text-[#15395f];
   }
 
   .assumption-table-presence-main thead .presence-detail-row th {
     @apply bg-white px-2 py-2 text-[0.68rem] font-semibold normal-case tracking-normal text-slate-600;
+  }
+
+  .assumption-table-presence-main thead .presence-detail-row th.presence-detail-calendar {
+    @apply bg-slate-50 text-slate-700;
+  }
+
+  .assumption-table-presence-main thead .presence-detail-row th.presence-detail-presence {
+    @apply bg-rose-50 text-rose-700;
+  }
+
+  .assumption-table-presence-main thead .presence-detail-row th.presence-detail-utilization {
+    @apply bg-amber-50 text-amber-700;
+  }
+
+  .assumption-table-presence-main thead .presence-detail-row th.presence-detail-results {
+    @apply bg-[#edf3f7] text-[#15395f];
   }
 
   .assumption-table-presence-main tbody td {
