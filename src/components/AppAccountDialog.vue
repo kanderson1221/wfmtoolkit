@@ -30,6 +30,7 @@ const mode = ref('sign-in')
 const statusMessage = ref('')
 const statusTone = ref('success')
 const authBusy = ref(false)
+const pendingConfirmationEmail = ref('')
 
 const signInEmailRef = ref(null)
 const registerEmailRef = ref(null)
@@ -186,10 +187,17 @@ const submitSignIn = async () => {
 
   if (error) {
     statusTone.value = 'error'
+    if (validateEmail(signInForm.email) && /confirm/i.test(error.message || '')) {
+      pendingConfirmationEmail.value = signInForm.email.trim()
+      statusMessage.value = 'Your account is waiting for email confirmation. Check your inbox or resend the confirmation email.'
+      return
+    }
+
     statusMessage.value = error.message
     return
   }
 
+  pendingConfirmationEmail.value = ''
   statusTone.value = 'success'
   statusMessage.value = 'Signed in. Opening your account-backed workspace...'
 }
@@ -230,7 +238,51 @@ const submitRegister = async () => {
   statusTone.value = 'success'
   statusMessage.value = data.session
     ? 'Account created. Opening your account-backed workspace...'
-    : 'Account created. Check your email to confirm your registration before signing in.'
+    : 'Account created. Check your email to confirm your registration before signing in. If no email arrives, this Supabase project still needs email delivery configured.'
+
+  pendingConfirmationEmail.value = data.session ? '' : registerForm.email.trim()
+}
+
+const submitConfirmationResend = async () => {
+  clearStatus()
+
+  if (!authAvailable.value || !supabase) {
+    statusTone.value = 'error'
+    statusMessage.value = authAvailable.value ? supabaseConfigError : 'Account sync is unavailable in this environment.'
+    return
+  }
+
+  const targetEmail = (pendingConfirmationEmail.value || registerForm.email).trim()
+
+  if (!validateEmail(targetEmail)) {
+    clearErrors(registerErrors)
+    registerErrors.email = 'Enter your work email before resending confirmation.'
+    statusTone.value = 'error'
+    statusMessage.value = 'Enter the email address for the account waiting on confirmation.'
+    return
+  }
+
+  authBusy.value = true
+
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: targetEmail,
+    options: {
+      emailRedirectTo: buildAuthRedirectUrl()
+    }
+  })
+
+  authBusy.value = false
+
+  if (error) {
+    statusTone.value = 'error'
+    statusMessage.value = error.message
+    return
+  }
+
+  pendingConfirmationEmail.value = targetEmail
+  statusTone.value = 'success'
+  statusMessage.value = 'Confirmation email sent. Check your inbox for the new link.'
 }
 
 const submitPasswordReset = async () => {
@@ -284,6 +336,7 @@ watch(visible, (isVisible) => {
     return
   }
 
+  pendingConfirmationEmail.value = ''
   resetTransientState()
 })
 </script>
@@ -397,6 +450,17 @@ watch(visible, (isVisible) => {
           >
             {{ authBusy ? 'Signing In...' : 'Sign In' }}
           </AppButton>
+
+          <AppButton
+            v-if="pendingConfirmationEmail"
+            type="button"
+            variant="quiet"
+            block
+            :disabled="authBusy || !authAvailable"
+            @click="submitConfirmationResend"
+          >
+            {{ authBusy ? 'Sending Confirmation...' : 'Resend Confirmation Email' }}
+          </AppButton>
         </form>
 
         <form
@@ -473,6 +537,17 @@ watch(visible, (isVisible) => {
             :disabled="authBusy || !authAvailable"
           >
             {{ authBusy ? 'Creating Account...' : 'Register' }}
+          </AppButton>
+
+          <AppButton
+            v-if="pendingConfirmationEmail"
+            type="button"
+            variant="quiet"
+            block
+            :disabled="authBusy || !authAvailable"
+            @click="submitConfirmationResend"
+          >
+            {{ authBusy ? 'Sending Confirmation...' : 'Resend Confirmation Email' }}
           </AppButton>
         </form>
       </div>

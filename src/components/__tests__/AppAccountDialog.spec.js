@@ -1,9 +1,10 @@
 import { mount } from '@vue/test-utils'
 
-const { signInWithPassword, signUp, resetPasswordForEmail } = vi.hoisted(() => ({
+const { signInWithPassword, signUp, resetPasswordForEmail, resend } = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
-  resetPasswordForEmail: vi.fn()
+  resetPasswordForEmail: vi.fn(),
+  resend: vi.fn()
 }))
 
 vi.mock('../../supabaseClient', () => ({
@@ -12,7 +13,8 @@ vi.mock('../../supabaseClient', () => ({
     auth: {
       signInWithPassword,
       signUp,
-      resetPasswordForEmail
+      resetPasswordForEmail,
+      resend
     }
   },
   supabaseConfigError: 'Missing Supabase config.'
@@ -46,6 +48,7 @@ describe('AppAccountDialog', () => {
     signInWithPassword.mockReset()
     signUp.mockReset()
     resetPasswordForEmail.mockReset()
+    resend.mockReset()
   })
 
   it('shows the guest storage message alongside the sign-in form', () => {
@@ -86,6 +89,46 @@ describe('AppAccountDialog', () => {
 
     expect(resetPasswordForEmail).toHaveBeenCalled()
     expect(wrapper.text()).toContain('Password reset email sent.')
+  })
+
+  it('offers to resend confirmation after register succeeds without a session', async () => {
+    signUp.mockResolvedValue({
+      data: {
+        session: null
+      },
+      error: null
+    })
+    resend.mockResolvedValue({ error: null })
+
+    const wrapper = mountDialog()
+    const registerButton = wrapper.findAll('button').find((button) => button.text() === 'Register')
+
+    await registerButton.trigger('click')
+    await wrapper.get('#register-email').setValue('planner@example.com')
+    await wrapper.get('#register-password').setValue('averysecurepass')
+    await wrapper.get('#register-confirm-password').setValue('averysecurepass')
+    await wrapper.get('form').trigger('submit.prevent')
+
+    expect(signUp).toHaveBeenCalledWith({
+      email: 'planner@example.com',
+      password: 'averysecurepass',
+      options: {
+        emailRedirectTo: `${window.location.origin}${window.location.pathname}#planning`
+      }
+    })
+    expect(wrapper.text()).toContain('If no email arrives')
+    expect(wrapper.text()).toContain('Resend Confirmation Email')
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Resend Confirmation Email').trigger('click')
+
+    expect(resend).toHaveBeenCalledWith({
+      type: 'signup',
+      email: 'planner@example.com',
+      options: {
+        emailRedirectTo: `${window.location.origin}${window.location.pathname}#planning`
+      }
+    })
+    expect(wrapper.text()).toContain('Confirmation email sent.')
   })
 
   it('shows the config error when account sync is unavailable', () => {
