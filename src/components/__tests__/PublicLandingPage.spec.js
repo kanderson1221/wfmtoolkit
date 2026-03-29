@@ -20,9 +20,15 @@ describe('PublicLandingPage', () => {
       authConfigured: true
     })
 
+    const italicNotes = wrapper.findAll('p.italic')
+
     expect(wrapper.text()).toContain('Practical workforce planning tools, shared free.')
     expect(wrapper.text()).toContain('Built by a workforce manager')
-    expect(wrapper.text()).toContain('Outputs are intended for decision support')
+    expect(wrapper.text()).toContain('WFMToolkit is provided for decision support only')
+    expect(italicNotes).toHaveLength(2)
+    expect(italicNotes[0].text()).toContain('WFMToolkit is provided for decision support only')
+    expect(italicNotes[1].text()).toContain('WFMToolkit does not use accounts or store planning data on a server')
+    expect(wrapper.find('a[href="/terms/index.html"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Planning Workspace')
     expect(wrapper.text()).toContain('Erlang Tools')
     expect(wrapper.text()).toContain('Sign In')

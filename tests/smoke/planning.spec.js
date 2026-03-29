@@ -18,10 +18,10 @@ test('opens the public landing page and highlights the available tools', async (
 test('opens the terms page from the public footer', async ({ page }) => {
   await page.goto('/')
 
-  await page.getByRole('link', { name: 'Terms' }).click()
+  await page.getByRole('contentinfo').getByRole('link', { name: 'Terms' }).click()
 
   await expect(page).toHaveURL(/\/terms\/index\.html$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Basic terms for using WFM Toolkit.' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Basic terms for using WFM Toolkit' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open Planning Workspace' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Explore Erlang Tools' })).toHaveCount(0)
 })

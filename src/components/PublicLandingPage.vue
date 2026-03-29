@@ -120,10 +120,21 @@ const scrollToSection = (sectionId) => {
               Built by a workforce manager, WFM Toolkit helps teams explore staffing scenarios, structure annual plans,
               and work through operational assumptions in one place.
             </p>
-            <p class="max-w-3xl text-sm leading-7 text-slate-600">
-              Outputs are intended for decision support and should be reviewed against your organization&apos;s real-world
-              requirements and obligations.
-            </p>
+            <div class="grid max-w-3xl gap-0.5">
+              <p class="text-sm italic leading-6 text-slate-600">
+                WFMToolkit is provided for decision support only. Review outputs against your own requirements,
+                obligations, and operating context.
+                <a
+                  href="/terms/index.html"
+                  class="underline decoration-slate-400 underline-offset-2 transition hover:text-slate-700 hover:decoration-slate-500"
+                >
+                  Terms
+                </a>
+              </p>
+              <p class="text-sm italic leading-6 text-slate-600">
+                WFMToolkit does not use accounts or store planning data on a server. Your work stays in your browser.
+              </p>
+            </div>
             <div class="flex flex-wrap items-center gap-3 pt-1">
               <AppButton
                 href="#planning"
