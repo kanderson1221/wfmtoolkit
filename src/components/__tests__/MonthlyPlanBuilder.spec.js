@@ -194,7 +194,7 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.find('[data-test="staffing-tab"]').text()).toContain('1|2026')
   })
 
-  it('preserves saved plan values instead of re-defaulting them from the workspace seed', async () => {
+  it('uses the current center schedule when reopening a saved plan', async () => {
     const wrapper = mountBuilder({
       draftKey: 'plan-1',
       initialPlan: {
@@ -215,9 +215,15 @@ describe('MonthlyPlanBuilder', () => {
       id: 'plan-1',
       name: '2026 Plan',
       planningYear: 2026,
-      operatingWeekdays: [1],
-      holidayCalendarId: 'none',
-      customHolidays: []
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      holidayCalendarId: 'us_federal',
+      customHolidays: [
+        {
+          id: 'new-years-day',
+          label: "New Year's Day",
+          date: '2026-01-01'
+        }
+      ]
     })
   })
 
@@ -281,6 +287,49 @@ describe('MonthlyPlanBuilder', () => {
         centerDefaults,
         draftKey: 'new-plan',
         prefilledYear: 2026
+      },
+      global: {
+        stubs: {
+          ...plannerStubs,
+          PlannerMonthlyPlanTab: plannerBusinessDayStub
+        }
+      }
+    })
+
+    await wrapper.find('[data-section-id="requirement"]').trigger('click')
+
+    expect(wrapper.get('[data-test="plan-tab"]').text()).toBe('21')
+
+    await wrapper.setProps({
+      centerDefaults: {
+        ...centerDefaults,
+        customHolidays: [
+          ...centerDefaults.customHolidays,
+          {
+            id: 'company-closure',
+            label: 'Company Closure',
+            date: '2026-01-02'
+          }
+        ]
+      }
+    })
+
+    expect(wrapper.get('[data-test="plan-tab"]').text()).toBe('20')
+  })
+
+  it('keeps saved plan business days aligned to current center holidays', async () => {
+    const wrapper = mount(MonthlyPlanBuilder, {
+      props: {
+        centerDefaults,
+        draftKey: 'plan-1',
+        initialPlan: {
+          id: 'plan-1',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          name: '2026 Plan',
+          planningYear: 2026,
+          holidayCalendarId: 'none',
+          customHolidays: []
+        }
       },
       global: {
         stubs: {
