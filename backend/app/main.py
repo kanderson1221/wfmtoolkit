@@ -48,6 +48,7 @@ SEO_PATHS = (
     "/",
     "/planning-workspace/",
     "/erlang-tools/",
+    "/terms/",
 )
 
 

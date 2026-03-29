@@ -30,6 +30,8 @@ class SeoEndpointTests(unittest.TestCase):
             Path(tmpdir, "planning-workspace", "index.html").write_text("<html></html>", encoding="utf-8")
             Path(tmpdir, "erlang-tools").mkdir()
             Path(tmpdir, "erlang-tools", "index.html").write_text("<html></html>", encoding="utf-8")
+            Path(tmpdir, "terms").mkdir()
+            Path(tmpdir, "terms", "index.html").write_text("<html></html>", encoding="utf-8")
 
             response = main.sitemap(FakeRequest("https://example.com/"))
 
@@ -38,6 +40,7 @@ class SeoEndpointTests(unittest.TestCase):
         self.assertIn("<loc>https://example.com/</loc>", body)
         self.assertIn("<loc>https://example.com/planning-workspace/</loc>", body)
         self.assertIn("<loc>https://example.com/erlang-tools/</loc>", body)
+        self.assertIn("<loc>https://example.com/terms/</loc>", body)
 
     def test_directory_index_is_served_before_spa_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.object(main, "DIST_DIR", Path(tmpdir)):

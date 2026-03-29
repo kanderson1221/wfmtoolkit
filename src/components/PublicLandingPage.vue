@@ -249,6 +249,7 @@ const scrollToSection = (sectionId) => {
         <div class="flex flex-wrap items-center gap-4">
           <a href="#planning" class="hover:text-[#173b5d]">Planning Workspace</a>
           <a href="#calculators/interval" class="hover:text-[#173b5d]">Erlang Tools</a>
+          <a href="/terms/index.html" class="hover:text-[#173b5d]">Terms</a>
         </div>
       </div>
     </footer>

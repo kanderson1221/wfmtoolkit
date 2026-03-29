@@ -9,10 +9,21 @@ test.beforeEach(async ({ page }) => {
 test('opens the public landing page and highlights the available tools', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /Practical workforce planning tools, shared free\./i })).toBeVisible()
   await expect(page.getByRole('main').getByText('Planning Workspace', { exact: true })).toBeVisible()
   await expect(page.getByRole('main').getByText('Erlang Tools', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open Planning Workspace' }).first()).toBeVisible()
+})
+
+test('opens the terms page from the public footer', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByRole('link', { name: 'Terms' }).click()
+
+  await expect(page).toHaveURL(/\/terms\/index\.html$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Basic terms for using WFM Toolkit.' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Planning Workspace' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Explore Erlang Tools' })).toHaveCount(0)
 })
 
 test('opens the planning workspace directly and creates a call center', async ({ page }) => {
@@ -41,13 +52,13 @@ test('opens the hamburger menu and exposes primary destinations', async ({ page 
 test('opens home-like hashes as the public landing page', async ({ page }) => {
   await page.goto('/#home')
 
-  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /Practical workforce planning tools, shared free\./i })).toBeVisible()
 
   await page.goto('/#/home')
-  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /Practical workforce planning tools, shared free\./i })).toBeVisible()
 
   await page.goto('/#/apps')
-  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /Practical workforce planning tools, shared free\./i })).toBeVisible()
 })
 
 test('returns to the public landing page from the app logo', async ({ page }) => {
@@ -55,7 +66,7 @@ test('returns to the public landing page from the app logo', async ({ page }) =>
 
   await page.getByRole('link', { name: 'WFMToolkit home' }).click()
 
-  await expect(page.getByRole('heading', { level: 1, name: /Workforce Planning And Staffing Tools/i })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /Practical workforce planning tools, shared free\./i })).toBeVisible()
 })
 
 test('opens the sign-in dialog from the header', async ({ page }) => {
