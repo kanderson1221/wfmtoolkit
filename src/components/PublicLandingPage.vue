@@ -89,9 +89,6 @@ const scrollToSection = (sectionId) => {
     <main class="pb-16 lg:pb-20">
       <section class="app-frame landing-frame py-14 lg:py-18">
         <div class="grid max-w-[74rem] gap-7 lg:gap-8">
-          <span class="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#44607c]">
-            Independent Project
-          </span>
           <h1 class="max-w-6xl text-balance text-[clamp(2.9rem,5.3vw,4.75rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-slate-950">
             Practical workforce planning tools, shared free.
           </h1>
