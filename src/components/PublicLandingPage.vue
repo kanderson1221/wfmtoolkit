@@ -114,11 +114,15 @@ const scrollToSection = (sectionId) => {
         <div class="rounded-[34px] border border-slate-200 bg-white px-6 py-9 shadow-[0_18px_44px_rgba(15,23,42,0.05)] sm:px-8 sm:py-10 lg:px-12 lg:py-14">
           <div class="grid gap-8 lg:gap-10">
             <h1 class="text-[clamp(2.9rem,5.3vw,4.75rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-slate-950">
-              Workforce Planning And Staffing Tools
+              Practical workforce planning tools, shared free.
             </h1>
             <p class="max-w-3xl text-[1.05rem] leading-8 text-slate-700">
-              WFM Toolkit gives teams a planning workspace and Erlang tools so they can move from a staffing question to
-              a workable operating plan without rebuilding context in different places.
+              Built by a workforce manager, WFM Toolkit helps teams explore staffing scenarios, structure annual plans,
+              and work through operational assumptions in one place.
+            </p>
+            <p class="max-w-3xl text-sm leading-7 text-slate-600">
+              Outputs are intended for decision support and should be reviewed against your organization&apos;s real-world
+              requirements and obligations.
             </p>
             <div class="flex flex-wrap items-center gap-3 pt-1">
               <AppButton

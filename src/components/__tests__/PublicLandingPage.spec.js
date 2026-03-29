@@ -20,7 +20,9 @@ describe('PublicLandingPage', () => {
       authConfigured: true
     })
 
-    expect(wrapper.text()).toContain('Workforce Planning And Staffing Tools')
+    expect(wrapper.text()).toContain('Practical workforce planning tools, shared free.')
+    expect(wrapper.text()).toContain('Built by a workforce manager')
+    expect(wrapper.text()).toContain('Outputs are intended for decision support')
     expect(wrapper.text()).toContain('Planning Workspace')
     expect(wrapper.text()).toContain('Erlang Tools')
     expect(wrapper.text()).toContain('Sign In')
@@ -34,7 +36,7 @@ describe('PublicLandingPage', () => {
       userEmail: 'planner@example.com'
     })
 
-    expect(wrapper.text()).toContain('Workforce Planning And Staffing Tools')
+    expect(wrapper.text()).toContain('Practical workforce planning tools, shared free.')
     expect(wrapper.text()).not.toContain('Sign In')
   })
 })
