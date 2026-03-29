@@ -128,24 +128,24 @@ const metricCards = computed(() => [
     meta: 'across successful rows'
   },
   {
-    label: 'Total Agent Hours',
+    label: 'Total Required Hours (Without Shrinkage)',
     value: props.formatDecimal(props.summary?.totalRequiredStaffHoursNet),
-    meta: 'required agents without shrinkage'
+    meta: 'required staffing before shrinkage'
   },
   {
-    label: 'Total Headcount Hours',
+    label: 'Total Required Hours (With Shrinkage)',
     value: props.formatDecimal(props.summary?.totalRequiredStaffHoursGross),
-    meta: 'required headcount with shrinkage'
+    meta: 'required staffing after shrinkage'
   },
   {
-    label: 'Peak Agent Need',
+    label: 'Peak Required Agents',
     value: props.formatCount(props.summary?.peakStaffNet),
-    meta: 'highest interval requirement'
+    meta: 'highest interval requirement before shrinkage'
   },
   {
-    label: 'Peak Headcount Need',
+    label: 'Peak Required Headcount',
     value: props.formatCount(props.summary?.peakStaffGross),
-    meta: 'highest gross requirement'
+    meta: 'highest interval requirement after shrinkage'
   }
 ])
 </script>

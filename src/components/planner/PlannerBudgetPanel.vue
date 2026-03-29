@@ -23,12 +23,12 @@ const budgetPrepItems = computed(() => [
     meta: 'Opening payroll population that a budget model will price'
   },
   {
-    label: 'Total Hires',
+    label: 'Total Hire Headcount',
     value: props.formatNumber(props.staffingSummary?.totalHireHeadcount, 1),
     meta: 'Hiring volume that can later drive recruiting and training cost'
   },
   {
-    label: 'Peak In Training',
+    label: 'Peak In-Training Headcount',
     value: props.formatNumber(props.staffingSummary?.peakInTrainingHeadcount, 1),
     meta: 'Maximum training pipeline load for instructor and seat planning'
   }

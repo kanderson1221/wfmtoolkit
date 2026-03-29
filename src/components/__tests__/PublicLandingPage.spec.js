@@ -23,7 +23,7 @@ describe('PublicLandingPage', () => {
     const italicNotes = wrapper.findAll('p.italic')
 
     expect(wrapper.text()).toContain('Practical workforce planning tools, shared free.')
-    expect(wrapper.text()).toContain('Built by a workforce manager')
+    expect(wrapper.text()).toContain('Built by a workforce manager, WFM Toolkit is an independent project')
     expect(wrapper.text()).toContain('WFMToolkit is provided for decision support and estimation only')
     expect(italicNotes).toHaveLength(2)
     expect(italicNotes[0].text()).toContain('Results are estimates and are not guaranteed')

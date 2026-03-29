@@ -115,11 +115,11 @@ const hideTooltip = () => {
     <div class="actuals-chart-legend">
       <span class="actuals-legend-item">
         <span class="actuals-legend-swatch actuals-legend-swatch-need"></span>
-        Actual Req HC
+        Actual Required Headcount
       </span>
       <span class="actuals-legend-item">
         <span class="actuals-legend-swatch actuals-legend-swatch-plan"></span>
-        Planned Req HC
+        Planned Required Headcount
       </span>
     </div>
 
@@ -131,9 +131,9 @@ const hideTooltip = () => {
       >
         <strong class="actuals-chart-tooltip-title">{{ tooltipPoint.fullLabel }}</strong>
         <div class="actuals-chart-tooltip-grid">
-          <span>Planned Req HC</span>
+          <span>Planned Required Headcount</span>
           <strong>{{ props.formatNumber(tooltipPoint.plannedRequiredHeadcount, 1) }}</strong>
-          <span>Actual Req HC</span>
+          <span>Actual Required Headcount</span>
           <strong>
             {{
               tooltipPoint.actualRequiredHeadcount == null
@@ -172,7 +172,7 @@ const hideTooltip = () => {
           class="actuals-chart-axis-title"
           :transform="`rotate(-90 14 ${chartTop + plotHeight / 2})`"
         >
-          Headcount
+          Required Headcount
         </text>
 
         <g v-for="tick in yTicks" :key="`tick-${tick.value}`">

@@ -129,7 +129,7 @@ describe('PlannerStaffingSupplyTable', () => {
     })
 
     expect(wrapper.find('input[aria-label="December ending frontline headcount target"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('the December End Frontline HC cell becomes an editable target')
+    expect(wrapper.text()).toContain('the December Ending Frontline Headcount cell becomes an editable target')
     expect(wrapper.text()).toContain('against a target of 22.0')
     expect(wrapper.text()).toContain('Projected: 18.0')
   })

@@ -472,7 +472,7 @@ const handleSubmit = async () => {
                               Agents
                             </th>
                             <th class="border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                              Headcount
+                              Required Headcount
                             </th>
                             <th class="border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                               Service Level

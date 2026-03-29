@@ -75,7 +75,7 @@ export const useCsvBatchCalculator = () => {
     }
 
     return {
-      label: 'Peak Headcount Need',
+      label: 'Peak Required Headcount',
       value: formatCount(summary.value.peakStaffGross),
       meta: 'highest interval requirement in file'
     }

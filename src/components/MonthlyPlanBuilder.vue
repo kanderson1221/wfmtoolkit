@@ -102,7 +102,7 @@ const variabilityProgress = computed(() => {
 
     return {
       id: 'variability',
-      title: 'Variability Buffer',
+      title: 'Random/Variability',
       description: 'Apply adherence and occupancy assumptions before the requirement is finalized.',
       statusLabel: formatMonthCoverage(configuredCount),
       detail: isReady
@@ -112,7 +112,7 @@ const variabilityProgress = computed(() => {
       tone: isReady ? 'ready' : configuredCount > 0 ? 'attention' : 'default',
       isReady,
       isStarted: configuredCount > 0,
-      nextTitle: 'Variability Buffer',
+      nextTitle: 'Random/Variability',
       nextDescription: 'Set the occupancy and adherence assumptions that convert scheduled time into a usable design factor.'
     }
   }
@@ -125,7 +125,7 @@ const variabilityProgress = computed(() => {
 
   return {
     id: 'variability',
-    title: 'Variability Buffer',
+    title: 'Random/Variability',
     description: 'Apply adherence and occupancy assumptions before the requirement is finalized.',
     statusLabel: defaultsPendingReview ? 'Using defaults' : defaultsConfigured ? 'Defaults confirmed' : 'Needs review',
     detail: isReady
@@ -136,12 +136,12 @@ const variabilityProgress = computed(() => {
     blocker: isReady
       ? ''
       : defaultsPendingReview
-        ? 'Open Variability Buffer and confirm the default occupancy and adherence assumptions.'
+        ? 'Open Random/Variability and confirm the default occupancy and adherence assumptions.'
         : 'Set occupancy and adherence defaults before finalizing requirement.',
     tone: isReady ? 'ready' : defaultsConfigured ? 'attention' : 'default',
     isReady,
     isStarted: reviewedSections.value.has('variability'),
-    nextTitle: 'Variability Buffer',
+    nextTitle: 'Random/Variability',
     nextDescription: defaultsPendingReview
       ? 'Review the default occupancy and adherence assumptions before locking in the design factor.'
       : 'Set the occupancy and adherence assumptions that convert scheduled time into a usable design factor.'
@@ -160,8 +160,8 @@ const requirementProgress = computed(() => {
 
   return {
     id: 'requirement',
-    title: 'Required Headcount',
-    description: 'Turn contacts and AHT into the frontline headcount the staffing plan needs to cover.',
+    title: 'Demand Model',
+    description: 'Turn contacts and AHT into the required frontline headcount the staffing plan needs to cover.',
     statusLabel: formatMonthCoverage(configuredCount),
     detail: isReady
       ? 'Contacts and AHT are populated for every month.'
@@ -172,7 +172,7 @@ const requirementProgress = computed(() => {
     tone: isReady ? 'ready' : configuredCount > 0 ? 'attention' : 'default',
     isReady,
     isStarted: configuredCount > 0,
-    nextTitle: 'Required Headcount',
+    nextTitle: 'Demand Model',
     nextDescription: 'Enter monthly contacts and AHT so the planner can translate workload into required frontline headcount.'
   }
 })
@@ -194,9 +194,9 @@ const staffingProgress = computed(() => {
     description: 'Layer in starting position, hiring, training, and attrition against the requirement.',
     statusLabel: `${requiredInputsComplete}/2 required`,
     detail: !startingRosterSet
-      ? 'Opening roster headcount is still missing.'
+      ? 'Starting roster headcount is still missing.'
       : !startingFrontlineSet
-        ? 'Opening frontline headcount is still missing.'
+        ? 'Starting frontline headcount is still missing.'
         : builder.hasNextYearStartingFrontlineTarget && movementStarted
           ? 'Opening position is set, staffing movement is in progress, and a next January opening frontline target is active.'
           : builder.hasNextYearStartingFrontlineTarget
@@ -205,7 +205,7 @@ const staffingProgress = computed(() => {
               ? 'Opening position is set and staffing movement assumptions are in progress.'
               : 'Opening position is set. Add attrition or training assumptions if the plan needs movement.',
     blocker: !startingRosterSet
-      ? 'Set starting total headcount for January.'
+      ? 'Set starting roster headcount for January.'
       : !startingFrontlineSet
         ? 'Set starting frontline headcount for January.'
         : '',
@@ -213,7 +213,7 @@ const staffingProgress = computed(() => {
     isReady,
     isStarted: requiredInputsComplete > 0 || movementStarted,
     nextTitle: 'Staffing Plan',
-    nextDescription: 'Set opening roster and frontline headcount, then add attrition or training assumptions as needed.'
+    nextDescription: 'Set starting roster and frontline headcount, then add attrition or training assumptions as needed.'
   }
 })
 
@@ -267,13 +267,13 @@ const workflowSections = computed(() => [
       },
       {
         id: 'variability',
-        title: 'Variability Buffer',
+        title: variabilityProgress.value.title,
         statusLabel: variabilityProgress.value.statusLabel,
         tone: variabilityProgress.value.tone
       },
       {
         id: 'requirement',
-        title: 'Required Headcount',
+        title: requirementProgress.value.title,
         statusLabel: requirementProgress.value.statusLabel,
         tone: requirementProgress.value.tone
       },

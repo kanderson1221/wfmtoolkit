@@ -2,6 +2,11 @@ import { mount } from '@vue/test-utils'
 
 import PlannerMonthlyPlanTab from '../planner/PlannerMonthlyPlanTab.vue'
 
+const AppSectionHeaderStub = {
+  props: ['title'],
+  template: '<h2>{{ title }}</h2>'
+}
+
 describe('PlannerMonthlyPlanTab', () => {
   it('renders peak-planning summary and worksheet columns', () => {
     const wrapper = mount(PlannerMonthlyPlanTab, {
@@ -53,16 +58,17 @@ describe('PlannerMonthlyPlanTab', () => {
       },
       global: {
         stubs: {
-          AppSectionHeader: true,
+          AppSectionHeader: AppSectionHeaderStub,
           AppButton: true
         }
       }
     })
 
-    expect(wrapper.text()).toContain('Peak Day HC')
+    expect(wrapper.text()).toContain('Demand Model')
+    expect(wrapper.text()).toContain('Peak Day Required Headcount')
     expect(wrapper.text()).toContain('Peak Day%')
     expect(wrapper.text()).toContain('BusinessDays')
-    expect(wrapper.text()).toContain('PeakHC')
+    expect(wrapper.text()).toContain('Peak DayReq HC')
   })
 
   it('renders plan warnings through the shared status message pattern', () => {
@@ -102,7 +108,7 @@ describe('PlannerMonthlyPlanTab', () => {
       },
       global: {
         stubs: {
-          AppSectionHeader: true,
+          AppSectionHeader: AppSectionHeaderStub,
           AppButton: true
         }
       }

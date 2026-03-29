@@ -90,12 +90,12 @@ const summaryItems = computed(() => [
 
 <template>
   <section class="monthly-tab-panel">
-    <AppSectionHeader title="Variability Buffer" />
+    <AppSectionHeader title="Random/Variability" />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-5" />
 
     <section class="grid gap-3">
-      <AppSectionHeader title="Variability Assumptions" />
+      <AppSectionHeader title="Assumptions" />
 
       <div class="grid gap-3 xl:grid-cols-[minmax(0,12rem)_minmax(0,12rem)_minmax(0,1fr)] xl:items-start">
         <AppFieldGroup
@@ -162,78 +162,80 @@ const summaryItems = computed(() => [
     </section>
 
     <section class="grid gap-3">
-      <AppSectionHeader title="Monthly Variability Overrides" />
-
       <p v-if="!useMonthlyRandomOverrides" class="random-global-note">
         Global occupancy and adherence assumptions apply to every month in this plan year.
       </p>
 
-      <div v-else class="assumption-table-shell">
-        <table class="assumption-table assumption-table-random">
-          <thead>
-            <tr>
-              <th title="Planning month for the worksheet row.">Month</th>
-              <th title="Scheduled percentage flowing in from Step 1.">Scheduled %</th>
-              <th title="Expected monthly occupancy assumption used in the random loss build.">Occupancy %</th>
-              <th title="Expected monthly adherence assumption used in the random loss build.">Adherence %</th>
-              <th title="Adherence loss calculated as (1 - Adherence %) x Scheduled %.">Adherence Loss</th>
-              <th title="Occupancy loss calculated as (1 - Occupancy %) x (Scheduled % - Adherence Loss).">Occupancy Loss</th>
-              <th title="Total scheduled random loss calculated as Adherence Loss + Occupancy Loss.">Total Random Loss</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="record in props.monthlyRecords"
-              :key="record.label"
-            >
-              <td class="month-cell">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="inline-flex flex-1 items-center px-2 py-1 text-left font-semibold text-slate-800">
-                    {{ record.fullLabel }}
-                  </span>
-                  <div @click.stop @keydown.stop>
-                    <PlannerCopyMenu
-                      :month-label="record.fullLabel"
-                      @select="handleCopyAction(record.monthIndex, $event)"
-                    />
+      <div v-else class="grid gap-3">
+        <AppSectionHeader title="Monthly Overrides" />
+
+        <div class="assumption-table-shell">
+          <table class="assumption-table assumption-table-random">
+            <thead>
+              <tr>
+                <th title="Planning month for the worksheet row.">Month</th>
+                <th title="Scheduled percentage flowing in from Step 1.">Scheduled %</th>
+                <th title="Expected monthly occupancy assumption used in the random loss build.">Occupancy %</th>
+                <th title="Expected monthly adherence assumption used in the random loss build.">Adherence %</th>
+                <th title="Adherence loss calculated as (1 - Adherence %) x Scheduled %.">Adherence Loss</th>
+                <th title="Occupancy loss calculated as (1 - Occupancy %) x (Scheduled % - Adherence Loss).">Occupancy Loss</th>
+                <th title="Total scheduled random loss calculated as Adherence Loss + Occupancy Loss.">Total Random Loss</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="record in props.monthlyRecords"
+                :key="record.label"
+              >
+                <td class="month-cell">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="inline-flex flex-1 items-center px-2 py-1 text-left font-semibold text-slate-800">
+                      {{ record.fullLabel }}
+                    </span>
+                    <div @click.stop @keydown.stop>
+                      <PlannerCopyMenu
+                        :month-label="record.fullLabel"
+                        @select="handleCopyAction(record.monthIndex, $event)"
+                      />
+                    </div>
                   </div>
-                </div>
-              </td>
-              <td>{{ props.formatPercent(record.scheduledPercent, 1) }}</td>
-              <td>
-                <AppTableNumberField
-                  v-model.number="randomMonths[record.monthIndex].occupancyPercent"
-                  min="1"
-                  max="100"
-                  step="0.1"
-                  :min-fraction-digits="1"
-                  :max-fraction-digits="1"
-                  aria-label="Occupancy percent"
-                />
-              </td>
-              <td>
-                <AppTableNumberField
-                  v-model.number="randomMonths[record.monthIndex].adherencePercent"
-                  min="1"
-                  max="100"
-                  step="0.1"
-                  :min-fraction-digits="1"
-                  :max-fraction-digits="1"
-                  aria-label="Adherence percent"
-                />
-              </td>
-              <td>{{ props.formatPercent(record.adherenceLossPercent, 1) }}</td>
-              <td>{{ props.formatPercent(record.occupancyLossPercent, 1) }}</td>
-              <td>{{ props.formatPercent(record.randomLossPercent, 1) }}</td>
-            </tr>
-          </tbody>
-        </table>
+                </td>
+                <td>{{ props.formatPercent(record.scheduledPercent, 1) }}</td>
+                <td>
+                  <AppTableNumberField
+                    v-model.number="randomMonths[record.monthIndex].occupancyPercent"
+                    min="1"
+                    max="100"
+                    step="0.1"
+                    :min-fraction-digits="1"
+                    :max-fraction-digits="1"
+                    aria-label="Occupancy percent"
+                  />
+                </td>
+                <td>
+                  <AppTableNumberField
+                    v-model.number="randomMonths[record.monthIndex].adherencePercent"
+                    min="1"
+                    max="100"
+                    step="0.1"
+                    :min-fraction-digits="1"
+                    :max-fraction-digits="1"
+                    aria-label="Adherence percent"
+                  />
+                </td>
+                <td>{{ props.formatPercent(record.adherenceLossPercent, 1) }}</td>
+                <td>{{ props.formatPercent(record.occupancyLossPercent, 1) }}</td>
+                <td>{{ props.formatPercent(record.randomLossPercent, 1) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
     <div class="monthly-tab-actions">
       <AppButton variant="secondary" @click="emit('previous')">Back to Agent Availability</AppButton>
-      <AppButton variant="primary" @click="emit('continue')">Continue to Required Headcount</AppButton>
+      <AppButton variant="primary" @click="emit('continue')">Continue to Demand Model</AppButton>
     </div>
   </section>
 </template>

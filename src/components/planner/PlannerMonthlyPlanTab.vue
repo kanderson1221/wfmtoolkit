@@ -57,40 +57,34 @@ const setSelectedMonth = (monthIndex) => {
 const summaryItems = computed(() => [
   {
     label: 'Annual Contacts',
-    value: props.formatWhole(props.planSummary?.annualContacts),
-    meta: 'Sum of all monthly demand entered in the demand model'
+    value: props.formatWhole(props.planSummary?.annualContacts)
   },
   {
     label: 'Annual Workload Hours',
-    value: props.formatWhole(props.planSummary?.annualWorkloadHours),
-    meta: `${props.planSummary?.busiestMonth?.fullLabel || 'The busiest month'} is the busiest workload month`
+    value: props.formatWhole(props.planSummary?.annualWorkloadHours)
   },
   {
     label: 'Avg Required Staff Hours',
-    value: props.formatNumber(props.planSummary?.averageRequiredStaffHours, 1),
-    meta: 'Average staffing hours required after design factor is applied'
+    value: props.formatNumber(props.planSummary?.averageRequiredStaffHours, 1)
   },
   {
     label: 'Avg Required Headcount',
-    value: props.formatNumber(props.planSummary?.averageRequiredHeadcount, 1),
-    meta: 'Average monthly required headcount before rounding'
+    value: props.formatNumber(props.planSummary?.averageRequiredHeadcount, 1)
   },
   {
-    label: 'Peak Month HC',
-    value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
-    meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
+    label: 'Peak Required Headcount',
+    value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1)
   },
   {
-    label: 'Peak Day HC',
-    value: props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1),
-    meta: props.planSummary?.peakDayMonth?.fullLabel || 'Highest modeled peak-day requirement'
+    label: 'Peak Day Required Headcount',
+    value: props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1)
   }
 ])
 </script>
 
 <template>
   <section class="monthly-tab-panel">
-    <AppSectionHeader title="Required Headcount" />
+    <AppSectionHeader title="Demand Model" />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-6" />
 
@@ -145,7 +139,7 @@ const summaryItems = computed(() => [
               <span class="plan-head-label">Avg Req<br />HC</span>
             </th>
             <th title="Peak-day headcount calculated from average open-day contacts plus Peak Day Uplift %.">
-              <span class="plan-head-label">Peak<br />HC</span>
+              <span class="plan-head-label">Peak Day<br />Req HC</span>
             </th>
           </tr>
         </thead>
@@ -217,7 +211,7 @@ const summaryItems = computed(() => [
     </div>
 
     <div class="monthly-tab-actions">
-      <AppButton variant="secondary" @click="emit('previous')">Back to Variability Buffer</AppButton>
+      <AppButton variant="secondary" @click="emit('previous')">Back to Random/Variability</AppButton>
       <AppButton variant="primary" @click="emit('continue')">Continue to Staffing Plan</AppButton>
     </div>
   </section>

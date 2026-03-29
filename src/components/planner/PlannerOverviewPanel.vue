@@ -76,7 +76,7 @@ const overviewItems = computed(() => [
     meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
   },
   {
-    label: 'Average Frontline Gap',
+    label: 'Average Gap to Requirement',
     value: props.formatNumber(props.staffingSummary?.averageGapToRequirement, 1),
     meta: 'Average opening gap between frontline supply and need'
   }
@@ -99,7 +99,7 @@ const demandItems = computed(() => [
     meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
   },
   {
-    label: 'Peak Day HC',
+    label: 'Peak Day Required Headcount',
     value: props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1),
     meta: props.planSummary?.peakDayMonth?.fullLabel || 'Highest modeled peak-day requirement'
   }
@@ -112,12 +112,12 @@ const staffingItems = computed(() => [
     meta: 'Projected productive frontline at year end'
   },
   {
-    label: 'Total Graduating',
+    label: 'Graduating Headcount',
     value: props.formatNumber(props.staffingSummary?.totalGraduatingHeadcount, 1),
     meta: 'Training graduates delivered into frontline'
   },
   {
-    label: 'Average Frontline Gap',
+    label: 'Average Gap to Requirement',
     value: props.formatNumber(props.staffingSummary?.averageGapToRequirement, 1),
     meta: 'Average opening gap between staffing and need'
   }

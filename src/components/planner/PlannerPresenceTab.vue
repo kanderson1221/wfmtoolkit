@@ -74,7 +74,7 @@ const summaryItems = computed(() => [
 
 <template>
   <section class="monthly-tab-panel">
-    <AppSectionHeader title="Agent Availability" />
+    <AppSectionHeader title="Agent Availability Assumptions" />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-3 xl:grid-cols-6" />
 
@@ -295,7 +295,7 @@ const summaryItems = computed(() => [
     </section>
 
     <div class="monthly-tab-actions">
-      <AppButton variant="primary" @click="emit('continue')">Continue to Variability Buffer</AppButton>
+      <AppButton variant="primary" @click="emit('continue')">Continue to Random/Variability</AppButton>
     </div>
   </section>
 </template>

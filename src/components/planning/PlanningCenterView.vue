@@ -87,9 +87,12 @@ const formatNumber = (value, digits = 1) =>
 const formatPercent = (value, digits = 1) => `${formatNumber(value, digits)}%`
 
 const planComparisonGridClass =
-  'grid min-w-0 grid-cols-[minmax(6.5rem,0.95fr)_repeat(6,minmax(5.75rem,0.72fr))] items-center'
+  'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(5.5rem,0.68fr)_minmax(6rem,0.76fr)_minmax(5.5rem,0.68fr)_minmax(6rem,0.72fr)_minmax(8.25rem,1fr)_minmax(8.25rem,1fr)] items-center'
 
 const planListRowGridClass = 'grid grid-cols-[auto_minmax(0,1fr)_8.25rem] items-center gap-2'
+const planHeaderCellClass =
+  'px-3 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap'
+const planHeaderCellRightClass = `${planHeaderCellClass} text-right`
 
 const sortedPlansForGroup = (group) =>
   [...getGroupPlans(group)].sort((left, right) => Number(right.planningYear || 0) - Number(left.planningYear || 0))
@@ -561,26 +564,26 @@ const handlePlanMenuSelect = (plan, item) => {
                     <span class="h-9 w-1" aria-hidden="true" />
 
                     <div :class="[planComparisonGridClass, 'px-2']">
-                      <span class="truncate px-3 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                      <span :class="planHeaderCellClass">
                         Plan Year
                       </span>
-                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                      <span :class="planHeaderCellRightClass">
                         Contacts
                       </span>
-                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                      <span :class="planHeaderCellRightClass">
                         Staff Hours
                       </span>
-                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                      <span :class="planHeaderCellRightClass">
                         Presence %
                       </span>
-                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                      <span :class="planHeaderCellRightClass">
                         Utilization %
                       </span>
-                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                        Peak HC
+                      <span :class="planHeaderCellRightClass" title="Peak Required Headcount">
+                        Peak Req HC
                       </span>
-                      <span class="truncate px-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                        Avg HC
+                      <span :class="planHeaderCellRightClass" title="Average Required Headcount">
+                        Avg Req HC
                       </span>
                     </div>
 

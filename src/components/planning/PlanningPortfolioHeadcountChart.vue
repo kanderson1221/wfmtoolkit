@@ -201,12 +201,12 @@ const clearTooltip = () => {
 <template>
   <section class="grid gap-4">
     <AppSectionHeader
-      title="Monthly Headcount Need vs Staffing"
+      title="Monthly Required Headcount vs Staffing"
     />
 
     <AppEmptyState
       v-if="!hasData"
-      title="No monthly headcount data"
+      title="No monthly required headcount data"
       :description="`No staffing groups have modeled required headcount for ${props.planningYear}.`"
     />
 
@@ -227,11 +227,11 @@ const clearTooltip = () => {
             {{ activeTooltip.monthLabel }}
           </p>
           <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            <span>Needed Headcount</span>
+            <span>Required Headcount</span>
             <strong>{{ props.formatNumber(activeTooltip.neededHeadcount, 1) }}</strong>
             <span>Frontline Headcount</span>
             <strong>{{ props.formatNumber(activeTooltip.frontlineHeadcount, 1) }}</strong>
-            <span>Total Headcount</span>
+            <span>Roster Headcount</span>
             <strong>{{ props.formatNumber(activeTooltip.totalHeadcount, 1) }}</strong>
           </div>
         </div>
@@ -240,7 +240,7 @@ const clearTooltip = () => {
           :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
           class="block min-w-[920px]"
           role="img"
-          :aria-label="`Monthly headcount need versus frontline and total staffing for ${props.planningYear}`"
+          :aria-label="`Monthly required headcount versus frontline and roster staffing for ${props.planningYear}`"
         >
           <line
             v-for="tick in yTicks"
@@ -298,7 +298,7 @@ const clearTooltip = () => {
               @focus="showSegmentTooltip(bar, $event)"
               @blur="clearTooltip"
             >
-              <title>{{ bar.label }} | Needed headcount {{ props.formatNumber(bar.total, 1) }}</title>
+              <title>{{ bar.label }} | Required headcount {{ props.formatNumber(bar.total, 1) }}</title>
             </rect>
 
             <text
@@ -379,7 +379,7 @@ const clearTooltip = () => {
       <div class="flex flex-wrap gap-2.5">
         <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
           <span class="h-2.5 w-2.5 rounded-sm bg-[#d7e1ec]" aria-hidden="true" />
-          <span class="font-medium text-slate-900">Needed Headcount</span>
+          <span class="font-medium text-slate-900">Required Headcount</span>
         </div>
         <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
           <span class="h-0 w-5 border-t-2 border-[#15395f]" aria-hidden="true" />
@@ -387,7 +387,7 @@ const clearTooltip = () => {
         </div>
         <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
           <span class="h-0 w-5 border-t-2 border-dashed border-slate-500" aria-hidden="true" />
-          <span class="font-medium text-slate-900">Total Headcount</span>
+          <span class="font-medium text-slate-900">Roster Headcount</span>
         </div>
       </div>
     </div>

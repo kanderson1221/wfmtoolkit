@@ -26,7 +26,7 @@ describe('PlannerActualsComparisonChart', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Planned Req HC')
+    expect(wrapper.text()).toContain('Planned Required Headcount')
     expect(wrapper.find('svg').exists()).toBe(true)
     expect(wrapper.findAll('circle').length).toBe(2)
   })

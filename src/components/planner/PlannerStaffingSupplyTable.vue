@@ -92,7 +92,7 @@ const yearEndProjectionMessage = computed(() => {
       ? ''
       : ` against a target of ${props.formatNumber(yearEndHeadcountTarget.value, 1)}`
 
-  return `Current plan projects next January to open at ${props.formatNumber(decemberRecord.value.endingFrontlineHeadcount, 1)} frontline${targetLabel}.`
+  return `Current plan projects next January to open at ${props.formatNumber(decemberRecord.value.endingFrontlineHeadcount, 1)} frontline headcount${targetLabel}.`
 })
 </script>
 
@@ -108,7 +108,7 @@ const yearEndProjectionMessage = computed(() => {
         Set a target next January starting frontline headcount.
       </AppCheckbox>
       <p class="pl-7 text-sm leading-6 text-slate-600">
-        When enabled, the December <span class="font-medium text-slate-700">End Frontline HC</span> cell becomes an editable target and recommendations will try to land there while still covering in-year monthly staffing needs.
+        When enabled, the December <span class="font-medium text-slate-700">Ending Frontline Headcount</span> cell becomes an editable target and recommendations will try to land there while still covering in-year monthly staffing needs.
       </p>
       <p v-if="yearEndProjectionMessage" class="pl-7 text-sm leading-6 text-slate-600">
         {{ yearEndProjectionMessage }}
@@ -141,31 +141,31 @@ const yearEndProjectionMessage = computed(() => {
               <span class="plan-head-label">Peak Req<br />HC</span>
             </th>
             <th title="Total headcount on the roster at the start of the month, before any monthly movement is applied.">
-              <span class="plan-head-label">Start Total<br />HC</span>
+              <span class="plan-head-label">Start Roster<br />HC</span>
             </th>
             <th title="Productive frontline headcount available at the start of the month before graduates and attrition are applied.">
               <span class="plan-head-label">Start Frontline<br />HC</span>
             </th>
             <th title="Total people hired into training during the month.">
-              <span class="plan-head-label">Hired<br />HC</span>
+              <span class="plan-head-label">Hire<br />HC</span>
             </th>
             <th title="Full class headcount scheduled to finish training during the month. Graduation yield still affects how many become frontline-ready after nesting.">
               <span class="plan-head-label">Graduating<br />HC</span>
             </th>
             <th title="People still in training at the end of the month and therefore not yet available as frontline supply.">
-              <span class="plan-head-label">In Training<br />Month End</span>
+              <span class="plan-head-label">In-Training<br />HC</span>
             </th>
             <th title="Planned frontline exits for the month. This reduces both total headcount and frontline headcount.">
               <span class="plan-head-label">Attrition<br />HC</span>
             </th>
             <th title="Total headcount remaining on the roster at the end of the month after hires, fallout, and attrition.">
-              <span class="plan-head-label">End Total<br />HC</span>
+              <span class="plan-head-label">End Roster<br />HC</span>
             </th>
             <th title="Productive frontline headcount available at the end of the month after graduates and attrition are applied.">
               <span class="plan-head-label">End Frontline<br />HC</span>
             </th>
             <th title="Starting frontline headcount minus required headcount from the demand model. Negative values indicate the month opens short.">
-              <span class="plan-head-label">Opening<br />Gap</span>
+              <span class="plan-head-label">Gap to<br />Req</span>
             </th>
           </tr>
         </thead>
@@ -219,7 +219,7 @@ const yearEndProjectionMessage = computed(() => {
                   :min="0"
                   :step="0.1"
                   :max-fraction-digits="1"
-                  :title="`Derived attrition: ${props.formatNumber(record.frontlineAttritionPercent, 1)}% of starting frontline HC`"
+                  :title="`Derived attrition: ${props.formatNumber(record.frontlineAttritionPercent, 1)}% of starting frontline headcount`"
                   aria-label="Frontline attrition headcount"
                 />
             </td>

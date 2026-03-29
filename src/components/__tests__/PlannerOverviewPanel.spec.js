@@ -39,7 +39,7 @@ describe('PlannerOverviewPanel', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Peak Day HC')
+    expect(wrapper.text()).toContain('Peak Day Required Headcount')
     expect(wrapper.text()).toContain('15.8')
   })
 

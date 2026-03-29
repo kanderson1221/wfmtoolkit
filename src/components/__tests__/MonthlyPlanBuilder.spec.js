@@ -109,6 +109,10 @@ describe('MonthlyPlanBuilder', () => {
     })
 
     expect(wrapper.text()).toContain('Plan Status')
+    expect(wrapper.text()).toContain('Random/Variability')
+    expect(wrapper.text()).not.toContain('Variability Buffer')
+    expect(wrapper.text()).toContain('Demand Model')
+    expect(wrapper.text()).not.toContain('Required Headcount')
   })
 
   it('treats inherited defaults as pending review until the section is opened', async () => {

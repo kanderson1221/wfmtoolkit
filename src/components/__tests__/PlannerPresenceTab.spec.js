@@ -2,6 +2,11 @@ import { shallowMount } from '@vue/test-utils'
 
 import PlannerPresenceTab from '../planner/PlannerPresenceTab.vue'
 
+const AppSectionHeaderStub = {
+  props: ['title'],
+  template: '<h3>{{ title }}</h3>'
+}
+
 describe('PlannerPresenceTab', () => {
   it('keeps grouped availability header classes for calendar, presence, utilization, and results', () => {
     const wrapper = shallowMount(PlannerPresenceTab, {
@@ -46,7 +51,8 @@ describe('PlannerPresenceTab', () => {
       },
       global: {
         stubs: {
-          PlannerCopyMenu: true
+          PlannerCopyMenu: true,
+          AppSectionHeader: AppSectionHeaderStub
         }
       }
     })
@@ -59,5 +65,6 @@ describe('PlannerPresenceTab', () => {
     expect(wrapper.text()).toContain('Presence Loss')
     expect(wrapper.text()).toContain('Utilization Loss')
     expect(wrapper.text()).toContain('Results')
+    expect(wrapper.text()).toContain('Agent Availability Assumptions')
   })
 })

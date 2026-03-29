@@ -210,12 +210,12 @@ const summaryStripItems = computed(() => [
     meta: 'Blended handle time'
   },
   {
-    label: 'Needed Staff Hours',
+    label: 'Required Staff Hours',
     value: formatWhole(dashboardSummary.value.totalNeededStaffHours),
     meta: 'Staffing requirement'
   },
   {
-    label: 'Average Required HC',
+    label: 'Average Required Headcount',
     value: formatNumber(dashboardSummary.value.totalAvgRequiredHeadcount, 1),
     meta: 'Average requirement'
   },
@@ -434,10 +434,10 @@ const handleCenterMenuSelect = (center, item) => {
                   Annual Contacts
                 </th>
                 <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Needed Staff Hours
+                  Required Staff Hours
                 </th>
                 <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Avg HC
+                  Average Required Headcount
                 </th>
                 <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                   Peak Required Headcount

@@ -94,10 +94,10 @@ const scrollToSection = (sectionId) => {
               Practical workforce planning tools, shared free.
             </h1>
             <p class="max-w-3xl text-[1.05rem] leading-8 text-slate-700">
-              Built by a workforce manager, WFM Toolkit helps teams explore staffing scenarios, structure annual plans,
-              and work through operational assumptions in one place.
+              Built by a workforce manager, WFM Toolkit is an independent project that helps teams explore staffing
+              scenarios, structure annual plans, and work through operational assumptions in one place.
             </p>
-            <div class="grid max-w-3xl gap-0.5">
+            <div class="grid max-w-3xl gap-1">
               <p class="text-sm italic leading-6 text-slate-600">
                 WFMToolkit is provided for decision support and estimation only. Results are estimates and are not
                 guaranteed. Review and validate outputs against your own requirements, obligations, and operating

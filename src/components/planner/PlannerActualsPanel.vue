@@ -34,10 +34,10 @@ const actualsMonths = defineModel('actualsMonths', {
 })
 
 const staffingMetricOptions = [
-  { label: 'Start Frontline HC', value: 'plannedStartingFrontlineHeadcount' },
-  { label: 'End Frontline HC', value: 'plannedEndingFrontlineHeadcount' },
-  { label: 'Start Total HC', value: 'plannedStartingTotalHeadcount' },
-  { label: 'End Total HC', value: 'plannedEndingTotalHeadcount' }
+  { label: 'Starting Frontline Headcount', value: 'plannedStartingFrontlineHeadcount' },
+  { label: 'Ending Frontline Headcount', value: 'plannedEndingFrontlineHeadcount' },
+  { label: 'Starting Roster Headcount', value: 'plannedStartingTotalHeadcount' },
+  { label: 'Ending Roster Headcount', value: 'plannedEndingTotalHeadcount' }
 ]
 
 const selectedStaffingMetric = ref('plannedStartingFrontlineHeadcount')
@@ -69,17 +69,17 @@ const summaryItems = computed(() => [
     meta: 'Average handle-time variance across months with actual demand'
   },
   {
-    label: 'Avg Req HC Variance',
+    label: 'Average Required Headcount Variance',
     value: formatSignedNumber(props.actualsSummary.averageRequiredHeadcountVariance, 1),
     meta: 'Actual required headcount versus planned requirement'
   },
   {
-    label: 'Peak Actual Req HC',
+    label: 'Peak Actual Required Headcount',
     value: props.formatNumber(props.actualsSummary.peakActualRequiredHeadcount, 1),
     meta: 'Highest actual required headcount across loaded months'
   },
   {
-    label: 'Peak Plan Req HC',
+    label: 'Peak Planned Required Headcount',
     value: props.formatNumber(props.actualsSummary.peakPlannedRequiredHeadcount, 1),
     meta: 'Highest planned required headcount across the year'
   }
@@ -204,7 +204,7 @@ const infoIconPath = mdiInformationOutline
                   <span class="plan-head-label">Planned<br />Contacts</span>
                   <span
                     class="actuals-head-info"
-                    title="Monthly planned contacts from the saved Required Headcount worksheet."
+                    title="Monthly planned contacts from the saved Demand Model worksheet."
                     aria-label="Planned contacts help"
                   >
                     <AppIcon :path="infoIconPath" size="12" />
@@ -228,7 +228,7 @@ const infoIconPath = mdiInformationOutline
                   <span class="plan-head-label">Planned AHT<br />Sec</span>
                   <span
                     class="actuals-head-info"
-                    title="Monthly planned average handle time in seconds from the saved Required Headcount worksheet."
+                    title="Monthly planned average handle time in seconds from the saved Demand Model worksheet."
                     aria-label="Planned AHT seconds help"
                   >
                     <AppIcon :path="infoIconPath" size="12" />
@@ -252,7 +252,7 @@ const infoIconPath = mdiInformationOutline
                   <span class="plan-head-label">Planned Wkld<br />Hrs</span>
                   <span
                     class="actuals-head-info"
-                    title="Monthly planned workload hours from the saved Required Headcount worksheet."
+                    title="Monthly planned workload hours from the saved Demand Model worksheet."
                     aria-label="Planned workload hours help"
                   >
                     <AppIcon :path="infoIconPath" size="12" />
@@ -276,7 +276,7 @@ const infoIconPath = mdiInformationOutline
                   <span class="plan-head-label">Planned Req<br />HC</span>
                   <span
                     class="actuals-head-info"
-                    title="Planned required headcount from the saved Required Headcount worksheet."
+                    title="Planned required headcount from the saved Demand Model worksheet."
                     aria-label="Planned required headcount help"
                   >
                     <AppIcon :path="infoIconPath" size="12" />
