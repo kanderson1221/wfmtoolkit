@@ -546,11 +546,11 @@
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-presence {
-    @apply bg-rose-50 text-rose-700;
+    @apply bg-[#f4f8fb] text-[#4f6984];
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-utilization {
-    @apply bg-amber-50 text-amber-700;
+    @apply bg-[#e9f0f5] text-[#2f4b67];
   }
 
   .assumption-table-presence-main thead .presence-super-head.presence-super-results {
@@ -566,11 +566,11 @@
   }
 
   .assumption-table-presence-main thead .presence-detail-row th.presence-detail-presence {
-    @apply bg-rose-50 text-rose-700;
+    @apply bg-[#f8fbfd] text-[#4f6984];
   }
 
   .assumption-table-presence-main thead .presence-detail-row th.presence-detail-utilization {
-    @apply bg-amber-50 text-amber-700;
+    @apply bg-[#f1f6fa] text-[#2f4b67];
   }
 
   .assumption-table-presence-main thead .presence-detail-row th.presence-detail-results {
