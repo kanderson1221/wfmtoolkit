@@ -1,5 +1,4 @@
 <script setup>
-import { computed, ref } from 'vue'
 import {
   mdiArrowRight
 } from '@mdi/js'
@@ -7,10 +6,9 @@ import {
 import erlangToolImageUrl from '../assets/landing-erlang-tool.png'
 import planningToolImageUrl from '../assets/landing-planning-tool.png'
 import logoUrl from '../assets/logo.svg'
-import AppAccountDialog from './AppAccountDialog.vue'
 import AppButton from './ui/AppButton.vue'
 
-const props = defineProps({
+defineProps({
   authConfigured: {
     type: Boolean,
     default: false
@@ -24,8 +22,6 @@ const props = defineProps({
     default: ''
   }
 })
-
-const accountDialogOpen = ref(false)
 
 const topNavLinks = [
   {
@@ -49,16 +45,6 @@ const erlangHighlights = [
   'Test service level, occupancy, shrinkage, and volume assumptions before planning work begins.',
   'Use file-driven analysis when you need to review multiple scenarios together.'
 ]
-
-const showSignInAction = computed(() => props.authConfigured && !props.isAuthenticated)
-
-const openAccountDialog = () => {
-  accountDialogOpen.value = true
-}
-
-const closeAccountDialog = () => {
-  accountDialogOpen.value = false
-}
 
 const openPublicHome = () => {
   window.location.hash = ''
@@ -96,15 +82,6 @@ const scrollToSection = (sectionId) => {
           >
             {{ link.label }}
           </AppButton>
-          <AppButton
-            v-if="showSignInAction"
-            variant="quiet"
-            size="sm"
-            class="rounded-xl border border-[#c7d6e5] bg-[#e6edf4] px-3 py-2 text-[#15395f] shadow-sm hover:border-[#b9cada] hover:bg-[#dfe8f1]"
-            @click="openAccountDialog"
-          >
-            Sign In
-          </AppButton>
         </div>
       </div>
     </header>
@@ -122,14 +99,17 @@ const scrollToSection = (sectionId) => {
             </p>
             <div class="grid max-w-3xl gap-0.5">
               <p class="text-sm italic leading-6 text-slate-600">
-                WFMToolkit is provided for decision support only. Review outputs against your own requirements,
-                obligations, and operating context.
+                WFMToolkit is provided for decision support and estimation only. Results are estimates and are not
+                guaranteed. Review and validate outputs against your own requirements, obligations, and operating
+                context.
+                (
                 <a
                   href="/terms/index.html"
                   class="underline decoration-slate-400 underline-offset-2 transition hover:text-slate-700 hover:decoration-slate-500"
                 >
                   Terms
                 </a>
+                )
               </p>
               <p class="text-sm italic leading-6 text-slate-600">
                 WFMToolkit does not use accounts or store planning data on a server. Your work stays in your browser.
@@ -265,12 +245,6 @@ const scrollToSection = (sectionId) => {
       </div>
     </footer>
 
-    <AppAccountDialog
-      v-if="showSignInAction"
-      v-model:visible="accountDialogOpen"
-      :auth-configured="props.authConfigured"
-      @close="closeAccountDialog"
-    />
   </div>
 </template>
 

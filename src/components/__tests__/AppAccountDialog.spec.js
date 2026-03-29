@@ -55,7 +55,7 @@ describe('AppAccountDialog', () => {
     const wrapper = mountDialog()
 
     expect(wrapper.text()).toContain('Save Planning Data to Your Account')
-    expect(wrapper.text()).toContain('Guest mode keeps planning data in this browser.')
+    expect(wrapper.text()).toContain('Local data storage keeps planning data in this browser.')
     expect(wrapper.text()).toContain('Sign In')
   })
 

@@ -69,13 +69,11 @@ test('returns to the public landing page from the app logo', async ({ page }) =>
   await expect(page.getByRole('heading', { level: 1, name: /Practical workforce planning tools, shared free\./i })).toBeVisible()
 })
 
-test('opens the sign-in dialog from the header', async ({ page }) => {
+test('shows local data storage in the app header without a sign-in action', async ({ page }) => {
   await page.goto('/#planning')
 
-  await page.getByRole('button', { name: 'Sign In' }).click()
-
-  await expect(page.getByRole('heading', { name: 'Save Planning Data to Your Account' })).toBeVisible()
-  await expect(page.getByText('Guest mode keeps planning data in this browser.')).toBeVisible()
+  await expect(page.getByText('Local Data Storage')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign In' })).toHaveCount(0)
 })
 
 test('opens and edits an existing call center from the portfolio list', async ({ page }) => {

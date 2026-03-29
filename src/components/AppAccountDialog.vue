@@ -346,7 +346,7 @@ watch(visible, (isVisible) => {
     v-model:visible="visible"
     kicker="Account Storage"
     title="Save Planning Data to Your Account"
-    description="Planning stays available in guest mode. Sign in only if you want planning data backed up to your account."
+    description="Planning stays available with local data storage. Sign in only if you want planning data backed up to your account."
     max-width="max-w-xl"
     allow-backdrop-close
     @close="handleDialogClose"
@@ -355,7 +355,7 @@ watch(visible, (isVisible) => {
       <AppStatusMessage :tone="authAvailable ? 'info' : 'error'">
         {{
           authAvailable
-            ? 'Guest mode keeps planning data in this browser. Sign in to save new planning changes to your account.'
+            ? 'Local data storage keeps planning data in this browser. Sign in to save new planning changes to your account.'
             : supabaseConfigError
         }}
       </AppStatusMessage>

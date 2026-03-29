@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import {
   mdiBriefcaseOutline,
   mdiCalculatorVariantOutline,
@@ -9,8 +9,6 @@ import {
 } from '@mdi/js'
 
 import logoInverseUrl from '../assets/logo-inverse.svg'
-import AppAccountDialog from './AppAccountDialog.vue'
-import AppButton from './ui/AppButton.vue'
 import AppMenu from './ui/AppMenu.vue'
 
 const props = defineProps({
@@ -37,21 +35,14 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['sign-out'])
-const accountDialogOpen = ref(false)
 
 const sessionLabel = computed(() => {
   if (props.isAuthenticated) {
     return props.userEmail || 'Signed In'
   }
 
-  if (props.authConfigured && !props.authBypassEnabled) {
-    return 'Guest Mode'
-  }
-
-  return 'Local Mode'
+  return 'Local Data Storage'
 })
-
-const showSignInButton = computed(() => props.authConfigured && !props.authBypassEnabled && !props.isAuthenticated)
 
 const appLinks = computed(() => [
   {
@@ -87,14 +78,6 @@ const menuItems = computed(() => [
     : [])
 ])
 
-const openAccountDialog = () => {
-  accountDialogOpen.value = true
-}
-
-const closeAccountDialog = () => {
-  accountDialogOpen.value = false
-}
-
 const openPublicHome = () => {
   window.location.hash = ''
 }
@@ -114,15 +97,6 @@ const handleMenuItemClick = (item) => {
     window.location.hash = item.href
   }
 }
-
-watch(
-  () => props.isAuthenticated,
-  (isAuthenticated) => {
-    if (isAuthenticated) {
-      closeAccountDialog()
-    }
-  }
-)
 </script>
 
 <template>
@@ -144,16 +118,6 @@ watch(
           {{ sessionLabel }}
         </span>
 
-        <AppButton
-          v-if="showSignInButton"
-          variant="secondary-inverse"
-          size="sm"
-          class="px-3"
-          @click="openAccountDialog"
-        >
-          Sign In
-        </AppButton>
-
         <AppMenu
           :items="menuItems"
           :active-id="props.currentApp"
@@ -165,11 +129,4 @@ watch(
       </div>
     </div>
   </header>
-
-  <AppAccountDialog
-    v-if="showSignInButton"
-    v-model:visible="accountDialogOpen"
-    :auth-configured="props.authConfigured"
-    @close="closeAccountDialog"
-  />
 </template>
