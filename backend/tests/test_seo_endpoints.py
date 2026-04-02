@@ -21,7 +21,10 @@ class SeoEndpointTests(unittest.TestCase):
 
         self.assertIsInstance(response, PlainTextResponse)
         self.assertIn("User-agent: *", response.body.decode("utf-8"))
-        self.assertIn("Sitemap: https://example.com/sitemap.xml", response.body.decode("utf-8"))
+        self.assertIn(
+            f"Sitemap: {main.CANONICAL_BASE_URL}/sitemap.xml",
+            response.body.decode("utf-8"),
+        )
 
     def test_sitemap_lists_crawlable_pages(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.object(main, "DIST_DIR", Path(tmpdir)):
@@ -37,10 +40,10 @@ class SeoEndpointTests(unittest.TestCase):
 
         self.assertIsInstance(response, Response)
         body = response.body.decode("utf-8")
-        self.assertIn("<loc>https://example.com/</loc>", body)
-        self.assertIn("<loc>https://example.com/planning-workspace/</loc>", body)
-        self.assertIn("<loc>https://example.com/erlang-tools/</loc>", body)
-        self.assertIn("<loc>https://example.com/terms/</loc>", body)
+        self.assertIn(f"<loc>{main.CANONICAL_BASE_URL}/</loc>", body)
+        self.assertIn(f"<loc>{main.CANONICAL_BASE_URL}/planning-workspace/</loc>", body)
+        self.assertIn(f"<loc>{main.CANONICAL_BASE_URL}/erlang-tools/</loc>", body)
+        self.assertIn(f"<loc>{main.CANONICAL_BASE_URL}/terms/</loc>", body)
 
     def test_directory_index_is_served_before_spa_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.object(main, "DIST_DIR", Path(tmpdir)):

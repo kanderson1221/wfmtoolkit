@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -44,6 +45,7 @@ app = FastAPI(title="WFMToolkit API")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DIST_DIR = PROJECT_ROOT / "dist"
+CANONICAL_BASE_URL = os.getenv("WFMTOOLKIT_SITE_URL", "https://www.wfmtoolkit.com").rstrip("/")
 SEO_PATHS = (
     "/",
     "/planning-workspace/",
@@ -52,9 +54,8 @@ SEO_PATHS = (
 )
 
 
-def _build_absolute_url(request: Request, path: str) -> str:
-    base_url = str(request.base_url).rstrip("/")
-    return f"{base_url}{path}"
+def _build_absolute_url(path: str) -> str:
+    return f"{CANONICAL_BASE_URL}{path}"
 
 
 def _resolve_last_modified(relative_path: str) -> str | None:
@@ -73,7 +74,7 @@ def health() -> dict[str, str]:
 
 @app.get("/robots.txt", include_in_schema=False)
 def robots(request: Request) -> PlainTextResponse:
-    sitemap_url = _build_absolute_url(request, "/sitemap.xml")
+    sitemap_url = _build_absolute_url("/sitemap.xml")
     return PlainTextResponse(
         f"User-agent: *\nAllow: /\n\nSitemap: {sitemap_url}\n",
         media_type="text/plain",
@@ -89,7 +90,7 @@ def sitemap(request: Request) -> Response:
         last_modified = _resolve_last_modified(relative_path)
         last_modified_xml = f"<lastmod>{last_modified}</lastmod>" if last_modified else ""
         urlset_entries.append(
-            f"<url><loc>{_build_absolute_url(request, path)}</loc>{last_modified_xml}</url>"
+            f"<url><loc>{_build_absolute_url(path)}</loc>{last_modified_xml}</url>"
         )
 
     xml = (
