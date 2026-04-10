@@ -318,6 +318,8 @@ const openEditCenter = (center) => {
     name: center.name,
     holidayProfiles: center.holidayProfiles,
     operatingWeekdays: center.operatingWeekdays,
+    operatingOpenTime: center.operatingOpenTime,
+    operatingCloseTime: center.operatingCloseTime,
     defaultPaidHoursPerDay: center.defaultPaidHoursPerDay,
     defaultOccupancyPercent: center.defaultOccupancyPercent,
     defaultAdherencePercent: center.defaultAdherencePercent,
@@ -541,6 +543,8 @@ const handleCenterMenuSelect = (center, item) => {
       v-model:center-name="centerDraft.name"
       v-model:holiday-profiles="centerDraft.holidayProfiles"
       v-model:operating-weekdays="centerDraft.operatingWeekdays"
+      v-model:operating-open-time="centerDraft.operatingOpenTime"
+      v-model:operating-close-time="centerDraft.operatingCloseTime"
       :display-year="selectedPlanningYear"
       :weekday-options="props.weekdayOptions"
       :allow-backdrop-close="false"

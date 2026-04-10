@@ -6,6 +6,10 @@ const props = defineProps({
     type: String,
     required: true
   },
+  icon: {
+    type: String,
+    default: ''
+  },
   description: {
     type: String,
     default: ''
@@ -17,19 +21,26 @@ const props = defineProps({
   subtle: {
     type: Boolean,
     default: true
+  },
+  framed: {
+    type: Boolean,
+    default: true
   }
 })
 </script>
 
 <template>
   <section
-    class="grid gap-4 rounded-[24px] border border-slate-200 p-4"
-    :class="props.subtle ? 'bg-slate-50/70' : 'bg-white'"
+    class="grid gap-4"
+    :class="props.framed
+      ? ['rounded-[24px] border border-slate-200 p-4', props.subtle ? 'bg-slate-50/70' : 'bg-white']
+      : 'bg-transparent pt-2'"
   >
     <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
       <AppSectionHeader
         :kicker="props.kicker"
         :title="props.title"
+        :icon="props.icon"
         :description="props.description"
       />
 

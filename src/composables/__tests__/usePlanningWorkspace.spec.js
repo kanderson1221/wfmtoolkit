@@ -2,6 +2,7 @@ import { computed, nextTick, ref } from 'vue'
 
 import {
   buildPlanningCenterHash,
+  buildPlanningGroupForecastsHash,
   buildPlanningGroupHash,
   buildPlanningHomeHash,
   buildPlanningNewPlanHash,
@@ -10,6 +11,7 @@ import {
 import { getCurrentCalendarYear } from '../../planner/shared'
 import { usePlanningWorkspace } from '../usePlanningWorkspace'
 import { planningRepository } from '../../planningRepository'
+import { BrowserStorageError } from '../../storage/browserStorage'
 
 vi.mock('../../planningRepository', () => ({
   planningRepository: {
@@ -19,7 +21,6 @@ vi.mock('../../planningRepository', () => ({
     findGroup: vi.fn(),
     findGroupByPlanId: vi.fn(),
     findPlan: vi.fn(),
-    hydrateWorkspace: vi.fn(),
     loadWorkspace: vi.fn(),
     persistWorkspace: vi.fn(),
     deleteCenter: vi.fn(),
@@ -87,9 +88,8 @@ describe('usePlanningWorkspace', () => {
       name: '',
       ...overrides
     }))
-    planningRepository.hydrateWorkspace.mockResolvedValue(undefined)
-    planningRepository.loadWorkspace.mockReturnValue(centers)
-    planningRepository.persistWorkspace.mockImplementation((nextCenters) => nextCenters)
+    planningRepository.loadWorkspace.mockResolvedValue(centers)
+    planningRepository.persistWorkspace.mockImplementation(async (nextCenters) => nextCenters)
     planningRepository.findCenter.mockImplementation((list, centerId) => list.find((center) => center.id === centerId) || null)
     planningRepository.findGroup.mockImplementation(
       (list, centerId, groupId) => list.find((center) => center.id === centerId)?.groups.find((group) => group.id === groupId) || null
@@ -153,12 +153,38 @@ describe('usePlanningWorkspace', () => {
       randomDefaults: {
         occupancyPercent: 90,
         adherencePercent: 95
-      }
+      },
+      forecastStorageScope: 'user-1:center:center-1:group:group-1:forecasts',
+      forecastWorkspaceHref: buildPlanningGroupForecastsHash('center-1', 'group-1', 2026)
+    })
+    expect(workspace.forecastSeed.value).toMatchObject({
+      centerId: 'center-1',
+      centerName: 'North America Operations',
+      groupId: 'group-1',
+      groupName: 'Consumer Voice',
+      planningYear: 2026,
+      centerManagedHolidays: true,
+      timezone: 'America/New_York',
+      planningContext: {
+        centerId: 'center-1',
+        groupId: 'group-1',
+        planId: 'plan-1',
+        planningYear: 2026,
+        groupName: 'Consumer Voice'
+      },
+      sourceCenterSnapshot: {
+        centerId: 'center-1',
+        centerName: 'North America Operations',
+        holidayCalendarLabel: '1 custom holiday'
+      },
+      forecastStorageScope: 'user-1:center:center-1:group:group-1:forecasts',
+      fallbackScopes: ['user-1:center:center-1:forecasts', 'user-1'],
+      forecastWorkspaceHref: buildPlanningGroupForecastsHash('center-1', 'group-1', 2026)
     })
     expect(workspace.plannerDraftKey.value).toBe('user-1:plan:plan-1')
   })
 
-  it('persists center saves through the planning storage layer', () => {
+  it('persists center saves through the planning storage layer', async () => {
     const currentRoute = ref({
       app: 'planning',
       page: 'home',
@@ -180,15 +206,15 @@ describe('usePlanningWorkspace', () => {
       storageScope
     })
 
-    void workspace.loadCentersForScope()
-    workspace.handleSaveCenter({ name: 'North America Operations' })
+    await workspace.loadCentersForScope()
+    await workspace.handleSaveCenter({ name: 'North America Operations' })
 
     expect(planningRepository.saveCenter).toHaveBeenCalled()
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
     expect(window.location.hash).toBe(buildPlanningCenterHash('center-1'))
   })
 
-  it('persists staffing groups and routes into the saved group workspace', () => {
+  it('persists staffing groups and routes into the saved group workspace', async () => {
     const currentRoute = ref({
       app: 'planning',
       page: 'center',
@@ -210,15 +236,15 @@ describe('usePlanningWorkspace', () => {
       storageScope
     })
 
-    void workspace.loadCentersForScope()
-    workspace.handleSaveGroup({ name: 'Consumer Voice' })
+    await workspace.loadCentersForScope()
+    await workspace.handleSaveGroup({ name: 'Consumer Voice' })
 
     expect(planningRepository.saveGroup).toHaveBeenCalledWith(centers, 'center-1', { name: 'Consumer Voice' })
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
     expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', getCurrentCalendarYear()))
   })
 
-  it('persists plans and keeps the user in the editor route', () => {
+  it('persists plans and keeps the user in the editor route', async () => {
     const currentRoute = ref({
       app: 'planning',
       page: 'editor',
@@ -241,8 +267,8 @@ describe('usePlanningWorkspace', () => {
       storageScope
     })
 
-    void workspace.loadCentersForScope()
-    workspace.handleSavePlan({ planningYear: 2026 })
+    await workspace.loadCentersForScope()
+    await workspace.handleSavePlan({ planningYear: 2026 })
 
     expect(planningRepository.savePlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
@@ -271,10 +297,47 @@ describe('usePlanningWorkspace', () => {
     })
 
     await workspace.loadCentersForScope()
-    workspace.handleSaveCenter({ name: 'North America Operations' })
+    await workspace.handleSaveCenter({ name: 'North America Operations' })
 
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'default')
     expect(workspace.plannerDraftKey.value).toBe('guest:plan:new')
+  })
+
+  it('surfaces a local persistence error and keeps the user on the current route when a save fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'home',
+      centerId: null,
+      groupId: null,
+      planId: null
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const storageScope = computed(() => currentUser.value.id)
+
+    planningRepository.saveCenter.mockReturnValue(centers)
+    planningRepository.persistWorkspace.mockImplementation(async () => {
+      throw new BrowserStorageError('Local storage is full.', {
+        code: 'storage_quota_exceeded',
+        storageKey: 'wfmtoolkit.callCenters.v1.user-1'
+      })
+    })
+
+    window.location.hash = buildPlanningHomeHash()
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      storageScope
+    })
+
+    await workspace.loadCentersForScope()
+    await workspace.handleSaveCenter({ name: 'North America Operations' })
+
+    expect(workspace.workspaceSaveError.value).toContain('Unable to save planning changes locally.')
+    expect(workspace.workspaceSaveError.value).toContain('out of local data storage space')
+    expect(window.location.hash).toBe(buildPlanningHomeHash())
   })
 
   it('seeds a new plan from the prior year ending position or explicit next-year frontline target', async () => {
@@ -303,7 +366,7 @@ describe('usePlanningWorkspace', () => {
       }
     ]
 
-    planningRepository.loadWorkspace.mockReturnValue(linkedCenters)
+    planningRepository.loadWorkspace.mockResolvedValue(linkedCenters)
 
     const currentRoute = ref({
       app: 'planning',

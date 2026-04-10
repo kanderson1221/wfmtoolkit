@@ -3,13 +3,15 @@
   .schedule-starts,
   .schedule-legend,
   .trend-legend,
-  .trend-key {
+  .trend-key,
+  .forecast-chart-legend {
     @apply flex flex-wrap gap-2;
   }
 
   .schedule-chip,
   .schedule-legend-item,
-  .trend-legend-item {
+  .trend-legend-item,
+  .forecast-chart-legend-item {
     @apply inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600;
   }
 
@@ -18,7 +20,8 @@
   .trend-key-line-calls,
   .trend-key-staff-addon,
   .trend-key-staff-base,
-  .schedule-legend-line {
+  .schedule-legend-line,
+  .forecast-chart-swatch {
     @apply block h-2.5 w-2.5 rounded-full;
   }
 
@@ -39,7 +42,8 @@
   .trend-chart,
   .schedule-chart,
   .schedule-gantt,
-  .schedule-plot {
+  .schedule-plot,
+  .forecast-chart-surface {
     @apply overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4;
   }
 
@@ -47,7 +51,9 @@
   .trend-axis,
   .schedule-plot-grid-line,
   .schedule-gantt-axis,
-  .schedule-plot-axis {
+  .schedule-plot-axis,
+  .forecast-chart-grid,
+  .forecast-chart-axis {
     stroke: rgb(226 232 240);
     stroke-width: 1;
   }
@@ -64,6 +70,33 @@
     stroke-width: 2.5;
   }
 
+  .forecast-chart-line-actual,
+  .forecast-chart-line-forecast,
+  .forecast-chart-line-component {
+    fill: none;
+    stroke-width: 2.5;
+  }
+
+  .forecast-chart-line-actual {
+    stroke: rgb(21 57 95);
+  }
+
+  .forecast-chart-line-forecast,
+  .forecast-chart-line-component {
+    stroke: rgb(14 116 144);
+  }
+
+  .forecast-chart-band {
+    fill: rgba(149, 188, 214, 0.32);
+    stroke: none;
+  }
+
+  .forecast-chart-cutoff {
+    stroke: rgb(15 23 42);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+  }
+
   .trend-bar,
   .trend-bar-staff-base,
   .schedule-plot-bar-base {
@@ -71,7 +104,16 @@
   }
 
   .schedule-plot-point,
-  .trend-key-point-calls {
+  .trend-key-point-calls,
+  .forecast-chart-point-component {
+    fill: rgb(14 116 144);
+  }
+
+  .forecast-chart-point-actual {
+    fill: rgb(21 57 95);
+  }
+
+  .forecast-chart-point-forecast {
     fill: rgb(14 116 144);
   }
 
@@ -94,10 +136,28 @@
   .schedule-plot-ytick,
   .trend-ytick,
   .trend-ytick-calls,
-  .trend-ytick-staff {
+  .trend-ytick-staff,
+  .forecast-chart-tick,
+  .forecast-chart-label {
     fill: rgb(100 116 139);
     font-size: 11px;
     font-weight: 600;
+  }
+
+  .forecast-chart-shell {
+    @apply grid gap-3;
+  }
+
+  .forecast-chart-swatch-actual {
+    background-color: rgb(21 57 95);
+  }
+
+  .forecast-chart-swatch-forecast {
+    background-color: rgb(14 116 144);
+  }
+
+  .forecast-chart-swatch-band {
+    background-color: rgb(149 188 214);
   }
 
   .trend-tooltip-box,

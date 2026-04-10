@@ -10,10 +10,12 @@ import {
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode
 } from './planner/holidayCalendars'
+import { createPlanDemandSource } from './planner/demandSources'
 import { createNextYearOpening, getCurrentCalendarYear, resolvePlanningYear } from './planner/shared'
+import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/browserStorage'
 
-const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
-const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
+export const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
+export const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
 
 const buildScopedStorageKey = (baseKey, scope = 'default') => `${baseKey}.${String(scope || 'default')}`
 
@@ -191,21 +193,26 @@ const uniquePlansByYear = (plans) => {
   return sortPlans([...chosenByYear.values()])
 }
 
-const sortGroups = (groups) =>
+export const sortPlanningGroups = (groups) =>
   [...groups].sort((left, right) => {
     const leftStamp = new Date(left.updatedAt || left.createdAt || 0).getTime()
     const rightStamp = new Date(right.updatedAt || right.createdAt || 0).getTime()
     return rightStamp - leftStamp
   })
 
-const sortCenters = (centers) =>
+export const sortPlanningCenters = (centers) =>
   [...centers].sort((left, right) => {
     const leftStamp = new Date(left.updatedAt || left.createdAt || 0).getTime()
     const rightStamp = new Date(right.updatedAt || right.createdAt || 0).getTime()
     return rightStamp - leftStamp
   })
 
-const normalizePlan = (draftPlan, timestamp = new Date().toISOString()) => {
+const normalizeOperatingTime = (value, fallback = '') => {
+  const normalized = String(value || '').trim()
+  return /^\d{2}:\d{2}$/.test(normalized) ? normalized : fallback
+}
+
+export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOString()) => {
   const snapshot = clonePlain(draftPlan)
   const { budgets: _discardBudgets, ...planSnapshot } = snapshot
   const resolvedYear = resolvePlanningYear(planSnapshot.planningYear)
@@ -219,13 +226,14 @@ const normalizePlan = (draftPlan, timestamp = new Date().toISOString()) => {
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),
     customHolidays: normalizeCustomHolidays(planSnapshot.customHolidays),
     holidayScheduleMode: normalizeHolidayScheduleMode(planSnapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
+    demandSource: createPlanDemandSource(planSnapshot.demandSource),
     nextYearOpening: createNextYearOpening(planSnapshot.nextYearOpening),
     createdAt: planSnapshot.createdAt || timestamp,
     updatedAt: planSnapshot.updatedAt || timestamp
   }
 }
 
-const normalizeGroup = (draftGroup, timestamp = new Date().toISOString(), defaults = {}) => {
+export const normalizePlanningGroup = (draftGroup, timestamp = new Date().toISOString(), defaults = {}) => {
   const snapshot = clonePlain(draftGroup || {})
   const defaultOperatingWeekdays = normalizeWeekdays(defaults.operatingWeekdays)
   const defaultPaidHoursPerDay = Math.max(toNumber(defaults.defaultPaidHoursPerDay, 8), 0)
@@ -245,7 +253,7 @@ const normalizeGroup = (draftGroup, timestamp = new Date().toISOString(), defaul
     updatedAt: snapshot.updatedAt || timestamp,
     plans: uniquePlansByYear(
       Array.isArray(snapshot.plans)
-        ? snapshot.plans.map((plan) => normalizePlan(plan, timestamp))
+        ? snapshot.plans.map((plan) => normalizePlanningPlan(plan, timestamp))
         : []
     )
   }
@@ -254,14 +262,14 @@ const normalizeGroup = (draftGroup, timestamp = new Date().toISOString(), defaul
 const createGroupFromLegacyPlan = (legacyPlan, timestamp = new Date().toISOString()) => {
   const groupName = legacyPlan?.name?.trim() || 'Staffing Group'
 
-  return normalizeGroup(
+  return normalizePlanningGroup(
     {
       id: legacyPlan?.groupId || undefined,
       name: groupName,
       createdAt: legacyPlan?.createdAt || timestamp,
       updatedAt: legacyPlan?.updatedAt || timestamp,
       plans: [
-        normalizePlan(
+        normalizePlanningPlan(
           {
             ...legacyPlan
           },
@@ -285,7 +293,7 @@ const createGroupFromLegacyPlan = (legacyPlan, timestamp = new Date().toISOStrin
   )
 }
 
-const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
+export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toISOString()) => {
   const snapshot = clonePlain(draftCenter || {})
   const {
     defaultHolidayCalendarId: _legacyDefaultHolidayCalendarId,
@@ -301,7 +309,7 @@ const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
     : migrateLegacyHolidayProfiles(snapshot)
   const normalizedGroups = Array.isArray(groups)
     ? groups.map((group) =>
-        normalizeGroup(group, timestamp, {
+        normalizePlanningGroup(group, timestamp, {
           operatingWeekdays: snapshot.operatingWeekdays,
           defaultPaidHoursPerDay: snapshot.defaultPaidHoursPerDay,
           defaultOccupancyPercent: snapshot.defaultOccupancyPercent,
@@ -319,47 +327,36 @@ const normalizeCenter = (draftCenter, timestamp = new Date().toISOString()) => {
     timezone: snapshot.timezone?.trim() || getDefaultTimeZone(),
     holidayProfiles: normalizedHolidayProfiles,
     operatingWeekdays: normalizeWeekdays(snapshot.operatingWeekdays),
+    operatingOpenTime: normalizeOperatingTime(snapshot.operatingOpenTime),
+    operatingCloseTime: normalizeOperatingTime(snapshot.operatingCloseTime),
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, 90), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, 95), 1)),
     createdAt: snapshot.createdAt || timestamp,
     updatedAt: snapshot.updatedAt || timestamp,
-    groups: sortGroups(normalizedGroups)
+    groups: sortPlanningGroups(normalizedGroups)
   }
 }
 
 const readStorage = (storageKey) => {
-  if (typeof window === 'undefined') {
-    return null
-  }
-
-  try {
-    const raw = window.localStorage.getItem(storageKey)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+  return readJsonFromLocalStorage(storageKey, null)
 }
 
 const writeCenters = (centers, scope = 'default') => {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window.localStorage.setItem(buildScopedStorageKey(CENTERS_STORAGE_KEY, scope), JSON.stringify(sortCenters(centers)))
+  writeJsonToLocalStorage(buildScopedStorageKey(CENTERS_STORAGE_KEY, scope), sortPlanningCenters(centers))
 }
 
-const migrateLegacyPlans = (legacyPlans) => {
+export const migrateLegacyPlansToCenters = (legacyPlans) => {
   if (!Array.isArray(legacyPlans) || !legacyPlans.length) {
     return []
   }
 
   const timestamp = new Date().toISOString()
-  const normalizedGroups = sortGroups(legacyPlans.map((plan) => createGroupFromLegacyPlan(plan, timestamp)))
+  const normalizedGroups = sortPlanningGroups(legacyPlans.map((plan) => createGroupFromLegacyPlan(plan, timestamp)))
   const firstPlan = normalizedGroups[0]?.plans?.[0]
 
   return [
-    normalizeCenter(
+    normalizePlanningCenter(
       {
         name: 'Imported Call Center',
         timezone: getDefaultTimeZone(),
@@ -392,6 +389,8 @@ export const createPlanningCenterDraft = (overrides = {}) => {
     timezone: overrides?.timezone ?? getDefaultTimeZone(),
     holidayProfiles: normalizeCenterHolidayProfiles(holidayProfiles),
     operatingWeekdays: normalizeWeekdays(overrides?.operatingWeekdays),
+    operatingOpenTime: normalizeOperatingTime(overrides?.operatingOpenTime),
+    operatingCloseTime: normalizeOperatingTime(overrides?.operatingCloseTime),
     defaultPaidHoursPerDay: Math.max(toNumber(overrides?.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(overrides?.defaultOccupancyPercent, 90), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(overrides?.defaultAdherencePercent, 95), 1))
@@ -414,38 +413,52 @@ export const loadPlanningCenters = (scope = 'default') => {
   const storedCenters = readStorage(scopedStorageKey)
 
   if (Array.isArray(storedCenters)) {
-    const normalizedCenters = sortCenters(
-      storedCenters.map((center) => normalizeCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
+    const normalizedCenters = sortPlanningCenters(
+      storedCenters.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
     )
-    writeCenters(normalizedCenters, scope)
+    try {
+      writeCenters(normalizedCenters, scope)
+    } catch {
+      // Keep the workspace readable even if we cannot rewrite the normalized local copy.
+    }
     return normalizedCenters
   }
 
   const sharedCenters = scope !== 'default' ? readStorage(CENTERS_STORAGE_KEY) : null
 
   if (Array.isArray(sharedCenters) && sharedCenters.length) {
-    const normalizedCenters = sortCenters(
-      sharedCenters.map((center) => normalizeCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
+    const normalizedCenters = sortPlanningCenters(
+      sharedCenters.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
     )
-    writeCenters(normalizedCenters, scope)
+    try {
+      writeCenters(normalizedCenters, scope)
+    } catch {
+      // Keep the workspace readable even if we cannot copy shared data into the scoped key.
+    }
     return normalizedCenters
   }
 
   const legacyPlans = readStorage(LEGACY_PLANS_STORAGE_KEY)
-  const migratedCenters = migrateLegacyPlans(legacyPlans)
+  const migratedCenters = migrateLegacyPlansToCenters(legacyPlans)
 
   if (migratedCenters.length) {
-    writeCenters(migratedCenters, scope)
+    try {
+      writeCenters(migratedCenters, scope)
+    } catch {
+      // Keep migrated centers available in memory even if persistence is unavailable.
+    }
   }
 
   return migratedCenters
 }
 
 export const persistPlanningCenters = (centers, scope = 'default') => {
-  writeCenters(
-    sortCenters(centers.map((center) => normalizeCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))),
-    scope
+  const normalizedCenters = sortPlanningCenters(
+    centers.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
   )
+
+  writeCenters(normalizedCenters, scope)
+  return normalizedCenters
 }
 
 export const findPlanningCenter = (centers, centerId) =>
@@ -482,7 +495,7 @@ export const upsertPlanningCenter = (centers, draftCenter) => {
   const timestamp = new Date().toISOString()
   const snapshot = clonePlain(draftCenter)
   const existingCenter = snapshot.id ? centers.find((center) => center.id === snapshot.id) : null
-  const nextCenter = normalizeCenter(
+  const nextCenter = normalizePlanningCenter(
     {
       ...existingCenter,
       ...snapshot,
@@ -499,15 +512,15 @@ export const upsertPlanningCenter = (centers, draftCenter) => {
     nextCenters[existingIndex] = nextCenter
   }
 
-  return sortCenters(nextCenters)
+  return sortPlanningCenters(nextCenters)
 }
 
 export const removePlanningCenter = (centers, centerId) =>
-  sortCenters(centers.filter((center) => center.id !== centerId))
+  sortPlanningCenters(centers.filter((center) => center.id !== centerId))
 
 export const upsertPlanningGroup = (centers, centerId, draftGroup) => {
   const timestamp = new Date().toISOString()
-  const nextGroup = normalizeGroup(
+  const nextGroup = normalizePlanningGroup(
     {
       ...draftGroup,
       updatedAt: timestamp
@@ -515,7 +528,7 @@ export const upsertPlanningGroup = (centers, centerId, draftGroup) => {
     timestamp
   )
 
-  return sortCenters(
+  return sortPlanningCenters(
     centers.map((center) => {
       if (center.id !== centerId) {
         return center
@@ -534,7 +547,7 @@ export const upsertPlanningGroup = (centers, centerId, draftGroup) => {
 
       return {
         ...center,
-        groups: sortGroups(nextGroups),
+        groups: sortPlanningGroups(nextGroups),
         updatedAt: timestamp
       }
     })
@@ -544,7 +557,7 @@ export const upsertPlanningGroup = (centers, centerId, draftGroup) => {
 export const removePlanningGroup = (centers, centerId, groupId) => {
   const timestamp = new Date().toISOString()
 
-  return sortCenters(
+  return sortPlanningCenters(
     centers.map((center) => {
       if (center.id !== centerId) {
         return center
@@ -552,7 +565,7 @@ export const removePlanningGroup = (centers, centerId, groupId) => {
 
       return {
         ...center,
-        groups: sortGroups(center.groups.filter((group) => group.id !== groupId)),
+        groups: sortPlanningGroups(center.groups.filter((group) => group.id !== groupId)),
         updatedAt: timestamp
       }
     })
@@ -562,7 +575,7 @@ export const removePlanningGroup = (centers, centerId, groupId) => {
 export const upsertPlanningPlan = (centers, centerId, groupId, draftPlan) => {
   const timestamp = new Date().toISOString()
 
-  return sortCenters(
+  return sortPlanningCenters(
     centers.map((center) => {
       if (center.id !== centerId) {
         return center
@@ -570,7 +583,7 @@ export const upsertPlanningPlan = (centers, centerId, groupId, draftPlan) => {
 
       return {
         ...center,
-        groups: sortGroups(
+        groups: sortPlanningGroups(
           center.groups.map((group) => {
             if (group.id !== groupId) {
               return group
@@ -590,7 +603,7 @@ export const upsertPlanningPlan = (centers, centerId, groupId, draftPlan) => {
               return group
             }
 
-            const nextPlan = normalizePlan(
+            const nextPlan = normalizePlanningPlan(
               {
                 ...yearMatchedPlan,
                 ...existingPlan,
@@ -625,7 +638,7 @@ export const upsertPlanningPlan = (centers, centerId, groupId, draftPlan) => {
 export const removePlanningPlan = (centers, centerId, groupId, planId) => {
   const timestamp = new Date().toISOString()
 
-  return sortCenters(
+  return sortPlanningCenters(
     centers.map((center) => {
       if (center.id !== centerId) {
         return center
@@ -633,7 +646,7 @@ export const removePlanningPlan = (centers, centerId, groupId, planId) => {
 
       return {
         ...center,
-        groups: sortGroups(
+        groups: sortPlanningGroups(
           center.groups.map((group) => {
             if (group.id !== groupId) {
               return group

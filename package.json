@@ -18,13 +18,16 @@
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",
-    "@supabase/supabase-js": "^2.99.1",
     "@tailwindcss/vite": "^4.2.1",
+    "dexie": "^4.4.2",
+    "echarts": "^6.0.0",
+    "fake-indexeddb": "^6.2.5",
     "primevue": "^4.5.4",
     "sass": "^1.98.0",
     "tailwindcss": "^4.2.1",
     "tailwindcss-primeui": "^0.6.1",
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "vue-echarts": "^8.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

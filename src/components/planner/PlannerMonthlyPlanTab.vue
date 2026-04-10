@@ -6,6 +6,7 @@ import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
+import { DEMAND_SOURCE_FORECAST } from '../../planner/demandSources'
 
 const props = defineProps({
   monthlyRecords: {
@@ -13,6 +14,14 @@ const props = defineProps({
     required: true
   },
   planSummary: {
+    type: Object,
+    default: null
+  },
+  demandSource: {
+    type: Object,
+    required: true
+  },
+  currentDemandSourceSummary: {
     type: Object,
     default: null
   },
@@ -80,6 +89,14 @@ const summaryItems = computed(() => [
     value: props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1)
   }
 ])
+
+const contactsSourceMessage = computed(() => {
+  if (props.demandSource?.mode === DEMAND_SOURCE_FORECAST && props.currentDemandSourceSummary?.projectName) {
+    return `Monthly contacts come from ${props.currentDemandSourceSummary.projectName}. Manage contact volume in Forecast.`
+  }
+
+  return 'Monthly contacts are managed in Forecast. Update contact volume there, then review workload and staffing outputs here.'
+})
 </script>
 
 <template>
@@ -87,6 +104,10 @@ const summaryItems = computed(() => [
     <AppSectionHeader title="Demand Model" />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-6" />
+
+    <AppStatusMessage>
+      {{ contactsSourceMessage }}
+    </AppStatusMessage>
 
     <section class="grid gap-3">
       <AppSectionHeader title="Monthly Requirement Worksheet" />
@@ -160,12 +181,7 @@ const summaryItems = computed(() => [
               </button>
             </td>
             <td>
-              <AppTableNumberField
-                v-model.number="planMonths[record.monthIndex].contacts"
-                :min="0"
-                :step="100"
-                aria-label="Contacts"
-              />
+              {{ props.formatWhole(planMonths[record.monthIndex].contacts) }}
             </td>
             <td>
               <AppTableNumberField

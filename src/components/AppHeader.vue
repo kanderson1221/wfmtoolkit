@@ -4,11 +4,11 @@ import {
   mdiBriefcaseOutline,
   mdiCalculatorVariantOutline,
   mdiHomeOutline,
-  mdiLogout,
   mdiMenu
 } from '@mdi/js'
 
 import logoInverseUrl from '../assets/logo-inverse.svg'
+import AppButton from './ui/AppButton.vue'
 import AppMenu from './ui/AppMenu.vue'
 
 const props = defineProps({
@@ -16,32 +16,26 @@ const props = defineProps({
     type: String,
     default: 'planning'
   },
-  isAuthenticated: {
-    type: Boolean,
-    default: false
-  },
-  userEmail: {
+  currentTool: {
     type: String,
     default: ''
-  },
-  authConfigured: {
-    type: Boolean,
-    default: false
-  },
-  authBypassEnabled: {
-    type: Boolean,
-    default: false
   }
 })
 
-const emit = defineEmits(['sign-out'])
+const emit = defineEmits(['open-local-data-storage'])
 
-const sessionLabel = computed(() => {
-  if (props.isAuthenticated) {
-    return props.userEmail || 'Signed In'
+const sessionLabel = computed(() => 'Local Data Storage')
+
+const activeNavId = computed(() => {
+  if (props.currentApp === 'planning') {
+    return 'planning'
   }
 
-  return 'Local Data Storage'
+  if (props.currentApp === 'calculators') {
+    return 'erlang'
+  }
+
+  return props.currentApp
 })
 
 const appLinks = computed(() => [
@@ -57,7 +51,7 @@ const appLinks = computed(() => [
     icon: mdiBriefcaseOutline
   },
   {
-    id: 'calculators',
+    id: 'erlang',
     href: '#calculators/interval',
     label: 'Erlang Calculators',
     icon: mdiCalculatorVariantOutline
@@ -65,17 +59,7 @@ const appLinks = computed(() => [
 ])
 
 const menuItems = computed(() => [
-  ...appLinks.value,
-  ...(props.isAuthenticated && !props.authBypassEnabled
-    ? [
-        {
-          id: 'sign-out',
-          label: 'Sign Out',
-          icon: mdiLogout,
-          tone: 'danger'
-        }
-      ]
-    : [])
+  ...appLinks.value
 ])
 
 const openPublicHome = () => {
@@ -85,11 +69,6 @@ const openPublicHome = () => {
 const handleMenuItemClick = (item) => {
   if (item.id === 'home') {
     openPublicHome()
-    return
-  }
-
-  if (item.id === 'sign-out') {
-    emit('sign-out')
     return
   }
 
@@ -112,15 +91,18 @@ const handleMenuItemClick = (item) => {
       </a>
 
       <div class="ml-auto flex items-center gap-2.5">
-        <span
-          class="max-w-[11rem] truncate rounded-2xl border border-white/12 bg-white/5 px-3 py-1.5 text-xs font-semibold tracking-wide text-slate-100 sm:max-w-[16rem]"
+        <AppButton
+          size="sm"
+          variant="secondary-inverse"
+          class="max-w-[11rem] truncate sm:max-w-[16rem]"
+          @click="emit('open-local-data-storage')"
         >
           {{ sessionLabel }}
-        </span>
+        </AppButton>
 
         <AppMenu
           :items="menuItems"
-          :active-id="props.currentApp"
+          :active-id="activeNavId"
           :trigger-icon="mdiMenu"
           trigger-variant="icon-inverse"
           trigger-label="Open navigation menu"

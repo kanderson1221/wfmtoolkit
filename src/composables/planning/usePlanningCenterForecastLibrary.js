@@ -1,0 +1,359 @@
+import { computed, ref, watch } from 'vue'
+
+import { buildForecastStorageScope, forecastingRepository } from '../../forecastingRepository'
+import { DEMAND_SOURCE_FORECAST } from '../../planner/demandSources'
+import {
+  clonePlain,
+  computeForecastPlanningReady,
+  FORECAST_TYPE_REFORECAST,
+  createSavedForecastName,
+  forecastProjectBelongsToPlanningContext,
+  formatDate,
+  formatDateTime,
+  getDefaultReforecastStartMonthIndex,
+  getForecastPlanningYear,
+  getForecastTypeLabel,
+  parseForecastDateValue,
+  resolveForecastCoverageWindow,
+  resolveForecastType
+} from '../../forecasting/shared'
+
+const formatWhole = (value) =>
+  new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0
+  }).format(value || 0)
+
+const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+const buildForecastUsageSummary = (plans = [], forecastId = '') => {
+  const matchingPlans = (Array.isArray(plans) ? plans : []).filter((plan) =>
+    plan?.demandSource?.mode === DEMAND_SOURCE_FORECAST &&
+    String(plan?.demandSource?.forecastProjectId || '').trim() === forecastId
+  )
+
+  if (!matchingPlans.length) {
+    return {
+      usedByLabel: 'Not used',
+      usedByTitle: 'Not used in any saved plan'
+    }
+  }
+
+  if (matchingPlans.length === 1) {
+    const planningYear = Number(matchingPlans[0]?.planningYear) || 0
+    return {
+      usedByLabel: planningYear ? `${planningYear} Plan` : '1 Plan',
+      usedByTitle: planningYear ? `Imported into the ${planningYear} plan` : 'Imported into 1 saved plan'
+    }
+  }
+
+  const planYears = matchingPlans
+    .map((plan) => Number(plan?.planningYear) || 0)
+    .filter((year) => year > 0)
+    .sort((left, right) => left - right)
+
+  return {
+    usedByLabel: `${matchingPlans.length} Plans`,
+    usedByTitle: planYears.length
+      ? `Imported into ${planYears.join(', ')}`
+      : `Imported into ${matchingPlans.length} saved plans`
+  }
+}
+
+const derivePeakMonthLabel = (monthlyRollup = []) => {
+  const peakRow = (Array.isArray(monthlyRollup) ? monthlyRollup : []).reduce(
+    (currentPeak, monthRow) => (
+      Number(monthRow?.contacts || 0) > Number(currentPeak?.contacts || -1)
+        ? monthRow
+        : currentPeak
+    ),
+    null
+  )
+
+  if (!peakRow?.monthStart) {
+    return '—'
+  }
+
+  const parsedMonthStart = parseForecastDateValue(peakRow.monthStart)
+  if (!parsedMonthStart) {
+    return String(peakRow.monthStart)
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    year: 'numeric'
+  }).format(parsedMonthStart)
+}
+
+const sortForecastsByRecentActivity = (forecasts = []) =>
+  [...forecasts].sort((left, right) => {
+    const leftStamp = new Date(left?.lastRun?.runAt || left?.updatedAt || left?.createdAt || 0).getTime()
+    const rightStamp = new Date(right?.lastRun?.runAt || right?.updatedAt || right?.createdAt || 0).getTime()
+    return rightStamp - leftStamp
+  })
+
+export function usePlanningCenterForecastLibrary({
+  center,
+  selectedGroup,
+  storageScope,
+  storageRefreshToken
+}) {
+  const savedForecasts = ref([])
+  const forecastsLoading = ref(false)
+  const forecastsError = ref('')
+
+  const forecastWorkspaceScopes = computed(() => {
+    if (!selectedGroup.value) {
+      return []
+    }
+
+    return [...new Set([
+      buildForecastStorageScope(storageScope.value, center.value.id, selectedGroup.value.id),
+      buildForecastStorageScope(storageScope.value, center.value.id),
+      String(storageScope.value || 'default')
+    ])]
+  })
+
+  const loadSelectedGroupForecasts = async () => {
+    if (!selectedGroup.value) {
+      savedForecasts.value = []
+      forecastsError.value = ''
+      forecastsLoading.value = false
+      return
+    }
+
+    forecastsLoading.value = true
+    forecastsError.value = ''
+
+    try {
+      const scopeResults = await Promise.all(
+        forecastWorkspaceScopes.value.map(async (scope) => ({
+          scope,
+          ...(await forecastingRepository.loadWorkspaceResult(scope))
+        }))
+      )
+
+      const mergedProjectsById = new Map()
+
+      scopeResults.forEach((result) => {
+        result.projects.forEach((project) => {
+          if (!project?.id) {
+            return
+          }
+
+          if (!forecastProjectBelongsToPlanningContext(project, center.value.id, selectedGroup.value?.id || '')) {
+            return
+          }
+
+          const existingProject = mergedProjectsById.get(project.id)
+          if (!existingProject) {
+            mergedProjectsById.set(project.id, {
+              ...project,
+              storageScope: result.scope,
+              storageScopes: [result.scope]
+            })
+            return
+          }
+
+          const nextScopes = [...new Set([...(existingProject.storageScopes || []), result.scope])]
+          mergedProjectsById.set(project.id, {
+            ...existingProject,
+            storageScopes: nextScopes
+          })
+        })
+      })
+
+      savedForecasts.value = sortForecastsByRecentActivity([...mergedProjectsById.values()])
+
+      if (scopeResults.some((result) => result.error)) {
+        forecastsError.value = savedForecasts.value.length
+          ? 'Some saved forecasts could not be read from this device. Showing the forecasts available on this device.'
+          : 'Unable to read saved forecasts from this device.'
+      }
+    } catch (error) {
+      console.error('Unable to read saved forecasts from this device.', error)
+      savedForecasts.value = []
+      forecastsError.value = 'Unable to read saved forecasts from this device.'
+    } finally {
+      forecastsLoading.value = false
+    }
+  }
+
+  const deleteForecast = async (forecast) => {
+    const forecastId = String(forecast?.id || '').trim()
+    const targetScopes = [...new Set(
+      (Array.isArray(forecast?.storageScopes) ? forecast.storageScopes : [forecast?.storageScope])
+        .map((scope) => String(scope || '').trim())
+        .filter(Boolean)
+    )]
+
+    if (!targetScopes.length || !forecastId) {
+      forecastsError.value = 'Unable to delete this forecast from this device.'
+      return
+    }
+
+    const previousForecasts = [...savedForecasts.value]
+    savedForecasts.value = savedForecasts.value.filter((project) => String(project?.id || '').trim() !== forecastId)
+    forecastsError.value = ''
+
+    try {
+      await Promise.all(
+        targetScopes.map(async (scope) => {
+          const workspaceProjects = await forecastingRepository.loadWorkspace(scope)
+          const remainingProjects = workspaceProjects.filter((project) => String(project?.id || '').trim() !== forecastId)
+          await forecastingRepository.persistWorkspace(remainingProjects, scope)
+        })
+      )
+    } catch (error) {
+      console.error('Unable to delete the selected forecast from this device.', error)
+      savedForecasts.value = previousForecasts
+      forecastsError.value = 'Unable to delete this forecast from this device.'
+    }
+  }
+
+  const saveForecastCopy = async (forecast, overrides = {}, errorMessage = 'Unable to save this forecast on this device.') => {
+    const sourceForecast = savedForecasts.value.find((project) => project?.id === forecast?.id) || forecast
+    const targetScope = String(forecastWorkspaceScopes.value[0] || sourceForecast?.storageScope || '').trim()
+    const forecastId = String(sourceForecast?.id || '').trim()
+
+    if (!targetScope || !forecastId) {
+      forecastsError.value = errorMessage
+      return
+    }
+
+    forecastsLoading.value = true
+
+    try {
+      const targetWorkspaceProjects = await forecastingRepository.loadWorkspace(targetScope)
+      const duplicateSeed = {
+        ...clonePlain(sourceForecast),
+        ...clonePlain(overrides || {}),
+        id: '',
+        name: createSavedForecastName(targetWorkspaceProjects, {
+          ...sourceForecast,
+          ...overrides
+        }),
+        createdAt: '',
+        updatedAt: '',
+        lastRun: {},
+        planningReady: false
+      }
+      const nextProjects = forecastingRepository.saveProject(targetWorkspaceProjects, duplicateSeed)
+      await forecastingRepository.persistWorkspace(nextProjects, targetScope)
+      forecastsError.value = ''
+      await loadSelectedGroupForecasts()
+    } catch (error) {
+      console.error(errorMessage, error)
+      forecastsError.value = errorMessage
+    } finally {
+      forecastsLoading.value = false
+    }
+  }
+
+  const createReforecastFromBudget = async (forecast) => {
+    const sourceForecast = savedForecasts.value.find((project) => project?.id === forecast?.id) || forecast
+    const planningYear = getForecastPlanningYear(sourceForecast)
+    const coverageStartMonthIndex = getDefaultReforecastStartMonthIndex(planningYear)
+
+    await saveForecastCopy(
+      forecast,
+      {
+        forecastType: FORECAST_TYPE_REFORECAST,
+        coverageStartMonthIndex
+      },
+      'Unable to create a reforecast on this device.'
+    )
+  }
+
+  const duplicateForecast = async (forecast) => {
+    await saveForecastCopy(
+      forecast,
+      {
+        forecastType: resolveForecastType(forecast?.forecastType, forecast),
+        coverageStartMonthIndex: forecast?.coverageStartMonthIndex
+      },
+      'Unable to duplicate this forecast on this device.'
+    )
+  }
+
+  const forecastRows = computed(() =>
+    savedForecasts.value.map((forecast) => {
+      const forecastId = String(forecast?.id || '').trim()
+      const historyRows = Array.isArray(forecast.historyRows) ? forecast.historyRows : []
+      const monthlyRollup = Array.isArray(forecast.lastRun?.monthlyRollup) ? forecast.lastRun.monthlyRollup : []
+      const forecastType = resolveForecastType(forecast.forecastType, forecast)
+      const planningYear = getForecastPlanningYear(forecast)
+      const coverageWindow = resolveForecastCoverageWindow({
+        planningYear,
+        forecastType,
+        coverageStartMonthIndex: forecast.coverageStartMonthIndex
+      })
+      const projectedTotalContacts = Number(
+        forecast.lastRun?.summary?.projectedTotalContacts ??
+          monthlyRollup.reduce((sum, row) => sum + Number(row?.contacts || 0), 0)
+      ) || 0
+      const historyRangeLabel = historyRows.length
+        ? `${formatDate(historyRows[0].ds)} to ${formatDate(historyRows[historyRows.length - 1].ds)}`
+        : 'No history loaded'
+      const displayName = forecastType === FORECAST_TYPE_REFORECAST
+        ? `Reforecast (${MONTH_SHORT_LABELS[coverageWindow.coverageStartMonthIndex] || 'Jan'})`
+        : forecastType
+          ? 'Budget Forecast'
+          : forecast.name
+      const usageSummary = buildForecastUsageSummary(selectedGroup.value?.plans, forecastId)
+
+      return {
+        id: forecastId,
+        storageScope: forecast.storageScope || '',
+        storageScopes: Array.isArray(forecast.storageScopes)
+          ? [...forecast.storageScopes]
+          : [forecast.storageScope || ''].filter(Boolean),
+        name: forecast.name,
+        displayName,
+        planningYear,
+        planningYearLabel: Number(planningYear) > 0
+          ? String(planningYear)
+          : '',
+        forecastType,
+        forecastTypeLabel: getForecastTypeLabel(forecastType),
+        coverageWindowLabel: coverageWindow.coverageMonthLabel || 'Legacy coverage',
+        historyRangeLabel,
+        observationCountLabel: formatWhole(historyRows.length),
+        monthlyCoverageLabel: monthlyRollup.length
+          ? `${monthlyRollup.length}/${coverageWindow.expectedMonthCount || monthlyRollup.length} months`
+          : 'Not run yet',
+        projectedContactsLabel: monthlyRollup.length ? formatWhole(projectedTotalContacts) : '—',
+        peakMonthLabel: monthlyRollup.length
+          ? (forecast.lastRun?.summary?.peakForecastMonthLabel || derivePeakMonthLabel(monthlyRollup))
+          : '—',
+        usedByLabel: usageSummary.usedByLabel,
+        usedByTitle: usageSummary.usedByTitle,
+        updatedAtLabel: formatDateTime(forecast.updatedAt),
+        runAtLabel: forecast.lastRun?.runAt ? formatDateTime(forecast.lastRun.runAt) : 'Not run yet',
+        readyForPlanning: computeForecastPlanningReady(forecast)
+      }
+    })
+  )
+
+  const forecastStatusTone = computed(() =>
+    forecastsError.value && forecastRows.value.length ? 'info' : 'error'
+  )
+
+  watch(
+    () => [center.value?.id || '', selectedGroup.value?.id || '', storageScope.value, storageRefreshToken.value],
+    () => {
+      void loadSelectedGroupForecasts()
+    },
+    { immediate: true }
+  )
+
+  return {
+    createReforecastFromBudget,
+    duplicateForecast,
+    deleteForecast,
+    forecastRows,
+    forecastStatusTone,
+    forecastsError,
+    forecastsLoading,
+    loadSelectedGroupForecasts
+  }
+}

@@ -1,0 +1,235 @@
+<svg width="1600" height="1020" viewBox="0 0 1600 1020" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="1020" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#EEF4F8"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="0" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F5F9FC"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#102F4F" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .sans { font-family: Inter, Arial, sans-serif; }
+      .title { font: 700 20px Inter, Arial, sans-serif; fill: #0F172A; }
+      .h1 { font: 700 46px Inter, Arial, sans-serif; fill: #0F172A; letter-spacing: -1.5px; }
+      .h2 { font: 700 26px Inter, Arial, sans-serif; fill: #0F172A; letter-spacing: -0.5px; }
+      .h3 { font: 700 18px Inter, Arial, sans-serif; fill: #0F172A; }
+      .body { font: 500 15px Inter, Arial, sans-serif; fill: #475569; }
+      .body-sm { font: 500 13px Inter, Arial, sans-serif; fill: #64748B; }
+      .label { font: 700 12px Inter, Arial, sans-serif; fill: #64748B; letter-spacing: 1.8px; text-transform: uppercase; }
+      .metric { font: 700 28px Inter, Arial, sans-serif; fill: #0F172A; letter-spacing: -0.8px; }
+      .chip-text { font: 600 13px Inter, Arial, sans-serif; fill: #15395F; }
+      .tab { font: 700 14px Inter, Arial, sans-serif; }
+      .mono { font: 600 13px Inter, Arial, sans-serif; fill: #0F172A; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1020" fill="url(#bg)"/>
+
+  <rect x="24" y="20" width="1552" height="78" rx="24" fill="#FFFFFF" stroke="#D8E3EC"/>
+  <text x="58" y="51" class="label sans">Planning Workspace</text>
+  <text x="58" y="78" class="title sans">North America Support</text>
+  <g transform="translate(1092 34)">
+    <rect width="150" height="48" rx="16" fill="#15395F"/>
+    <text x="75" y="30" text-anchor="middle" class="tab sans" fill="#FFFFFF">New Forecast</text>
+  </g>
+  <g transform="translate(1256 34)">
+    <rect width="130" height="48" rx="16" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="65" y="30" text-anchor="middle" class="tab sans" fill="#334155">Center Settings</text>
+  </g>
+  <g transform="translate(1402 34)">
+    <rect width="128" height="48" rx="16" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="64" y="30" text-anchor="middle" class="tab sans" fill="#334155">Open Planner</text>
+  </g>
+
+  <rect x="24" y="116" width="300" height="876" rx="28" fill="#0E2237"/>
+  <text x="56" y="168" class="label sans" fill="#9DB0C3">Call Center</text>
+  <text x="56" y="205" class="h2 sans" fill="#FFFFFF">North America</text>
+  <text x="56" y="232" class="body sans" fill="#C6D3E0">Shared calendar, holidays, forecasts, and plan rollups.</text>
+
+  <g transform="translate(40 286)">
+    <rect width="268" height="74" rx="22" fill="#122B45"/>
+    <text x="24" y="31" class="h3 sans" fill="#FFFFFF">Overview</text>
+    <text x="24" y="53" class="body-sm sans" fill="#C4D2E0">Portfolio summary and current staffing signals</text>
+  </g>
+
+  <g transform="translate(40 374)">
+    <rect width="268" height="74" rx="22" fill="#122B45"/>
+    <text x="24" y="31" class="h3 sans" fill="#FFFFFF">Staffing Groups</text>
+    <text x="24" y="53" class="body-sm sans" fill="#C4D2E0">Voice Support, Chat, Escalations</text>
+  </g>
+
+  <g transform="translate(40 462)">
+    <rect width="268" height="82" rx="24" fill="#EAF2F8"/>
+    <rect x="0.5" y="0.5" width="267" height="81" rx="23.5" stroke="#D4E1EC"/>
+    <text x="24" y="34" class="h3 sans" fill="#0F172A">Forecasts</text>
+    <text x="24" y="57" class="body-sm sans" fill="#475569">Center-scoped forecasting workspace</text>
+    <rect x="12" y="10" width="4" height="62" rx="2" fill="#15395F"/>
+  </g>
+
+  <g transform="translate(40 582)">
+    <rect width="268" height="186" rx="24" fill="#122B45"/>
+    <text x="24" y="34" class="label sans" fill="#9DB0C3">Center Calendar</text>
+    <text x="24" y="70" class="metric sans" fill="#FFFFFF">Mon-Fri</text>
+    <text x="24" y="98" class="body-sm sans" fill="#C4D2E0">Hours: 08:00 to 18:00</text>
+    <text x="24" y="123" class="body-sm sans" fill="#C4D2E0">Holiday profile: U.S. closed schedule</text>
+    <rect x="24" y="142" width="98" height="28" rx="14" fill="#1A3B5E"/>
+    <text x="73" y="160" text-anchor="middle" class="chip-text sans" fill="#DDEAF3">2026 Active</text>
+  </g>
+
+  <g transform="translate(352 116)">
+    <rect width="1224" height="184" rx="28" fill="url(#hero)" stroke="#D8E3EC" filter="url(#shadow)"/>
+    <text x="40" y="52" class="label sans">Call Center Forecasts</text>
+    <text x="40" y="105" class="h1 sans">Forecasting Workspace</text>
+    <text x="40" y="139" class="body sans">Forecasts are managed inside the call center so calendar, operating days, hours, and holiday closures stay connected.</text>
+
+    <g transform="translate(40 152)">
+      <rect width="148" height="34" rx="17" fill="#E7EEF4"/>
+      <text x="74" y="22" text-anchor="middle" class="chip-text sans">Mon-Fri</text>
+    </g>
+    <g transform="translate(198 152)">
+      <rect width="160" height="34" rx="17" fill="#E7EEF4"/>
+      <text x="80" y="22" text-anchor="middle" class="chip-text sans">08:00-18:00</text>
+    </g>
+    <g transform="translate(368 152)">
+      <rect width="176" height="34" rx="17" fill="#E7EEF4"/>
+      <text x="88" y="22" text-anchor="middle" class="chip-text sans">U.S. Holidays</text>
+    </g>
+    <g transform="translate(554 152)">
+      <rect width="184" height="34" rx="17" fill="#E7EEF4"/>
+      <text x="92" y="22" text-anchor="middle" class="chip-text sans">Planner Ready</text>
+    </g>
+  </g>
+
+  <g transform="translate(352 320)">
+    <rect width="1224" height="70" rx="24" fill="#FFFFFF" stroke="#D8E3EC"/>
+    <g transform="translate(24 13)">
+      <rect width="136" height="44" rx="18" fill="#15395F"/>
+      <text x="68" y="28" text-anchor="middle" class="tab sans" fill="#FFFFFF">Forecasts</text>
+    </g>
+    <g transform="translate(170 13)">
+      <rect width="170" height="44" rx="18" fill="#FFFFFF" stroke="#CBD5E1"/>
+      <text x="85" y="28" text-anchor="middle" class="tab sans" fill="#334155">Daily to Interval</text>
+    </g>
+    <g transform="translate(356 13)">
+      <rect width="152" height="44" rx="18" fill="#FFFFFF" stroke="#CBD5E1"/>
+      <text x="76" y="28" text-anchor="middle" class="tab sans" fill="#334155">Saved Projects</text>
+    </g>
+    <text x="884" y="42" class="body-sm sans">Center defaults flow into every new forecast.</text>
+  </g>
+
+  <g transform="translate(352 410)">
+    <rect width="300" height="560" rx="28" fill="#102F4F"/>
+    <text x="28" y="42" class="label sans" fill="#A9BDD0">Setup</text>
+
+    <g transform="translate(22 78)">
+      <rect width="256" height="72" rx="20" fill="#EAF2F8"/>
+      <text x="22" y="31" class="h3 sans">Data</text>
+      <text x="22" y="53" class="body-sm sans">CSV upload, date mapping, call volume</text>
+    </g>
+
+    <g transform="translate(22 162)">
+      <rect width="256" height="72" rx="20" fill="#163757"/>
+      <text x="22" y="31" class="h3 sans" fill="#FFFFFF">Forecast</text>
+      <text x="22" y="53" class="body-sm sans" fill="#C4D2E0">365-day horizon, weekly and yearly patterns</text>
+    </g>
+
+    <g transform="translate(22 246)">
+      <rect width="256" height="72" rx="20" fill="#163757"/>
+      <text x="22" y="31" class="h3 sans" fill="#FFFFFF">Accuracy</text>
+      <text x="22" y="53" class="body-sm sans" fill="#C4D2E0">30-day test set and forecast scoring</text>
+    </g>
+
+    <g transform="translate(22 346)">
+      <rect width="256" height="184" rx="22" fill="#163757"/>
+      <text x="22" y="32" class="label sans" fill="#A9BDD0">Inherits From Center</text>
+      <text x="22" y="66" class="body-sm sans" fill="#FFFFFF">Time zone: America/New_York</text>
+      <text x="22" y="92" class="body-sm sans" fill="#FFFFFF">Open days: Mon-Fri</text>
+      <text x="22" y="118" class="body-sm sans" fill="#FFFFFF">Hours: 08:00-18:00</text>
+      <text x="22" y="144" class="body-sm sans" fill="#FFFFFF">Holiday schedule: U.S. closed dates</text>
+    </g>
+  </g>
+
+  <g transform="translate(676 410)">
+    <rect width="900" height="560" rx="28" fill="#FFFFFF" stroke="#D8E3EC"/>
+    <text x="36" y="48" class="h2 sans">North America Daily Call Forecast</text>
+    <text x="36" y="78" class="body sans">This forecast belongs to the call center, so the monthly rollup and future interval shaping stay aligned with center operating assumptions.</text>
+
+    <g transform="translate(36 102)">
+      <rect width="154" height="34" rx="17" fill="#E7EEF4"/>
+      <text x="77" y="22" text-anchor="middle" class="chip-text sans">Project: Q1 2027</text>
+    </g>
+    <g transform="translate(202 102)">
+      <rect width="168" height="34" rx="17" fill="#E7EEF4"/>
+      <text x="84" y="22" text-anchor="middle" class="chip-text sans">Demand Source: Calls</text>
+    </g>
+    <g transform="translate(382 102)">
+      <rect width="182" height="34" rx="17" fill="#E7EEF4"/>
+      <text x="91" y="22" text-anchor="middle" class="chip-text sans">Imported to Planner</text>
+    </g>
+
+    <g transform="translate(36 162)">
+      <rect width="188" height="100" rx="22" fill="#F8FBFD" stroke="#D8E3EC"/>
+      <text x="20" y="28" class="label sans">Projected Contacts</text>
+      <text x="20" y="66" class="metric sans">1.26M</text>
+      <text x="20" y="87" class="body-sm sans">365-day horizon</text>
+    </g>
+    <g transform="translate(240 162)">
+      <rect width="188" height="100" rx="22" fill="#F8FBFD" stroke="#D8E3EC"/>
+      <text x="20" y="28" class="label sans">Peak Month</text>
+      <text x="20" y="66" class="metric sans">Nov 2027</text>
+      <text x="20" y="87" class="body-sm sans">182,400 contacts</text>
+    </g>
+    <g transform="translate(444 162)">
+      <rect width="188" height="100" rx="22" fill="#F8FBFD" stroke="#D8E3EC"/>
+      <text x="20" y="28" class="label sans">Peak Day</text>
+      <text x="20" y="66" class="metric sans">Nov 24</text>
+      <text x="20" y="87" class="body-sm sans">12,480 calls</text>
+    </g>
+    <g transform="translate(648 162)">
+      <rect width="216" height="100" rx="22" fill="#F8FBFD" stroke="#D8E3EC"/>
+      <text x="20" y="28" class="label sans">Forecast Status</text>
+      <text x="20" y="66" class="metric sans">Planner Ready</text>
+      <text x="20" y="87" class="body-sm sans">Monthly rollup connected to center</text>
+    </g>
+
+    <g transform="translate(36 288)">
+      <rect width="548" height="220" rx="24" fill="#F8FBFD" stroke="#D8E3EC"/>
+      <text x="24" y="34" class="h3 sans">Daily Forecast</text>
+      <text x="24" y="56" class="body-sm sans">Historical actuals, forecast line, and confidence band</text>
+      <path d="M28 184H518" stroke="#D9E5EE" stroke-width="1"/>
+      <path d="M28 142H518" stroke="#E5EDF4" stroke-width="1"/>
+      <path d="M28 100H518" stroke="#E5EDF4" stroke-width="1"/>
+      <path d="M28 58H518" stroke="#E5EDF4" stroke-width="1"/>
+      <path d="M48 166L116 146L182 152L246 118L310 126L378 84" stroke="#15395F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M378 84L430 74L478 92L518 58" stroke="#2DBE83" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 8"/>
+      <path d="M378 62L430 52L478 70L518 38L518 86L478 116L430 98L378 108Z" fill="#BFE8D4" opacity="0.55"/>
+      <path d="M376 48V198" stroke="#94A3B8" stroke-width="2" stroke-dasharray="6 6"/>
+      <text x="390" y="34" class="body-sm sans">Forecast starts</text>
+    </g>
+
+    <g transform="translate(610 288)">
+      <rect width="254" height="220" rx="24" fill="#F8FBFD" stroke="#D8E3EC"/>
+      <text x="22" y="34" class="h3 sans">Monthly Rollup</text>
+      <text x="22" y="58" class="body-sm sans">Used by the planner today</text>
+      <text x="22" y="92" class="label sans">Jul</text>
+      <text x="124" y="92" class="mono sans">98,440</text>
+      <text x="22" y="120" class="label sans">Aug</text>
+      <text x="124" y="120" class="mono sans">104,210</text>
+      <text x="22" y="148" class="label sans">Sep</text>
+      <text x="124" y="148" class="mono sans">110,900</text>
+      <text x="22" y="176" class="label sans">Oct</text>
+      <text x="124" y="176" class="mono sans">126,330</text>
+    </g>
+
+    <g transform="translate(36 530)">
+      <rect width="828" height="110" rx="24" fill="#F8FBFD" stroke="#D8E3EC"/>
+      <text x="24" y="32" class="h3 sans">What This Enables Later</text>
+      <text x="24" y="60" class="body sans">Because this forecast sits inside the call center, the Daily to Interval step can later use center open days, hours of operation, and holiday closures without forcing users to re-enter them.</text>
+      <text x="24" y="86" class="body-sm sans">Planning keeps monthly imports. Staffing later consumes interval demand from the same center forecast.</text>
+    </g>
+  </g>
+</svg>

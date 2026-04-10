@@ -1,9 +1,26 @@
 import { expect, test } from '@playwright/test'
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
+const clearBrowserData = async (page) => {
+  await page.goto('/')
+  await page.evaluate(async () => {
     window.localStorage.clear()
+    window.sessionStorage.clear()
+
+    await new Promise((resolve, reject) => {
+      const request = window.indexedDB.deleteDatabase('wfmtoolkit-local-data')
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error || new Error('Unable to clear IndexedDB'))
+      request.onblocked = () => resolve()
+    })
   })
+}
+
+const waitForCenterWorkspace = async (page) => {
+  await expect(page).toHaveURL(/#planning\/center\//)
+}
+
+test.beforeEach(async ({ page }) => {
+  await clearBrowserData(page)
 })
 
 test('opens the public landing page and highlights the available tools', async ({ page }) => {
@@ -11,8 +28,10 @@ test('opens the public landing page and highlights the available tools', async (
 
   await expect(page.getByRole('heading', { level: 1, name: /Practical workforce planning tools, shared free\./i })).toBeVisible()
   await expect(page.getByRole('main').getByText('Planning Workspace', { exact: true })).toBeVisible()
-  await expect(page.getByRole('main').getByText('Erlang Tools', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByText('Forecasting', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('main').getByText('Erlang Calculators', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open Planning Workspace' }).first()).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Call Centers' }).first()).toBeVisible()
 })
 
 test('opens the terms page from the public footer', async ({ page }) => {
@@ -23,7 +42,8 @@ test('opens the terms page from the public footer', async ({ page }) => {
   await expect(page).toHaveURL(/\/terms\/index\.html$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Basic terms for using WFM Toolkit' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open Planning Workspace' })).toHaveCount(0)
-  await expect(page.getByRole('link', { name: 'Explore Erlang Tools' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Open Call Centers' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Open Erlang Calculators' })).toHaveCount(0)
 })
 
 test('opens the planning workspace directly and creates a call center', async ({ page }) => {
@@ -37,6 +57,30 @@ test('opens the planning workspace directly and creates a call center', async ({
   await page.getByRole('button', { name: 'Create Call Center' }).last().click()
 
   await expect(page.getByRole('heading', { level: 1, name: 'North America Operations' })).toBeVisible()
+})
+
+test('opens staffing-group forecasts from the call-center workspace', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'New Center' }).first().click()
+  await page.getByLabel('Call Center Name').fill('North America Operations')
+  await page.getByRole('button', { name: 'Create Call Center' }).last().click()
+
+  await page.getByRole('button', { name: 'New Group' }).first().click()
+  await page.getByLabel('Staffing Group Name').fill('Consumer Voice')
+  await page.getByRole('button', { name: 'Create Staffing Group' }).last().click()
+
+  await page.getByRole('button', { name: 'Forecasts' }).click()
+  await expect(page.getByText('No forecasts yet')).toBeVisible()
+  await page.getByRole('button', { name: 'New Forecast' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Create Forecast' })).toBeVisible()
+  await page.getByLabel('Plan Year').selectOption({ label: '2026' })
+  await page.getByLabel('Forecast Type').selectOption({ label: 'Budget Forecast' })
+  await page.getByRole('button', { name: 'Create Forecast' }).last().click()
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Consumer Voice Forecasts' })).toBeVisible()
+  await expect(page.getByText('Staffing Group', { exact: true })).toBeVisible()
+  await expect(page.getByText('Hours of Operation')).toBeVisible()
 })
 
 test('opens the hamburger menu and exposes primary destinations', async ({ page }) => {
@@ -76,12 +120,24 @@ test('shows local data storage in the app header without a sign-in action', asyn
   await expect(page.getByRole('button', { name: 'Sign In' })).toHaveCount(0)
 })
 
+test('opens the local data storage dialog from the app header', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'Local Data Storage' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Local Data Storage' })).toBeVisible()
+  await expect(page.getByText('Stored in this browser', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download Backup' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Import Backup' })).toBeVisible()
+})
+
 test('opens and edits an existing call center from the portfolio list', async ({ page }) => {
   await page.goto('/#planning')
 
   await page.getByRole('button', { name: 'New Center' }).first().click()
   await page.getByLabel('Call Center Name').fill('North America Operations')
   await page.getByRole('button', { name: 'Create Call Center' }).last().click()
+  await waitForCenterWorkspace(page)
 
   await page.goto('/#planning')
 
@@ -109,6 +165,7 @@ test('confirms before deleting a call center from the portfolio list', async ({ 
   await page.getByRole('button', { name: 'New Center' }).first().click()
   await page.getByLabel('Call Center Name').fill('North America Operations')
   await page.getByRole('button', { name: 'Create Call Center' }).last().click()
+  await waitForCenterWorkspace(page)
 
   await page.goto('/#planning')
 
@@ -145,6 +202,9 @@ test('creates a staffing group and opens a new plan from the call-center detail 
   await expect(page.getByRole('heading', { name: 'Create Staffing Group' })).toBeHidden()
 
   await expect(page.getByRole('heading', { level: 1, name: 'North America Operations' })).toBeVisible()
+  await expect(page).toHaveURL(/#planning\/center\/.+\/group\/.+\/year\/\d+/)
+  await page.getByRole('button', { name: 'Plans' }).click()
+  await expect(page.getByRole('button', { name: 'New Plan' })).toBeVisible()
   await page.getByRole('button', { name: 'New Plan' }).click()
   await expect(page.getByRole('heading', { name: 'New Plan' })).toBeVisible()
   await expect(page.getByLabel('Planning Year')).toHaveValue(String(planningYear))
@@ -154,8 +214,14 @@ test('creates a staffing group and opens a new plan from the call-center detail 
   await expect(page.getByLabel('Breadcrumb').getByText('Consumer Voice', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Save Plan' })).toBeVisible()
   await expect(page.locator('[data-section-id="overview"]')).toBeVisible()
+  await expect(page.locator('[data-section-id="forecast"]')).toBeVisible()
   await expect(page.locator('[data-section-id="availability"]')).toBeVisible()
   await expect(page.locator('[data-section-id="variability"]')).toBeVisible()
   await expect(page.locator('[data-section-id="requirement"]')).toBeVisible()
   await expect(page.locator('[data-section-id="staffing"]')).toBeVisible()
+
+  await page.locator('[data-section-id="forecast"]').click()
+  await expect(page.getByText('Manual monthly contacts are maintained here.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Staffing Group Forecasts' })).toBeVisible()
+  await expect(page.getByLabel('Forecast workflow').getByRole('button', { name: /Data/ })).toHaveCount(0)
 })

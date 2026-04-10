@@ -1,47 +1,76 @@
 import { computed, ref, watch } from 'vue'
 import {
   buildPlanningCenterHash,
+  buildPlanningGroupForecastsHash,
   buildPlanningGroupHash,
   buildPlanningHomeHash,
   buildPlanningPlanHash,
   navigateToHash
 } from '../appRoutes'
+import { buildForecastStorageScope } from '../forecastingRepository'
+import {
+  FORECAST_TYPE_BUDGET,
+  FORECAST_TYPE_REFORECAST,
+  createForecastCenterSnapshot,
+  createForecastHoliday,
+  getDefaultReforecastStartMonthIndex
+} from '../forecasting/shared'
 import {
   HOLIDAY_CALENDAR_NONE,
+  HOLIDAY_CALENDAR_US_FEDERAL,
   HOLIDAY_SCHEDULE_CLOSED,
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
 import { findLinkedPriorPlan, getCurrentCalendarYear, resolveLinkedOpeningPosition, resolvePlanningYear } from '../plannerModel'
 import { resolveCenterHolidayProfile } from '../planningStorage'
 import { planningRepository } from '../planningRepository'
+import { describeBrowserStorageError } from '../storage/browserStorage'
 
-export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAccess, storageScope }) => {
+export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }) => {
   const planningCenters = ref([])
   const workspaceHydrating = ref(false)
+  const workspaceSaveError = ref('')
 
-  const persistAndSetCenters = (centers) => {
-    const nextCenters =
-      hasWorkspaceAccess.value
-        ? planningRepository.persistWorkspace(centers, storageScope.value) || centers
-        : centers
+  const buildForecastFallbackScopes = (centerId, groupId) => {
+    const scopes = [
+      buildForecastStorageScope(storageScope.value, centerId, groupId),
+      buildForecastStorageScope(storageScope.value, centerId),
+      String(storageScope.value || 'default')
+    ]
 
-    planningCenters.value = Array.isArray(nextCenters) ? nextCenters : centers
+    return [...new Set(scopes.filter(Boolean))]
   }
 
-  const loadCentersForScope = async (scope = storageScope.value, options = {}) => {
-    workspaceHydrating.value = true
-    planningCenters.value = planningRepository.loadWorkspace(scope)
-
+  const persistAndSetCenters = async (centers) => {
     try {
-      if (typeof planningRepository.hydrateWorkspace === 'function') {
-        const hydratedCenters = await planningRepository.hydrateWorkspace(scope, options)
+      const nextCenters = (await planningRepository.persistWorkspace(centers, storageScope.value)) || centers
+      planningCenters.value = Array.isArray(nextCenters) ? nextCenters : centers
+      workspaceSaveError.value = ''
+      return true
+    } catch (error) {
+      console.error('Unable to save planning changes locally.', error)
+      workspaceSaveError.value = `Unable to save planning changes locally. ${describeBrowserStorageError(
+        error,
+        'This browser could not store the latest planning updates.'
+      )}`
+      return false
+    }
+  }
 
-        if (Array.isArray(hydratedCenters)) {
-          planningCenters.value = hydratedCenters
-        }
-      }
-
+  const loadCentersForScope = async (scope = storageScope.value) => {
+    workspaceHydrating.value = true
+    try {
+      planningCenters.value = await planningRepository.loadWorkspace(scope)
+      workspaceSaveError.value = ''
       return planningCenters.value
+    } catch (error) {
+      console.error('Unable to load planning data from this browser.', error)
+      planningCenters.value = []
+      workspaceSaveError.value = `Unable to read planning data from this browser. ${describeBrowserStorageError(
+        error,
+        'This browser could not load the saved planning workspace.'
+      )}`
+      return []
     } finally {
       workspaceHydrating.value = false
     }
@@ -50,6 +79,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
   const clearCenters = () => {
     workspaceHydrating.value = false
     planningCenters.value = []
+    workspaceSaveError.value = ''
   }
 
   const currentCenter = computed(() => {
@@ -123,6 +153,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       startingFrontlineHeadcount: 0
     })
 
+    const forecastFallbackScopes = buildForecastFallbackScopes(currentCenter.value.id, currentGroup.value.id)
+
     return {
       centerId: currentCenter.value.id,
       centerName: currentCenter.value.name,
@@ -146,7 +178,88 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
       randomDefaults: {
         occupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
         adherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent
-      }
+      },
+      forecastStorageScope: buildForecastStorageScope(storageScope.value, currentCenter.value.id, currentGroup.value.id),
+      forecastFallbackScopes,
+      forecastWorkspaceHref: buildPlanningGroupForecastsHash(
+        currentCenter.value.id,
+        currentGroup.value.id,
+        resolvedPlanningYear
+      )
+    }
+  })
+
+  const forecastSeed = computed(() => {
+    if (!currentCenter.value || !currentGroup.value) {
+      return null
+    }
+
+    const resolvedPlanningYear =
+      currentRoute.value.page === 'editor' || currentRoute.value.page === 'group-forecasts'
+        ? resolvePlanningYear(currentRoute.value.year, currentPlan.value?.planningYear)
+        : null
+    const groupName = currentGroup.value?.name || ''
+    const holidayProfileYear = resolvedPlanningYear || getCurrentCalendarYear()
+    const centerHolidayProfile = resolveCenterHolidayProfile(currentCenter.value, holidayProfileYear)
+    const customHolidays = centerHolidayProfile.customHolidays.map((holiday) =>
+      createForecastHoliday({
+        name: holiday.label,
+        date: holiday.date
+      })
+    )
+    const holidayCalendarLabel =
+      centerHolidayProfile.holidayCalendarId === HOLIDAY_CALENDAR_US_FEDERAL
+        ? 'United States Federal'
+        : customHolidays.length
+          ? `${customHolidays.length} custom holiday${customHolidays.length === 1 ? '' : 's'}`
+          : 'No holiday calendar'
+    const seededForecastType = currentRoute.value.page === 'group-forecasts'
+      ? (currentRoute.value.forecastType || FORECAST_TYPE_BUDGET)
+      : FORECAST_TYPE_BUDGET
+    const seededCoverageStartMonthIndex =
+      currentRoute.value.page === 'group-forecasts' && seededForecastType === FORECAST_TYPE_REFORECAST
+        ? currentRoute.value.coverageStartMonthIndex ?? getDefaultReforecastStartMonthIndex(resolvedPlanningYear)
+        : 0
+
+    return {
+      centerId: currentCenter.value.id,
+      centerName: currentCenter.value.name,
+      groupId: currentGroup.value.id,
+      groupName,
+      planningYear: resolvedPlanningYear,
+      forecastType: seededForecastType,
+      coverageStartMonthIndex: seededCoverageStartMonthIndex,
+      centerManagedHolidays: true,
+      timezone: currentCenter.value.timezone,
+      planningContext: {
+        centerId: currentCenter.value.id,
+        groupId: currentGroup.value.id,
+        planId: currentRoute.value.page === 'editor' ? currentPlan.value?.id || null : null,
+        planningYear: resolvedPlanningYear,
+        groupName
+      },
+      sourceCenterSnapshot: createForecastCenterSnapshot({
+        centerId: currentCenter.value.id,
+        centerName: currentCenter.value.name,
+        timezone: currentCenter.value.timezone,
+        operatingWeekdays: currentCenter.value.operatingWeekdays,
+        operatingOpenTime: currentCenter.value.operatingOpenTime,
+        operatingCloseTime: currentCenter.value.operatingCloseTime,
+        holidayProfileYear,
+        holidayCalendarLabel,
+        customHolidayCount: customHolidays.length
+      }),
+      modelConfig: {
+        builtInHolidayCountry: centerHolidayProfile.holidayCalendarId === HOLIDAY_CALENDAR_US_FEDERAL ? 'US' : '',
+        customHolidays
+      },
+      forecastStorageScope: buildForecastStorageScope(storageScope.value, currentCenter.value.id, currentGroup.value.id),
+      fallbackScopes: buildForecastFallbackScopes(currentCenter.value.id, currentGroup.value.id).slice(1),
+      forecastWorkspaceHref: buildPlanningGroupForecastsHash(
+        currentCenter.value.id,
+        currentGroup.value.id,
+        resolvedPlanningYear
+      )
     }
   })
 
@@ -186,14 +299,16 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     return `planner-${currentGroup.value?.id || 'no-group'}-new-${currentRoute.value.year || 'default'}`
   })
 
-  const handleSaveCenter = (centerDraft) => {
+  const handleSaveCenter = async (centerDraft) => {
     const nextCenters = planningRepository.saveCenter(planningCenters.value, centerDraft)
     const savedCenter =
       centerDraft.id
         ? nextCenters.find((center) => center.id === centerDraft.id)
         : nextCenters[0]
 
-    persistAndSetCenters(nextCenters)
+    if (!await persistAndSetCenters(nextCenters)) {
+      return
+    }
 
     if (savedCenter) {
       navigateToHash(buildPlanningCenterHash(savedCenter.id))
@@ -203,12 +318,14 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     navigateToHash(buildPlanningHomeHash())
   }
 
-  const handleDeleteCenter = (centerId) => {
-    persistAndSetCenters(planningRepository.deleteCenter(planningCenters.value, centerId))
+  const handleDeleteCenter = async (centerId) => {
+    if (!await persistAndSetCenters(planningRepository.deleteCenter(planningCenters.value, centerId))) {
+      return
+    }
     navigateToHash(buildPlanningHomeHash())
   }
 
-  const handleSaveGroup = (groupDraft) => {
+  const handleSaveGroup = async (groupDraft) => {
     const targetCenterId = currentCenter.value?.id || currentRoute.value.centerId
     if (!targetCenterId) {
       navigateToHash(buildPlanningHomeHash())
@@ -216,7 +333,9 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     }
 
     const nextCenters = planningRepository.saveGroup(planningCenters.value, targetCenterId, groupDraft)
-    persistAndSetCenters(nextCenters)
+    if (!await persistAndSetCenters(nextCenters)) {
+      return
+    }
 
     const savedCenter = planningRepository.findCenter(nextCenters, targetCenterId)
     const savedGroup = groupDraft.id
@@ -232,12 +351,14 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     navigateToHash(buildPlanningCenterHash(targetCenterId))
   }
 
-  const handleDeleteGroup = ({ centerId, groupId }) => {
-    persistAndSetCenters(planningRepository.deleteGroup(planningCenters.value, centerId, groupId))
+  const handleDeleteGroup = async ({ centerId, groupId }) => {
+    if (!await persistAndSetCenters(planningRepository.deleteGroup(planningCenters.value, centerId, groupId))) {
+      return
+    }
     navigateToHash(buildPlanningCenterHash(centerId))
   }
 
-  const handleSavePlan = (planDraft) => {
+  const handleSavePlan = async (planDraft) => {
     const targetCenterId = currentCenter.value?.id
     const targetGroupId = currentGroup.value?.id
 
@@ -247,7 +368,9 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     }
 
     const nextCenters = planningRepository.savePlan(planningCenters.value, targetCenterId, targetGroupId, planDraft)
-    persistAndSetCenters(nextCenters)
+    if (!await persistAndSetCenters(nextCenters)) {
+      return
+    }
 
     const savedCenter = planningRepository.findCenter(nextCenters, targetCenterId)
     const savedGroup = savedCenter?.groups.find((group) => group.id === targetGroupId)
@@ -263,8 +386,10 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     navigateToHash(buildPlanningGroupHash(targetCenterId, targetGroupId, planDraft.planningYear))
   }
 
-  const handleDeletePlan = ({ centerId, groupId, planId, planningYear }) => {
-    persistAndSetCenters(planningRepository.deletePlan(planningCenters.value, centerId, groupId, planId))
+  const handleDeletePlan = async ({ centerId, groupId, planId, planningYear }) => {
+    if (!await persistAndSetCenters(planningRepository.deletePlan(planningCenters.value, centerId, groupId, planId))) {
+      return
+    }
     if (planningYear) {
       navigateToHash(buildPlanningGroupHash(centerId, groupId, planningYear))
       return
@@ -330,6 +455,40 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
         }
       }
 
+      if (route.page === 'forecasts') {
+        const routeCenter = route.centerId ? planningRepository.findCenter(centers, route.centerId) : null
+
+        if (route.centerId && !routeCenter) {
+          navigateToHash(buildPlanningHomeHash())
+          return
+        }
+
+        if (!routeCenter) {
+          return
+        }
+
+        const firstGroup = routeCenter.groups?.[0]
+        if (firstGroup?.id) {
+          navigateToHash(buildPlanningGroupForecastsHash(routeCenter.id, firstGroup.id))
+          return
+        }
+
+        navigateToHash(buildPlanningCenterHash(route.centerId))
+      }
+
+      if (route.page === 'group-forecasts') {
+        const routeCenter = route.centerId ? planningRepository.findCenter(centers, route.centerId) : null
+
+        if (route.centerId && !routeCenter) {
+          navigateToHash(buildPlanningHomeHash())
+          return
+        }
+
+        if (route.groupId && routeCenter && !planningRepository.findGroup(centers, route.centerId, route.groupId)) {
+          navigateToHash(buildPlanningCenterHash(route.centerId))
+        }
+      }
+
       if (route.page === 'editor') {
         const routeCenter = route.centerId
           ? planningRepository.findCenter(centers, route.centerId)
@@ -362,12 +521,14 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, hasWorkspaceAc
     currentGroup,
     currentPlan,
     plannerSeed,
+    forecastSeed,
     groupDraft,
     groupDraftKey,
     plannerDraftKey,
     monthlyPlannerKey,
     loadCentersForScope,
     workspaceHydrating,
+    workspaceSaveError,
     clearCenters,
     handleSaveCenter,
     handleDeleteCenter,

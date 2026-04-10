@@ -19,6 +19,18 @@ export default defineConfig({
             return 'ui-vendor'
           }
 
+          if (id.includes('vue-echarts')) {
+            return 'vue-echarts-vendor'
+          }
+
+          if (id.includes('zrender')) {
+            return 'zrender-vendor'
+          }
+
+          if (id.includes('echarts')) {
+            return 'echarts-vendor'
+          }
+
           if (id.includes('@supabase')) {
             return 'auth-vendor'
           }

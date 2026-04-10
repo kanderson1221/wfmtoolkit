@@ -17,6 +17,10 @@ const autosaveStatusClass = computed(() => {
     return 'text-[#15395f]'
   }
 
+  if (props.autosaveState === 'error') {
+    return 'text-rose-700'
+  }
+
   if (props.autosaveState === 'restored' || props.autosaveState === 'saved') {
     return 'text-[#15395f]'
   }

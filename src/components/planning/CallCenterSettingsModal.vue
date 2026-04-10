@@ -57,6 +57,16 @@ const holidayProfiles = defineModel('holidayProfiles', {
   required: true
 })
 
+const operatingOpenTime = defineModel('operatingOpenTime', {
+  type: String,
+  default: ''
+})
+
+const operatingCloseTime = defineModel('operatingCloseTime', {
+  type: String,
+  default: ''
+})
+
 const operatingWeekdays = defineModel('operatingWeekdays', {
   type: Array,
   required: true
@@ -195,6 +205,37 @@ watch(
 
 const selectedHolidayYearMinDate = computed(() => `${selectedHolidayYear.value}-01-01`)
 const selectedHolidayYearMaxDate = computed(() => `${selectedHolidayYear.value}-12-31`)
+
+const parseClockValueToMinutes = (value) => {
+  const [hoursText, minutesText] = String(value || '').split(':')
+  const hours = Number(hoursText)
+  const minutes = Number(minutesText)
+
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+    return null
+  }
+
+  return hours * 60 + minutes
+}
+
+const operatingHoursError = computed(() => {
+  if (!operatingOpenTime.value || !operatingCloseTime.value) {
+    return ''
+  }
+
+  const openMinutes = parseClockValueToMinutes(operatingOpenTime.value)
+  const closeMinutes = parseClockValueToMinutes(operatingCloseTime.value)
+
+  if (openMinutes == null || closeMinutes == null) {
+    return 'Enter valid opening and closing times.'
+  }
+
+  if (openMinutes >= closeMinutes) {
+    return 'Closing time must be later than opening time.'
+  }
+
+  return ''
+})
 
 const setHolidayProfilesForYear = (nextCustomHolidays) => {
   const nextProfile = createPlanningHolidayProfile(
@@ -354,6 +395,31 @@ const holidayYearStatusMessage = computed(() => {
             item-class="min-w-14 justify-center"
           />
         </AppFieldGroup>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <AppFieldGroup
+            label="Open Time"
+            input-id="call-center-open-time"
+          >
+            <AppTextField
+              id="call-center-open-time"
+              v-model="operatingOpenTime"
+              type="time"
+            />
+          </AppFieldGroup>
+
+          <AppFieldGroup
+            label="Close Time"
+            input-id="call-center-close-time"
+            :error="operatingHoursError"
+          >
+            <AppTextField
+              id="call-center-close-time"
+              v-model="operatingCloseTime"
+              type="time"
+            />
+          </AppFieldGroup>
+        </div>
       </AppWorkspaceSection>
 
       <AppWorkspaceSection
@@ -393,45 +459,64 @@ const holidayYearStatusMessage = computed(() => {
             {{ holidayYearStatusMessage }}
           </AppStatusMessage>
 
-          <div v-if="customHolidayRows.length" class="grid gap-3">
-            <div
-              v-for="holiday in customHolidayRows"
-              :key="holiday.id"
-              class="grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
-            >
-              <AppFieldGroup
-                :label="`Holiday Name`"
-                :input-id="`custom-holiday-label-${holiday.id}`"
-                :error="holidayRowErrors[holiday.id]?.label"
-              >
-                <AppTextField
-                  :id="`custom-holiday-label-${holiday.id}`"
-                  :model-value="holiday.label"
-                  maxlength="80"
-                  placeholder="Company holiday"
-                  @update:model-value="updateCustomHoliday(holiday.id, { label: $event })"
-                />
-              </AppFieldGroup>
+          <div v-if="customHolidayRows.length" class="overflow-hidden rounded-[18px] border border-slate-200 bg-white">
+            <div class="hidden border-b border-slate-200 bg-slate-50/80 px-3 py-2 md:grid md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-center md:gap-3">
+              <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Holiday
+              </span>
+              <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Date
+              </span>
+              <span class="text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Action
+              </span>
+            </div>
 
-              <AppFieldGroup
-                :label="`Date`"
-                :input-id="`custom-holiday-date-${holiday.id}`"
-                :error="holidayRowErrors[holiday.id]?.date"
+            <div class="divide-y divide-slate-200">
+              <div
+                v-for="(holiday, index) in customHolidayRows"
+                :key="holiday.id"
+                class="grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-start"
               >
-                <AppTextField
-                  :id="`custom-holiday-date-${holiday.id}`"
-                  type="date"
-                  :min="selectedHolidayYearMinDate"
-                  :max="selectedHolidayYearMaxDate"
-                  :model-value="holiday.date || ''"
-                  @update:model-value="updateCustomHoliday(holiday.id, { date: $event })"
-                />
-              </AppFieldGroup>
+                <div class="grid gap-1">
+                  <AppTextField
+                    :id="`custom-holiday-label-${holiday.id}`"
+                    :model-value="holiday.label"
+                    :aria-label="`Holiday name ${index + 1}`"
+                    maxlength="80"
+                    placeholder="Holiday name"
+                    @update:model-value="updateCustomHoliday(holiday.id, { label: $event })"
+                  />
+                  <p v-if="holidayRowErrors[holiday.id]?.label" class="text-[0.82rem] font-medium text-rose-700">
+                    {{ holidayRowErrors[holiday.id]?.label }}
+                  </p>
+                </div>
 
-              <div class="flex items-end justify-end">
-                <AppButton size="sm" variant="quiet" @click="removeCustomHoliday(holiday.id)">
-                  Delete
-                </AppButton>
+                <div class="grid gap-1">
+                  <AppTextField
+                    :id="`custom-holiday-date-${holiday.id}`"
+                    type="date"
+                    :min="selectedHolidayYearMinDate"
+                    :max="selectedHolidayYearMaxDate"
+                    :model-value="holiday.date || ''"
+                    :aria-label="`Holiday date ${index + 1}`"
+                    @update:model-value="updateCustomHoliday(holiday.id, { date: $event })"
+                  />
+                  <p v-if="holidayRowErrors[holiday.id]?.date" class="text-[0.82rem] font-medium text-rose-700">
+                    {{ holidayRowErrors[holiday.id]?.date }}
+                  </p>
+                </div>
+
+                <div class="flex items-start justify-end md:pt-1">
+                  <AppButton
+                    size="sm"
+                    variant="quiet"
+                    :aria-label="`Delete ${holiday.label || `holiday ${index + 1}`}`"
+                    @click="removeCustomHoliday(holiday.id)"
+                  >
+                    Delete
+                  </AppButton>
+                </div>
               </div>
             </div>
           </div>
@@ -446,7 +531,11 @@ const holidayYearStatusMessage = computed(() => {
     <template #footer>
       <div class="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-end">
         <AppButton variant="secondary" @click="emit('close')">Cancel</AppButton>
-        <AppButton variant="primary" :disabled="!centerName.trim() || hasHolidayValidationErrors" @click="emit('save')">
+        <AppButton
+          variant="primary"
+          :disabled="!centerName.trim() || hasHolidayValidationErrors || !!operatingHoursError"
+          @click="emit('save')"
+        >
           {{ props.submitLabel }}
         </AppButton>
       </div>

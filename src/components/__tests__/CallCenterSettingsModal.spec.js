@@ -38,6 +38,8 @@ const mountModal = (props = {}) => {
       holidayProfiles: [],
       displayYear: 2026,
       operatingWeekdays: [1, 2, 3, 4, 5],
+      operatingOpenTime: '',
+      operatingCloseTime: '',
       weekdayOptions: [
         { value: 0, label: 'Sun' },
         { value: 1, label: 'Mon' },
@@ -48,6 +50,8 @@ const mountModal = (props = {}) => {
         { value: 6, label: 'Sat' }
       ],
       'onUpdate:operatingWeekdays': (value) => syncProps({ operatingWeekdays: value }),
+      'onUpdate:operatingOpenTime': (value) => syncProps({ operatingOpenTime: value }),
+      'onUpdate:operatingCloseTime': (value) => syncProps({ operatingCloseTime: value }),
       'onUpdate:holidayProfiles': (value) => syncProps({ holidayProfiles: value }),
       ...props
     },
@@ -94,6 +98,24 @@ describe('CallCenterSettingsModal', () => {
     expect(wrapper.props('operatingWeekdays')).toEqual([2, 3, 4, 5, 6])
   })
 
+  it('captures operating hours and validates that close time is later than open time', async () => {
+    const wrapper = mountModal()
+    const openTimeInput = wrapper.find('#call-center-open-time')
+    const closeTimeInput = wrapper.find('#call-center-close-time')
+
+    await openTimeInput.setValue('09:00')
+    await closeTimeInput.setValue('17:30')
+
+    expect(wrapper.props('operatingOpenTime')).toBe('09:00')
+    expect(wrapper.props('operatingCloseTime')).toBe('17:30')
+    expect(wrapper.text()).not.toContain('Hours of operation: 09:00 to 17:30.')
+
+    await closeTimeInput.setValue('08:30')
+
+    expect(wrapper.text()).toContain('Closing time must be later than opening time.')
+    expect(findButtonByText(wrapper, 'Save Call Center').attributes('disabled')).toBeDefined()
+  })
+
   it('loads U.S. holidays into the selected holiday year profile', async () => {
     const wrapper = mountModal({
       displayYear: 2027,
@@ -105,6 +127,35 @@ describe('CallCenterSettingsModal', () => {
     expect(wrapper.props('holidayProfiles')).toHaveLength(1)
     expect(wrapper.props('holidayProfiles')[0].year).toBe(2027)
     expect(wrapper.props('holidayProfiles')[0].customHolidays.some((holiday) => holiday.date.startsWith('2027-'))).toBe(true)
+  })
+
+  it('renders holiday rows in a compact shared-header layout', () => {
+    const wrapper = mountModal({
+      displayYear: 2027,
+      holidayProfiles: [
+        {
+          year: 2027,
+          customHolidays: [
+            {
+              id: 'new-years-day',
+              label: 'New Year\'s Day',
+              date: '2027-01-01'
+            },
+            {
+              id: 'company-day',
+              label: 'Company Day',
+              date: '2027-07-16'
+            }
+          ]
+        }
+      ]
+    })
+
+    expect(wrapper.text()).toContain('Holiday')
+    expect(wrapper.text()).toContain('Date')
+    expect(wrapper.text()).not.toContain('Holiday Name')
+    expect(wrapper.findAll('input[aria-label^="Holiday name"]').length).toBe(2)
+    expect(wrapper.findAll('input[aria-label^="Holiday date"]').length).toBe(2)
   })
 
   it('copies the prior year holiday schedule into the selected year', async () => {

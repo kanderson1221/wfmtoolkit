@@ -18,6 +18,7 @@ from .batch import (
     process_uploaded_file,
 )
 from .erlang import build_results_payload
+from .forecasting import ForecastRunRequest, run_daily_volume_forecast
 from .models import StaffingInput
 
 
@@ -186,6 +187,16 @@ async def file_processor_upload(request: Request) -> dict[str, Any]:
     except HTTPException:
         temp_upload.unlink(missing_ok=True)
         raise
+
+
+@app.post("/api/forecasting/daily-volume/run")
+def daily_volume_forecast(payload: ForecastRunRequest) -> dict[str, Any]:
+    try:
+        return run_daily_volume_forecast(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/erlang-c/batch/file-processor/download/{file_id}")

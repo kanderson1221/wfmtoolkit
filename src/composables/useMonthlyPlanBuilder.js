@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import { plannerDraftRepository } from '../plannerDraftRepository'
 import {
@@ -37,10 +37,14 @@ import {
   summarizeStaffingRecords,
   toNumber
 } from '../plannerModel'
+import {
+  createPlanDemandSource
+} from '../planner/demandSources'
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
 import { buildExamplePlannerState } from './monthlyPlanBuilder/examplePlan'
+import { usePlannerAutosave } from './monthlyPlanBuilder/usePlannerAutosave'
+import { usePlannerForecastDemandSource } from './monthlyPlanBuilder/usePlannerForecastDemandSource'
 import {
-  autosaveTimeFormatter,
   currentMonthIndex,
   currentYear,
   formatFactor,
@@ -84,110 +88,156 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     : toNumber(props.prefilledYear, NaN)
   const hasPrefilledYear = Number.isFinite(prefilledYear)
   const resolvedDraftKey = computed(() => plannerDraftRepository.buildDraftKey(props.draftKey || savedPlan?.id))
-  const activeDraftKey = ref(resolvedDraftKey.value)
-  const restoredDraft = plannerDraftRepository.loadDraft(activeDraftKey.value)
-  const sourcePlan =
-    restoredDraft?.plan
-      ? syncPlanScheduleWithSeed(restoredDraft.plan)
-      : savedPlan
-        ? syncPlanScheduleWithSeed(savedPlan)
-        : null
-  const initialPlan = sourcePlan || props.centerDefaults || {}
-  const initialUi = restoredDraft?.ui || {}
-  const initialReviewedSections = Array.isArray(initialUi.reviewedSections)
-    ? initialUi.reviewedSections.filter((sectionId) => CORE_SECTION_IDS.has(sectionId))
-    : sourcePlan?.id || initialPlan.id
-      ? [...CORE_SECTION_IDS]
-      : []
   const plannerSeedDefaults = computed(() =>
     buildPlannerSeedDefaults(props.centerDefaults, hasPrefilledYear ? prefilledYear : currentYear)
   )
-  const initialState = resolvePlannerInitialState({
-    sourcePlan,
-    centerDefaults: props.centerDefaults,
-    prefilledYear
-  })
-  const legacyInitialTab = initialUi.activeTab === 'random' || initialUi.activeTab === 'plan'
-    ? initialUi.activeTab
-    : 'presence'
-  const normalizedInitialForecastStep = (() => {
-    if (initialUi.activeForecastStep === 'variability' || initialUi.activeForecastStep === 'requirement') {
-      return initialUi.activeForecastStep
-    }
+  const restoredDraft = ref(null)
+  const plannerBootstrapping = ref(true)
 
-    if (legacyInitialTab === 'random') {
-      return 'variability'
-    }
+  const buildBootstrapState = (draftPayload = null) => {
+    const sourcePlan =
+      draftPayload?.plan
+        ? syncPlanScheduleWithSeed(draftPayload.plan)
+        : savedPlan
+          ? syncPlanScheduleWithSeed(savedPlan)
+          : null
+    const initialPlan = sourcePlan || props.centerDefaults || {}
+    const initialUi = draftPayload?.ui || {}
+    const initialReviewedSections = Array.isArray(initialUi.reviewedSections)
+      ? initialUi.reviewedSections.filter((sectionId) => CORE_SECTION_IDS.has(sectionId))
+      : sourcePlan?.id || initialPlan.id
+        ? [...CORE_SECTION_IDS]
+        : []
+    const initialState = resolvePlannerInitialState({
+      sourcePlan,
+      centerDefaults: props.centerDefaults,
+      prefilledYear
+    })
+    const initialSelectedForecastProjectId = initialUi.selectedForecastProjectId || initialState.demandSource.forecastProjectId || ''
+    const legacyInitialTab = initialUi.activeTab === 'random' || initialUi.activeTab === 'plan'
+      ? initialUi.activeTab
+      : 'presence'
+    const normalizedInitialForecastStep = (() => {
+      if (initialUi.activeForecastStep === 'variability' || initialUi.activeForecastStep === 'requirement') {
+        return initialUi.activeForecastStep
+      }
 
-    if (legacyInitialTab === 'plan') {
-      return 'requirement'
-    }
+      if (legacyInitialTab === 'random') {
+        return 'variability'
+      }
 
-    return 'availability'
-  })()
-  const normalizedInitialSection = (() => {
-    if (
-      initialUi.activeSection === 'overview' ||
-      initialUi.activeSection === 'availability' ||
-      initialUi.activeSection === 'variability' ||
-      initialUi.activeSection === 'requirement' ||
-      initialUi.activeSection === 'staffing' ||
-      initialUi.activeSection === 'actuals'
-    ) {
-      return initialUi.activeSection
-    }
+      if (legacyInitialTab === 'plan') {
+        return 'requirement'
+      }
 
-    if (initialUi.activeSection === 'forecast') {
-      return normalizedInitialForecastStep
-    }
+      return 'availability'
+    })()
+    const normalizedInitialSection = (() => {
+      if (
+        initialUi.activeSection === 'overview' ||
+        initialUi.activeSection === 'availability' ||
+        initialUi.activeSection === 'variability' ||
+        initialUi.activeSection === 'requirement' ||
+        initialUi.activeSection === 'staffing' ||
+        initialUi.activeSection === 'actuals'
+      ) {
+        return initialUi.activeSection
+      }
 
-    if (initialUi.activeSection === 'budget' || initialUi.activeSection === 'review') {
+      if (initialUi.activeSection === 'forecast') {
+        return normalizedInitialForecastStep
+      }
+
+      if (initialUi.activeSection === 'budget' || initialUi.activeSection === 'review') {
+        return 'overview'
+      }
+
+      if (initialUi.activeMode === 'staffing') {
+        return 'staffing'
+      }
+
+      if (legacyInitialTab === 'random') {
+        return 'variability'
+      }
+
+      if (legacyInitialTab === 'plan') {
+        return 'requirement'
+      }
+
       return 'overview'
+    })()
+
+    return {
+      initialState,
+      selectedForecastProjectId: initialSelectedForecastProjectId,
+      activeSection: normalizedInitialSection,
+      activeForecastStep: normalizedInitialForecastStep,
+      selectedMonthIndex: clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1),
+      reviewedSections: [...new Set(initialReviewedSections)]
     }
+  }
 
-    if (initialUi.activeMode === 'staffing') {
-      return 'staffing'
-    }
+  const applyBootstrapState = (bootstrapState) => {
+    planningYear.value = bootstrapState.initialState.planningYear
+    activeSection.value = bootstrapState.activeSection
+    activeForecastStep.value = bootstrapState.activeForecastStep
+    selectedMonthIndex.value = bootstrapState.selectedMonthIndex
+    operatingWeekdays.value = [...bootstrapState.initialState.operatingWeekdays]
+    holidayCalendarId.value = bootstrapState.initialState.holidayCalendarId
+    disabledHolidayRuleIds.value = [...bootstrapState.initialState.disabledHolidayRuleIds]
+    customHolidays.value = bootstrapState.initialState.customHolidays.map((holiday) => ({ ...holiday }))
+    holidayScheduleMode.value = bootstrapState.initialState.holidayScheduleMode
+    presenceMonths.value = bootstrapState.initialState.presenceMonths.map((month) => createPresenceMonth(month))
+    randomDefaults.value = createRandomMonth(bootstrapState.initialState.randomDefaults)
+    useMonthlyRandomOverrides.value = bootstrapState.initialState.useMonthlyRandomOverrides
+    randomMonths.value = bootstrapState.initialState.randomMonths.map((month) => createRandomMonth(month))
+    planMonths.value = bootstrapState.initialState.planMonths.map((month) => createPlanMonth(month))
+    demandSource.value = createPlanDemandSource(bootstrapState.initialState.demandSource)
+    selectedForecastProjectId.value = bootstrapState.selectedForecastProjectId
+    actualsMonths.value = bootstrapState.initialState.actualsMonths.map((month) => createActualsMonth(month))
+    trainingSettings.value = createTrainingSettings(bootstrapState.initialState.trainingSettings)
+    nextYearOpening.value = createNextYearOpening(bootstrapState.initialState.nextYearOpening)
+    startingHeadcount.value = bootstrapState.initialState.startingHeadcount
+    startingFrontlineHeadcount.value = bootstrapState.initialState.startingFrontlineHeadcount
+    staffingMonths.value = bootstrapState.initialState.staffingMonths.map((month) => createStaffingMonth(month))
+    trainingClasses.value = bootstrapState.initialState.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass))
+    reviewedSections.value = [...bootstrapState.reviewedSections]
+  }
 
-    if (legacyInitialTab === 'random') {
-      return 'variability'
-    }
+  const initialBootstrapState = buildBootstrapState()
+  const sourcePlanReference = computed(() =>
+    restoredDraft.value?.plan
+      ? syncPlanScheduleWithSeed(restoredDraft.value.plan)
+      : savedPlan
+        ? syncPlanScheduleWithSeed(savedPlan)
+        : props.centerDefaults || {}
+  )
 
-    if (legacyInitialTab === 'plan') {
-      return 'requirement'
-    }
-
-    return 'overview'
-  })()
-
-  const planningYear = ref(initialState.planningYear)
-  const activeSection = ref(normalizedInitialSection)
-  const activeForecastStep = ref(normalizedInitialForecastStep)
-  const selectedMonthIndex = ref(clamp(toNumber(initialUi.selectedMonthIndex, currentMonthIndex), 0, MONTH_LABELS.length - 1))
-  const operatingWeekdays = ref([...initialState.operatingWeekdays])
-  const holidayCalendarId = ref(initialState.holidayCalendarId)
-  const disabledHolidayRuleIds = ref([...initialState.disabledHolidayRuleIds])
-  const customHolidays = ref(initialState.customHolidays.map((holiday) => ({ ...holiday })))
-  const holidayScheduleMode = ref(initialState.holidayScheduleMode)
-  const presenceMonths = ref(initialState.presenceMonths.map((month) => createPresenceMonth(month)))
-  const randomDefaults = ref(createRandomMonth(initialState.randomDefaults))
-  const useMonthlyRandomOverrides = ref(initialState.useMonthlyRandomOverrides)
-  const randomMonths = ref(initialState.randomMonths.map((month) => createRandomMonth(month)))
-  const planMonths = ref(initialState.planMonths.map((month) => createPlanMonth(month)))
-  const actualsMonths = ref(initialState.actualsMonths.map((month) => createActualsMonth(month)))
-  const trainingSettings = ref(createTrainingSettings(initialState.trainingSettings))
-  const nextYearOpening = ref(createNextYearOpening(initialState.nextYearOpening))
-  const startingHeadcount = ref(initialState.startingHeadcount)
-  const startingFrontlineHeadcount = ref(initialState.startingFrontlineHeadcount)
-  const staffingMonths = ref(initialState.staffingMonths.map((month) => createStaffingMonth(month)))
-  const trainingClasses = ref(initialState.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass)))
-  const reviewedSections = ref([...new Set(initialReviewedSections)])
-  const autosaveState = ref(restoredDraft ? 'restored' : savedPlan?.updatedAt ? 'saved' : 'idle')
-  const lastAutosavedAt = ref(restoredDraft?.autosavedAt || savedPlan?.updatedAt || null)
-  const autosaveReady = ref(false)
-  const suspendAutosave = ref(false)
-
-  let autosaveTimer = null
+  const planningYear = ref(initialBootstrapState.initialState.planningYear)
+  const activeSection = ref(initialBootstrapState.activeSection)
+  const activeForecastStep = ref(initialBootstrapState.activeForecastStep)
+  const selectedMonthIndex = ref(initialBootstrapState.selectedMonthIndex)
+  const operatingWeekdays = ref([...initialBootstrapState.initialState.operatingWeekdays])
+  const holidayCalendarId = ref(initialBootstrapState.initialState.holidayCalendarId)
+  const disabledHolidayRuleIds = ref([...initialBootstrapState.initialState.disabledHolidayRuleIds])
+  const customHolidays = ref(initialBootstrapState.initialState.customHolidays.map((holiday) => ({ ...holiday })))
+  const holidayScheduleMode = ref(initialBootstrapState.initialState.holidayScheduleMode)
+  const presenceMonths = ref(initialBootstrapState.initialState.presenceMonths.map((month) => createPresenceMonth(month)))
+  const randomDefaults = ref(createRandomMonth(initialBootstrapState.initialState.randomDefaults))
+  const useMonthlyRandomOverrides = ref(initialBootstrapState.initialState.useMonthlyRandomOverrides)
+  const randomMonths = ref(initialBootstrapState.initialState.randomMonths.map((month) => createRandomMonth(month)))
+  const planMonths = ref(initialBootstrapState.initialState.planMonths.map((month) => createPlanMonth(month)))
+  const demandSource = ref(createPlanDemandSource(initialBootstrapState.initialState.demandSource))
+  const selectedForecastProjectId = ref(initialBootstrapState.selectedForecastProjectId)
+  const actualsMonths = ref(initialBootstrapState.initialState.actualsMonths.map((month) => createActualsMonth(month)))
+  const trainingSettings = ref(createTrainingSettings(initialBootstrapState.initialState.trainingSettings))
+  const nextYearOpening = ref(createNextYearOpening(initialBootstrapState.initialState.nextYearOpening))
+  const startingHeadcount = ref(initialBootstrapState.initialState.startingHeadcount)
+  const startingFrontlineHeadcount = ref(initialBootstrapState.initialState.startingFrontlineHeadcount)
+  const staffingMonths = ref(initialBootstrapState.initialState.staffingMonths.map((month) => createStaffingMonth(month)))
+  const trainingClasses = ref(initialBootstrapState.initialState.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass)))
+  const reviewedSections = ref([...new Set(initialBootstrapState.reviewedSections)])
+  const validationMessage = ref('')
 
   const markSectionReviewed = (sectionId) => {
     if (!CORE_SECTION_IDS.has(sectionId) || reviewedSections.value.includes(sectionId)) {
@@ -281,6 +331,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const loadExamplePlan = () => {
+    validationMessage.value = ''
     const examplePlan = buildExamplePlannerState(currentYear + 1)
 
     planningYear.value = currentYear + 1
@@ -294,6 +345,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides.value = false
     randomMonths.value = examplePlan.randomMonths
     planMonths.value = examplePlan.planMonths
+    demandSource.value = createPlanDemandSource(examplePlan.demandSource)
+    selectedForecastProjectId.value = examplePlan.demandSource?.forecastProjectId || ''
     actualsMonths.value = buildActualsMonths()
     startingHeadcount.value = examplePlan.startingHeadcount
     startingFrontlineHeadcount.value = examplePlan.startingFrontlineHeadcount
@@ -308,6 +361,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const resetPlanner = () => {
+    validationMessage.value = ''
     planningYear.value = plannerSeedDefaults.value.planningYear
     operatingWeekdays.value = [...plannerSeedDefaults.value.operatingWeekdays]
     holidayCalendarId.value = plannerSeedDefaults.value.holidayCalendarId
@@ -319,6 +373,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides.value = false
     randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(plannerSeedDefaults.value.randomDefaults))
     planMonths.value = buildPlanMonths()
+    demandSource.value = createPlanDemandSource()
+    selectedForecastProjectId.value = ''
     actualsMonths.value = buildActualsMonths()
     trainingSettings.value = createTrainingSettings()
     nextYearOpening.value = createNextYearOpening()
@@ -331,6 +387,27 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     activeForecastStep.value = 'availability'
     selectedMonthIndex.value = currentMonthIndex
   }
+
+  const {
+    availableForecastProjects,
+    savedForecastProjectCount,
+    forecastsLoading,
+    forecastsError,
+    forecastSelectOptions,
+    selectedForecastProject,
+    selectedForecastPreviewSummary,
+    demandSourceSummary,
+    forecastCanApply,
+    setDemandSourceMode,
+    applyForecastToDemand,
+    reloadForecastProjects: loadForecastProjects
+  } = usePlannerForecastDemandSource({
+    props,
+    planningYear,
+    demandSource,
+    planMonths,
+    selectedForecastProjectId
+  })
 
   const monthlyRecords = computed(() =>
     computeMonthlyRecords({
@@ -362,7 +439,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const linkedPriorPlan = computed(() =>
     findLinkedPriorPlan(props.groupPlans || [], {
-      id: sourcePlan?.id || initialPlan.id || null,
+      id: sourcePlanReference.value?.id || null,
       planningYear: planningYear.value
     })
   )
@@ -430,7 +507,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const displayPlanLabel = computed(() => `${planningYear.value} Plan`)
   const duplicateYearPlan = computed(() => {
     const targetYear = toNumber(planningYear.value, currentYear)
-    const currentPlanId = sourcePlan?.id || initialPlan.id || null
+    const currentPlanId = sourcePlanReference.value?.id || null
 
     return (props.groupPlans || []).find(
       (plan) => plan?.id !== currentPlanId && toNumber(plan?.planningYear, currentYear) === targetYear
@@ -451,8 +528,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const hasNextYearStartingFrontlineTarget = computed(() => nextYearOpening.value.frontlineHeadcount != null)
 
   const buildPlanPayload = () => ({
-    id: sourcePlan?.id || initialPlan.id || null,
-    createdAt: sourcePlan?.createdAt || initialPlan.createdAt || null,
+    id: sourcePlanReference.value?.id || null,
+    createdAt: sourcePlanReference.value?.createdAt || null,
     name: `${planningYear.value} Plan`,
     planningYear: planningYear.value,
     operatingWeekdays: [...operatingWeekdays.value],
@@ -465,6 +542,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
     randomMonths: randomMonths.value.map((month) => createRandomMonth(month)),
     planMonths: planMonths.value.map((month) => createPlanMonth(month)),
+    demandSource: createPlanDemandSource(demandSource.value),
     actualsMonths: actualsMonths.value.map((month) => createActualsMonth(month)),
     trainingSettings: createTrainingSettings(trainingSettings.value),
     nextYearOpening: createNextYearOpening({
@@ -513,9 +591,46 @@ export const useMonthlyPlanBuilder = (props, emit) => {
           : activeSection.value === 'requirement'
             ? 'plan'
             : 'presence',
+      selectedForecastProjectId: selectedForecastProjectId.value,
       selectedMonthIndex: selectedMonthIndex.value,
       reviewedSections: [...reviewedSections.value]
     }
+  })
+
+  const hydratePlannerDraft = async () => {
+    plannerBootstrapping.value = true
+
+    try {
+      restoredDraft.value = await plannerDraftRepository.loadDraft(resolvedDraftKey.value)
+
+      if (restoredDraft.value?.plan || restoredDraft.value?.ui) {
+        applyBootstrapState(buildBootstrapState(restoredDraft.value))
+      }
+
+      validationMessage.value = ''
+    } finally {
+      plannerBootstrapping.value = false
+    }
+  }
+
+  const {
+    autosaveState,
+    autosaveReady,
+    suspendAutosave,
+    autosaveStatusMessage,
+    queueAutosave,
+    flushAutosave,
+    completeManualSave
+  } = usePlannerAutosave({
+    resolvedDraftKey,
+    restoredDraft,
+    plannerBootstrapping,
+    savedPlan,
+    buildDraftPayload
+  })
+
+  onMounted(() => {
+    void hydratePlannerDraft()
   })
 
   watch(plannerSeedDefaults, (nextSeedDefaults) => {
@@ -530,76 +645,17 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     markSectionReviewed(sectionId)
   })
 
-  const clearPendingAutosave = () => {
-    if (autosaveTimer) {
-      window.clearTimeout(autosaveTimer)
-      autosaveTimer = null
-    }
-  }
-
-  const persistDraftNow = () => {
-    if (suspendAutosave.value) {
-      return
-    }
-
-    const nextDraft = plannerDraftRepository.persistDraft(activeDraftKey.value, buildDraftPayload())
-    lastAutosavedAt.value = nextDraft.autosavedAt
-    autosaveState.value = 'saved'
-  }
-
-  const queueAutosave = () => {
-    if (!autosaveReady.value || suspendAutosave.value) {
-      return
-    }
-
-    clearPendingAutosave()
-    autosaveState.value = 'saving'
-    autosaveTimer = window.setTimeout(() => {
-      persistDraftNow()
-      autosaveTimer = null
-    }, 700)
-  }
-
-  const flushAutosave = () => {
-    if (!autosaveReady.value || suspendAutosave.value) {
-      return
-    }
-
-    clearPendingAutosave()
-    persistDraftNow()
-  }
-
-  const removeDraft = () => {
-    clearPendingAutosave()
-    plannerDraftRepository.clearDraft(activeDraftKey.value)
-    lastAutosavedAt.value = null
-    autosaveState.value = 'idle'
-  }
-
-  watch(resolvedDraftKey, (nextDraftKey, previousDraftKey) => {
-    if (!nextDraftKey || nextDraftKey === previousDraftKey) {
-      return
-    }
-
-    activeDraftKey.value = nextDraftKey
-
-    if (!autosaveReady.value || suspendAutosave.value) {
-      return
-    }
-
-    clearPendingAutosave()
-
-    const nextDraft = plannerDraftRepository.persistDraft(nextDraftKey, buildDraftPayload())
-    lastAutosavedAt.value = nextDraft.autosavedAt
-    autosaveState.value = 'saved'
-  })
+  watch([planningYear, () => props.groupPlans], () => {
+    validationMessage.value = ''
+  }, { deep: true })
 
   const validatePlanDetails = () => {
     if (duplicateYearPlan.value) {
-      window.alert(duplicateYearMessage.value)
+      validationMessage.value = duplicateYearMessage.value
       return false
     }
 
+    validationMessage.value = ''
     return true
   }
 
@@ -609,35 +665,15 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     }
 
     const savedAt = new Date().toISOString()
-    suspendAutosave.value = true
-    removeDraft()
-    lastAutosavedAt.value = savedAt
-    autosaveState.value = 'saved'
+    void completeManualSave(savedAt)
     emit('save', buildPlanPayload())
   }
 
   const cancelEditor = () => {
-    flushAutosave()
+    void flushAutosave()
     emit('cancel')
   }
 
-  const autosaveStatusMessage = computed(() => {
-    if (autosaveState.value === 'saving') {
-      return 'Autosaving draft...'
-    }
-
-    if (lastAutosavedAt.value) {
-      const formattedTime = autosaveTimeFormatter.format(new Date(lastAutosavedAt.value))
-      if (autosaveState.value === 'saved') {
-        return `Saved ${formattedTime}`
-      }
-      return autosaveState.value === 'restored'
-        ? `Draft restored from ${formattedTime}`
-        : `Autosaved ${formattedTime}`
-    }
-
-    return 'Autosave ready'
-  })
   watch(
     [
       planningYear,
@@ -654,6 +690,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       useMonthlyRandomOverrides,
       randomMonths,
       planMonths,
+      demandSource,
+      selectedForecastProjectId,
       actualsMonths,
       trainingSettings,
       nextYearOpening,
@@ -663,11 +701,15 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       trainingClasses
     ],
     () => {
+      if (plannerBootstrapping.value) {
+        return
+      }
+
       if (autosaveState.value === 'restored' || autosaveState.value === 'saved') {
         autosaveState.value = 'idle'
       }
 
-      queueAutosave()
+      void queueAutosave()
     },
     { deep: true }
   )
@@ -691,19 +733,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     { immediate: true }
   )
 
-  onMounted(() => {
-    autosaveReady.value = true
-    window.addEventListener('beforeunload', flushAutosave)
-  })
-
-  onBeforeUnmount(() => {
-    if (!suspendAutosave.value) {
-      flushAutosave()
-    }
-
-    window.removeEventListener('beforeunload', flushAutosave)
-  })
-
   return {
     planningYear,
     activeSection,
@@ -718,6 +747,17 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides,
     randomMonths,
     planMonths,
+    demandSource,
+    selectedForecastProjectId,
+    availableForecastProjects,
+    savedForecastProjectCount,
+    forecastsLoading,
+    forecastsError,
+    forecastSelectOptions,
+    selectedForecastProject,
+    selectedForecastPreviewSummary,
+    demandSourceSummary,
+    forecastCanApply,
     actualsMonths,
     trainingSettings,
     nextYearOpening,
@@ -732,6 +772,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     effectiveTrainingClasses,
     reviewedSections,
     autosaveState,
+    plannerBootstrapping,
     monthlyRecords,
     displayPlanLabel,
     presenceSummary,
@@ -743,6 +784,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     actualsRecords,
     actualsSummary,
     autosaveStatusMessage,
+    validationMessage,
     formatNumber,
     formatWhole,
     formatPercent,
@@ -753,6 +795,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     handlePresenceCopyAction,
     handleRandomCopyAction,
     setRandomOverrideMode,
+    setDemandSourceMode,
+    applyForecastToDemand,
+    reloadForecastProjects: loadForecastProjects,
     loadExamplePlan,
     resetPlanner,
     generateRecommendedTrainingClasses,

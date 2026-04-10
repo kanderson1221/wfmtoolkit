@@ -8,29 +8,18 @@ import planningToolImageUrl from '../assets/landing-planning-tool.png'
 import logoUrl from '../assets/logo.svg'
 import AppButton from './ui/AppButton.vue'
 
-defineProps({
-  authConfigured: {
-    type: Boolean,
-    default: false
-  },
-  isAuthenticated: {
-    type: Boolean,
-    default: false
-  },
-  userEmail: {
-    type: String,
-    default: ''
-  }
-})
-
 const topNavLinks = [
   {
     id: 'planning-workspace',
     label: 'Planning Workspace'
   },
   {
+    id: 'forecasting-workspace',
+    label: 'Forecasting'
+  },
+  {
     id: 'erlang-tools',
-    label: 'Erlang Tools'
+    label: 'Erlang Calculators'
   }
 ]
 
@@ -44,6 +33,12 @@ const erlangHighlights = [
   'Run Erlang C staffing checks quickly when a question needs a near-term answer.',
   'Test service level, occupancy, shrinkage, and volume assumptions before planning work begins.',
   'Use file-driven analysis when you need to review multiple scenarios together.'
+]
+
+const forecastingHighlights = [
+  'Open forecasting from inside each staffing group so the workspace starts with the right calendar and operating setup.',
+  'Review daily demand, monthly rollups, components, and accuracy checks in one place.',
+  'Carry saved forecast totals into Planning Workspace when monthly demand should come from a forecast.'
 ]
 
 const openPublicHome = () => {
@@ -97,7 +92,7 @@ const scrollToSection = (sectionId) => {
           </h1>
           <p class="max-w-4xl text-[1.05rem] leading-8 text-slate-700">
             Built by a workforce manager, WFM Toolkit is an independent project that helps teams explore staffing
-            scenarios, structure annual plans, and work through operational assumptions in one place.
+            scenarios, produce demand forecasts, and structure annual plans in clearly separated workspaces.
           </p>
           <div class="flex flex-wrap items-center gap-3 pt-1">
             <AppButton
@@ -111,12 +106,20 @@ const scrollToSection = (sectionId) => {
               Open Planning Workspace
             </AppButton>
             <AppButton
+              href="#planning"
+              variant="secondary"
+              size="lg"
+              class="rounded-[1.1rem] border-slate-300 bg-white px-5 hover:border-[#c4d1de] hover:bg-slate-50"
+            >
+              Open Call Centers
+            </AppButton>
+            <AppButton
               href="#calculators/interval"
               variant="secondary"
               size="lg"
               class="rounded-[1.1rem] border-slate-300 bg-white px-5 hover:border-[#c4d1de] hover:bg-slate-50"
             >
-              Explore Erlang Tools
+              Open Erlang Calculators
             </AppButton>
           </div>
           <div class="grid max-w-4xl gap-2 border-l border-[#ccd7e2] pl-4">
@@ -188,12 +191,81 @@ const scrollToSection = (sectionId) => {
         </div>
       </section>
 
-      <section id="erlang-tools" class="scroll-mt-28 bg-slate-50/55">
+      <section id="forecasting-workspace" class="scroll-mt-28 bg-slate-50/55">
+        <div class="app-frame landing-frame grid gap-10 py-14 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center lg:gap-14 lg:py-18">
+          <div class="grid gap-6">
+            <h2 class="text-[2rem] font-semibold leading-[1.02] tracking-[-0.04em] text-slate-950">
+              Forecasting
+            </h2>
+            <p class="max-w-xl text-[1rem] leading-8 text-slate-700">
+              Build daily demand forecasts inside each staffing group, then carry the monthly rollup into planning when
+              the plan should follow forecasted volume.
+            </p>
+            <ul class="grid divide-y divide-slate-200/80 text-sm leading-7 text-slate-600">
+              <li
+                v-for="highlight in forecastingHighlights"
+                :key="highlight"
+                class="flex gap-3 py-3.5 first:pt-0 last:pb-0"
+              >
+                <span class="mt-3 h-px w-7 shrink-0 bg-[#9db0c4]" aria-hidden="true" />
+                <span>{{ highlight }}</span>
+              </li>
+            </ul>
+            <div class="pt-1">
+              <AppButton
+                href="#planning"
+                variant="primary"
+                size="lg"
+                icon-position="right"
+                :icon="mdiArrowRight"
+                class="rounded-[1.1rem] px-5"
+              >
+                Open Call Centers
+              </AppButton>
+            </div>
+          </div>
+
+          <div class="overflow-hidden rounded-[30px] border border-[#173b5d] bg-[#102f4f] text-white shadow-[0_24px_56px_rgba(15,23,42,0.18)]">
+            <div class="grid gap-6 p-6 lg:p-7">
+              <div class="grid gap-2">
+                <span class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-300">Forecasting</span>
+                <h3 class="text-[1.7rem] font-semibold leading-[1.03] tracking-[-0.04em]">
+                  Daily forecasts that stay usable downstream.
+                </h3>
+                <p class="max-w-xl text-sm leading-7 text-slate-200">
+                  Forecasts now live inside each staffing group so teams can model demand with the right operating days,
+                  hours, holidays, and planning context already attached.
+                </p>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-3">
+                <div class="rounded-[24px] border border-white/10 bg-white/6 p-4">
+                  <div class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-300">Daily Demand</div>
+                  <div class="mt-2 text-lg font-semibold text-white">Forecast</div>
+                  <p class="mt-2 text-sm leading-6 text-slate-200">Review history, forecast, and uncertainty in one charting workspace.</p>
+                </div>
+                <div class="rounded-[24px] border border-white/10 bg-white/6 p-4">
+                  <div class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-300">Monthly Rollup</div>
+                  <div class="mt-2 text-lg font-semibold text-white">Planning Ready</div>
+                  <p class="mt-2 text-sm leading-6 text-slate-200">Carry forecasted monthly contacts into a plan when demand should come from a saved run.</p>
+                </div>
+                <div class="rounded-[24px] border border-white/10 bg-white/6 p-4">
+                  <div class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-300">Accuracy</div>
+                  <div class="mt-2 text-lg font-semibold text-white">Test Set</div>
+                  <p class="mt-2 text-sm leading-6 text-slate-200">Score held-back days so the forecast can be reviewed before it moves into planning.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="erlang-tools" class="scroll-mt-28 bg-white/82">
         <div class="app-frame landing-frame grid gap-10 py-14 lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)] lg:items-center lg:gap-14 lg:py-18">
           <div class="overflow-hidden rounded-[30px] border border-slate-200 bg-slate-50 shadow-[0_24px_56px_rgba(15,23,42,0.08)] lg:order-1">
             <img
               :src="erlangToolImageUrl"
-              alt="Erlang Tools showing interval staffing inputs and recommendation results."
+              alt="Erlang Calculators showing interval staffing inputs and recommendation results."
               class="block aspect-[16/10] w-full object-cover object-top"
               loading="lazy"
             />
@@ -204,7 +276,7 @@ const scrollToSection = (sectionId) => {
 
           <div class="grid gap-6 lg:order-2">
             <h2 class="text-[2rem] font-semibold leading-[1.02] tracking-[-0.04em] text-slate-950">
-              Erlang Tools
+              Erlang Calculators
             </h2>
             <p class="max-w-xl text-[1rem] leading-8 text-slate-700">
               Run Erlang-based staffing checks, scenario testing, and file-driven analysis before work moves into a
@@ -229,7 +301,7 @@ const scrollToSection = (sectionId) => {
                 :icon="mdiArrowRight"
                 class="rounded-[1.1rem] border-slate-300 bg-white px-5 hover:border-[#c4d1de] hover:bg-slate-50"
               >
-                Explore Erlang Tools
+                Open Erlang Calculators
               </AppButton>
             </div>
           </div>
@@ -242,7 +314,8 @@ const scrollToSection = (sectionId) => {
         <p>Independent workforce planning and staffing tools built for practical analysis.</p>
         <div class="flex flex-wrap items-center gap-4">
           <a href="#planning" class="hover:text-[#173b5d]">Planning Workspace</a>
-          <a href="#calculators/interval" class="hover:text-[#173b5d]">Erlang Tools</a>
+          <a href="#planning" class="hover:text-[#173b5d]">Forecasting In Call Centers</a>
+          <a href="#calculators/interval" class="hover:text-[#173b5d]">Erlang Calculators</a>
           <a href="/terms/index.html" class="hover:text-[#173b5d]">Terms</a>
         </div>
       </div>

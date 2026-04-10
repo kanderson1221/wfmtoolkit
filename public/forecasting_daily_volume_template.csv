@@ -1,0 +1,6 @@
+service_date,call_volume,cap,floor,holiday_label,is_closed_day
+2025-01-01,820,2500,0,New Year's Day,false
+2025-01-02,910,2500,0,,false
+2025-01-03,965,2500,0,,false
+2025-01-04,640,2500,0,,false
+2025-01-05,590,2500,0,,false

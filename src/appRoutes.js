@@ -5,7 +5,10 @@ export const defaultRoute = {
   centerId: null,
   groupId: null,
   planId: null,
-  year: null
+  year: null,
+  forecastId: null,
+  forecastType: null,
+  coverageStartMonthIndex: null
 }
 
 const PLANNING_HOME_HASH = '#planning'
@@ -19,6 +22,68 @@ export const buildPlanningCenterHash = (centerId) => (
     ? `${PLANNING_HOME_HASH}/center/${centerId}`
     : buildPlanningHomeHash()
 )
+
+export const buildPlanningCenterForecastsHash = (centerId) => (
+  centerId
+    ? `${PLANNING_HOME_HASH}/center/${centerId}/forecasts`
+    : buildPlanningHomeHash()
+)
+
+export const buildPlanningGroupForecastsHash = (centerId, groupId, year = null, forecastId = null) => {
+  if (!centerId) {
+    return buildPlanningHomeHash()
+  }
+
+  if (!groupId) {
+    return buildPlanningCenterHash(centerId)
+  }
+
+  const normalizedYear = Number(year)
+  const normalizedForecastId = typeof forecastId === 'string' && forecastId.trim()
+    ? encodeURIComponent(forecastId.trim())
+    : ''
+
+  if (Number.isInteger(normalizedYear) && normalizedYear > 0) {
+    return normalizedForecastId
+      ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/project/${normalizedForecastId}`
+      : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}`
+  }
+
+  return normalizedForecastId
+    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/project/${normalizedForecastId}`
+    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts`
+}
+
+export const buildPlanningGroupNewForecastHash = (
+  centerId,
+  groupId,
+  year,
+  options = {}
+) => {
+  if (!centerId) {
+    return buildPlanningHomeHash()
+  }
+
+  if (!groupId) {
+    return buildPlanningCenterHash(centerId)
+  }
+
+  const normalizedYear = Number(year)
+  if (!Number.isInteger(normalizedYear) || normalizedYear <= 0) {
+    return buildPlanningGroupForecastsHash(centerId, groupId)
+  }
+
+  const normalizedForecastType = String(options.forecastType || '').trim().toLowerCase()
+  const normalizedStartMonthIndex = Number(options.coverageStartMonthIndex)
+
+  if (normalizedForecastType === 'reforecast') {
+    return Number.isInteger(normalizedStartMonthIndex) && normalizedStartMonthIndex >= 0 && normalizedStartMonthIndex <= 11
+      ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new/type/reforecast/month/${normalizedStartMonthIndex}`
+      : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new/type/reforecast`
+  }
+
+  return `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new/type/budget`
+}
 
 export const buildPlanningGroupHash = (centerId, groupId, year = null) => {
   if (!centerId) {
@@ -85,7 +150,8 @@ export const parseHashRoute = (hash) => {
       centerId: null,
       groupId: null,
       planId: null,
-      year: null
+      year: null,
+      forecastId: null
     }
   }
 
@@ -97,7 +163,21 @@ export const parseHashRoute = (hash) => {
       centerId: null,
       groupId: null,
       planId: null,
-      year: null
+      year: null,
+      forecastId: null
+    }
+  }
+
+  if (normalizedHash === 'forecasting' || normalizedHash === 'forecast') {
+    return {
+      app: 'calculators',
+      page: 'tool',
+      tool: 'forecasting',
+      centerId: null,
+      groupId: null,
+      planId: null,
+      year: null,
+      forecastId: null
     }
   }
 
@@ -109,7 +189,8 @@ export const parseHashRoute = (hash) => {
       centerId: null,
       groupId: null,
       planId: null,
-      year: null
+      year: null,
+      forecastId: null
     }
   }
 
@@ -121,15 +202,192 @@ export const parseHashRoute = (hash) => {
     return {
       app: 'calculators',
       page: 'tool',
-      tool: parts[1] === 'batch' ? 'batch' : 'interval',
+      tool:
+        parts[1] === 'batch'
+          ? 'batch'
+          : parts[1] === 'forecasting' || parts[1] === 'forecast'
+            ? 'forecasting'
+            : 'interval',
       centerId: null,
       groupId: null,
       planId: null,
-      year: null
+      year: null,
+      forecastId: null
     }
   }
 
   if (parts[0] === 'planning') {
+    if (
+      parts[1] === 'center' &&
+      parts[2] &&
+      parts[3] === 'group' &&
+      parts[4] &&
+      parts[5] === 'forecasts' &&
+      parts[6] === 'year' &&
+      parts[7] &&
+      parts[8] === 'new' &&
+      parts[9] === 'type' &&
+      parts[10] === 'reforecast' &&
+      parts[11] === 'month' &&
+      parts[12]
+    ) {
+      return {
+        app: 'planning',
+        page: 'group-forecasts',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: Number(parts[7]) || null,
+        forecastId: null,
+        forecastType: 'reforecast',
+        coverageStartMonthIndex: Number(parts[12])
+      }
+    }
+
+    if (
+      parts[1] === 'center' &&
+      parts[2] &&
+      parts[3] === 'group' &&
+      parts[4] &&
+      parts[5] === 'forecasts' &&
+      parts[6] === 'year' &&
+      parts[7] &&
+      parts[8] === 'new' &&
+      parts[9] === 'type' &&
+      parts[10] === 'reforecast'
+    ) {
+      return {
+        app: 'planning',
+        page: 'group-forecasts',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: Number(parts[7]) || null,
+        forecastId: null,
+        forecastType: 'reforecast',
+        coverageStartMonthIndex: null
+      }
+    }
+
+    if (
+      parts[1] === 'center' &&
+      parts[2] &&
+      parts[3] === 'group' &&
+      parts[4] &&
+      parts[5] === 'forecasts' &&
+      parts[6] === 'year' &&
+      parts[7] &&
+      parts[8] === 'new' &&
+      parts[9] === 'type' &&
+      parts[10] === 'budget'
+    ) {
+      return {
+        app: 'planning',
+        page: 'group-forecasts',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: Number(parts[7]) || null,
+        forecastId: null,
+        forecastType: 'budget',
+        coverageStartMonthIndex: 0
+      }
+    }
+
+    if (
+      parts[1] === 'center' &&
+      parts[2] &&
+      parts[3] === 'group' &&
+      parts[4] &&
+      parts[5] === 'forecasts' &&
+      parts[6] === 'year' &&
+      parts[7] &&
+      parts[8] === 'project' &&
+      parts[9]
+    ) {
+      return {
+        app: 'planning',
+        page: 'group-forecasts',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: Number(parts[7]) || null,
+        forecastId: decodeURIComponent(parts[9]),
+        forecastType: null,
+        coverageStartMonthIndex: null
+      }
+    }
+
+    if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'forecasts' && parts[6] === 'year' && parts[7]) {
+      return {
+        app: 'planning',
+        page: 'group-forecasts',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: Number(parts[7]) || null,
+        forecastId: null,
+        forecastType: null,
+        coverageStartMonthIndex: null
+      }
+    }
+
+    if (
+      parts[1] === 'center' &&
+      parts[2] &&
+      parts[3] === 'group' &&
+      parts[4] &&
+      parts[5] === 'forecasts' &&
+      parts[6] === 'project' &&
+      parts[7]
+    ) {
+      return {
+        app: 'planning',
+        page: 'group-forecasts',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: null,
+        forecastId: decodeURIComponent(parts[7]),
+        forecastType: null,
+        coverageStartMonthIndex: null
+      }
+    }
+
+    if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'forecasts') {
+      return {
+        app: 'planning',
+        page: 'group-forecasts',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        planId: null,
+        year: null,
+        forecastId: null,
+        forecastType: null,
+        coverageStartMonthIndex: null
+      }
+    }
+
+    if (parts[1] === 'center' && parts[2] && parts[3] === 'forecasts') {
+      return {
+        app: 'planning',
+        page: 'forecasts',
+        tool: null,
+        centerId: parts[2],
+        groupId: null,
+        planId: null,
+        year: null,
+        forecastId: null
+      }
+    }
+
     if (parts[1] === 'center' && parts[2] && !parts[3]) {
       return {
         app: 'planning',
@@ -138,7 +396,8 @@ export const parseHashRoute = (hash) => {
         centerId: parts[2],
         groupId: null,
         planId: null,
-        year: null
+        year: null,
+        forecastId: null
       }
     }
 
@@ -150,7 +409,8 @@ export const parseHashRoute = (hash) => {
         centerId: parts[2],
         groupId: parts[4],
         planId: null,
-        year: null
+        year: null,
+        forecastId: null
       }
     }
 
@@ -162,7 +422,8 @@ export const parseHashRoute = (hash) => {
         centerId: parts[2],
         groupId: parts[4],
         planId: null,
-        year: Number(parts[6]) || null
+        year: Number(parts[6]) || null,
+        forecastId: null
       }
     }
 
@@ -174,7 +435,8 @@ export const parseHashRoute = (hash) => {
         centerId: parts[2],
         groupId: parts[4],
         planId: 'new',
-        year: Number(parts[8]) || null
+        year: Number(parts[8]) || null,
+        forecastId: null
       }
     }
 
@@ -186,7 +448,8 @@ export const parseHashRoute = (hash) => {
         centerId: parts[2],
         groupId: parts[4],
         planId: 'new',
-        year: null
+        year: null,
+        forecastId: null
       }
     }
 
@@ -198,7 +461,8 @@ export const parseHashRoute = (hash) => {
         centerId: parts[2],
         groupId: parts[4],
         planId: parts[6],
-        year: null
+        year: null,
+        forecastId: null
       }
     }
 
@@ -210,7 +474,8 @@ export const parseHashRoute = (hash) => {
         centerId: parts[2],
         groupId: null,
         planId: parts[4],
-        year: null
+        year: null,
+        forecastId: null
       }
     }
 
@@ -222,7 +487,8 @@ export const parseHashRoute = (hash) => {
         centerId: null,
         groupId: null,
         planId: parts[2],
-        year: null
+        year: null,
+        forecastId: null
       }
     }
 
@@ -233,7 +499,8 @@ export const parseHashRoute = (hash) => {
       centerId: null,
       groupId: null,
       planId: null,
-      year: null
+      year: null,
+      forecastId: null
     }
   }
 

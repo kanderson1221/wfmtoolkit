@@ -11,7 +11,7 @@ describe('AppOptionPills', () => {
         ariaLabel: 'Tools',
         items: [
           { id: 'planning', label: 'Planning Workspace' },
-          { id: 'calculators', label: 'Erlang Tools' }
+          { id: 'calculators', label: 'Erlang Calculators' }
         ]
       }
     })

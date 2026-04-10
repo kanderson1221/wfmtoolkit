@@ -1,8 +1,9 @@
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { FULL_MONTH_LABELS, toNumber } from '../plannerModel'
 
 import PlannerActualsPanel from './planner/PlannerActualsPanel.vue'
+import PlannerForecastPanel from './planner/PlannerForecastPanel.vue'
 import PlannerMonthlyPlanTab from './planner/PlannerMonthlyPlanTab.vue'
 import PlannerOverviewPanel from './planner/PlannerOverviewPanel.vue'
 import PlannerPresenceTab from './planner/PlannerPresenceTab.vue'
@@ -13,8 +14,14 @@ import PlannerWorkspaceHeader from './planner/PlannerWorkspaceHeader.vue'
 import AppBreadcrumbs from './ui/AppBreadcrumbs.vue'
 import AppButton from './ui/AppButton.vue'
 import AppPanel from './ui/AppPanel.vue'
-import { buildPlanningCenterHash, buildPlanningGroupHash, buildPlanningHomeHash } from '../appRoutes'
+import AppStatusMessage from './ui/AppStatusMessage.vue'
+import {
+  buildPlanningCenterHash,
+  buildPlanningGroupHash,
+  buildPlanningHomeHash
+} from '../appRoutes'
 import { useMonthlyPlanBuilder } from '../composables/useMonthlyPlanBuilder'
+import { DEMAND_SOURCE_FORECAST, DEMAND_SOURCE_MANUAL } from '../planner/demandSources'
 
 const props = defineProps({
   initialPlan: {
@@ -36,12 +43,50 @@ const props = defineProps({
   draftKey: {
     type: String,
     default: ''
+  },
+  storageScope: {
+    type: String,
+    default: 'default'
+  },
+  storageRefreshToken: {
+    type: Number,
+    default: 0
+  },
+  forecastSeed: {
+    type: Object,
+    default: null
   }
 })
 
 const emit = defineEmits(['save', 'cancel'])
 
 const builder = reactive(useMonthlyPlanBuilder(props, emit))
+const forecastEntryMode = ref(
+  builder.demandSource.mode === DEMAND_SOURCE_FORECAST
+    ? DEMAND_SOURCE_FORECAST
+    : DEMAND_SOURCE_MANUAL
+)
+
+const handleForecastEntryModeChange = (mode) => {
+  const nextMode = mode === DEMAND_SOURCE_FORECAST ? DEMAND_SOURCE_FORECAST : DEMAND_SOURCE_MANUAL
+  forecastEntryMode.value = nextMode
+
+  if (nextMode === DEMAND_SOURCE_MANUAL) {
+    builder.setDemandSourceMode(DEMAND_SOURCE_MANUAL)
+    return
+  }
+
+  void builder.reloadForecastProjects()
+}
+
+watch(
+  () => builder.demandSource.mode,
+  (mode) => {
+    forecastEntryMode.value = mode === DEMAND_SOURCE_FORECAST
+      ? DEMAND_SOURCE_FORECAST
+      : DEMAND_SOURCE_MANUAL
+  }
+)
 
 const TOTAL_PLAN_MONTHS = FULL_MONTH_LABELS.length
 const reviewedSections = computed(() => new Set(builder.reviewedSections))
@@ -164,11 +209,19 @@ const requirementProgress = computed(() => {
     description: 'Turn contacts and AHT into the required frontline headcount the staffing plan needs to cover.',
     statusLabel: formatMonthCoverage(configuredCount),
     detail: isReady
-      ? 'Contacts and AHT are populated for every month.'
+      ? builder.demandSource.mode === 'forecast' && builder.demandSourceSummary?.projectName
+        ? `Contacts are populated from ${builder.demandSourceSummary.projectName} and AHT is set across the full year.`
+        : 'Contacts and AHT are populated for every month.'
       : configuredCount > 0
-        ? `Demand inputs are modeled for ${configuredCount} months so far.`
+        ? builder.demandSource.mode === 'forecast'
+          ? `Forecast contacts are applied for ${configuredCount} months so far.`
+          : `Demand inputs are modeled for ${configuredCount} months so far.`
         : 'Demand inputs are still blank across the plan.',
-    blocker: isReady ? '' : `Enter contacts and AHT for ${firstMissingMonthLabel} to complete the requirement model.`,
+    blocker: isReady
+      ? ''
+      : builder.demandSource.mode === 'forecast'
+        ? `Apply a forecast or enter contacts and AHT for ${firstMissingMonthLabel} to complete the requirement model.`
+        : `Enter contacts and AHT for ${firstMissingMonthLabel} to complete the requirement model.`,
     tone: isReady ? 'ready' : configuredCount > 0 ? 'attention' : 'default',
     isReady,
     isStarted: configuredCount > 0,
@@ -224,31 +277,23 @@ const coreSectionCards = computed(() => [
   staffingProgress.value
 ])
 
-const availabilityReady = computed(() => availabilityProgress.value.isReady)
-const variabilityReady = computed(() => variabilityProgress.value.isReady)
-const requirementReady = computed(() => requirementProgress.value.isReady)
 const actualsStarted = computed(() => builder.actualsSummary.loadedMonthsCount > 0)
 
 const planComplete = computed(() => coreSectionCards.value.every((section) => section.isReady))
 const readyCoreSectionCount = computed(() => coreSectionCards.value.filter((section) => section.isReady).length)
 
-const forecastEntryStep = computed(() => {
-  if (!availabilityReady.value) {
-    return 'availability'
-  }
-
-  if (!variabilityReady.value) {
-    return 'variability'
-  }
-
-  if (!requirementReady.value) {
-    return 'requirement'
-  }
-
-  return 'requirement'
-})
-
 const workflowSections = computed(() => [
+  {
+    id: 'forecast',
+    label: 'Forecast',
+    items: [
+      {
+        id: 'forecast',
+        title: 'Forecasts',
+        tone: 'default'
+      }
+    ]
+  },
   {
     id: 'plan',
     label: 'Plan',
@@ -320,7 +365,13 @@ const openWorkflowDestination = ({ sectionId, stepId } = {}) => {
   }
 
   if (sectionId) {
-    builder.setActiveSection(sectionId === 'forecast' ? forecastEntryStep.value : sectionId)
+    builder.setActiveSection(sectionId)
+  }
+}
+
+const handleWorkflowItemSelect = (item) => {
+  if (item?.id) {
+    builder.setActiveSection(item.id)
   }
 }
 
@@ -362,13 +413,28 @@ const breadcrumbItems = computed(() => {
         </div>
       </div>
 
+      <AppStatusMessage v-if="builder.plannerBootstrapping" class="mb-3">
+        Restoring the latest planner draft from this browser.
+      </AppStatusMessage>
+
+      <AppStatusMessage v-else-if="builder.validationMessage" tone="error" class="mb-3">
+        {{ builder.validationMessage }}
+      </AppStatusMessage>
+
       <AppPanel :padded="false" class="monthly-flow-card">
-        <div class="grid xl:grid-cols-[188px_minmax(0,1fr)] xl:items-start">
+        <div v-if="builder.plannerBootstrapping" class="grid gap-3 p-6">
+          <AppStatusMessage>
+            The planner will become editable as soon as the saved draft is restored.
+          </AppStatusMessage>
+        </div>
+
+        <div v-else class="grid xl:grid-cols-[188px_minmax(0,1fr)] xl:items-start">
           <section class="border-b border-slate-200 p-3 xl:sticky xl:top-4 xl:border-b-0 xl:border-r">
             <div class="grid gap-2">
               <PlannerSectionNav
                 v-model:active-id="builder.activeSection"
                 :groups="workflowSections"
+                @select="handleWorkflowItemSelect"
               />
             </div>
           </section>
@@ -386,6 +452,32 @@ const breadcrumbItems = computed(() => {
                 :format-number="builder.formatNumber"
                 @open-section="openWorkflowDestination"
               />
+
+              <div
+                v-else-if="builder.activeSection === 'forecast'"
+                class="grid gap-3"
+              >
+                <PlannerForecastPanel
+                  :entry-mode="forecastEntryMode"
+                  v-model:plan-months="builder.planMonths"
+                  v-model:demand-source="builder.demandSource"
+                  v-model:selected-forecast-project-id="builder.selectedForecastProjectId"
+                  v-model:selected-month-index="builder.selectedMonthIndex"
+                  :monthly-records="builder.monthlyRecords"
+                  :saved-forecast-project-count="builder.savedForecastProjectCount"
+                  :forecast-select-options="builder.forecastSelectOptions"
+                  :forecasts-loading="builder.forecastsLoading"
+                  :forecasts-error="builder.forecastsError"
+                  :selected-forecast-preview-summary="builder.selectedForecastPreviewSummary"
+                  :current-demand-source-summary="builder.demandSourceSummary"
+                  :forecast-can-apply="builder.forecastCanApply"
+                  :forecast-workspace-href="props.forecastSeed?.forecastWorkspaceHref || props.centerDefaults?.forecastWorkspaceHref || ''"
+                  :format-whole="builder.formatWhole"
+                  :format-number="builder.formatNumber"
+                  @update:entry-mode="handleForecastEntryModeChange"
+                  @apply-forecast="builder.applyForecastToDemand"
+                />
+              </div>
 
               <PlannerPresenceTab
                 v-else-if="builder.activeSection === 'availability'"
@@ -419,6 +511,8 @@ const breadcrumbItems = computed(() => {
                 v-model:selected-month-index="builder.selectedMonthIndex"
                 :monthly-records="builder.monthlyRecords"
                 :plan-summary="builder.planSummary"
+                :demand-source="builder.demandSource"
+                :current-demand-source-summary="builder.demandSourceSummary"
                 :format-whole="builder.formatWhole"
                 :format-number="builder.formatNumber"
                 :format-percent="builder.formatPercent"

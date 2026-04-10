@@ -27,6 +27,7 @@ import {
   resolveLinkedOpeningPosition,
   toNumber
 } from '../../plannerModel'
+import { createPlanDemandSource } from '../../planner/demandSources'
 
 export const WEEKDAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -144,6 +145,7 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
     useMonthlyRandomOverrides: Boolean(basePlan.useMonthlyRandomOverrides),
     randomMonths: hydrateMonths(basePlan.randomMonths, buildRandomMonths, createRandomMonth),
     planMonths: hydrateMonths(basePlan.planMonths, buildPlanMonths, createPlanMonth),
+    demandSource: createPlanDemandSource(basePlan.demandSource),
     actualsMonths: hydrateMonths(basePlan.actualsMonths, buildActualsMonths, createActualsMonth),
     trainingSettings,
     nextYearOpening: createNextYearOpening(basePlan.nextYearOpening || {}),

@@ -4,21 +4,12 @@ import PublicLandingPage from '../PublicLandingPage.vue'
 
 const mountLandingPage = (props = {}) =>
   mount(PublicLandingPage, {
-    props,
-    global: {
-      stubs: {
-        AppAccountDialog: {
-          template: '<div class="account-dialog-stub" />'
-        }
-      }
-    }
+    props
   })
 
 describe('PublicLandingPage', () => {
   it('introduces the toolkit and available tools for search visitors', () => {
-    const wrapper = mountLandingPage({
-      authConfigured: true
-    })
+    const wrapper = mountLandingPage()
 
     const italicNotes = wrapper.findAll('p.italic')
 
@@ -32,17 +23,16 @@ describe('PublicLandingPage', () => {
     expect(italicNotes[1].text()).toContain('WFMToolkit does not use accounts or store planning data on a server')
     expect(wrapper.find('a[href="/terms/index.html"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Planning Workspace')
-    expect(wrapper.text()).toContain('Erlang Tools')
+    expect(wrapper.text()).toContain('Forecasting')
+    expect(wrapper.text()).toContain('Erlang Calculators')
     expect(wrapper.text()).not.toContain('Sign In')
     expect(wrapper.text()).toContain('Open Planning Workspace')
+    expect(wrapper.text()).toContain('Open Call Centers')
+    expect(wrapper.text()).toContain('Open Erlang Calculators')
   })
 
-  it('keeps the landing header free of sign-in actions when the visitor is already authenticated', () => {
-    const wrapper = mountLandingPage({
-      authConfigured: true,
-      isAuthenticated: true,
-      userEmail: 'planner@example.com'
-    })
+  it('keeps the landing header free of sign-in actions', () => {
+    const wrapper = mountLandingPage()
 
     expect(wrapper.text()).toContain('Practical workforce planning tools, shared')
     expect(wrapper.text()).toContain('free.')

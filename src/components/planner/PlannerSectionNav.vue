@@ -10,10 +10,20 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['select'])
+
 const activeId = defineModel('activeId', {
   type: String,
   required: true
 })
+
+const handleItemClick = (item) => {
+  emit('select', item)
+
+  if (!item?.href) {
+    activeId.value = item.id
+  }
+}
 
 const toneClasses = (tone, isActive) => {
   if (isActive) {
@@ -51,7 +61,7 @@ const toneClasses = (tone, isActive) => {
         :aria-current="activeId === item.id ? 'step' : undefined"
         class="rounded-[18px] border px-3 py-2.5 text-left transition"
         :class="toneClasses(item.tone, activeId === item.id)"
-        @click="activeId = item.id"
+        @click="handleItemClick(item)"
       >
         <strong class="block min-w-0 text-sm font-semibold leading-5 tracking-[-0.02em] text-balance">
           {{ item.title }}

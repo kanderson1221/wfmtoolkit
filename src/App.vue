@@ -3,19 +3,19 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 
 import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
-import { AUTH_BYPASS_ENABLED } from './authMode'
+import LocalDataStorageDialog from './components/LocalDataStorageDialog.vue'
+import AppStatusMessage from './components/ui/AppStatusMessage.vue'
 import { isPublicHomeHash } from './appRoutes'
-import { useAuthSession } from './composables/useAuthSession'
 import { useHashNavigation } from './composables/useHashNavigation'
 import { usePlanningWorkspace } from './composables/usePlanningWorkspace'
-import { isSupabaseConfigured } from './supabaseClient'
+import { ensureLegacyLocalStorageMigrated } from './storage/localDataStore'
 
 const CalculatorApp = defineAsyncComponent(() => import('./components/CalculatorApp.vue'))
 const MonthlyPlanBuilder = defineAsyncComponent(() => import('./components/MonthlyPlanBuilder.vue'))
 const PlanningCenterView = defineAsyncComponent(() => import('./components/planning/PlanningCenterView.vue'))
+const PlanningGroupForecastsView = defineAsyncComponent(() => import('./components/planning/PlanningGroupForecastsView.vue'))
 const PlanningHome = defineAsyncComponent(() => import('./components/PlanningHome.vue'))
 const PublicLandingPage = defineAsyncComponent(() => import('./components/PublicLandingPage.vue'))
-const authAvailable = isSupabaseConfigured && !AUTH_BYPASS_ENABLED
 
 const WEEKDAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -27,14 +27,9 @@ const WEEKDAY_OPTIONS = [
   { value: 6, label: 'Sat' }
 ]
 
-const auth = useAuthSession()
-const {
-  currentUser,
-  isAuthenticated,
-  hasWorkspaceAccess,
-  handleSignOut
-} = auth
 const { currentHash, currentRoute, syncRouteFromHash } = useHashNavigation()
+const currentUser = ref(null)
+const storageScope = computed(() => 'default')
 
 const {
   planningCenters,
@@ -42,9 +37,11 @@ const {
   currentGroup,
   currentPlan,
   plannerSeed,
+  forecastSeed,
   plannerDraftKey,
   monthlyPlannerKey,
   loadCentersForScope,
+  workspaceSaveError,
   handleSaveCenter,
   handleDeleteCenter,
   handleSaveGroup,
@@ -55,11 +52,12 @@ const {
 } = usePlanningWorkspace({
   currentRoute,
   currentUser,
-  hasWorkspaceAccess,
-  storageScope: auth.storageScope
+  storageScope
 })
 
 const appMainRef = ref(null)
+const localDataDialogOpen = ref(false)
+const storageRefreshToken = ref(0)
 let previousScrollRestoration = null
 const showPublicLanding = computed(() => isPublicHomeHash(currentHash.value))
 
@@ -87,6 +85,12 @@ const scheduleScrollReset = async () => {
   })
 }
 
+const reloadLocalAppData = async () => {
+  await loadCentersForScope(storageScope.value)
+  storageRefreshToken.value += 1
+  syncRouteFromHash()
+}
+
 watch(
   currentRoute,
   () => {
@@ -101,10 +105,15 @@ onMounted(() => {
     window.history.scrollRestoration = 'manual'
   }
 
-  auth.initializeAuth({
-    loadCentersForScope,
-    syncRouteFromHash
-  })
+  void (async () => {
+    try {
+      await ensureLegacyLocalStorageMigrated()
+    } catch (error) {
+      console.error('Unable to initialize local data storage.', error)
+    }
+
+    await reloadLocalAppData()
+  })()
 
   void scheduleScrollReset()
 })
@@ -113,33 +122,30 @@ onBeforeUnmount(() => {
   if ('scrollRestoration' in window.history && previousScrollRestoration) {
     window.history.scrollRestoration = previousScrollRestoration
   }
-
-  auth.disposeAuth()
 })
 </script>
 
 <template>
-  <PublicLandingPage
-    v-if="showPublicLanding"
-    :auth-configured="authAvailable"
-    :is-authenticated="isAuthenticated"
-    :user-email="currentUser?.email || ''"
-  />
+  <PublicLandingPage v-if="showPublicLanding" />
 
   <div v-else class="app-shell">
     <AppHeader
       :current-app="currentRoute.app"
-      :is-authenticated="isAuthenticated"
-      :user-email="currentUser?.email || ''"
-      :auth-configured="authAvailable"
-      :auth-bypass-enabled="AUTH_BYPASS_ENABLED"
-      @sign-out="handleSignOut"
+      :current-tool="currentRoute.tool || ''"
+      @open-local-data-storage="localDataDialogOpen = true"
     />
 
     <main ref="appMainRef" class="app-main">
+      <div v-if="currentRoute.app === 'planning' && workspaceSaveError" class="app-frame pb-0">
+        <AppStatusMessage tone="error">
+          {{ workspaceSaveError }}
+        </AppStatusMessage>
+      </div>
+
       <CalculatorApp
         v-if="currentRoute.app === 'calculators'"
         :active-tool="currentRoute.tool || 'interval'"
+        :storage-scope="storageScope"
       />
 
       <PlanningHome
@@ -151,10 +157,12 @@ onBeforeUnmount(() => {
       />
 
       <PlanningCenterView
-        v-else-if="currentRoute.app === 'planning' && currentCenter && currentRoute.page === 'center'"
+        v-else-if="currentRoute.app === 'planning' && currentCenter && (currentRoute.page === 'center' || currentRoute.page === 'forecasts')"
         :center="currentCenter"
         :selected-group-id="currentRoute.groupId"
         :selected-year="currentRoute.year"
+        :storage-scope="storageScope"
+        :storage-refresh-token="storageRefreshToken"
         :weekday-options="WEEKDAY_OPTIONS"
         @save-center="handleSaveCenter"
         @save-group="handleSaveGroup"
@@ -162,14 +170,29 @@ onBeforeUnmount(() => {
         @delete-plan="handleDeletePlan"
       />
 
+      <PlanningGroupForecastsView
+        v-else-if="currentRoute.app === 'planning' && currentCenter && currentGroup && currentRoute.page === 'group-forecasts'"
+        :center="currentCenter"
+        :group="currentGroup"
+        :forecast-seed="forecastSeed"
+        :selected-forecast-id="currentRoute.forecastId"
+        :planning-year="currentRoute.year"
+        :storage-scope="storageScope"
+        :storage-refresh-token="storageRefreshToken"
+        :weekday-options="WEEKDAY_OPTIONS"
+      />
+
       <MonthlyPlanBuilder
         v-else-if="currentRoute.app === 'planning' && currentRoute.page === 'editor' && currentCenter && currentGroup && (currentRoute.planId === 'new' || currentPlan)"
         :key="monthlyPlannerKey"
         :initial-plan="currentPlan"
         :center-defaults="plannerSeed"
+        :forecast-seed="forecastSeed"
         :group-plans="currentGroup?.plans || []"
         :prefilled-year="currentRoute.year"
         :draft-key="plannerDraftKey"
+        :storage-scope="storageScope"
+        :storage-refresh-token="storageRefreshToken"
         @cancel="openPlanningHome"
         @save="handleSavePlan"
       />
@@ -182,6 +205,11 @@ onBeforeUnmount(() => {
         @delete-center="handleDeleteCenter"
       />
     </main>
+
+    <LocalDataStorageDialog
+      v-model:visible="localDataDialogOpen"
+      @imported="reloadLocalAppData"
+    />
 
     <AppFooter />
   </div>
