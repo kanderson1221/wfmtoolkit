@@ -8,6 +8,7 @@ import {
   buildPlanningNewPlanHash,
   buildPlanningPlanHash
 } from '../../appRoutes'
+import { createHolidayTemplateHolidays } from '../../planner/holidayCalendars'
 import { getCurrentCalendarYear } from '../../planner/shared'
 import { usePlanningWorkspace } from '../usePlanningWorkspace'
 import { planningRepository } from '../../planningRepository'
@@ -182,6 +183,55 @@ describe('usePlanningWorkspace', () => {
       forecastWorkspaceHref: buildPlanningGroupForecastsHash('center-1', 'group-1', 2026)
     })
     expect(workspace.plannerDraftKey.value).toBe('user-1:plan:plan-1')
+  })
+
+  it('preserves recurring holiday rule metadata when seeding a forecast from planning', async () => {
+    const holidayTemplateCenters = [
+      {
+        ...centers[0],
+        holidayProfiles: [
+          {
+            year: 2026,
+            holidayCalendarId: 'none',
+            customHolidays: createHolidayTemplateHolidays('us_federal', 2026)
+          }
+        ]
+      }
+    ]
+
+    planningRepository.loadWorkspace.mockResolvedValue(holidayTemplateCenters)
+
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'group-forecasts',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      year: 2026
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const hasWorkspaceAccess = computed(() => true)
+    const storageScope = computed(() => currentUser.value.id)
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      hasWorkspaceAccess,
+      storageScope
+    })
+
+    await workspace.loadCentersForScope()
+    await nextTick()
+
+    const independenceDay = workspace.forecastSeed.value?.modelConfig?.customHolidays.find(
+      (holiday) => holiday.name === 'Independence Day'
+    )
+
+    expect(independenceDay).toMatchObject({
+      sourceRuleId: 'independence_day',
+      month: 7,
+      day: 3,
+      date: '2026-07-03'
+    })
   })
 
   it('persists center saves through the planning storage layer', async () => {

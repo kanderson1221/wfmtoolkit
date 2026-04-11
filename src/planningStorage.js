@@ -112,7 +112,7 @@ const migrateLegacyHolidayProfiles = (draftCenter = {}) => {
 
 export const normalizeCenterHolidayProfiles = (holidayProfiles) => normalizeHolidayProfilesByYear(holidayProfiles)
 
-const resolveCenterHolidayProfiles = (center = {}) => {
+export const resolveCenterHolidayProfiles = (center = {}) => {
   if (Array.isArray(center?.holidayProfiles) && center.holidayProfiles.length) {
     return normalizeCenterHolidayProfiles(center.holidayProfiles)
   }

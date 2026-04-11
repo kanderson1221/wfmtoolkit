@@ -34,10 +34,6 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  saveStatusMessage: {
-    type: String,
-    default: ''
-  },
   saveError: {
     type: String,
     default: ''
@@ -62,24 +58,6 @@ const project = defineModel('project', {
   type: Object,
   required: true
 })
-
-const duplicateOptions = [
-  { label: 'Add same-day rows together', value: 'sum' },
-  { label: 'Average same-day rows', value: 'average' },
-  { label: 'Keep the last same-day row', value: 'last' }
-]
-
-const missingDateOptions = [
-  { label: 'Fill missing days with zero calls', value: 'fill_zero' },
-  { label: 'Estimate missing days', value: 'interpolate' },
-  { label: 'Leave gaps as-is', value: 'keep_gaps' }
-]
-
-const outlierOptions = [
-  { label: 'Leave unusual days alone', value: 'none' },
-  { label: 'Cap unusual days', value: 'winsorize_p99' },
-  { label: 'Remove unusual days', value: 'drop_iqr' }
-]
 
 const growthOptions = [
   { label: 'Steady growth', value: 'linear' },
@@ -400,51 +378,6 @@ const inheritedHolidayList = computed(() =>
       <ForecastingConfigSection title="Advanced">
         <div class="grid gap-6">
           <div class="grid gap-4">
-            <h4 class="text-sm font-semibold text-slate-950">Data Cleanup</h4>
-            <div class="grid gap-4 md:grid-cols-2">
-              <AppFieldGroup label="Same-Day Rows" input-id="forecast-duplicate-strategy">
-                <AppSelect
-                  id="forecast-duplicate-strategy"
-                  v-model="project.dataPreparation.duplicateStrategy"
-                  :options="duplicateOptions"
-                />
-              </AppFieldGroup>
-
-              <AppFieldGroup label="Missing Days" input-id="forecast-missing-date-strategy">
-                <AppSelect
-                  id="forecast-missing-date-strategy"
-                  v-model="project.dataPreparation.missingDateStrategy"
-                  :options="missingDateOptions"
-                />
-              </AppFieldGroup>
-
-              <AppFieldGroup label="Unusual Days" input-id="forecast-outlier-strategy">
-                <AppSelect
-                  id="forecast-outlier-strategy"
-                  v-model="project.dataPreparation.outlierStrategy"
-                  :options="outlierOptions"
-                />
-              </AppFieldGroup>
-
-              <AppFieldGroup label="Start From" input-id="forecast-trim-start">
-                <AppTextField
-                  id="forecast-trim-start"
-                  v-model="project.dataPreparation.trimStartDate"
-                  type="date"
-                />
-              </AppFieldGroup>
-
-              <AppFieldGroup label="End On" input-id="forecast-trim-end">
-                <AppTextField
-                  id="forecast-trim-end"
-                  v-model="project.dataPreparation.trimEndDate"
-                  type="date"
-                />
-              </AppFieldGroup>
-            </div>
-          </div>
-
-          <div class="grid gap-4">
             <h4 class="text-sm font-semibold text-slate-950">Model Tuning</h4>
             <div class="grid gap-4 md:grid-cols-2">
               <AppFieldGroup
@@ -618,18 +551,6 @@ const inheritedHolidayList = computed(() =>
               </AppFieldGroup>
 
               <AppFieldGroup
-                label="Run Notes"
-                input-id="forecast-run-notes"
-                help-text="Saved with the forecast and shown beside the results."
-              >
-                <AppTextArea
-                  id="forecast-run-notes"
-                  v-model="project.modelConfig.runNotes"
-                  rows="4"
-                />
-              </AppFieldGroup>
-
-              <AppFieldGroup
                 label="Manual Trend Change Dates"
                 input-id="forecast-manual-changepoints"
                 help-text="Use ISO dates separated by commas or new lines."
@@ -788,9 +709,9 @@ const inheritedHolidayList = computed(() =>
           v-if="isDataStep"
           variant="primary"
           :disabled="!hasLoadedFile"
-          @click="emit('request-step-change', 'setup')"
+          @click="emit('request-step-change', 'workbench')"
         >
-          Continue to Forecast Setup
+          Continue to Forecast Workbench
         </AppButton>
         <AppButton
           v-else-if="isSetupStep"

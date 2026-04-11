@@ -12,6 +12,7 @@ import {
   formatDateTime,
   getDefaultReforecastStartMonthIndex,
   getForecastPlanningYear,
+  getForecastProjectMonthlyRollup,
   getForecastTypeLabel,
   parseForecastDateValue,
   resolveForecastCoverageWindow,
@@ -279,7 +280,7 @@ export function usePlanningCenterForecastLibrary({
     savedForecasts.value.map((forecast) => {
       const forecastId = String(forecast?.id || '').trim()
       const historyRows = Array.isArray(forecast.historyRows) ? forecast.historyRows : []
-      const monthlyRollup = Array.isArray(forecast.lastRun?.monthlyRollup) ? forecast.lastRun.monthlyRollup : []
+      const monthlyRollup = getForecastProjectMonthlyRollup(forecast)
       const forecastType = resolveForecastType(forecast.forecastType, forecast)
       const planningYear = getForecastPlanningYear(forecast)
       const coverageWindow = resolveForecastCoverageWindow({

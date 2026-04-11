@@ -12,6 +12,18 @@ const props = defineProps({
   formatNumber: {
     type: Function,
     required: true
+  },
+  heightClass: {
+    type: String,
+    default: 'h-[20rem]'
+  },
+  minWidthClass: {
+    type: String,
+    default: 'min-w-[920px]'
+  },
+  showLegend: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -230,7 +242,7 @@ const chartOption = computed(() => ({
 
 <template>
   <div class="forecast-chart-shell">
-    <div class="forecast-chart-legend">
+    <div v-if="props.showLegend" class="forecast-chart-legend">
       <span class="forecast-chart-legend-item">
         <span class="forecast-chart-swatch forecast-chart-swatch-actual"></span>
         History
@@ -249,8 +261,8 @@ const chartOption = computed(() => ({
       chart-id="forecast-daily-history-chart"
       aria-label="Daily history and forecast chart"
       fallback-text="The daily forecast chart could not be loaded."
-      height-class="h-[20rem]"
-      min-width-class="min-w-[920px]"
+      :height-class="props.heightClass"
+      :min-width-class="props.minWidthClass"
       :option="chartOption"
     />
   </div>

@@ -126,8 +126,12 @@ const sampleForecasts = [
       { ds: '2025-01-01', y: 100 },
       { ds: '2025-01-02', y: 120 }
     ],
+    manualAdjustments: [
+      { ds: '2026-01-01', delta: 25, reason: 'Promo spike' }
+    ],
     lastRun: {
       runAt: '2026-04-08T14:00:00.000Z',
+      inputSignature: '{"seed":"forecast-run"}',
       dailyForecast: [
         { ds: '2026-01-01', yhat: 110, yhatLower: 100, yhatUpper: 120, isHistory: false }
       ],
@@ -144,7 +148,6 @@ const sampleForecasts = [
         projectedTotalContacts: 3400
       },
       diagnostics: {
-        dataPrepActions: [],
         warnings: [],
         validationNotes: [],
         holdout: null
@@ -214,6 +217,12 @@ describe('localDataStore', () => {
 
     expect(loadedCenters[0].groups[0].plans[0].planningYear).toBe(2026)
     expect(loadedForecasts[0].lastRun.monthlyRollup[0].contacts).toBe(3400)
+    expect(loadedForecasts[0].manualAdjustments[0]).toMatchObject({
+      ds: '2026-01-01',
+      delta: 25,
+      reason: 'Promo spike'
+    })
+    expect(loadedForecasts[0].lastRun.inputSignature).toBe('{"seed":"forecast-run"}')
     expect(loadedDraft?.ui?.activeSection).toBe('forecast')
   })
 

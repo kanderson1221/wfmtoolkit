@@ -22,7 +22,7 @@ import {
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
 import { findLinkedPriorPlan, getCurrentCalendarYear, resolveLinkedOpeningPosition, resolvePlanningYear } from '../plannerModel'
-import { resolveCenterHolidayProfile } from '../planningStorage'
+import { resolveCenterHolidayProfile, resolveCenterHolidayProfiles } from '../planningStorage'
 import { planningRepository } from '../planningRepository'
 import { describeBrowserStorageError } from '../storage/browserStorage'
 
@@ -201,10 +201,23 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
     const groupName = currentGroup.value?.name || ''
     const holidayProfileYear = resolvedPlanningYear || getCurrentCalendarYear()
     const centerHolidayProfile = resolveCenterHolidayProfile(currentCenter.value, holidayProfileYear)
+    const sourceCenterHolidayProfiles = resolveCenterHolidayProfiles(currentCenter.value).map((profile) => ({
+      year: profile.year,
+      customHolidays: profile.customHolidays.map((holiday) => ({
+        label: holiday.label,
+        date: holiday.date,
+        sourceRuleId: holiday.sourceRuleId || null,
+        month: holiday.month,
+        day: holiday.day
+      }))
+    }))
     const customHolidays = centerHolidayProfile.customHolidays.map((holiday) =>
       createForecastHoliday({
         name: holiday.label,
-        date: holiday.date
+        date: holiday.date,
+        sourceRuleId: holiday.sourceRuleId || null,
+        month: holiday.month,
+        day: holiday.day
       })
     )
     const holidayCalendarLabel =
@@ -249,6 +262,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         holidayCalendarLabel,
         customHolidayCount: customHolidays.length
       }),
+      sourceCenterHolidayProfiles,
       modelConfig: {
         builtInHolidayCountry: centerHolidayProfile.holidayCalendarId === HOLIDAY_CALENDAR_US_FEDERAL ? 'US' : '',
         customHolidays

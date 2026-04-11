@@ -23,14 +23,6 @@ class ForecastHistoryRow(BaseModel):
     holidayLabel: str = ""
 
 
-class DataPreparationConfig(BaseModel):
-    duplicateStrategy: Literal["sum", "average", "last"] = "sum"
-    missingDateStrategy: Literal["fill_zero", "interpolate", "keep_gaps"] = "fill_zero"
-    outlierStrategy: Literal["none", "winsorize_p99", "drop_iqr"] = "none"
-    trimStartDate: str = ""
-    trimEndDate: str = ""
-
-
 class SeasonalityConfig(BaseModel):
     enabled: bool = True
     fourierOrder: int = Field(default=3, ge=1)
@@ -73,7 +65,6 @@ class ForecastModelConfig(BaseModel):
     intervalWidth: float = Field(default=0.8, gt=0, lt=1)
     mcmcSamples: int = Field(default=0, ge=0)
     holdoutDays: int = Field(default=30, ge=0)
-    runNotes: str = ""
 
 
 class ForecastRunRequest(BaseModel):
@@ -84,14 +75,12 @@ class ForecastRunRequest(BaseModel):
     coverageStartDate: str = ""
     coverageEndDate: str = ""
     history: list[ForecastHistoryRow] = Field(min_length=1)
-    dataPreparation: DataPreparationConfig = Field(default_factory=DataPreparationConfig)
     modelConfig: ForecastModelConfig = Field(default_factory=ForecastModelConfig)
 
 
 @dataclass
 class PreparedHistory:
     frame: pd.DataFrame
-    actions: list[str]
     warnings: list[str]
     validation_notes: list[str]
     original_observations: int
@@ -243,127 +232,6 @@ def _build_history_frame(payload: ForecastRunRequest) -> pd.DataFrame:
     return frame.sort_values("ds").reset_index(drop=True)
 
 
-def _apply_trim_window(
-    frame: pd.DataFrame,
-    config: DataPreparationConfig,
-    actions: list[str],
-) -> pd.DataFrame:
-    trimmed = frame
-
-    if config.trimStartDate:
-        trim_start = _parse_date(config.trimStartDate, "trimStartDate")
-        trimmed = trimmed[trimmed["ds"] >= trim_start]
-        actions.append(f"Trimmed the history window to start on {trim_start.date().isoformat()}.")
-
-    if config.trimEndDate:
-        trim_end = _parse_date(config.trimEndDate, "trimEndDate")
-        trimmed = trimmed[trimmed["ds"] <= trim_end]
-        actions.append(f"Trimmed the history window to end on {trim_end.date().isoformat()}.")
-
-    if trimmed.empty:
-        raise ValueError("The selected training window removed every history row.")
-
-    return trimmed.reset_index(drop=True)
-
-
-def _first_non_empty(values: pd.Series) -> str:
-    for value in values:
-        normalized = str(value or "").strip()
-        if normalized:
-            return normalized
-    return ""
-
-
-def _apply_duplicate_strategy(
-    frame: pd.DataFrame,
-    strategy: str,
-    actions: list[str],
-) -> pd.DataFrame:
-    duplicate_count = int(frame.duplicated(subset=["ds"]).sum())
-    if duplicate_count <= 0:
-        return frame
-
-    actions.append(
-        f"Collapsed {duplicate_count} duplicate history row{'s' if duplicate_count != 1 else ''} with the {strategy} strategy."
-    )
-
-    grouped = frame.groupby("ds", as_index=False).agg(
-        {
-            "y": "sum" if strategy == "sum" else "mean" if strategy == "average" else "last",
-            "cap": "last",
-            "floor": "last",
-            "holiday_label": _first_non_empty,
-        }
-    )
-
-    return grouped.sort_values("ds").reset_index(drop=True)
-
-
-def _apply_missing_date_strategy(
-    frame: pd.DataFrame,
-    strategy: str,
-    actions: list[str],
-) -> pd.DataFrame:
-    if strategy == "keep_gaps":
-        return frame
-
-    full_index = pd.date_range(frame["ds"].min(), frame["ds"].max(), freq="D")
-    expanded = frame.set_index("ds").reindex(full_index).rename_axis("ds").reset_index()
-    missing_count = int(expanded["y"].isna().sum())
-
-    if missing_count <= 0:
-        return expanded
-
-    if strategy == "fill_zero":
-        expanded["y"] = expanded["y"].fillna(0.0)
-        actions.append(
-            f"Filled {missing_count} missing date gap{'s' if missing_count != 1 else ''} with zero volume."
-        )
-    else:
-        expanded["y"] = expanded["y"].interpolate(limit_direction="both")
-        actions.append(
-            f"Interpolated {missing_count} missing date gap{'s' if missing_count != 1 else ''} across the training set."
-        )
-
-    expanded["cap"] = expanded["cap"].fillna(method="ffill")
-    expanded["floor"] = expanded["floor"].fillna(method="ffill")
-    expanded["holiday_label"] = expanded["holiday_label"].fillna("")
-
-    return expanded
-
-
-def _apply_outlier_strategy(
-    frame: pd.DataFrame,
-    strategy: str,
-    actions: list[str],
-) -> pd.DataFrame:
-    if strategy == "none" or frame.empty:
-        return frame
-
-    adjusted = frame.copy()
-
-    if strategy == "winsorize_p99":
-        cap = float(adjusted["y"].quantile(0.99))
-        adjusted["y"] = adjusted["y"].clip(upper=cap)
-        actions.append("Winsorized daily call volume at the 99th percentile before fitting.")
-        return adjusted
-
-    q1 = float(adjusted["y"].quantile(0.25))
-    q3 = float(adjusted["y"].quantile(0.75))
-    iqr = q3 - q1
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-    filtered = adjusted[(adjusted["y"] >= lower_bound) & (adjusted["y"] <= upper_bound)].copy()
-    removed_count = len(adjusted) - len(filtered)
-
-    if removed_count > 0:
-        actions.append(
-            f"Dropped {removed_count} IQR outlier row{'s' if removed_count != 1 else ''} from the training set."
-        )
-
-    return filtered.reset_index(drop=True)
-
-
 def _apply_logistic_bounds(
     frame: pd.DataFrame,
     config: ForecastModelConfig,
@@ -400,17 +268,18 @@ def _apply_logistic_bounds(
 
 
 def _prepare_history(payload: ForecastRunRequest) -> PreparedHistory:
-    actions: list[str] = []
     warnings: list[str] = []
     validation_notes: list[str] = []
 
     frame = _build_history_frame(payload)
     original_observations = len(frame)
 
-    frame = _apply_trim_window(frame, payload.dataPreparation, actions)
-    frame = _apply_duplicate_strategy(frame, payload.dataPreparation.duplicateStrategy, actions)
-    frame = _apply_missing_date_strategy(frame, payload.dataPreparation.missingDateStrategy, actions)
-    frame = _apply_outlier_strategy(frame, payload.dataPreparation.outlierStrategy, actions)
+    duplicate_count = int(frame.duplicated(subset=["ds"]).sum())
+    if duplicate_count > 0:
+        raise ValueError(
+            "History must contain one row per date. Remove duplicate dates before running a forecast."
+        )
+
     frame = _apply_logistic_bounds(frame, payload.modelConfig, warnings)
     frame = frame.sort_values("ds").reset_index(drop=True)
 
@@ -428,11 +297,6 @@ def _prepare_history(payload: ForecastRunRequest) -> PreparedHistory:
             "Yearly seasonality is enabled, but the training set contains fewer than 365 daily observations."
         )
 
-    if payload.dataPreparation.missingDateStrategy == "keep_gaps":
-        validation_notes.append(
-            "The training set kept date gaps as-is. Prophet will fit the available observations without filling missing days."
-        )
-
     if payload.modelConfig.builtInHolidayCountry:
         validation_notes.append(
             f"Built-in {payload.modelConfig.builtInHolidayCountry} holidays were enabled for this run."
@@ -440,7 +304,6 @@ def _prepare_history(payload: ForecastRunRequest) -> PreparedHistory:
 
     return PreparedHistory(
         frame=frame,
-        actions=actions,
         warnings=warnings,
         validation_notes=validation_notes,
         original_observations=original_observations,
@@ -989,7 +852,6 @@ def run_daily_volume_forecast(payload: ForecastRunRequest) -> dict[str, Any]:
         coverage_window,
     )
     diagnostics = {
-        "dataPrepActions": prepared_history.actions,
         "warnings": prepared_history.warnings,
         "validationNotes": prepared_history.validation_notes,
         "holdout": _compute_holdout_metrics(prepared_history.frame, payload),

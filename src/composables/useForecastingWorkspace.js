@@ -17,6 +17,7 @@ import {
   resolveForecastType
 } from '../forecasting/shared'
 import {
+  buildForecastRunInputSignature,
   buildForecastPayload,
   sanitizeColumnMapping
 } from './forecasting/forecastWorkspaceHelpers'
@@ -63,7 +64,7 @@ const HORIZON_PRESET_VALUES = Object.fromEntries(
 export const useForecastingWorkspace = (storageScope, options = {}) => {
   const isRunningForecast = ref(false)
   const runError = ref('')
-  const activeResultTab = ref('overview')
+  const activeResultTab = ref('daily')
 
   const {
     savedProjects,
@@ -84,7 +85,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     refreshToken: options.refreshToken,
     onProjectReplaced: () => {
       runError.value = ''
-      activeResultTab.value = 'overview'
+      activeResultTab.value = 'daily'
     }
   })
 
@@ -114,7 +115,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       currentProject.value.historyRows = []
       currentProject.value.normalizationIssues = []
       currentProject.value.lastRun = createEmptyForecastResults()
-      activeResultTab.value = 'overview'
+      activeResultTab.value = 'daily'
       return
     }
 
@@ -133,7 +134,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     )
     applyNormalization()
     currentProject.value.lastRun = createEmptyForecastResults()
-    activeResultTab.value = 'overview'
+    activeResultTab.value = 'daily'
   }
 
   const addCustomSeasonality = () => {
@@ -189,7 +190,8 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       const forecastResults = await response.json()
       currentProject.value.lastRun = createEmptyForecastResults({
         ...forecastResults,
-        runAt: forecastResults.runAt || new Date().toISOString()
+        runAt: forecastResults.runAt || new Date().toISOString(),
+        inputSignature: buildForecastRunInputSignature(currentProject.value)
       })
       currentProject.value.planningYear = forecastResults.summary?.planningYear || currentProject.value.planningYear
       currentProject.value.forecastType = forecastResults.summary?.forecastType || currentProject.value.forecastType
@@ -200,7 +202,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       currentProject.value.coverageEndDate =
         forecastResults.summary?.coverageEndDate || currentProject.value.coverageEndDate
       currentProject.value.planningReady = Boolean(forecastResults.summary?.planningReady)
-      activeResultTab.value = 'overview'
+      activeResultTab.value = 'daily'
       isDirty.value = true
       return true
     } catch (error) {
@@ -307,6 +309,18 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       applyNormalization()
     },
     { deep: true, immediate: true }
+  )
+
+  watch(
+    () => [currentProject.value.id, currentProject.value.lastRun?.runAt, currentProject.value.lastRun?.inputSignature],
+    () => {
+      if (!currentProject.value.lastRun?.runAt || currentProject.value.lastRun.inputSignature) {
+        return
+      }
+
+      currentProject.value.lastRun.inputSignature = buildForecastRunInputSignature(currentProject.value)
+    },
+    { immediate: true }
   )
 
   watch(

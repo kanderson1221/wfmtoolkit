@@ -450,10 +450,10 @@ const flattenForecastWorkspace = (projects, scope = DEFAULT_SCOPE) => {
       uploadedFileName: project.uploadedFileName || '',
       uploadedHeaders: [...(project.uploadedHeaders || [])],
       uploadedRows: clonePlain(project.uploadedRows || []),
+      manualAdjustments: clonePlain(project.manualAdjustments || []),
       parserIssues: [...(project.parserIssues || [])],
       normalizationIssues: [...(project.normalizationIssues || [])],
       columnMapping: clonePlain(project.columnMapping || {}),
-      dataPreparation: clonePlain(project.dataPreparation || {}),
       modelConfig,
       planningContext: clonePlain(project.planningContext || {}),
       createdAt: project.createdAt || nowIso(),
@@ -498,6 +498,7 @@ const flattenForecastWorkspace = (projects, scope = DEFAULT_SCOPE) => {
         runId,
         forecastId: project.id,
         runAt: project.lastRun.runAt,
+        inputSignature: project.lastRun.inputSignature || '',
         summary: clonePlain(project.lastRun.summary || null),
         diagnostics: clonePlain(project.lastRun.diagnostics || {}),
         createdAt: project.lastRun.runAt || nowIso(),
@@ -624,10 +625,10 @@ const hydrateForecastWorkspace = (scope, rows) => {
           uploadedFileName: row.uploadedFileName,
           uploadedHeaders: [...(row.uploadedHeaders || [])],
           uploadedRows: clonePlain(row.uploadedRows || []),
+          manualAdjustments: clonePlain(row.manualAdjustments || []),
           parserIssues: [...(row.parserIssues || [])],
           normalizationIssues: [...(row.normalizationIssues || [])],
           columnMapping: clonePlain(row.columnMapping || {}),
-          dataPreparation: clonePlain(row.dataPreparation || {}),
           modelConfig: {
             ...clonePlain(row.modelConfig || {}),
             customSeasonalities: (seasonalityByForecastId.get(row.id) || [])
@@ -644,6 +645,7 @@ const hydrateForecastWorkspace = (scope, rows) => {
           lastRun: runRecord
             ? {
                 runAt: runRecord.runAt,
+                inputSignature: runRecord.inputSignature || '',
                 summary: clonePlain(runRecord.summary || null),
                 diagnostics: clonePlain(runRecord.diagnostics || {}),
                 dailyForecast: (dailyByRunId.get(runId) || [])

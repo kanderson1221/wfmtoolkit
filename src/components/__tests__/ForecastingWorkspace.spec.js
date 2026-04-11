@@ -1,7 +1,8 @@
 import { mount } from '@vue/test-utils'
 
 import ForecastingWorkspace from '../ForecastingWorkspace.vue'
-import ForecastingControlPanel from '../forecasting/ForecastingControlPanel.vue'
+import ForecastingWorkbench from '../forecasting/ForecastingWorkbench.vue'
+import { buildForecastRunInputSignature } from '../../composables/forecasting/forecastWorkspaceHelpers'
 import { createForecastProject } from '../../forecasting/shared'
 import { forecastingRepository } from '../../forecastingRepository'
 import { BrowserStorageError } from '../../storage/browserStorage'
@@ -91,6 +92,105 @@ const createLoadedProject = (fileName = 'history.csv') => createForecastProject(
   }
 })
 
+const createForecastRunResults = () => ({
+  runAt: '2026-04-05T14:00:00Z',
+  dailyForecast: [
+    { ds: '2025-01-01', actualValue: 820, yhat: 820, yhatLower: 780, yhatUpper: 860, isHistory: true },
+    { ds: '2026-01-01', actualValue: null, yhat: 1005, yhatLower: 930, yhatUpper: 1085, isHistory: false },
+    { ds: '2026-01-02', actualValue: null, yhat: 1025, yhatLower: 950, yhatUpper: 1108, isHistory: false }
+  ],
+  monthlyRollup: [
+    {
+      monthStart: '2026-01-01',
+      monthLabel: 'Jan 2026',
+      contacts: 2030,
+      averageDailyVolume: 1015,
+      peakDailyVolume: 1025,
+      lowerBoundContacts: 1880,
+      upperBoundContacts: 2193
+    }
+  ],
+  components: {
+    trend: [
+      { label: '2025-01-01', value: 820 },
+      { label: '2026-01-01', value: 1000 }
+    ],
+    weekly: [
+      { label: 'Mon', value: 10 },
+      { label: 'Tue', value: 20 }
+    ],
+    yearly: [
+      { label: 'Jan 01', value: 15 },
+      { label: 'Feb 01', value: 25 }
+    ],
+    holidays: []
+  },
+  summary: {
+    originalObservations: 14,
+    observationsUsed: 14,
+    historyDateRange: '2025-01-01 to 2025-01-14',
+    trainingObservations: 11,
+    trainingDateRange: '2025-01-01 to 2025-01-11',
+    testObservations: 3,
+    testDateRange: '2025-01-12 to 2025-01-14',
+    forecastDateRange: '2026-01-01 to 2026-01-02',
+    forecastHorizonDays: 365,
+    projectedTotalContacts: 2030,
+    peakForecastMonthLabel: 'Jan 2026',
+    peakForecastMonthContacts: 2030,
+    peakForecastDayDate: '2026-01-02',
+    peakForecastDayVolume: 1025
+  },
+  diagnostics: {
+    warnings: ['Yearly seasonality is enabled, but the training set contains fewer than 365 daily observations.'],
+    validationNotes: ['Built-in US holidays were enabled for this run.'],
+    holdout: {
+      holdoutDays: 3,
+      trainingRows: 11,
+      testRows: 3,
+      trainingDateRange: '2025-01-01 to 2025-01-11',
+      testDateRange: '2025-01-12 to 2025-01-14',
+      mae: 42.1,
+      rmse: 48.2,
+      mape: 5.8,
+      wape: 5.2,
+      bias: -4.1,
+      meanActual: 1010.4,
+      meanForecast: 1006.3,
+      intervalCoverage: 66.7,
+      rows: [
+        {
+          ds: '2025-01-12',
+          actualValue: 980,
+          forecastValue: 955,
+          lowerBound: 910,
+          upperBound: 1000,
+          absoluteError: 25,
+          signedError: -25,
+          percentError: 2.6,
+          withinInterval: true
+        }
+      ]
+    }
+  }
+})
+
+const createProjectWithRun = (overrides = {}) => {
+  const baseProject = createLoadedProject()
+  const project = createForecastProject({
+    ...baseProject,
+    modelConfig: {
+      ...baseProject.modelConfig,
+      holdoutDays: 0
+    },
+    lastRun: createForecastRunResults(),
+    ...overrides
+  })
+
+  project.lastRun.inputSignature = buildForecastRunInputSignature(project)
+  return project
+}
+
 describe('ForecastingWorkspace', () => {
   beforeEach(async () => {
     await clearLocalDataStore()
@@ -123,8 +223,9 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).not.toContain('Time Zone')
     expect(wrapper.text()).not.toContain('Series')
     expect(wrapper.text()).toContain('Data')
-    expect(wrapper.text()).toContain('Forecast Setup')
-    expect(wrapper.text()).toContain('Review')
+    expect(wrapper.text()).toContain('Historical Data')
+    expect(wrapper.text()).toContain('Forecast Workbench')
+    expect(wrapper.text()).not.toContain('Review')
   })
 
   it('renders a unified historical-data workspace with file summary and mapped columns', async () => {
@@ -205,7 +306,7 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('Unable to read saved forecasts from this device.')
   })
 
-  it('inherits holiday effects from the call center without showing a holiday selector', async () => {
+  it('omits the holidays inspector section for call-center-managed forecasts', async () => {
     const wrapper = mount(ForecastingWorkspace, {
       props: {
         storageScope: 'forecast-center-holiday-spec',
@@ -236,103 +337,20 @@ describe('ForecastingWorkspace', () => {
     mountedWrappers.push(wrapper)
 
     await flushUi()
-    await findButtonByText(wrapper, 'Forecast Setup').trigger('click')
+    wrapper.vm.activeWorkflowStep = 'workbench'
+    await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).toContain('Holiday Effects')
-    expect(wrapper.text()).toContain('Uses United States holiday calendar')
-    expect(wrapper.text()).toContain('United States holiday calendar')
-    expect(wrapper.text()).toContain('Company Day · 2026-12-26')
+    expect(wrapper.text()).not.toContain('Holiday Effects')
+    expect(wrapper.text()).not.toContain('Holiday calendar and custom event effects.')
     expect(wrapper.find('#forecast-holiday-country').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Custom holidays are managed at the call center level.')
+    expect(wrapper.text()).not.toContain('Custom holidays are managed at the call center level.')
   })
 
   it('uploads daily history, runs the forecast, and shows the monthly rollup', async () => {
     global.fetch.mockResolvedValue({
       ok: true,
-      json: async () => ({
-        runAt: '2026-04-05T14:00:00Z',
-        dailyForecast: [
-          { ds: '2025-01-01', actualValue: 820, yhat: 820, yhatLower: 780, yhatUpper: 860, isHistory: true },
-          { ds: '2026-01-01', actualValue: null, yhat: 1005, yhatLower: 930, yhatUpper: 1085, isHistory: false },
-          { ds: '2026-01-02', actualValue: null, yhat: 1025, yhatLower: 950, yhatUpper: 1108, isHistory: false }
-        ],
-        monthlyRollup: [
-          {
-            monthStart: '2026-01-01',
-            monthLabel: 'Jan 2026',
-            contacts: 2030,
-            averageDailyVolume: 1015,
-            peakDailyVolume: 1025,
-            lowerBoundContacts: 1880,
-            upperBoundContacts: 2193
-          }
-        ],
-        components: {
-          trend: [
-            { label: '2025-01-01', value: 820 },
-            { label: '2026-01-01', value: 1000 }
-          ],
-          weekly: [
-            { label: 'Mon', value: 10 },
-            { label: 'Tue', value: 20 }
-          ],
-          yearly: [
-            { label: 'Jan 01', value: 15 },
-            { label: 'Feb 01', value: 25 }
-          ],
-          holidays: []
-        },
-        summary: {
-          originalObservations: 14,
-          observationsUsed: 14,
-          historyDateRange: '2025-01-01 to 2025-01-14',
-          trainingObservations: 11,
-          trainingDateRange: '2025-01-01 to 2025-01-11',
-          testObservations: 3,
-          testDateRange: '2025-01-12 to 2025-01-14',
-          forecastDateRange: '2026-01-01 to 2026-01-02',
-          forecastHorizonDays: 365,
-          projectedTotalContacts: 2030,
-          peakForecastMonthLabel: 'Jan 2026',
-          peakForecastMonthContacts: 2030,
-          peakForecastDayDate: '2026-01-02',
-          peakForecastDayVolume: 1025
-        },
-        diagnostics: {
-          dataPrepActions: ['Filled 0 missing date gaps with zero volume.'],
-          warnings: ['Yearly seasonality is enabled, but the training set contains fewer than 365 daily observations.'],
-          validationNotes: ['Built-in US holidays were enabled for this run.'],
-          holdout: {
-            holdoutDays: 3,
-            trainingRows: 11,
-            testRows: 3,
-            trainingDateRange: '2025-01-01 to 2025-01-11',
-            testDateRange: '2025-01-12 to 2025-01-14',
-            mae: 42.1,
-            rmse: 48.2,
-            mape: 5.8,
-            wape: 5.2,
-            bias: -4.1,
-            meanActual: 1010.4,
-            meanForecast: 1006.3,
-            intervalCoverage: 66.7,
-            rows: [
-              {
-                ds: '2025-01-12',
-                actualValue: 980,
-                forecastValue: 955,
-                lowerBound: 910,
-                upperBound: 1000,
-                absoluteError: 25,
-                signedError: -25,
-                percentError: 2.6,
-                withinInterval: true
-              }
-            ]
-          }
-        }
-      })
+      json: async () => createForecastRunResults()
     })
 
     const wrapper = mount(ForecastingWorkspace, {
@@ -354,10 +372,11 @@ describe('ForecastingWorkspace', () => {
     })
     mountedWrappers.push(wrapper)
     await flushUi()
-    await findButtonByText(wrapper, 'Forecast Setup').trigger('click')
+    wrapper.vm.activeWorkflowStep = 'workbench'
+    await flushUi()
     await flushUi()
 
-    await wrapper.findComponent(ForecastingControlPanel).vm.$emit('run-forecast')
+    await wrapper.findComponent(ForecastingWorkbench).vm.$emit('run-forecast')
     await flushUi()
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -372,10 +391,10 @@ describe('ForecastingWorkspace', () => {
     const savedProjects = await forecastingRepository.loadWorkspace('forecast-run-spec')
     expect(savedProjects[0].uploadedFileName).toBe('history.csv')
     expect(savedProjects[0].name).toBe('Consumer Voice 2026 Budget Forecast')
-    expect(wrapper.text()).toContain('Projected Contacts')
-    expect(wrapper.text()).toContain('2,030')
-    expect(wrapper.text()).toContain('Review')
-    expect(wrapper.text()).toContain('Forecast run complete. Forecast saved.')
+    expect(wrapper.text()).toContain('Forecast Workbench')
+    expect(wrapper.text()).toContain('Forecasted demand vs historical volume')
+    expect(wrapper.text()).toContain('Manual Adjustments')
+    expect(wrapper.text()).not.toContain('Forecast saved.')
 
     await findButtonByText(wrapper, 'Monthly Rollup').trigger('click')
     await flushUi()
@@ -420,7 +439,7 @@ describe('ForecastingWorkspace', () => {
     const savedProjects = await forecastingRepository.loadWorkspace('forecast-save-spec')
     expect(savedProjects[0].uploadedFileName).toBe('saved-history.csv')
     expect(savedProjects[0].name).toBe('Consumer Voice 2026 Budget Forecast')
-    expect(initialWrapper.text()).toContain('Forecast saved.')
+    expect(initialWrapper.text()).not.toContain('Forecast saved.')
 
     const wrapper = mount(ForecastingWorkspace, {
       props: {
@@ -498,12 +517,102 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('11,725')
     expect(wrapper.text()).not.toContain('No file loaded')
 
-    await findButtonByText(wrapper, 'Forecast Setup').trigger('click')
+    wrapper.vm.activeWorkflowStep = 'workbench'
+    await flushUi()
     await flushUi()
 
-    expect(wrapper.find('#forecast-type').element.value).toBe('reforecast')
+    expect(wrapper.find('#forecast-type').exists()).toBe(false)
+    expect(wrapper.find('#forecast-planning-year').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Reforecast Window')
+    expect(wrapper.find('#forecast-reforecast-start-month').exists()).toBe(false)
+
+    const reforecastToggle = wrapper.findAll('button').find((button) =>
+      button.text().includes('Reforecast Window')
+    )
+
+    expect(reforecastToggle).toBeTruthy()
+    await reforecastToggle.trigger('click')
+    await flushUi()
+
     expect(wrapper.find('#forecast-reforecast-start-month').exists()).toBe(true)
     expect(wrapper.find('#forecast-reforecast-start-month').element.value).toBe('3')
+  })
+
+  it('opens forecasts with prior results directly in the workbench and shows the docked worksheet', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-workbench-default-spec',
+        projectSeed: createProjectWithRun({
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          }
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Forecast Workbench')
+    expect(wrapper.text()).not.toContain('Plan Year')
+    expect(wrapper.text()).not.toContain('Forecast Type')
+    expect(wrapper.text()).toContain('Validation')
+    expect(wrapper.text()).not.toContain('Data Prep')
+    expect(wrapper.text()).toContain('Manual Adjustments')
+    expect(wrapper.text()).toContain('Daily override worksheet')
+  })
+
+  it('marks workbench results stale when settings change and reruns only on explicit action', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => createForecastRunResults()
+    })
+
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-stale-run-spec',
+        projectSeed: createProjectWithRun({
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          }
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    expect(wrapper.text()).not.toContain('Outputs Stale')
+
+    wrapper.vm.currentProject.modelConfig.intervalWidth = 0.9
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Outputs Stale')
+    expect(global.fetch).not.toHaveBeenCalled()
+
+    await findButtonByText(wrapper, 'Run Forecast').trigger('click')
+    await flushUi()
+    await flushUi()
+    await flushUi()
+    await flushUi()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).not.toContain('Outputs Stale')
+    expect(wrapper.text()).not.toContain('Forecast saved.')
   })
 
   it('shows a browser storage error when saving the forecast fails', async () => {

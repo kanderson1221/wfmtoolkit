@@ -86,9 +86,6 @@ export const normalizeForecastProject = (draftProject = {}, timestamp = new Date
               : []
           },
           diagnostics: {
-            dataPrepActions: Array.isArray(snapshot.lastRun?.diagnostics?.dataPrepActions)
-              ? [...snapshot.lastRun.diagnostics.dataPrepActions]
-              : [],
             warnings: Array.isArray(snapshot.lastRun?.diagnostics?.warnings)
               ? [...snapshot.lastRun.diagnostics.warnings]
               : [],

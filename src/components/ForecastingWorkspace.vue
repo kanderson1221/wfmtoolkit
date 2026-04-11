@@ -3,7 +3,7 @@ import { computed, ref, toRef, watch } from 'vue'
 
 import ForecastProjectDialog from './forecasting/ForecastProjectDialog.vue'
 import ForecastingControlPanel from './forecasting/ForecastingControlPanel.vue'
-import ForecastingResultsPanel from './forecasting/ForecastingResultsPanel.vue'
+import ForecastingWorkbench from './forecasting/ForecastingWorkbench.vue'
 import AppButton from './ui/AppButton.vue'
 import AppPanel from './ui/AppPanel.vue'
 import AppPageHeader from './ui/AppPageHeader.vue'
@@ -71,7 +71,7 @@ const props = defineProps({
 })
 
 const projectDialogOpen = ref(false)
-const activeWorkflowStep = ref('data')
+const activeWorkflowStep = ref(props.projectSeed?.lastRun?.runAt ? 'workbench' : 'data')
 const lastAppliedInitialProjectId = ref('')
 
 const {
@@ -81,10 +81,11 @@ const {
   loadError,
   runError,
   saveError,
-  saveStatusMessage,
+  isDirty,
   activeResultTab,
   projectSummaries,
   validationMessages,
+  currentProjectMeta,
   createNewProject,
   openProjectById,
   saveCurrentProject,
@@ -114,7 +115,7 @@ const projectDialogDescription = computed(() =>
 )
 
 const getDefaultWorkflowStep = (project = currentProject.value) =>
-  project?.lastRun?.runAt ? 'review' : 'data'
+  project?.lastRun?.runAt ? 'workbench' : 'data'
 
 const workflowSteps = computed(() => {
   return [
@@ -122,19 +123,13 @@ const workflowSteps = computed(() => {
       id: 'data',
       step: '1',
       title: 'Historical Data',
-      description: ''
+      description: 'Upload and map daily history.'
     },
     {
-      id: 'setup',
+      id: 'workbench',
       step: '2',
-      title: 'Forecast Setup',
-      description: ''
-    },
-    {
-      id: 'review',
-      step: '3',
-      title: 'Review',
-      description: ''
+      title: 'Forecast Workbench',
+      description: 'Tune the model, review results, and apply daily adjustments.'
     }
   ]
 })
@@ -153,9 +148,9 @@ const handleOpenProject = (projectId) => {
 const handleRunForecast = async () => {
   const didSucceed = await runForecast()
   if (didSucceed) {
-    const didSave = await saveCurrentProject('Forecast run complete. Forecast saved.')
+    const didSave = await saveCurrentProject()
     if (didSave) {
-      activeWorkflowStep.value = 'review'
+      activeWorkflowStep.value = 'workbench'
     }
   }
 }
@@ -250,45 +245,51 @@ watch(
         </div>
       </div>
 
-      <AppStatusMessage v-if="saveStatusMessage" tone="success">
-        {{ saveStatusMessage }}
-      </AppStatusMessage>
-
       <AppStatusMessage v-if="saveError" tone="error">
         {{ saveError }}
       </AppStatusMessage>
 
       <AppPanel :padded="false">
-        <div class="grid xl:grid-cols-[188px_minmax(0,1fr)] xl:items-start">
-          <section class="border-b border-slate-200 p-3 xl:sticky xl:top-4 xl:border-b-0 xl:border-r">
-            <nav class="grid gap-1" aria-label="Forecast workflow">
-              <button
-                v-for="step in workflowSteps"
-                :key="step.id"
-                type="button"
-                class="rounded-[18px] border px-3 py-2.5 text-left transition"
-                :class="activeWorkflowStep === step.id ? 'border-[#c3d2df] bg-[#e7eef4] text-[#15395f] shadow-sm' : 'border-slate-200 bg-white text-slate-900 hover:border-[#c3d2df] hover:bg-[#f4f7fa] hover:text-[#15395f]'"
-                @click="activeWorkflowStep = step.id"
-              >
-                <strong class="block text-sm font-semibold leading-5 tracking-[-0.02em]">
-                  {{ step.title }}
-                </strong>
-                <span class="mt-0.5 block text-[0.78rem] leading-5 text-slate-500">
-                  {{ step.description }}
+        <div class="grid gap-4 p-4">
+          <nav class="flex flex-wrap gap-3" aria-label="Forecast workflow">
+            <button
+              v-for="step in workflowSteps"
+              :key="step.id"
+              type="button"
+              class="min-w-[13rem] rounded-[20px] border px-4 py-3 text-left transition"
+              :class="activeWorkflowStep === step.id ? 'border-[#15395f] bg-[#15395f] text-white shadow-[0_12px_28px_rgba(21,57,95,0.18)]' : 'border-[#d3dee9] bg-[#e7eef4] text-[#15395f] hover:border-[#bcd0df] hover:bg-white'"
+              @click="activeWorkflowStep = step.id"
+            >
+              <div class="flex items-start gap-3">
+                <span
+                  class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                  :class="activeWorkflowStep === step.id ? 'bg-white/12 text-white' : 'bg-white text-[#15395f]'"
+                >
+                  {{ step.step }}
                 </span>
-              </button>
-            </nav>
-          </section>
+                <span class="min-w-0">
+                  <strong class="block text-sm font-semibold leading-5 tracking-[-0.02em]">
+                    {{ step.title }}
+                  </strong>
+                  <span
+                    class="mt-0.5 block text-[0.8rem] leading-5"
+                    :class="activeWorkflowStep === step.id ? 'text-[#d5e3ef]' : 'text-slate-600'"
+                  >
+                    {{ step.description }}
+                  </span>
+                </span>
+              </div>
+            </button>
+          </nav>
 
-          <section class="min-w-0 p-3">
+          <section class="min-w-0">
             <div class="grid gap-3">
               <ForecastingControlPanel
-                v-if="activeWorkflowStep !== 'review'"
+                v-if="activeWorkflowStep === 'data'"
                 v-model:project="currentProject"
                 :workflow-step="activeWorkflowStep"
                 :validation-messages="validationMessages"
                 :run-error="runError"
-                :save-status-message="saveStatusMessage"
                 :save-error="saveError"
                 :is-running-forecast="isRunningForecast"
                 @file-select="handleHistoryFileSelect"
@@ -300,12 +301,21 @@ watch(
                 @request-step-change="activeWorkflowStep = $event"
               />
 
-              <ForecastingResultsPanel
+              <ForecastingWorkbench
                 v-else
+                v-model:project="currentProject"
                 v-model:active-result-tab="activeResultTab"
-                :project="currentProject"
+                :validation-messages="validationMessages"
                 :run-error="runError"
-                @open-setup="activeWorkflowStep = 'setup'"
+                :is-running-forecast="isRunningForecast"
+                :is-dirty="isDirty"
+                :project-meta="currentProjectMeta"
+                @run-forecast="handleRunForecast"
+                @add-custom-seasonality="addCustomSeasonality"
+                @remove-custom-seasonality="removeCustomSeasonality"
+                @add-custom-holiday="addCustomHoliday"
+                @remove-custom-holiday="removeCustomHoliday"
+                @open-data-step="activeWorkflowStep = 'data'"
               />
             </div>
           </section>

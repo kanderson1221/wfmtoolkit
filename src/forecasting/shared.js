@@ -1,9 +1,8 @@
 export const FORECAST_RESULT_TABS = [
-  { id: 'overview', label: 'Overview' },
   { id: 'daily', label: 'Forecast' },
-  { id: 'monthly', label: 'Monthly Rollup' },
+  { id: 'accuracy', label: 'Accuracy' },
   { id: 'components', label: 'Components' },
-  { id: 'accuracy', label: 'Accuracy' }
+  { id: 'monthly', label: 'Monthly Rollup' }
 ]
 
 export const FORECAST_TYPE_BUDGET = 'budget'
@@ -23,24 +22,6 @@ export const FORECAST_HORIZON_PRESETS = [
 ]
 
 const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-export const DUPLICATE_STRATEGY_OPTIONS = [
-  { label: 'Sum daily rows', value: 'sum' },
-  { label: 'Average daily rows', value: 'average' },
-  { label: 'Keep last row', value: 'last' }
-]
-
-export const MISSING_DATE_STRATEGY_OPTIONS = [
-  { label: 'Fill missing dates with zero', value: 'fill_zero' },
-  { label: 'Interpolate missing dates', value: 'interpolate' },
-  { label: 'Keep gaps as-is', value: 'keep_gaps' }
-]
-
-export const OUTLIER_STRATEGY_OPTIONS = [
-  { label: 'Do not adjust outliers', value: 'none' },
-  { label: 'Winsorize to P99', value: 'winsorize_p99' },
-  { label: 'Drop IQR outliers', value: 'drop_iqr' }
-]
 
 export const GROWTH_OPTIONS = [
   { label: 'Linear', value: 'linear' },
@@ -264,6 +245,13 @@ export const createForecastHoliday = (overrides = {}) => ({
   ...overrides
 })
 
+export const createForecastManualAdjustment = (overrides = {}) => ({
+  ds: '',
+  delta: 0,
+  reason: '',
+  ...overrides
+})
+
 export const createForecastSeasonality = (overrides = {}) => ({
   id: createForecastEntityId('forecast-seasonality'),
   name: '',
@@ -317,6 +305,32 @@ const normalizeForecastHistoryRows = (rows = []) =>
     ? rows.map((row) => normalizeForecastHistoryRow(row))
     : []
 
+const normalizeForecastManualAdjustment = (adjustment = {}) => ({
+  ds: typeof adjustment?.ds === 'string' ? adjustment.ds : '',
+  delta: toNumber(adjustment?.delta, 0),
+  reason: typeof adjustment?.reason === 'string' ? adjustment.reason : ''
+})
+
+const normalizeForecastManualAdjustments = (adjustments = []) => {
+  const adjustmentMap = new Map()
+
+  ;(Array.isArray(adjustments) ? adjustments : []).forEach((adjustment) => {
+    const normalizedAdjustment = normalizeForecastManualAdjustment(adjustment)
+    if (!normalizedAdjustment.ds) {
+      return
+    }
+
+    if (normalizedAdjustment.delta === 0 && !normalizedAdjustment.reason.trim()) {
+      adjustmentMap.delete(normalizedAdjustment.ds)
+      return
+    }
+
+    adjustmentMap.set(normalizedAdjustment.ds, normalizedAdjustment)
+  })
+
+  return [...adjustmentMap.values()].sort((left, right) => left.ds.localeCompare(right.ds))
+}
+
 const normalizeForecastColumnMapping = (mapping = {}) => ({
   dateColumn: mapping?.dateColumn || '',
   volumeColumn: mapping?.volumeColumn || '',
@@ -355,6 +369,101 @@ const normalizeMonthlyRollupRows = (rows = [], dailyForecastRows = []) => {
     : []
 }
 
+const resolveMonthLabel = (value) => {
+  const parsed = parseForecastDateValue(value)
+  if (!parsed) {
+    return String(value || '')
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    year: 'numeric'
+  }).format(parsed)
+}
+
+export function getForecastProjectDailyRows(snapshot = {}) {
+  const dailyRows = normalizeDailyForecastRows(snapshot?.lastRun?.dailyForecast)
+  const adjustmentMap = new Map(
+    normalizeForecastManualAdjustments(snapshot?.manualAdjustments).map((adjustment) => [adjustment.ds, adjustment])
+  )
+
+  return dailyRows.map((row) => {
+    const baselineForecast = toNumber(row?.yhat, 0)
+    const adjustment = !row?.isHistory ? adjustmentMap.get(row.ds) : null
+    const delta = adjustment ? toNumber(adjustment.delta, 0) : 0
+    const nextForecast = row?.isHistory ? baselineForecast : Math.max(baselineForecast + delta, 0)
+    const nextLowerBound = row?.isHistory
+      ? toNumber(row?.yhatLower, 0)
+      : Math.max(toNumber(row?.yhatLower, 0) + delta, 0)
+    const nextUpperBound = row?.isHistory
+      ? toNumber(row?.yhatUpper, 0)
+      : Math.max(toNumber(row?.yhatUpper, 0) + delta, 0)
+
+    return {
+      ...row,
+      baselineYhat: baselineForecast,
+      manualAdjustmentDelta: row?.isHistory ? 0 : delta,
+      adjustmentReason: adjustment?.reason || '',
+      isAdjusted: !row?.isHistory && (delta !== 0 || Boolean(adjustment?.reason?.trim())),
+      yhat: nextForecast,
+      yhatLower: nextLowerBound,
+      yhatUpper: nextUpperBound
+    }
+  })
+}
+
+export function getForecastProjectMonthlyRollup(snapshot = {}) {
+  const dailyForecastRows = getForecastProjectDailyRows(snapshot)
+  const hasManualAdjustments = normalizeForecastManualAdjustments(snapshot?.manualAdjustments).length > 0
+
+  if (!hasManualAdjustments) {
+    return normalizeMonthlyRollupRows(snapshot?.lastRun?.monthlyRollup, dailyForecastRows)
+  }
+
+  const monthlyRollupMap = new Map()
+
+  dailyForecastRows
+    .filter((row) => !row?.isHistory && typeof row?.ds === 'string' && row.ds.length >= 7)
+    .forEach((row) => {
+      const monthStart = `${row.ds.slice(0, 7)}-01`
+      const existingMonth = monthlyRollupMap.get(monthStart) || {
+        monthStart,
+        monthLabel: resolveMonthLabel(monthStart),
+        contacts: 0,
+        averageDailyVolume: 0,
+        peakDailyDate: '',
+        peakDailyVolume: 0,
+        lowerBoundContacts: 0,
+        upperBoundContacts: 0,
+        _dayCount: 0
+      }
+
+      const forecastValue = toNumber(row?.yhat, 0)
+      const lowerBound = toNumber(row?.yhatLower, 0)
+      const upperBound = toNumber(row?.yhatUpper, 0)
+      const nextPeakDate = forecastValue >= existingMonth.peakDailyVolume ? row.ds : existingMonth.peakDailyDate
+      const nextPeakVolume = Math.max(existingMonth.peakDailyVolume, forecastValue)
+
+      monthlyRollupMap.set(monthStart, {
+        ...existingMonth,
+        contacts: existingMonth.contacts + forecastValue,
+        lowerBoundContacts: existingMonth.lowerBoundContacts + lowerBound,
+        upperBoundContacts: existingMonth.upperBoundContacts + upperBound,
+        peakDailyDate: nextPeakDate,
+        peakDailyVolume: nextPeakVolume,
+        _dayCount: existingMonth._dayCount + 1
+      })
+    })
+
+  return [...monthlyRollupMap.values()]
+    .sort((left, right) => left.monthStart.localeCompare(right.monthStart))
+    .map(({ _dayCount, contacts, ...row }) => ({
+      ...row,
+      contacts,
+      averageDailyVolume: _dayCount > 0 ? contacts / _dayCount : 0
+    }))
+}
+
 export const createEmptyForecastResults = (overrides = {}) => {
   const snapshot = overrides && typeof overrides === 'object' ? clonePlain(overrides) : {}
   const normalizedDailyForecast = normalizeDailyForecastRows(snapshot.dailyForecast)
@@ -372,7 +481,6 @@ export const createEmptyForecastResults = (overrides = {}) => {
     },
     summary: snapshot.summary ? { ...snapshot.summary } : null,
     diagnostics: {
-      dataPrepActions: Array.isArray(snapshot.diagnostics?.dataPrepActions) ? [...snapshot.diagnostics.dataPrepActions] : [],
       warnings: Array.isArray(snapshot.diagnostics?.warnings) ? [...snapshot.diagnostics.warnings] : [],
       validationNotes: Array.isArray(snapshot.diagnostics?.validationNotes) ? [...snapshot.diagnostics.validationNotes] : [],
       holdout: snapshot.diagnostics?.holdout || null
@@ -383,6 +491,7 @@ export const createEmptyForecastResults = (overrides = {}) => {
 export const createForecastProject = (overrides = {}) => {
   const snapshot = overrides && typeof overrides === 'object' ? clonePlain(overrides) : {}
   const { intervalModel: legacyIntervalModel, ...projectSnapshot } = snapshot
+  const { runNotes: _legacyRunNotes, ...snapshotModelConfig } = snapshot.modelConfig || {}
   const planningContext = {
     centerId: null,
     groupId: null,
@@ -438,17 +547,10 @@ export const createForecastProject = (overrides = {}) => {
     uploadedHeaders: Array.isArray(snapshot.uploadedHeaders) ? [...snapshot.uploadedHeaders] : [],
     uploadedRows: Array.isArray(snapshot.uploadedRows) ? snapshot.uploadedRows.map((row) => ({ ...row })) : [],
     historyRows: normalizeForecastHistoryRows(snapshot.historyRows),
+    manualAdjustments: normalizeForecastManualAdjustments(snapshot.manualAdjustments),
     parserIssues: Array.isArray(snapshot.parserIssues) ? [...snapshot.parserIssues] : [],
     normalizationIssues: Array.isArray(snapshot.normalizationIssues) ? [...snapshot.normalizationIssues] : [],
     columnMapping: normalizeForecastColumnMapping(snapshot.columnMapping),
-    dataPreparation: {
-      duplicateStrategy: 'sum',
-      missingDateStrategy: 'fill_zero',
-      outlierStrategy: 'none',
-      trimStartDate: '',
-      trimEndDate: '',
-      ...(snapshot.dataPreparation || {})
-    },
     modelConfig: {
       growth: 'linear',
       defaultCap: null,
@@ -466,17 +568,16 @@ export const createForecastProject = (overrides = {}) => {
       yearlyPriorScale: 10,
       builtInHolidayCountry: 'US',
       holidaysPriorScale: 10,
-      customSeasonalities: Array.isArray(snapshot.modelConfig?.customSeasonalities)
-        ? snapshot.modelConfig.customSeasonalities.map((item) => ({ ...item }))
+      customSeasonalities: Array.isArray(snapshotModelConfig?.customSeasonalities)
+        ? snapshotModelConfig.customSeasonalities.map((item) => ({ ...item }))
         : [],
-      customHolidays: Array.isArray(snapshot.modelConfig?.customHolidays)
-        ? snapshot.modelConfig.customHolidays.map((item) => ({ ...item }))
+      customHolidays: Array.isArray(snapshotModelConfig?.customHolidays)
+        ? snapshotModelConfig.customHolidays.map((item) => ({ ...item }))
         : [],
       intervalWidth: 0.8,
       mcmcSamples: 0,
       holdoutDays: 0,
-      runNotes: '',
-      ...(snapshot.modelConfig || {})
+      ...snapshotModelConfig
     },
     planningContext,
     lastRun: normalizedLastRun,

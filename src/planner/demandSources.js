@@ -1,6 +1,7 @@
 import {
   computeForecastPlanningReady,
   getForecastPlanningYear,
+  getForecastProjectMonthlyRollup,
   resolveForecastCoverageWindow,
   resolveForecastType
 } from '../forecasting/shared'
@@ -60,9 +61,7 @@ export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
     forecastType: resolvedForecastType,
     coverageStartMonthIndex: forecastProject?.coverageStartMonthIndex
   })
-  const monthlyRollup = Array.isArray(forecastProject?.lastRun?.monthlyRollup)
-    ? forecastProject.lastRun.monthlyRollup
-    : []
+  const monthlyRollup = getForecastProjectMonthlyRollup(forecastProject)
 
   if (
     !computeForecastPlanningReady(forecastProject) ||

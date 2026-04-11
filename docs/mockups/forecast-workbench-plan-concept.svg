@@ -1,0 +1,271 @@
+<svg width="1600" height="1120" viewBox="0 0 1600 1120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pageBg" x1="0" y1="0" x2="1600" y2="1120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5F8FC"/>
+      <stop offset="1" stop-color="#EDF3F8"/>
+    </linearGradient>
+    <linearGradient id="heroGlow" x1="250" y1="88" x2="1110" y2="910" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F7FAFD"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#173A63" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .sans { font-family: "IBM Plex Sans", Inter, Arial, sans-serif; }
+      .title-lg { font: 700 34px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #10253E; letter-spacing: -0.6px; }
+      .title-md { font: 700 22px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #10253E; }
+      .title-sm { font: 700 17px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #10253E; }
+      .metric { font: 700 26px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #10253E; letter-spacing: -0.5px; }
+      .label { font: 700 12px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #6B7D90; letter-spacing: 1.6px; text-transform: uppercase; }
+      .body { font: 500 15px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #4D6073; }
+      .body-sm { font: 500 13px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #64788D; }
+      .body-xs { font: 500 12px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #7C8FA2; }
+      .button { font: 700 14px "IBM Plex Sans", Inter, Arial, sans-serif; }
+      .tab { font: 700 14px "IBM Plex Sans", Inter, Arial, sans-serif; }
+      .mono { font: 600 13px "IBM Plex Sans", Inter, Arial, sans-serif; fill: #10253E; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1120" fill="url(#pageBg)"/>
+
+  <rect x="24" y="20" width="1552" height="74" rx="22" fill="#FFFFFF" stroke="#D8E4EE"/>
+  <text x="52" y="48" class="label sans">Nexus Forecasting</text>
+  <text x="52" y="74" class="title-md sans">Demand Prophet v2.4 - FY25</text>
+
+  <g transform="translate(1110 33)">
+    <rect width="128" height="48" rx="16" fill="#FFFFFF" stroke="#C6D5E2"/>
+    <text x="64" y="29" text-anchor="middle" class="button sans" fill="#31465D">Save Draft</text>
+  </g>
+  <g transform="translate(1250 33)">
+    <rect width="128" height="48" rx="16" fill="#FFFFFF" stroke="#C6D5E2"/>
+    <text x="64" y="29" text-anchor="middle" class="button sans" fill="#31465D">Open Project</text>
+  </g>
+  <g transform="translate(1390 33)">
+    <rect width="142" height="48" rx="16" fill="#173A63"/>
+    <text x="71" y="29" text-anchor="middle" class="button sans" fill="#FFFFFF">Run Forecast</text>
+  </g>
+
+  <g transform="translate(36 118)">
+    <rect width="170" height="54" rx="18" fill="#E7EEF5" stroke="#D3DEE9"/>
+    <circle cx="26" cy="27" r="9" fill="#2E7D64"/>
+    <path d="M22 27L25 30L31 23" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="46" y="24" class="label sans">Step 1</text>
+    <text x="46" y="40" class="title-sm sans">Historical Data</text>
+  </g>
+  <g transform="translate(220 118)">
+    <rect width="214" height="54" rx="18" fill="#173A63"/>
+    <circle cx="28" cy="27" r="11" fill="#FFFFFF" fill-opacity="0.18"/>
+    <text x="24.5" y="31" text-anchor="middle" class="button sans" fill="#FFFFFF">2</text>
+    <text x="50" y="24" class="label sans" fill="#BFD1E3">Active Step</text>
+    <text x="50" y="40" class="title-sm sans" fill="#FFFFFF">Forecast Workbench</text>
+  </g>
+  <text x="456" y="152" class="body-sm sans">Setup and review are merged into one work surface. Results stay visible while settings change.</text>
+
+  <rect x="24" y="192" width="1552" height="904" rx="30" fill="url(#heroGlow)" stroke="#D8E4EE" filter="url(#softShadow)"/>
+
+  <g transform="translate(48 220)">
+    <text x="0" y="16" class="label sans">Forecast Workbench</text>
+    <text x="0" y="56" class="title-lg sans">Demand Prophet v2.4 - FY25</text>
+    <text x="0" y="84" class="body sans">Chart-first tuning workspace with a sticky model inspector and a reserved adjustments dock.</text>
+
+    <g transform="translate(0 104)">
+      <rect width="110" height="32" rx="16" fill="#E4F3ED"/>
+      <text x="55" y="21" text-anchor="middle" class="body-sm sans" fill="#21664E">Current Version</text>
+    </g>
+    <g transform="translate(122 104)">
+      <rect width="118" height="32" rx="16" fill="#E9F0F8"/>
+      <text x="59" y="21" text-anchor="middle" class="body-sm sans" fill="#35506E">Coverage: 365d</text>
+    </g>
+    <g transform="translate(252 104)">
+      <rect width="128" height="32" rx="16" fill="#E9F0F8"/>
+      <text x="64" y="21" text-anchor="middle" class="body-sm sans" fill="#35506E">Test Set: 30d</text>
+    </g>
+    <g transform="translate(392 104)">
+      <rect width="176" height="32" rx="16" fill="#FFF5D9"/>
+      <text x="88" y="21" text-anchor="middle" class="body-sm sans" fill="#8A5A00">Outputs stale until rerun</text>
+    </g>
+  </g>
+
+  <g transform="translate(48 384)">
+    <rect width="1118" height="118" rx="24" fill="#FFFFFF" stroke="#D8E4EE"/>
+    <g transform="translate(24 20)">
+      <rect width="150" height="78" rx="18" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="16" y="22" class="label sans">History Rows</text>
+      <text x="16" y="54" class="metric sans">1,096</text>
+      <text x="16" y="69" class="body-xs sans">3 years loaded</text>
+    </g>
+    <g transform="translate(188 20)">
+      <rect width="150" height="78" rx="18" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="16" y="22" class="label sans">Coverage</text>
+      <text x="16" y="54" class="metric sans">365d</text>
+      <text x="16" y="69" class="body-xs sans">Jan-Dec FY25</text>
+    </g>
+    <g transform="translate(352 20)">
+      <rect width="150" height="78" rx="18" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="16" y="22" class="label sans">Test Set</text>
+      <text x="16" y="54" class="metric sans">30d</text>
+      <text x="16" y="69" class="body-xs sans">Validation window</text>
+    </g>
+    <g transform="translate(516 20)">
+      <rect width="178" height="78" rx="18" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="16" y="22" class="label sans">Projected Contacts</text>
+      <text x="16" y="54" class="metric sans">1.24M</text>
+      <text x="16" y="69" class="body-xs sans">From last completed run</text>
+    </g>
+    <g transform="translate(708 20)">
+      <rect width="150" height="78" rx="18" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="16" y="22" class="label sans">Peak Month</text>
+      <text x="16" y="54" class="metric sans">Nov</text>
+      <text x="16" y="69" class="body-xs sans">182.4k contacts</text>
+    </g>
+    <g transform="translate(872 20)">
+      <rect width="222" height="78" rx="18" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="16" y="22" class="label sans">Last Run</text>
+      <text x="16" y="54" class="metric sans">Apr 7, 4:12 PM</text>
+      <text x="16" y="69" class="body-xs sans">Results stay pinned until rerun</text>
+    </g>
+  </g>
+
+  <g transform="translate(48 522)">
+    <rect width="1118" height="438" rx="26" fill="#FFFFFF" stroke="#D8E4EE"/>
+    <g transform="translate(22 18)">
+      <rect width="122" height="42" rx="16" fill="#173A63"/>
+      <text x="61" y="27" text-anchor="middle" class="tab sans" fill="#FFFFFF">Forecast</text>
+    </g>
+    <g transform="translate(154 18)">
+      <rect width="118" height="42" rx="16" fill="#FFFFFF" stroke="#D0DCE7"/>
+      <text x="59" y="27" text-anchor="middle" class="tab sans" fill="#37506D">Accuracy</text>
+    </g>
+    <g transform="translate(282 18)">
+      <rect width="132" height="42" rx="16" fill="#FFFFFF" stroke="#D0DCE7"/>
+      <text x="66" y="27" text-anchor="middle" class="tab sans" fill="#37506D">Components</text>
+    </g>
+    <g transform="translate(424 18)">
+      <rect width="154" height="42" rx="16" fill="#FFFFFF" stroke="#D0DCE7"/>
+      <text x="77" y="27" text-anchor="middle" class="tab sans" fill="#37506D">Monthly Rollup</text>
+    </g>
+
+    <g transform="translate(756 16)">
+      <rect width="340" height="46" rx="16" fill="#FFF7E2" stroke="#F0D99A"/>
+      <text x="18" y="20" class="label sans" fill="#936200">Run status</text>
+      <text x="18" y="35" class="body-sm sans" fill="#7B5A13">Settings changed after the last run. Current charts are still from Apr 7.</text>
+    </g>
+
+    <g transform="translate(22 86)">
+      <rect width="1072" height="250" rx="22" fill="#F9FBFE" stroke="#D8E4EE"/>
+      <text x="24" y="30" class="title-sm sans">Forecast vs historical daily demand</text>
+      <text x="24" y="50" class="body-sm sans">Default analysis tab stays chart-first. Accuracy, components, and rollups move behind tabs instead of separate pages.</text>
+
+      <path d="M28 198H1044" stroke="#DCE6EF"/>
+      <path d="M28 150H1044" stroke="#E6EEF5"/>
+      <path d="M28 102H1044" stroke="#E6EEF5"/>
+      <path d="M28 54H1044" stroke="#E6EEF5"/>
+
+      <path d="M58 190L124 174L192 166L258 172L326 150L392 142L460 124L524 128L590 156L656 168L724 148" stroke="#94A7B8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 8"/>
+      <path d="M724 148L790 138L856 106L922 114L988 84L1034 98" stroke="#173A63" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M724 122L790 108L856 76L922 82L988 58L1034 72L1034 132L988 150L922 144L856 170L790 166L724 174Z" fill="#D8E7F7"/>
+      <path d="M722 64V220" stroke="#90A4B8" stroke-width="2" stroke-dasharray="6 8"/>
+
+      <circle cx="590" cy="156" r="4" fill="#B04700"/>
+      <circle cx="656" cy="168" r="4" fill="#B04700"/>
+      <circle cx="856" cy="106" r="4" fill="#214F88"/>
+      <text x="738" y="42" class="body-xs sans">forecast start</text>
+
+      <g transform="translate(24 212)">
+        <rect width="16" height="4" rx="2" fill="#94A7B8"/>
+        <text x="24" y="9" class="body-xs sans">historical</text>
+        <rect x="110" width="16" height="4" rx="2" fill="#173A63"/>
+        <text x="134" y="9" class="body-xs sans">forecast</text>
+        <rect x="210" width="16" height="12" rx="6" fill="#D8E7F7"/>
+        <text x="234" y="9" class="body-xs sans">confidence band</text>
+      </g>
+    </g>
+
+    <g transform="translate(22 352)">
+      <rect width="526" height="62" rx="18" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="22" y="24" class="label sans">Inline diagnostics</text>
+      <text x="22" y="42" class="body-sm sans">Residual summary, test-set score, and component notes can live here without overpowering the chart.</text>
+    </g>
+    <g transform="translate(568 352)">
+      <rect width="526" height="62" rx="18" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="22" y="24" class="label sans">Tables stay secondary</text>
+      <text x="22" y="42" class="body-sm sans">Monthly table and detailed diagnostics remain accessible from tabs instead of taking over the page.</text>
+    </g>
+  </g>
+
+  <g transform="translate(1188 384)">
+    <rect width="364" height="576" rx="26" fill="#EEF3F8" stroke="#D8E4EE"/>
+    <text x="24" y="32" class="label sans">Sticky Inspector</text>
+    <text x="24" y="58" class="title-md sans">Model Settings</text>
+
+    <g transform="translate(18 84)">
+      <rect width="328" height="74" rx="18" fill="#FFFFFF" stroke="#D2DEE9"/>
+      <text x="18" y="22" class="label sans">Scope</text>
+      <text x="18" y="42" class="body-sm sans">Plan year, horizon, reforecast month</text>
+      <rect x="18" y="50" width="292" height="10" rx="5" fill="#E9F0F6"/>
+      <rect x="18" y="50" width="154" height="10" rx="5" fill="#315F93"/>
+    </g>
+
+    <g transform="translate(18 170)">
+      <rect width="328" height="74" rx="18" fill="#FFFFFF" stroke="#D2DEE9"/>
+      <text x="18" y="22" class="label sans">Validation</text>
+      <text x="18" y="42" class="body-sm sans">Holdout days and confidence interval</text>
+      <rect x="18" y="50" width="134" height="18" rx="9" fill="#EAF1F7"/>
+      <text x="85" y="62" text-anchor="middle" class="body-xs sans" fill="#35506E">30 day holdout</text>
+    </g>
+
+    <g transform="translate(18 256)">
+      <rect width="328" height="88" rx="18" fill="#FFFFFF" stroke="#D2DEE9"/>
+      <text x="18" y="22" class="label sans">Data Prep</text>
+      <text x="18" y="42" class="body-sm sans">Estimate missing days and handle zeros</text>
+      <rect x="18" y="54" width="64" height="20" rx="10" fill="#173A63"/>
+      <circle cx="68" cy="64" r="8" fill="#FFFFFF"/>
+      <text x="96" y="68" class="body-xs sans">Estimate missing days</text>
+    </g>
+
+    <g transform="translate(18 356)">
+      <rect width="328" height="116" rx="18" fill="#FFFFFF" stroke="#D2DEE9"/>
+      <text x="18" y="22" class="label sans">Seasonality</text>
+      <text x="18" y="42" class="body-sm sans">One place for weekly and yearly controls</text>
+      <rect x="18" y="58" width="292" height="20" rx="10" fill="#EEF4F8"/>
+      <rect x="26" y="62" width="14" height="12" rx="2" fill="#173A63"/>
+      <text x="50" y="72" class="body-xs sans">Weekly enabled - Fourier 10</text>
+      <rect x="18" y="84" width="292" height="20" rx="10" fill="#EEF4F8"/>
+      <rect x="26" y="88" width="14" height="12" rx="2" fill="#173A63"/>
+      <text x="50" y="98" class="body-xs sans">Yearly enabled - Auto</text>
+    </g>
+
+    <g transform="translate(18 484)">
+      <rect width="328" height="74" rx="18" fill="#FFFFFF" stroke="#D2DEE9"/>
+      <text x="18" y="22" class="label sans">Holidays</text>
+      <text x="18" y="42" class="body-sm sans">Calendar source and holiday effects</text>
+      <text x="18" y="60" class="body-xs sans">United States schedule inherited from workspace</text>
+    </g>
+
+    <g transform="translate(18 570)">
+      <rect width="328" height="74" rx="18" fill="#FFFFFF" stroke="#D2DEE9"/>
+      <text x="18" y="22" class="label sans">Advanced</text>
+      <text x="18" y="42" class="body-sm sans">Growth mode, priors, and changepoint tuning</text>
+      <text x="18" y="60" class="body-xs sans">Hidden until needed, but always on the same rail</text>
+    </g>
+  </g>
+
+  <g transform="translate(48 978)">
+    <rect width="1504" height="88" rx="24" fill="#FFFFFF" stroke="#D8E4EE"/>
+    <text x="24" y="28" class="label sans">Reserved Lower Dock</text>
+    <text x="24" y="56" class="title-md sans">Manual Adjustments</text>
+    <text x="260" y="56" class="body sans">Phase 1 keeps this visible as part of the workbench, but non-editable until the adjustment model ships.</text>
+
+    <g transform="translate(1056 18)">
+      <rect width="166" height="52" rx="16" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="18" y="21" class="label sans">Future Worksheet</text>
+      <text x="18" y="39" class="body-xs sans">Date | Baseline | Delta | Final | Reason</text>
+    </g>
+    <g transform="translate(1236 18)">
+      <rect width="244" height="52" rx="16" fill="#F7FAFD" stroke="#D8E4EE"/>
+      <text x="18" y="21" class="label sans">Planning Handoff Later</text>
+      <text x="18" y="39" class="body-xs sans">Adjusted monthly rollup feeds planning once enabled</text>
+    </g>
+  </g>
+</svg>

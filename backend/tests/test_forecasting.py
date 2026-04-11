@@ -82,13 +82,6 @@ class ForecastingTests(unittest.TestCase):
                 {"ds": "2025-01-13", "y": 116, "cap": 500, "floor": 0, "holidayLabel": ""},
                 {"ds": "2025-01-14", "y": 119, "cap": 500, "floor": 0, "holidayLabel": ""},
             ],
-            "dataPreparation": {
-                "duplicateStrategy": "sum",
-                "missingDateStrategy": "fill_zero",
-                "outlierStrategy": "none",
-                "trimStartDate": "",
-                "trimEndDate": "",
-            },
             "modelConfig": {
                 "growth": "logistic",
                 "defaultCap": 500,
@@ -123,7 +116,6 @@ class ForecastingTests(unittest.TestCase):
                 "intervalWidth": 0.8,
                 "mcmcSamples": 0,
                 "holdoutDays": 0,
-                "runNotes": "Test run",
             },
         }
         base_payload.update(overrides)
@@ -157,6 +149,21 @@ class ForecastingTests(unittest.TestCase):
             run_daily_volume_forecast(payload)
 
         self.assertIn("defaultCap", str(raised.exception))
+
+    def test_forecast_run_rejects_duplicate_history_dates(self) -> None:
+        base_payload = self._payload()
+        payload = self._payload(
+            history=[
+                *[row.model_dump() for row in base_payload.history[:-1]],
+                {"ds": "2025-01-13", "y": 140, "cap": 500, "floor": 0, "holidayLabel": ""},
+                {"ds": "2025-01-13", "y": 119, "cap": 500, "floor": 0, "holidayLabel": ""},
+            ]
+        )
+
+        with self.assertRaises(ValueError) as raised:
+            run_daily_volume_forecast(payload)
+
+        self.assertIn("one row per date", str(raised.exception))
 
     @patch("backend.app.forecasting.Prophet", FakeProphet)
     def test_holdout_returns_accuracy_metrics_and_rows(self) -> None:
