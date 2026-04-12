@@ -4,6 +4,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  labelClass: {
+    type: String,
+    default: ''
+  },
   inputId: {
     type: String,
     default: ''
@@ -29,7 +33,10 @@ const props = defineProps({
       <label
         v-if="props.label"
         :for="props.inputId || undefined"
-        :class="props.compact ? 'text-[0.82rem] font-medium text-slate-700' : 'text-sm font-medium text-slate-700'"
+        :class="[
+          props.compact ? 'text-[0.82rem] font-medium text-slate-700' : 'text-sm font-medium text-slate-700',
+          props.labelClass
+        ]"
       >
         {{ props.label }}
       </label>

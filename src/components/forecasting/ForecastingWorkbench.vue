@@ -5,8 +5,14 @@ import ForecastingManualAdjustmentsDock from './ForecastingManualAdjustmentsDock
 import ForecastingResultsPanel from './ForecastingResultsPanel.vue'
 import ForecastingWorkbenchInspector from './ForecastingWorkbenchInspector.vue'
 import AppButton from '../ui/AppButton.vue'
+import AppDrawer from '../ui/AppDrawer.vue'
+import AppEmptyState from '../ui/AppEmptyState.vue'
 import {
-  FORECAST_RESULT_TABS
+  FORECAST_RESULT_TABS,
+  formatDateTime,
+  formatWhole,
+  getForecastProjectDailyRows,
+  getForecastProjectManualAdjustments
 } from '../../forecasting/shared'
 import { buildForecastRunInputSignature } from '../../composables/forecasting/forecastWorkspaceHelpers'
 
@@ -27,6 +33,14 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  showLibraryActions: {
+    type: Boolean,
+    default: true
+  },
+  showDuplicateAction: {
+    type: Boolean,
+    default: true
+  },
   projectMeta: {
     type: Object,
     default: () => ({})
@@ -35,11 +49,15 @@ const props = defineProps({
 
 const emit = defineEmits([
   'run-forecast',
+  'create-new-project',
+  'open-project-dialog',
+  'duplicate-project',
+  'save-project',
   'add-custom-seasonality',
   'remove-custom-seasonality',
   'add-custom-holiday',
   'remove-custom-holiday',
-  'open-data-step'
+  'open-history-modal'
 ])
 
 const project = defineModel('project', {
@@ -52,11 +70,17 @@ const activeResultTab = defineModel('activeResultTab', {
   required: true
 })
 
-const inspectorCollapsed = ref(false)
-const dockVisible = ref(true)
+const inspectorOpen = ref(false)
 
 const resultTabs = computed(() => FORECAST_RESULT_TABS)
+const hasHistory = computed(() =>
+  Array.isArray(project.value?.historyRows) && project.value.historyRows.length > 0
+)
 const hasResults = computed(() => Boolean(project.value?.lastRun?.runAt))
+const forecastRows = computed(() =>
+  getForecastProjectDailyRows(project.value).filter((row) => !row?.isHistory)
+)
+const manualAdjustments = computed(() => getForecastProjectManualAdjustments(project.value))
 const currentInputSignature = computed(() => buildForecastRunInputSignature(project.value))
 const resultsStale = computed(() =>
   Boolean(
@@ -75,16 +99,24 @@ const headerStatus = computed(() => {
 
   if (props.validationMessages.length) {
     return {
-      message: 'Resolve the validation issues in the inspector before running the forecast again.',
+      message: 'Resolve the validation issues in model parameters before running the forecast again.',
       tone: 'warning'
     }
   }
 
   return null
 })
-const desktopWorkbenchStyle = computed(() => ({
-  '--forecast-inspector-width': inspectorCollapsed.value ? '2.75rem' : '23rem'
-}))
+const inspectorFooterMessage = computed(() => {
+  if (props.validationMessages.length) {
+    return 'Resolve the validation issues before rerunning the forecast.'
+  }
+
+  if (resultsStale.value) {
+    return 'Outputs are stale. Run the forecast to refresh the chart and rollups.'
+  }
+
+  return hasResults.value ? 'Settings are current for the latest completed run.' : ''
+})
 const collapsedRailStatusClass = computed(() => {
   if (props.validationMessages.length) {
     return 'bg-rose-500'
@@ -94,8 +126,42 @@ const collapsedRailStatusClass = computed(() => {
     return 'bg-amber-500'
   }
 
-  return 'bg-[#15395f]'
+  return 'bg-slate-400'
 })
+const historyActionLabel = computed(() => 'Data')
+const currentRunLabel = computed(() =>
+  hasResults.value && project.value?.lastRun?.runAt
+    ? `Current run: ${formatDateTime(project.value.lastRun.runAt)}`
+    : ''
+)
+const adjustedDayCount = computed(() =>
+  forecastRows.value.filter((row) => row.isAdjusted).length
+)
+const totalAdjustmentDelta = computed(() =>
+  forecastRows.value.reduce((sum, row) => sum + Number(row.manualAdjustmentDelta || 0), 0)
+)
+const adjustedForecastTotal = computed(() =>
+  forecastRows.value.reduce((sum, row) => sum + Number(row.yhat || 0), 0)
+)
+const manualAdjustmentSummary = computed(() => {
+  if (!manualAdjustments.value.length) {
+    return ''
+  }
+
+  const ruleLabel = manualAdjustments.value.length === 1 ? 'rule' : 'rules'
+  const netImpactLabel = `${totalAdjustmentDelta.value >= 0 ? '+' : ''}${formatWhole(totalAdjustmentDelta.value)}`
+
+  return `${formatWhole(manualAdjustments.value.length)} ${ruleLabel} • ${formatWhole(adjustedDayCount.value)} adjusted days • ${netImpactLabel} net impact • ${formatWhole(adjustedForecastTotal.value)} adjusted total`
+})
+
+const clearManualAdjustments = () => {
+  project.value.manualAdjustments = []
+}
+
+const handleInspectorRun = () => {
+  inspectorOpen.value = false
+  emit('run-forecast')
+}
 </script>
 
 <template>
@@ -103,22 +169,50 @@ const collapsedRailStatusClass = computed(() => {
     <div class="border-b border-slate-200 bg-white px-5 py-5">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="grid gap-3">
-          <div class="grid gap-1">
-            <p class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Forecast Workbench
-            </p>
-            <h2 class="text-[1.85rem] font-semibold tracking-[-0.04em] text-slate-950">
-              {{ project.name || 'Untitled Forecast' }}
-            </h2>
-          </div>
+          <h2 class="text-[1.85rem] font-semibold tracking-[-0.04em] text-slate-950">
+            {{ project.name || 'Untitled Forecast' }}
+          </h2>
         </div>
 
         <div class="flex flex-wrap items-center gap-2 xl:justify-end">
-          <AppButton size="sm" variant="secondary" @click="emit('open-data-step')">
-            Historical Data
+          <AppButton
+            v-if="props.showLibraryActions"
+            size="sm"
+            variant="secondary"
+            @click="emit('create-new-project')"
+          >
+            New Forecast
           </AppButton>
-          <AppButton size="sm" variant="secondary" @click="dockVisible = !dockVisible">
-            {{ dockVisible ? 'Hide Adjustments' : 'Show Adjustments' }}
+          <AppButton
+            v-if="props.showLibraryActions"
+            size="sm"
+            variant="secondary"
+            @click="emit('open-project-dialog')"
+          >
+            Open Forecast
+          </AppButton>
+          <AppButton
+            v-if="props.showDuplicateAction"
+            size="sm"
+            variant="secondary"
+            @click="emit('duplicate-project')"
+          >
+            Duplicate Forecast
+          </AppButton>
+          <AppButton size="sm" variant="secondary" @click="emit('save-project')">
+            Save Forecast
+          </AppButton>
+          <span
+            v-if="currentRunLabel"
+            class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600"
+          >
+            {{ currentRunLabel }}
+          </span>
+          <AppButton size="sm" variant="secondary" @click="emit('open-history-modal')">
+            {{ historyActionLabel }}
+          </AppButton>
+          <AppButton size="sm" variant="secondary" class="xl:hidden" @click="inspectorOpen = true">
+            Model Parameters
           </AppButton>
           <span
             v-if="resultsStale"
@@ -127,12 +221,13 @@ const collapsedRailStatusClass = computed(() => {
             Outputs Stale
           </span>
           <AppButton
+            v-if="!inspectorOpen"
             size="sm"
             variant="primary"
             :disabled="props.isRunningForecast || props.validationMessages.length > 0"
             @click="emit('run-forecast')"
           >
-            {{ props.isRunningForecast ? 'Running Forecast...' : 'Run Forecast' }}
+            {{ props.isRunningForecast ? 'Running...' : 'Run' }}
           </AppButton>
         </div>
       </div>
@@ -148,13 +243,10 @@ const collapsedRailStatusClass = computed(() => {
     </div>
 
     <div class="grid gap-4">
-      <div
-        class="grid gap-4 xl:gap-0 xl:[grid-template-columns:minmax(0,1fr)_var(--forecast-inspector-width)] xl:transition-[grid-template-columns] xl:duration-300 xl:ease-[cubic-bezier(0.22,1,0.36,1)]"
-        :style="desktopWorkbenchStyle"
-      >
+      <div class="relative grid gap-4 xl:pr-11">
         <div class="min-w-0 grid gap-4">
           <section class="overflow-hidden bg-white">
-            <div class="border-b border-slate-200 px-4 py-4">
+            <div v-if="hasHistory" class="border-b border-slate-200 px-4 py-4">
               <div class="flex flex-wrap gap-2">
                 <button
                   v-for="tab in resultTabs"
@@ -169,7 +261,7 @@ const collapsedRailStatusClass = computed(() => {
               </div>
             </div>
 
-            <div class="pt-4">
+            <div v-if="hasHistory" class="pt-4">
               <ForecastingResultsPanel
                 v-model:active-result-tab="activeResultTab"
                 :project="project"
@@ -179,92 +271,72 @@ const collapsedRailStatusClass = computed(() => {
                 :show-forecast-table="false"
               />
             </div>
+
+            <div v-else class="p-5">
+              <AppEmptyState
+                title="No daily history loaded"
+                description="Upload a CSV to start configuring and running the forecast."
+              >
+                <div class="pt-3">
+                  <AppButton size="sm" variant="primary" @click="emit('open-history-modal')">
+                    Upload History
+                  </AppButton>
+                </div>
+              </AppEmptyState>
+            </div>
           </section>
         </div>
 
-        <aside
-          class="min-w-0 xl:sticky xl:top-4 xl:mt-[5.25rem]"
-          :class="inspectorCollapsed ? 'xl:self-stretch' : 'xl:self-start'"
+        <button
+          v-if="!inspectorOpen"
+          type="button"
+          class="hidden xl:flex xl:absolute xl:right-0 xl:top-0 xl:bottom-0 xl:z-10 xl:w-11 xl:flex-col xl:items-center xl:border-l xl:border-slate-200 xl:bg-slate-50 xl:px-1 xl:py-3 xl:text-slate-700 xl:shadow-[0_18px_36px_rgba(15,23,42,0.1)] xl:transition xl:hover:bg-white"
+          aria-label="Expand model parameters"
+          @click="inspectorOpen = true"
         >
-          <div class="relative h-full">
-            <section
-              class="overflow-hidden border border-slate-200 bg-[#edf3f8] shadow-sm transition-opacity duration-200 xl:flex xl:max-h-[calc(100vh-7.25rem)] xl:flex-col xl:rounded-none xl:border-y-0 xl:border-r-0 xl:shadow-none"
-              :class="inspectorCollapsed ? 'pointer-events-none xl:absolute xl:inset-0 xl:opacity-0' : 'opacity-100'"
-            >
-              <div class="flex items-center justify-between border-b border-slate-200 px-4 py-4">
-                <div class="grid gap-1">
-                  <p class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[#15395f]">
-                    Prophet Configuration
-                  </p>
-                  <h3 class="text-base font-semibold tracking-[-0.02em] text-slate-950">
-                    Model Inspector
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  class="hidden text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500 transition hover:text-[#15395f] xl:inline-flex"
-                  @click="inspectorCollapsed = true"
-                >
-                  Collapse
-                </button>
-              </div>
+          <div class="grid justify-items-center gap-3">
+            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#15395f] bg-[#15395f] text-sm font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.16)]">
+              +
+            </span>
 
-              <div class="p-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-3">
-                <ForecastingWorkbenchInspector
-                  v-model:project="project"
-                  :validation-messages="props.validationMessages"
-                  @add-custom-seasonality="emit('add-custom-seasonality')"
-                  @remove-custom-seasonality="emit('remove-custom-seasonality', $event)"
-                  @add-custom-holiday="emit('add-custom-holiday')"
-                  @remove-custom-holiday="emit('remove-custom-holiday', $event)"
-                />
-              </div>
-            </section>
-
-            <section
-              class="hidden border-l border-[#102f4f] bg-[#15395f] shadow-sm transition-opacity duration-200 xl:flex xl:rounded-none xl:border-y-0 xl:border-r-0 xl:shadow-none"
-              :class="inspectorCollapsed ? 'relative h-full opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'"
-            >
-              <button
-                type="button"
-                class="relative flex h-full w-full flex-col items-center px-1 py-3 text-slate-100 transition hover:bg-[#123153]"
-                aria-label="Expand model inspector"
-                @click="inspectorCollapsed = false"
-              >
-                <div class="grid justify-items-center gap-3">
-                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/60 bg-white text-sm font-semibold text-[#15395f] shadow-[0_4px_12px_rgba(15,23,42,0.2)]">
-                    +
-                  </span>
-
-                  <span
-                    class="h-1.5 w-4 rounded-full"
-                    :class="collapsedRailStatusClass"
-                  />
-                </div>
-
-                <span class="pointer-events-none absolute inset-x-0 top-16 bottom-3 flex items-center justify-center [writing-mode:vertical-rl] rotate-180 text-[0.58rem] font-semibold uppercase tracking-[0.22em] text-slate-200/85">
-                  Inspector
-                </span>
-              </button>
-            </section>
+            <span
+              class="h-1.5 w-4 rounded-full"
+              :class="collapsedRailStatusClass"
+            />
           </div>
-        </aside>
+
+          <span class="pointer-events-none absolute inset-x-0 top-16 bottom-3 flex items-center justify-center [writing-mode:vertical-rl] rotate-180 text-[0.58rem] font-semibold uppercase tracking-[0.22em] text-slate-500">
+            Model Parameters
+          </span>
+        </button>
       </div>
 
-      <section v-if="dockVisible" class="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-        <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-4">
-          <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div class="grid gap-1">
-              <p class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Reserved Lower Dock
-              </p>
-              <h3 class="text-lg font-semibold tracking-[-0.02em] text-slate-950">
-                Manual Adjustments
-              </h3>
-            </div>
-            <p class="max-w-[44rem] text-sm text-slate-600">
-              Apply future-row daily deltas here, then carry the adjusted monthly rollup downstream into planning.
+      <section
+        v-if="hasHistory && activeResultTab === 'daily'"
+        class="overflow-visible border border-slate-200 bg-white shadow-sm"
+      >
+        <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3 xl:flex-row xl:items-start xl:justify-between">
+          <div class="grid gap-1">
+            <h3 class="text-base font-semibold tracking-[-0.02em] text-slate-950">
+              Range adjustment rules
+            </h3>
+            <p class="text-sm text-slate-600">
+              All rules apply to the baseline forecast.
             </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+            <p v-if="manualAdjustmentSummary" class="text-[0.82rem] text-slate-500">
+              {{ manualAdjustmentSummary }}
+            </p>
+            <AppButton
+              v-if="manualAdjustments.length"
+              size="sm"
+              variant="secondary"
+              @click="clearManualAdjustments"
+            >
+              Clear Rules
+            </AppButton>
           </div>
         </div>
 
@@ -276,5 +348,48 @@ const collapsedRailStatusClass = computed(() => {
         </div>
       </section>
     </div>
+
+    <AppDrawer
+      v-model:visible="inspectorOpen"
+      title="Model Parameters"
+      kicker="Prophet Configuration"
+      side="right"
+      width-class="max-w-[38rem]"
+      allow-backdrop-close
+      @close="inspectorOpen = false"
+    >
+      <div class="p-6">
+        <ForecastingWorkbenchInspector
+          v-model:project="project"
+          :validation-messages="props.validationMessages"
+          @add-custom-seasonality="emit('add-custom-seasonality')"
+          @remove-custom-seasonality="emit('remove-custom-seasonality', $event)"
+          @add-custom-holiday="emit('add-custom-holiday')"
+          @remove-custom-holiday="emit('remove-custom-holiday', $event)"
+        />
+      </div>
+
+      <template #footer>
+        <div class="flex w-full flex-col gap-3 border-t border-slate-200 px-6 py-4 xl:flex-row xl:items-center xl:justify-between">
+          <p class="text-sm text-slate-600">
+            {{ inspectorFooterMessage }}
+          </p>
+
+          <div class="flex items-center justify-end gap-2">
+            <AppButton size="sm" variant="secondary" @click="inspectorOpen = false">
+              Close
+            </AppButton>
+            <AppButton
+              size="sm"
+              variant="primary"
+              :disabled="props.isRunningForecast || props.validationMessages.length > 0"
+              @click="handleInspectorRun"
+            >
+              {{ props.isRunningForecast ? 'Running...' : 'Run' }}
+            </AppButton>
+          </div>
+        </div>
+      </template>
+    </AppDrawer>
   </div>
 </template>

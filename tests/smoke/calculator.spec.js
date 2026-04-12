@@ -42,8 +42,11 @@ test('opens the forecasting workspace', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 3, name: 'Erlang Calculators' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Forecasting Workspace Open' })).toHaveCount(0)
   await expect(page.getByText('Upload daily call volume, run Prophet, and keep the monthly rollup ready for planning.')).toBeVisible()
-  await expect(page.getByLabel('Forecast workflow').getByRole('button', { name: /Historical Data/ })).toBeVisible()
-  await expect(page.getByLabel('Forecast workflow').getByRole('button', { name: /Forecast Workbench/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Untitled Forecast' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeVisible()
+  await expect(page.getByLabel('Forecast workflow')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeHidden()
 
   await page.getByRole('button', { name: 'Open Forecast' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'Open Forecast' })).toBeVisible()

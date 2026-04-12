@@ -78,9 +78,9 @@ test('opens staffing-group forecasts from the call-center workspace', async ({ p
   await page.getByLabel('Forecast Type').selectOption({ label: 'Budget Forecast' })
   await page.getByRole('button', { name: 'Create Forecast' }).last().click()
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Consumer Voice Forecasts' })).toBeVisible()
-  await expect(page.getByText('Staffing Group', { exact: true })).toBeVisible()
-  await expect(page.getByText('Hours of Operation')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Consumer Voice 2026 Budget Forecast' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Load', exact: true })).toBeVisible()
 })
 
 test('opens the hamburger menu and exposes primary destinations', async ({ page }) => {

@@ -5,7 +5,10 @@ import {
   createEmptyForecastResults,
   createForecastEntityId,
   createForecastProject,
+  FORECAST_MONTHLY_SEASONALITY_DEFAULTS,
   createSavedForecastName,
+  FORECAST_WEEKLY_SEASONALITY_DEFAULTS,
+  FORECAST_YEARLY_SEASONALITY_DEFAULTS,
   getForecastPlanningYear,
   isPlanAlignedForecast,
   resolveForecastCoverageWindow,
@@ -312,13 +315,19 @@ export const buildForecastPayload = (project) => {
       seasonalityMode: project.modelConfig.seasonalityMode,
       weeklySeasonality: {
         enabled: Boolean(project.modelConfig.weeklySeasonalityEnabled),
-        fourierOrder: Number(project.modelConfig.weeklyFourierOrder) || 3,
-        priorScale: Number(project.modelConfig.weeklyPriorScale) || 10
+        fourierOrder: FORECAST_WEEKLY_SEASONALITY_DEFAULTS.fourierOrder,
+        priorScale: FORECAST_WEEKLY_SEASONALITY_DEFAULTS.priorScale
       },
       yearlySeasonality: {
         enabled: Boolean(project.modelConfig.yearlySeasonalityEnabled),
-        fourierOrder: Number(project.modelConfig.yearlyFourierOrder) || 10,
-        priorScale: Number(project.modelConfig.yearlyPriorScale) || 10
+        fourierOrder: FORECAST_YEARLY_SEASONALITY_DEFAULTS.fourierOrder,
+        priorScale: FORECAST_YEARLY_SEASONALITY_DEFAULTS.priorScale
+      },
+      monthlySeasonality: {
+        enabled: Boolean(project.modelConfig.monthlySeasonalityEnabled),
+        periodDays: FORECAST_MONTHLY_SEASONALITY_DEFAULTS.periodDays,
+        fourierOrder: FORECAST_MONTHLY_SEASONALITY_DEFAULTS.fourierOrder,
+        priorScale: FORECAST_MONTHLY_SEASONALITY_DEFAULTS.priorScale
       },
       builtInHolidayCountry: project.modelConfig.builtInHolidayCountry || '',
       holidaysPriorScale: Number(project.modelConfig.holidaysPriorScale) || 10,

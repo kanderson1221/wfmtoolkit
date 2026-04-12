@@ -9,6 +9,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  holdoutDays: {
+    type: Number,
+    default: 0
+  },
   formatNumber: {
     type: Function,
     required: true
@@ -41,12 +45,41 @@ const formatAxisDate = (value) => {
 
 const chartRows = computed(() => props.rows || [])
 const cutoffIndex = computed(() => chartRows.value.findIndex((row) => !row.isHistory))
+const holdoutStartIndex = computed(() => {
+  if (props.holdoutDays <= 0 || cutoffIndex.value <= 0) {
+    return -1
+  }
+
+  return Math.max(cutoffIndex.value - Math.round(props.holdoutDays), 0)
+})
+const holdoutEndIndex = computed(() => (
+  holdoutStartIndex.value > -1 && cutoffIndex.value > 0
+    ? cutoffIndex.value - 1
+    : -1
+))
 const pointSize = computed(() => (chartRows.value.length > 120 ? 0 : 5))
 const axisLabels = computed(() => chartRows.value.map((row) => row.ds || ''))
 const bandSpread = computed(() =>
   chartRows.value.map((row) => Math.max((Number(row.yhatUpper) || 0) - (Number(row.yhatLower) || 0), 0))
 )
 const shouldShowZoom = computed(() => chartRows.value.length > 45)
+const hasHoldoutWindow = computed(() => holdoutStartIndex.value > -1 && holdoutEndIndex.value > -1)
+
+const resolveWindowLabel = (dataIndex) => {
+  if (!chartRows.value[dataIndex]) {
+    return ''
+  }
+
+  if (!chartRows.value[dataIndex].isHistory) {
+    return 'Forecast window'
+  }
+
+  if (hasHoldoutWindow.value && dataIndex >= holdoutStartIndex.value && dataIndex <= holdoutEndIndex.value) {
+    return 'Test window'
+  }
+
+  return 'Training window'
+}
 
 const chartOption = computed(() => ({
   animation: false,
@@ -85,7 +118,7 @@ const chartOption = computed(() => ({
         `<div>Forecast: ${props.formatNumber(row.yhat, 1)}</div>`,
         `<div>Lower: ${props.formatNumber(row.yhatLower, 1)}</div>`,
         `<div>Upper: ${props.formatNumber(row.yhatUpper, 1)}</div>`,
-        `<div>${row.isHistory ? 'History window' : 'Forecast window'}</div>`
+        `<div>${resolveWindowLabel(dataIndex)}</div>`
       ]
 
       return lines.join('')
@@ -234,7 +267,52 @@ const chartOption = computed(() => ({
       },
       itemStyle: {
         color: '#15395f'
-      }
+      },
+      markArea: hasHoldoutWindow.value
+        ? {
+            silent: true,
+            itemStyle: {
+              color: 'rgba(245, 158, 11, 0.1)'
+            },
+            label: {
+              show: true,
+              position: 'insideTop',
+              color: '#9a3412',
+              fontSize: 11,
+              fontWeight: 600,
+              formatter: 'Test period'
+            },
+            data: [
+              [
+                {
+                  xAxis: axisLabels.value[holdoutStartIndex.value]
+                },
+                {
+                  xAxis: axisLabels.value[holdoutEndIndex.value]
+                }
+              ]
+            ]
+          }
+        : undefined,
+      markLine: hasHoldoutWindow.value
+        ? {
+            symbol: 'none',
+            silent: true,
+            label: {
+              show: false
+            },
+            lineStyle: {
+              color: '#f59e0b',
+              type: 'dashed',
+              width: 1.5
+            },
+            data: [
+              {
+                xAxis: axisLabels.value[holdoutStartIndex.value]
+              }
+            ]
+          }
+        : undefined
     }
   ]
 }))
@@ -254,6 +332,10 @@ const chartOption = computed(() => ({
       <span class="forecast-chart-legend-item">
         <span class="forecast-chart-swatch forecast-chart-swatch-band"></span>
         Uncertainty band
+      </span>
+      <span v-if="hasHoldoutWindow" class="forecast-chart-legend-item">
+        <span class="forecast-chart-swatch forecast-chart-swatch-test"></span>
+        Test period
       </span>
     </div>
 

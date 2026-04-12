@@ -40,15 +40,13 @@ const chartPoints = computed(() =>
 
 const pointSize = computed(() => (chartPoints.value.length > 80 ? 0 : 5))
 const axisLabels = computed(() => chartPoints.value.map((point) => point.label))
-const shouldShowZoom = computed(() => chartPoints.value.length > 40)
-
 const chartOption = computed(() => ({
   animation: false,
   grid: {
     left: 56,
     right: 18,
     top: 20,
-    bottom: shouldShowZoom.value ? 64 : 26
+    bottom: 26
   },
   tooltip: {
     trigger: 'axis',
@@ -120,27 +118,7 @@ const chartOption = computed(() => ({
       }
     }
   },
-  dataZoom: shouldShowZoom.value
-    ? [
-        {
-          type: 'inside',
-          zoomOnMouseWheel: true,
-          moveOnMouseMove: true,
-          moveOnMouseWheel: false
-        },
-        {
-          type: 'slider',
-          height: 16,
-          bottom: 18,
-          borderColor: '#d7e2ec',
-          fillerColor: 'rgba(16, 47, 79, 0.14)',
-          backgroundColor: '#f8fafc',
-          handleStyle: {
-            color: '#15395f'
-          }
-        }
-      ]
-    : [],
+  dataZoom: [],
   series: [
     {
       name: props.title,
@@ -166,8 +144,9 @@ const chartOption = computed(() => ({
     :chart-id="`${props.title.toLowerCase().replace(/\s+/g, '-')}-chart`"
     :aria-label="props.title"
     fallback-text="The component chart could not be loaded."
-    height-class="h-[14rem]"
-    min-width-class="min-w-[720px]"
+    height-class="h-[13.5rem]"
+    min-width-class="min-w-0"
+    :scrollable="false"
     :option="chartOption"
   />
 </template>

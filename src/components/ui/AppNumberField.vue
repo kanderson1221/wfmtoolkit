@@ -47,7 +47,7 @@ const model = defineModel({
 const attrs = useAttrs()
 const pt = computed(() => ({
   root: {
-    class: 'w-full'
+    class: 'block w-full'
   },
   pcInputText: {
     root: {

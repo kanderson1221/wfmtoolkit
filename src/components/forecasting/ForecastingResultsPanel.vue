@@ -68,7 +68,6 @@ const dailyRows = computed(() => getForecastProjectDailyRows(props.project))
 const monthlyRows = computed(() => getForecastProjectMonthlyRollup(props.project))
 const diagnostics = computed(() => lastRun.value?.diagnostics || {})
 const holdoutMetrics = computed(() => diagnostics.value?.holdout || null)
-const accuracyRows = computed(() => holdoutMetrics.value?.rows || [])
 
 const noteMessages = computed(() =>
   Array.isArray(diagnostics.value?.validationNotes) ? diagnostics.value.validationNotes : []
@@ -133,45 +132,9 @@ const summaryItems = computed(() => {
   ]
 })
 
-const accuracyItems = computed(() => {
-  const holdout = holdoutMetrics.value
-  if (!holdout) {
-    return []
-  }
-
-  return [
-    {
-      label: 'Train Rows',
-      value: holdout.trainingRows != null ? formatWhole(holdout.trainingRows) : '—',
-      meta: holdout.trainingDateRange || 'Rows used to fit the scored model'
-    },
-    {
-      label: 'Test Rows',
-      value: holdout.testRows != null ? formatWhole(holdout.testRows) : '—',
-      meta: holdout.testDateRange || 'Rows compared to actuals'
-    },
-    {
-      label: 'MAE',
-      value: holdout.mae != null ? formatNumber(holdout.mae, 1) : '—',
-      meta: 'Average absolute daily error'
-    },
-    {
-      label: 'RMSE',
-      value: holdout.rmse != null ? formatNumber(holdout.rmse, 1) : '—',
-      meta: 'Root mean squared daily error'
-    },
-    {
-      label: 'MAPE',
-      value: holdout.mape != null ? formatPercent(holdout.mape, 1) : '—',
-      meta: 'Average percent error on non-zero actuals'
-    },
-    {
-      label: 'WAPE',
-      value: holdout.wape != null ? formatPercent(holdout.wape, 1) : '—',
-      meta: 'Weighted absolute percent error'
-    }
-  ]
-})
+const monthlyComponentEnabled = computed(() =>
+  Boolean(props.project?.modelConfig?.monthlySeasonalityEnabled)
+)
 
 const componentSections = computed(() => [
   {
@@ -190,11 +153,16 @@ const componentSections = computed(() => [
     points: lastRun.value?.components?.yearly || []
   },
   {
+    id: 'monthly',
+    title: 'Monthly Seasonality',
+    points: lastRun.value?.components?.monthly || []
+  },
+  {
     id: 'holidays',
     title: 'Holiday Effects',
     points: lastRun.value?.components?.holidays || []
   }
-].filter((section) => section.points.length > 0))
+].filter((section) => section.points.length > 0 || (section.id === 'monthly' && monthlyComponentEnabled.value)))
 
 const embeddedInsightCards = computed(() => {
   const cards = []
@@ -245,68 +213,28 @@ const embeddedMonthlyHighlights = computed(() => [
   }
 ])
 
-const embeddedAccuracyHighlights = computed(() => {
+const dailyAccuracyHighlights = computed(() => {
   if (!holdoutMetrics.value) {
     return []
   }
 
   return [
     {
-      label: 'Train Rows',
-      value: holdoutMetrics.value.trainingRows != null ? formatWhole(holdoutMetrics.value.trainingRows) : '—',
-      meta: holdoutMetrics.value.trainingDateRange || 'Rows used to fit the scored model'
-    },
-    {
-      label: 'Test Rows',
-      value: holdoutMetrics.value.testRows != null ? formatWhole(holdoutMetrics.value.testRows) : '—',
-      meta: holdoutMetrics.value.testDateRange || 'Rows compared to actuals'
-    },
-    {
-      label: 'MAE',
-      value: holdoutMetrics.value.mae != null ? formatNumber(holdoutMetrics.value.mae, 1) : '—',
-      meta: 'Average absolute daily error'
-    },
-    {
-      label: 'RMSE',
-      value: holdoutMetrics.value.rmse != null ? formatNumber(holdoutMetrics.value.rmse, 1) : '—',
-      meta: 'Root mean squared daily error'
+      label: 'Test Set',
+      value: holdoutMetrics.value.testRows != null ? `${formatWhole(holdoutMetrics.value.testRows)} days` : '—',
+      meta: holdoutMetrics.value.testDateRange || ''
     },
     {
       label: 'MAPE',
       value: holdoutMetrics.value.mape != null ? formatPercent(holdoutMetrics.value.mape, 1) : '—',
-      meta: 'Average percent error on non-zero actuals'
+      meta: 'Held-out percent error'
+    },
+    {
+      label: 'MAE',
+      value: holdoutMetrics.value.mae != null ? formatNumber(holdoutMetrics.value.mae, 1) : '—',
+      meta: 'Average daily error'
     }
   ]
-})
-
-const embeddedAccuracyCards = computed(() => {
-  const cards = []
-
-  if (holdoutMetrics.value) {
-    cards.push({
-      title: 'Held-Back Window',
-      body: `Trained on ${holdoutMetrics.value.trainingDateRange} and scored ${holdoutMetrics.value.testDateRange}.`,
-      meta: `Bias ${holdoutMetrics.value.bias == null ? '—' : formatNumber(holdoutMetrics.value.bias, 1)} • Interval coverage ${holdoutMetrics.value.intervalCoverage == null ? '—' : formatPercent(holdoutMetrics.value.intervalCoverage, 1)}`
-    })
-  }
-
-  if (warningMessages.value.length) {
-    cards.push({
-      title: 'Warnings',
-      body: warningMessages.value[0],
-      meta: warningMessages.value.length > 1 ? `${warningMessages.value.length} total warnings` : ''
-    })
-  }
-
-  if (noteMessages.value.length) {
-    cards.push({
-      title: 'Model Notes',
-      body: noteMessages.value[0],
-      meta: noteMessages.value.length > 1 ? `${noteMessages.value.length} total notes` : ''
-    })
-  }
-
-  return cards
 })
 </script>
 
@@ -356,30 +284,34 @@ const embeddedAccuracyCards = computed(() => {
     <template v-else-if="activeResultTab === 'daily'">
       <template v-if="isEmbedded">
         <section class="grid gap-4">
-          <div class="bg-white px-1 pb-1">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div class="bg-white px-4 pb-1">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div class="grid gap-1">
-                <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Forecast Canvas
-                </p>
                 <h3 class="text-lg font-semibold tracking-[-0.02em] text-slate-950">
                   Forecasted demand vs historical volume
                 </h3>
-                <p class="text-sm text-slate-600">
-                  Default to the chart. The tabs keep monthly rollups, component views, and scored accuracy close without turning the center pane into a report.
-                </p>
               </div>
 
-              <div class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                {{ lastRun?.runAt ? `Current run: ${formatDateTime(lastRun.runAt)}` : 'Awaiting run' }}
+              <div v-if="dailyAccuracyHighlights.length" class="flex flex-wrap gap-2 lg:justify-end">
+                <span
+                  v-for="item in dailyAccuracyHighlights"
+                  :key="item.label"
+                  class="inline-flex items-baseline gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
+                >
+                  <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    {{ item.label }}
+                  </span>
+                  <strong class="font-semibold text-slate-950">{{ item.value }}</strong>
+                </span>
               </div>
             </div>
 
-            <div class="mt-4 overflow-hidden bg-white">
+            <div class="mt-3 overflow-hidden bg-white">
               <ForecastDailyChart
                 :rows="dailyRows"
+                :holdout-days="holdoutMetrics?.holdoutDays || 0"
                 :format-number="formatNumber"
-                height-class="h-[25rem]"
+                height-class="h-[31.25rem]"
                 min-width-class="min-w-[760px]"
                 :show-legend="false"
               />
@@ -397,6 +329,10 @@ const embeddedAccuracyCards = computed(() => {
               <span class="inline-flex items-center gap-2">
                 <span class="h-3 w-5 rounded-full bg-[rgba(149,188,214,0.32)]"></span>
                 Confidence band
+              </span>
+              <span v-if="holdoutMetrics?.holdoutDays" class="inline-flex items-center gap-2">
+                <span class="h-3 w-5 rounded-sm bg-amber-100 ring-1 ring-amber-200"></span>
+                Test period
               </span>
             </div>
           </div>
@@ -425,20 +361,9 @@ const embeddedAccuracyCards = computed(() => {
         <AppWorkspaceSection title="Forecast vs History">
           <ForecastDailyChart
             :rows="dailyRows"
+            :holdout-days="holdoutMetrics?.holdoutDays || 0"
             :format-number="formatNumber"
           />
-        </AppWorkspaceSection>
-
-        <AppWorkspaceSection
-          v-if="holdoutMetrics"
-          title="Test Set Summary"
-        >
-          <div class="grid gap-2 text-sm text-slate-700">
-            <p v-if="holdoutMetrics">
-              Test set: <strong class="text-slate-950">{{ holdoutMetrics.testDateRange }}</strong>
-              ({{ holdoutMetrics.holdoutDays }} days).
-            </p>
-          </div>
         </AppWorkspaceSection>
 
         <AppWorkspaceSection v-if="warningMessages.length" title="Warnings">
@@ -630,25 +555,26 @@ const embeddedAccuracyCards = computed(() => {
         />
       </div>
 
-      <div v-else-if="isEmbedded" class="grid gap-4 xl:grid-cols-2">
+      <div v-else-if="isEmbedded" class="grid gap-4 px-4 pb-1 2xl:grid-cols-2">
         <article
           v-for="section in componentSections"
           :key="section.id"
-          class="grid gap-3 rounded-[22px] border border-slate-200 bg-[#fbfdff] p-4"
+          class="grid gap-3 border border-slate-200 bg-white p-4"
         >
-          <div class="grid gap-1">
-            <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Component View
-            </p>
+          <div class="flex items-center justify-between gap-3">
             <h3 class="text-base font-semibold tracking-[-0.02em] text-slate-950">
               {{ section.title }}
             </h3>
           </div>
           <ForecastComponentChart
+            v-if="section.points.length"
             :title="section.title"
             :points="section.points"
             :format-number="formatNumber"
           />
+          <p v-else class="text-sm leading-6 text-slate-600">
+            This run did not return a monthly component series.
+          </p>
         </article>
       </div>
 
@@ -659,217 +585,16 @@ const embeddedAccuracyCards = computed(() => {
           :title="section.title"
         >
           <ForecastComponentChart
+            v-if="section.points.length"
             :title="section.title"
             :points="section.points"
             :format-number="formatNumber"
           />
+          <p v-else class="text-sm leading-6 text-slate-600">
+            This run did not return a monthly component series.
+          </p>
         </AppWorkspaceSection>
       </div>
-    </template>
-
-    <template v-else>
-      <template v-if="holdoutMetrics && isEmbedded">
-        <section class="grid gap-4">
-          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <article
-              v-for="item in embeddedAccuracyHighlights"
-              :key="item.label"
-              class="grid gap-1 rounded-[20px] border border-slate-200 bg-white px-4 py-4"
-            >
-              <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                {{ item.label }}
-              </p>
-              <strong class="text-[1.15rem] font-semibold tracking-[-0.03em] text-slate-950">
-                {{ item.value }}
-              </strong>
-              <p class="text-[0.82rem] text-slate-500">
-                {{ item.meta }}
-              </p>
-            </article>
-          </div>
-
-          <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
-            <div class="overflow-hidden rounded-[22px] border border-slate-200 bg-white">
-              <div class="border-b border-slate-200 px-4 py-4">
-                <div class="grid gap-1">
-                  <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Validation Window
-                  </p>
-                  <h3 class="text-base font-semibold tracking-[-0.02em] text-slate-950">
-                    Forecast vs Actual Daily Rows
-                  </h3>
-                  <p class="text-sm text-slate-600">
-                    Trained on {{ holdoutMetrics.trainingDateRange }} and scored {{ holdoutMetrics.testDateRange }}.
-                  </p>
-                </div>
-              </div>
-
-              <div class="max-h-[22rem] overflow-auto">
-                <table class="min-w-[860px] w-full border-collapse text-sm text-slate-700">
-                  <thead class="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95">
-                    <tr>
-                      <th class="px-5 py-3 text-left text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Date</th>
-                      <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Actual</th>
-                      <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Forecast</th>
-                      <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Lower</th>
-                      <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Upper</th>
-                      <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Abs Error</th>
-                      <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">% Error</th>
-                      <th class="px-5 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">In Band</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-200">
-                    <tr v-for="row in accuracyRows" :key="row.ds" class="bg-white">
-                      <td class="px-5 py-3">{{ formatDate(row.ds) }}</td>
-                      <td class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.actualValue) }}</td>
-                      <td class="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{{ formatWhole(row.forecastValue) }}</td>
-                      <td class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.lowerBound) }}</td>
-                      <td class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.upperBound) }}</td>
-                      <td class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.absoluteError) }}</td>
-                      <td class="px-4 py-3 text-right tabular-nums">{{ row.percentError == null ? '—' : formatPercent(row.percentError, 1) }}</td>
-                      <td class="px-5 py-3 text-right">{{ row.withinInterval ? 'Yes' : 'No' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="grid gap-3">
-              <article
-                v-for="card in embeddedAccuracyCards"
-                :key="card.title"
-                class="grid gap-1 rounded-[20px] border border-slate-200 bg-white px-4 py-4"
-              >
-                <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {{ card.title }}
-                </p>
-                <p class="text-sm leading-6 text-slate-700">
-                  {{ card.body }}
-                </p>
-                <p v-if="card.meta" class="text-[0.82rem] text-slate-500">
-                  {{ card.meta }}
-                </p>
-              </article>
-            </div>
-          </div>
-        </section>
-      </template>
-
-      <template v-else-if="holdoutMetrics">
-        <AppStatStrip :items="accuracyItems" columns="md:grid-cols-2 xl:grid-cols-3" />
-
-        <AppWorkspaceSection title="Held-Back Window">
-          <div class="grid gap-2 text-sm text-slate-700">
-            <p>
-              Trained on {{ holdoutMetrics.trainingDateRange }} and compared forecasts to actuals on
-              <strong class="text-slate-950">{{ holdoutMetrics.testDateRange }}</strong>.
-            </p>
-            <p>
-              Mean actual {{ holdoutMetrics.meanActual == null ? '—' : formatNumber(holdoutMetrics.meanActual, 1) }} |
-              Mean forecast {{ holdoutMetrics.meanForecast == null ? '—' : formatNumber(holdoutMetrics.meanForecast, 1) }} |
-              Bias {{ holdoutMetrics.bias == null ? '—' : formatNumber(holdoutMetrics.bias, 1) }} |
-              Interval coverage {{ holdoutMetrics.intervalCoverage == null ? '—' : formatPercent(holdoutMetrics.intervalCoverage, 1) }}
-            </p>
-          </div>
-        </AppWorkspaceSection>
-
-        <AppTableShell>
-          <div class="border-b border-slate-200 px-5 py-4">
-            <AppSectionHeader title="Forecast vs Actual" />
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="min-w-[1040px] w-full border-collapse text-sm text-slate-700">
-              <thead class="border-b border-slate-200 bg-slate-50/85">
-                <tr>
-                  <th class="px-5 py-3 text-left text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Date</th>
-                  <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Actual</th>
-                  <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Forecast</th>
-                  <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Lower</th>
-                  <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Upper</th>
-                  <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Abs Error</th>
-                  <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">% Error</th>
-                  <th class="px-5 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">In Band</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-200">
-                <tr v-for="row in accuracyRows" :key="row.ds" class="bg-white">
-                  <td class="px-5 py-3">{{ formatDate(row.ds) }}</td>
-                  <td class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.actualValue) }}</td>
-                  <td class="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{{ formatWhole(row.forecastValue) }}</td>
-                  <td class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.lowerBound) }}</td>
-                  <td class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.upperBound) }}</td>
-                  <td class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.absoluteError) }}</td>
-                  <td class="px-4 py-3 text-right tabular-nums">{{ row.percentError == null ? '—' : formatPercent(row.percentError, 1) }}</td>
-                  <td class="px-5 py-3 text-right">{{ row.withinInterval ? 'Yes' : 'No' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </AppTableShell>
-      </template>
-
-      <template v-else>
-        <div
-          v-if="isEmbedded"
-          class="rounded-[24px] border border-slate-200 bg-[#fbfdff] p-4"
-        >
-          <AppEmptyState
-            title="No test set scored"
-            description="Set Hold Back Days above zero to compare the forecast against actuals at the end of the history."
-          />
-        </div>
-
-        <AppEmptyState
-          v-else
-          title="No test set scored"
-          description="Set Hold Back Days above zero to compare the forecast against actuals at the end of the history."
-        />
-      </template>
-
-      <div v-if="isEmbedded && !holdoutMetrics && (warningMessages.length || noteMessages.length)" class="grid gap-3 lg:grid-cols-2">
-        <article
-          v-if="warningMessages.length"
-          class="grid gap-1 rounded-[20px] border border-slate-200 bg-white px-4 py-4"
-        >
-          <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Warnings
-          </p>
-          <p class="text-sm leading-6 text-slate-700">
-            {{ warningMessages[0] }}
-          </p>
-        </article>
-
-        <article
-          v-if="noteMessages.length"
-          class="grid gap-1 rounded-[20px] border border-slate-200 bg-white px-4 py-4"
-        >
-          <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Model Notes
-          </p>
-          <p class="text-sm leading-6 text-slate-700">
-            {{ noteMessages[0] }}
-          </p>
-        </article>
-      </div>
-
-      <AppWorkspaceSection v-if="!isEmbedded && warningMessages.length" title="Warnings">
-        <div class="grid gap-2">
-          <AppStatusMessage
-            v-for="warning in warningMessages"
-            :key="warning"
-            tone="error"
-          >
-            {{ warning }}
-          </AppStatusMessage>
-        </div>
-      </AppWorkspaceSection>
-
-      <AppWorkspaceSection v-if="!isEmbedded && noteMessages.length" title="Model Notes">
-        <ul class="grid gap-2 text-sm leading-6 text-slate-700">
-          <li v-for="note in noteMessages" :key="note">{{ note }}</li>
-        </ul>
-      </AppWorkspaceSection>
     </template>
   </div>
 </template>

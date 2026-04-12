@@ -44,7 +44,7 @@
   .schedule-gantt,
   .schedule-plot,
   .forecast-chart-surface {
-    @apply overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4;
+    @apply overflow-hidden rounded-[24px] border border-white bg-white p-4;
   }
 
   .trend-grid-line,
@@ -158,6 +158,11 @@
 
   .forecast-chart-swatch-band {
     background-color: rgb(149 188 214);
+  }
+
+  .forecast-chart-swatch-test {
+    background-color: rgb(254 243 199);
+    box-shadow: inset 0 0 0 1px rgb(253 186 116);
   }
 
   .trend-tooltip-box,

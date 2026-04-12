@@ -2,7 +2,7 @@
 import { computed, ref, useAttrs } from 'vue'
 import InputText from 'primevue/inputtext'
 
-import { fieldInputClass } from './primevuePresets'
+import { fieldInputClass, fieldInputCompactClass } from './primevuePresets'
 
 defineOptions({
   inheritAttrs: false
@@ -12,6 +12,10 @@ const props = defineProps({
   type: {
     type: String,
     default: 'text'
+  },
+  compact: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -22,7 +26,7 @@ const [model, modifiers] = defineModel({
 
 const attrs = useAttrs()
 const inputRef = ref(null)
-const inputClass = computed(() => [fieldInputClass, attrs.class])
+const inputClass = computed(() => [props.compact ? fieldInputCompactClass : fieldInputClass, attrs.class])
 
 const updateValue = (nextValue) => {
   model.value = modifiers.trim && typeof nextValue === 'string' ? nextValue.trim() : nextValue

@@ -1,6 +1,5 @@
 import { computed, ref, watch } from 'vue'
 
-import { guessColumnMapping, normalizeUploadedRows, parseCsvText } from '../forecasting/csv'
 import {
   FORECAST_TYPE_REFORECAST,
   FORECAST_HORIZON_PRESETS,
@@ -12,16 +11,22 @@ import {
   formatWhole,
   getDefaultReforecastStartMonthIndex,
   getForecastPlanningYear,
+  getForecastTypeLabel,
   isPlanAlignedForecast,
+  parseForecastDateValue,
   resolveForecastCoverageWindow,
   resolveForecastType
 } from '../forecasting/shared'
 import {
   buildForecastRunInputSignature,
-  buildForecastPayload,
-  sanitizeColumnMapping
+  buildForecastPayload
 } from './forecasting/forecastWorkspaceHelpers'
 import { useForecastProjectLibrary } from './forecasting/useForecastProjectLibrary'
+import {
+  applyForecastHistoryState,
+  buildForecastHistoryStateFromFile,
+  normalizeForecastHistoryDraft
+} from '../forecasting/historyImport'
 
 const extractApiErrorMessage = async (response) => {
   const rawErrorText = await response.text().catch(() => '')
@@ -60,6 +65,42 @@ const extractApiErrorMessage = async (response) => {
 const HORIZON_PRESET_VALUES = Object.fromEntries(
   FORECAST_HORIZON_PRESETS.filter((preset) => preset.value != null).map((preset) => [preset.id, preset.value])
 )
+const DAY_IN_MS = 1000 * 60 * 60 * 24
+const MAX_SUPPORTED_FORECAST_HORIZON_DAYS = 730
+
+const getPlanAlignedHorizonValidationMessage = (project) => {
+  if (!isPlanAlignedForecast(project) || !Array.isArray(project?.historyRows) || !project.historyRows.length) {
+    return ''
+  }
+
+  const planningYear = getForecastPlanningYear(project)
+  const forecastType = resolveForecastType(project.forecastType, project)
+  const coverageWindow = resolveForecastCoverageWindow({
+    planningYear,
+    forecastType,
+    coverageStartMonthIndex: project.coverageStartMonthIndex
+  })
+
+  const historyEndDate = parseForecastDateValue(project.historyRows.at(-1)?.ds || '')
+  const coverageEndDate = parseForecastDateValue(coverageWindow.coverageEndDate || '')
+
+  if (!historyEndDate || !coverageEndDate) {
+    return ''
+  }
+
+  const requiredHorizonDays = Math.max(
+    0,
+    Math.ceil((coverageEndDate.getTime() - historyEndDate.getTime()) / DAY_IN_MS)
+  )
+
+  if (requiredHorizonDays <= MAX_SUPPORTED_FORECAST_HORIZON_DAYS) {
+    return ''
+  }
+
+  const forecastTypeLabel = getForecastTypeLabel(forecastType).toLowerCase()
+
+  return `Loaded history ends ${formatDate(historyEndDate)}. A ${planningYear} ${forecastTypeLabel} would require ${formatWhole(requiredHorizonDays)} forecast days to reach ${formatDate(coverageEndDate)}, but the maximum supported horizon is ${formatWhole(MAX_SUPPORTED_FORECAST_HORIZON_DAYS)} days. Load more recent history or choose an earlier forecast year.`
+}
 
 export const useForecastingWorkspace = (storageScope, options = {}) => {
   const isRunningForecast = ref(false)
@@ -90,7 +131,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
   })
 
   const applyNormalization = () => {
-    const normalized = normalizeUploadedRows({
+    const normalized = normalizeForecastHistoryDraft({
       rows: currentProject.value.uploadedRows,
       mapping: currentProject.value.columnMapping
     })
@@ -119,21 +160,22 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       return
     }
 
-    const text = await file.text()
-    const parsed = parseCsvText(text)
-    const guessedMapping = guessColumnMapping(parsed.headers)
-
-    currentProject.value.uploadedFileName = file.name || ''
-    currentProject.value.uploadedHeaders = parsed.headers
-    currentProject.value.uploadedRows = parsed.rows
-    currentProject.value.parserIssues = parsed.issues
-    currentProject.value.columnMapping = sanitizeColumnMapping(
-      parsed.headers,
-      currentProject.value.columnMapping,
-      guessedMapping
+    const historyState = await buildForecastHistoryStateFromFile(
+      file,
+      currentProject.value.columnMapping
     )
-    applyNormalization()
+
+    applyForecastHistoryState(currentProject.value, historyState)
     currentProject.value.lastRun = createEmptyForecastResults()
+    activeResultTab.value = 'daily'
+  }
+
+  const applyHistoryImport = (historyState = {}) => {
+    runError.value = ''
+    saveError.value = ''
+    saveStatusMessage.value = ''
+
+    applyForecastHistoryState(currentProject.value, historyState)
     activeResultTab.value = 'daily'
   }
 
@@ -188,11 +230,12 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       }
 
       const forecastResults = await response.json()
-      currentProject.value.lastRun = createEmptyForecastResults({
+      const normalizedResults = createEmptyForecastResults({
         ...forecastResults,
         runAt: forecastResults.runAt || new Date().toISOString(),
         inputSignature: buildForecastRunInputSignature(currentProject.value)
       })
+      currentProject.value.lastRun = normalizedResults
       currentProject.value.planningYear = forecastResults.summary?.planningYear || currentProject.value.planningYear
       currentProject.value.forecastType = forecastResults.summary?.forecastType || currentProject.value.forecastType
       currentProject.value.coverageStartMonthIndex =
@@ -269,6 +312,11 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       messages.push('Select a planning year before running a staffing-group forecast.')
     }
 
+    const planAlignedHorizonMessage = getPlanAlignedHorizonValidationMessage(currentProject.value)
+    if (planAlignedHorizonMessage) {
+      messages.push(planAlignedHorizonMessage)
+    }
+
     const holdoutDays = Math.max(0, Number(currentProject.value.modelConfig.holdoutDays) || 0)
     if (
       holdoutDays > 0 &&
@@ -283,11 +331,11 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       const defaultFloor = Number(currentProject.value.modelConfig.defaultFloor || 0)
 
       if (!Number.isFinite(defaultCap) || defaultCap <= 0) {
-        messages.push('Enter a positive upper limit before using growth with ceiling.')
+        messages.push('Enter a positive upper forecast limit before using logistic growth.')
       }
 
       if (Number.isFinite(defaultCap) && defaultCap <= defaultFloor) {
-        messages.push('Upper limit must be greater than lower limit when using growth with ceiling.')
+        messages.push('Upper forecast limit must be greater than lower forecast limit when using logistic growth.')
       }
     }
 
@@ -422,6 +470,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     currentProjectMeta,
     loadProjectsForScope,
     handleHistoryFileSelect,
+    applyHistoryImport,
     createNewProject,
     openProjectById,
     saveCurrentProject,

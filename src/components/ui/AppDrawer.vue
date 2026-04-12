@@ -39,7 +39,7 @@ const visible = defineModel('visible', {
   required: true
 })
 
-const drawerPt = computed(() => buildDrawerPt(props.widthClass))
+const drawerPt = computed(() => buildDrawerPt(props.widthClass, props.side))
 </script>
 
 <template>

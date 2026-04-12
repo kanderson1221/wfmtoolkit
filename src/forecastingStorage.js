@@ -78,6 +78,9 @@ export const normalizeForecastProject = (draftProject = {}, timestamp = new Date
             yearly: Array.isArray(snapshot.lastRun?.components?.yearly)
               ? snapshot.lastRun.components.yearly.map((row) => ({ ...row }))
               : [],
+            monthly: Array.isArray(snapshot.lastRun?.components?.monthly)
+              ? snapshot.lastRun.components.monthly.map((row) => ({ ...row }))
+              : [],
             weekly: Array.isArray(snapshot.lastRun?.components?.weekly)
               ? snapshot.lastRun.components.weekly.map((row) => ({ ...row }))
               : [],

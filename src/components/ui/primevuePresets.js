@@ -25,12 +25,12 @@ export const buildDialogPt = (maxWidthClass = 'max-w-4xl') => ({
   }
 })
 
-export const buildDrawerPt = (widthClass = 'max-w-[74rem]') => ({
+export const buildDrawerPt = (widthClass = 'max-w-[74rem]', side = 'left') => ({
   mask: {
     class: 'bg-slate-950/55 backdrop-blur-sm'
   },
   root: {
-    class: `m-0 flex h-screen max-h-screen w-full ${widthClass} flex-col overflow-hidden rounded-none border-r border-slate-200 bg-white shadow-[0_28px_70px_rgba(15,23,42,0.22)]`
+    class: `m-0 flex h-screen max-h-screen w-full ${widthClass} flex-col overflow-hidden rounded-none ${side === 'right' ? 'border-l border-slate-200' : 'border-r border-slate-200'} bg-white shadow-[0_28px_70px_rgba(15,23,42,0.22)]`
   },
   header: {
     class: 'shrink-0 border-b border-slate-200 px-6 py-5'

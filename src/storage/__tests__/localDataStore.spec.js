@@ -127,7 +127,7 @@ const sampleForecasts = [
       { ds: '2025-01-02', y: 120 }
     ],
     manualAdjustments: [
-      { ds: '2026-01-01', delta: 25, reason: 'Promo spike' }
+      { startDate: '2026-01-01', endDate: '2026-01-03', adjustmentType: 'delta', value: 25, reason: 'Promo spike' }
     ],
     lastRun: {
       runAt: '2026-04-08T14:00:00.000Z',
@@ -141,6 +141,7 @@ const sampleForecasts = [
       components: {
         trend: [{ label: '2026-01-01', value: 110 }],
         yearly: [],
+        monthly: [{ label: 'Jan 01', value: 5.7 }],
         weekly: [],
         holidays: []
       },
@@ -217,9 +218,12 @@ describe('localDataStore', () => {
 
     expect(loadedCenters[0].groups[0].plans[0].planningYear).toBe(2026)
     expect(loadedForecasts[0].lastRun.monthlyRollup[0].contacts).toBe(3400)
+    expect(loadedForecasts[0].lastRun.components.monthly[0].value).toBe(5.7)
     expect(loadedForecasts[0].manualAdjustments[0]).toMatchObject({
-      ds: '2026-01-01',
-      delta: 25,
+      startDate: '2026-01-01',
+      endDate: '2026-01-03',
+      adjustmentType: 'delta',
+      value: 25,
       reason: 'Promo spike'
     })
     expect(loadedForecasts[0].lastRun.inputSignature).toBe('{"seed":"forecast-run"}')
@@ -249,6 +253,7 @@ describe('localDataStore', () => {
     expect(migrationResult.migrated).toBe(true)
     expect(loadedCenters).toHaveLength(1)
     expect(loadedForecasts).toHaveLength(1)
+    expect(loadedForecasts[0].lastRun.components.monthly[0].value).toBe(5.7)
     expect(loadedDraft?.ui?.activeSection).toBe('forecast')
   })
 

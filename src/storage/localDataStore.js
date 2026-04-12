@@ -527,7 +527,7 @@ const flattenForecastWorkspace = (projects, scope = DEFAULT_SCOPE) => {
         })
       })
 
-      ;(['trend', 'yearly', 'weekly', 'holidays']).forEach((componentType) => {
+      ;(['trend', 'yearly', 'monthly', 'weekly', 'holidays']).forEach((componentType) => {
         ;(project.lastRun.components?.[componentType] || []).forEach((row, rowIndex) => {
           forecastRunComponentRows.push({
             scope: normalizedScope,
@@ -661,6 +661,10 @@ const hydrateForecastWorkspace = (scope, rows) => {
                     .map(({ id: _id, scope: _scope, forecastId: _forecastId, runId: _runId, componentType: _componentType, rowIndex: _rowIndex, ...componentRow }) => componentRow),
                   yearly: runComponents
                     .filter((componentRow) => componentRow.componentType === 'yearly')
+                    .sort((left, right) => left.rowIndex - right.rowIndex)
+                    .map(({ id: _id, scope: _scope, forecastId: _forecastId, runId: _runId, componentType: _componentType, rowIndex: _rowIndex, ...componentRow }) => componentRow),
+                  monthly: runComponents
+                    .filter((componentRow) => componentRow.componentType === 'monthly')
                     .sort((left, right) => left.rowIndex - right.rowIndex)
                     .map(({ id: _id, scope: _scope, forecastId: _forecastId, runId: _runId, componentType: _componentType, rowIndex: _rowIndex, ...componentRow }) => componentRow),
                   weekly: runComponents

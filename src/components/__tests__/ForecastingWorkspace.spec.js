@@ -1,7 +1,9 @@
 import { mount } from '@vue/test-utils'
 
 import ForecastingWorkspace from '../ForecastingWorkspace.vue'
+import ForecastHistoryModal from '../forecasting/ForecastHistoryModal.vue'
 import ForecastingWorkbench from '../forecasting/ForecastingWorkbench.vue'
+import AppNumberField from '../ui/AppNumberField.vue'
 import { buildForecastRunInputSignature } from '../../composables/forecasting/forecastWorkspaceHelpers'
 import { createForecastProject } from '../../forecasting/shared'
 import { forecastingRepository } from '../../forecastingRepository'
@@ -89,6 +91,9 @@ const createLoadedProject = (fileName = 'history.csv') => createForecastProject(
     volumeColumn: 'call_volume',
     capColumn: '',
     floorColumn: ''
+  },
+  modelConfig: {
+    holdoutDays: 0
   }
 })
 
@@ -175,6 +180,16 @@ const createForecastRunResults = () => ({
   }
 })
 
+const buildHistoryImportState = (project) => ({
+  uploadedFileName: project.uploadedFileName,
+  uploadedHeaders: project.uploadedHeaders,
+  uploadedRows: project.uploadedRows,
+  parserIssues: project.parserIssues,
+  historyRows: project.historyRows,
+  normalizationIssues: project.normalizationIssues,
+  columnMapping: project.columnMapping
+})
+
 const createProjectWithRun = (overrides = {}) => {
   const baseProject = createLoadedProject()
   const project = createForecastProject({
@@ -210,7 +225,10 @@ describe('ForecastingWorkspace', () => {
     })
     mountedWrappers.push(wrapper)
 
-    const downloadLinks = wrapper.findAll('a').map((link) => link.element)
+    await flushUi()
+    await flushUi()
+
+    const downloadLinks = [...document.body.querySelectorAll('a')]
     expect(downloadLinks.some((link) => (link.textContent || '').includes('Download Sample Template'))).toBe(true)
     expect(
       downloadLinks.some(
@@ -218,17 +236,16 @@ describe('ForecastingWorkspace', () => {
       )
     ).toBe(true)
     expect(downloadLinks.some((link) => link.getAttribute('href') === '/forecasting_daily_volume_template.csv')).toBe(false)
-    expect(wrapper.text()).toContain('Upload Daily History')
+    expect(document.body.textContent || '').toContain('Upload Daily History')
     expect(wrapper.text()).not.toContain('No historical CSV loaded yet.')
     expect(wrapper.text()).not.toContain('Time Zone')
     expect(wrapper.text()).not.toContain('Series')
-    expect(wrapper.text()).toContain('Data')
-    expect(wrapper.text()).toContain('Historical Data')
-    expect(wrapper.text()).toContain('Forecast Workbench')
+    expect(wrapper.text()).toContain('Untitled Forecast')
+    expect(wrapper.text()).not.toContain('Historical Data')
     expect(wrapper.text()).not.toContain('Review')
   })
 
-  it('renders a unified historical-data workspace with file summary and mapped columns', async () => {
+  it('opens the history modal from the workbench and shows file summary and mapped columns', async () => {
     const wrapper = mount(ForecastingWorkspace, {
       props: {
         storageScope: 'forecast-historical-data-spec',
@@ -240,20 +257,90 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).toContain('Historical Data')
-    expect(wrapper.text()).toContain('File Summary')
-    expect(wrapper.text()).toContain('Daily History')
-    expect(wrapper.text()).toContain('File Definition')
-    expect(wrapper.text()).toContain('Mapped Column')
-    expect(wrapper.text()).not.toContain('Field Mapping')
-    expect(wrapper.text()).toContain('Total Contacts')
-    expect(wrapper.text()).toContain('11,725')
-    expect(wrapper.text()).toContain('Jan 1, 2025')
-    expect(wrapper.text()).toContain('Jan 14, 2025')
-    expect(wrapper.find('#forecast-date-column').exists()).toBe(true)
-    expect(wrapper.find('#forecast-contacts-column').exists()).toBe(true)
-    expect(wrapper.find('#forecast-ceiling-column').exists()).toBe(true)
-    expect(wrapper.find('#forecast-floor-column').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Data')
+    expect(document.body.textContent || '').not.toContain('Upload Daily History')
+
+    await findButtonByText(wrapper, 'Data').trigger('click')
+    await flushUi()
+
+    const bodyText = document.body.textContent || ''
+    expect(bodyText).toContain('Upload Daily History')
+    expect(bodyText).toContain('File Definition')
+    expect(bodyText).toContain('Mapped Column')
+    expect(bodyText).not.toContain('Field Mapping')
+    expect(bodyText).not.toContain('File Summary')
+    expect(document.body.querySelector('#forecast-date-column')).not.toBeNull()
+    expect(document.body.querySelector('#forecast-contacts-column')).not.toBeNull()
+    expect(document.body.querySelector('#forecast-ceiling-column')).not.toBeNull()
+    expect(document.body.querySelector('#forecast-floor-column')).not.toBeNull()
+  })
+
+  it('automatically runs the forecast after the first successful history load', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => createForecastRunResults()
+    })
+
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-auto-run-on-load-spec'
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    const extendedHistoryRows = Array.from({ length: 90 }, (_, index) => {
+      const date = new Date(2025, 0, 1 + index)
+      const ds = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0')
+      ].join('-')
+
+      return {
+        ds,
+        y: 800 + (index % 25),
+        cap: null,
+        floor: null,
+        holidayLabel: ''
+      }
+    })
+    const loadedProject = createForecastProject({
+      uploadedFileName: 'auto-run-history.csv',
+      uploadedHeaders: ['service_date', 'call_volume'],
+      uploadedRows: extendedHistoryRows.map((row) => ({
+        service_date: row.ds,
+        call_volume: String(row.y)
+      })),
+      historyRows: extendedHistoryRows,
+      parserIssues: [],
+      normalizationIssues: [],
+      columnMapping: {
+        dateColumn: 'service_date',
+        volumeColumn: 'call_volume',
+        capColumn: '',
+        floorColumn: ''
+      }
+    })
+    await wrapper.findComponent(ForecastHistoryModal).vm.$emit('apply', buildHistoryImportState(loadedProject))
+    await flushUi()
+    await flushUi()
+    await flushUi()
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/forecasting/daily-volume/run',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+    )
+    expect(wrapper.text()).toContain('Forecasted demand vs historical volume')
+    expect(wrapper.text()).toContain('Current run:')
+    expect(document.body.textContent || '').not.toContain('Upload Daily History')
   })
 
   it('can hide the duplicate action in the workspace header', async () => {
@@ -337,14 +424,16 @@ describe('ForecastingWorkspace', () => {
     mountedWrappers.push(wrapper)
 
     await flushUi()
-    wrapper.vm.activeWorkflowStep = 'workbench'
     await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).not.toContain('Holiday Effects')
-    expect(wrapper.text()).not.toContain('Holiday calendar and custom event effects.')
-    expect(wrapper.find('#forecast-holiday-country').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Custom holidays are managed at the call center level.')
+    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
+    await flushUi()
+
+    const bodyText = document.body.textContent || ''
+    expect(bodyText).not.toContain('Holiday Effects')
+    expect(document.body.querySelector('#forecast-holiday-country')).toBeNull()
+    expect(bodyText).not.toContain('Custom holidays are managed at the call center level.')
   })
 
   it('uploads daily history, runs the forecast, and shows the monthly rollup', async () => {
@@ -372,7 +461,6 @@ describe('ForecastingWorkspace', () => {
     })
     mountedWrappers.push(wrapper)
     await flushUi()
-    wrapper.vm.activeWorkflowStep = 'workbench'
     await flushUi()
     await flushUi()
 
@@ -391,9 +479,11 @@ describe('ForecastingWorkspace', () => {
     const savedProjects = await forecastingRepository.loadWorkspace('forecast-run-spec')
     expect(savedProjects[0].uploadedFileName).toBe('history.csv')
     expect(savedProjects[0].name).toBe('Consumer Voice 2026 Budget Forecast')
-    expect(wrapper.text()).toContain('Forecast Workbench')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Budget Forecast')
     expect(wrapper.text()).toContain('Forecasted demand vs historical volume')
-    expect(wrapper.text()).toContain('Manual Adjustments')
+    expect(wrapper.text()).toContain('Test period')
+    expect(wrapper.text()).toContain('MAPE')
+    expect(wrapper.text()).not.toContain('Accuracy')
     expect(wrapper.text()).not.toContain('Forecast saved.')
 
     await findButtonByText(wrapper, 'Monthly Rollup').trigger('click')
@@ -403,12 +493,6 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('Jan 2026')
     expect(wrapper.text()).toContain('Jan 2, 2026')
     expect(wrapper.text()).toContain('1,025')
-
-    await findButtonByText(wrapper, 'Accuracy', { last: true }).trigger('click')
-    await flushUi()
-
-    expect(wrapper.text()).toContain('Forecast vs Actual')
-    expect(wrapper.text()).toContain('RMSE')
   })
 
   it('saves a project and reopens it from the project dialog', async () => {
@@ -448,7 +532,8 @@ describe('ForecastingWorkspace', () => {
     })
     mountedWrappers.push(wrapper)
     await flushUi()
-    expect(wrapper.text()).toContain('Upload Daily History')
+    await flushUi()
+    expect(document.body.textContent || '').toContain('Upload Daily History')
     expect(wrapper.text()).not.toContain('No historical CSV loaded yet.')
 
     await findButtonByText(wrapper, 'Open Forecast').trigger('click')
@@ -457,10 +542,9 @@ describe('ForecastingWorkspace', () => {
 
     await clickBodyButton('Open Forecast', { last: true })
 
-    expect(wrapper.text()).toContain('File Summary')
-    expect(wrapper.text()).toContain('Total Contacts')
-    expect(wrapper.text()).toContain('11,725')
-    expect(wrapper.text()).not.toContain('No file loaded')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Budget Forecast')
+    expect(wrapper.text()).toContain('Data')
+    expect(document.body.textContent || '').not.toContain('No file loaded')
   })
 
   it('opens the requested saved forecast when an initial project id is provided', async () => {
@@ -513,29 +597,18 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).toContain('File Summary')
-    expect(wrapper.text()).toContain('11,725')
-    expect(wrapper.text()).not.toContain('No file loaded')
-
-    wrapper.vm.activeWorkflowStep = 'workbench'
-    await flushUi()
-    await flushUi()
-
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Reforecast (Apr)')
+    expect(wrapper.text()).toContain('Data')
     expect(wrapper.find('#forecast-type').exists()).toBe(false)
     expect(wrapper.find('#forecast-planning-year').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Reforecast Window')
-    expect(wrapper.find('#forecast-reforecast-start-month').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Expand model parameters"]').exists()).toBe(true)
 
-    const reforecastToggle = wrapper.findAll('button').find((button) =>
-      button.text().includes('Reforecast Window')
-    )
-
-    expect(reforecastToggle).toBeTruthy()
-    await reforecastToggle.trigger('click')
+    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
     await flushUi()
 
-    expect(wrapper.find('#forecast-reforecast-start-month').exists()).toBe(true)
-    expect(wrapper.find('#forecast-reforecast-start-month').element.value).toBe('3')
+    expect(document.body.textContent || '').toContain('Reforecast Window')
+    expect(document.body.querySelector('#forecast-reforecast-start-month')).not.toBeNull()
+    expect(document.body.querySelector('#forecast-reforecast-start-month')?.value).toBe('3')
   })
 
   it('opens forecasts with prior results directly in the workbench and shows the docked worksheet', async () => {
@@ -560,13 +633,267 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).toContain('Forecast Workbench')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Budget Forecast')
     expect(wrapper.text()).not.toContain('Plan Year')
     expect(wrapper.text()).not.toContain('Forecast Type')
-    expect(wrapper.text()).toContain('Validation')
-    expect(wrapper.text()).not.toContain('Data Prep')
-    expect(wrapper.text()).toContain('Manual Adjustments')
-    expect(wrapper.text()).toContain('Daily override worksheet')
+    expect(wrapper.text()).toContain('Range adjustment rules')
+    expect(wrapper.find('button[aria-label="Expand model parameters"]').exists()).toBe(true)
+
+    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
+    await flushUi()
+
+    const bodyText = document.body.textContent || ''
+    expect(bodyText).toContain('Validation')
+    expect(bodyText).toContain('Confidence')
+    expect(bodyText).toContain('Weekly')
+    expect(document.body.querySelector('#forecast-monthly-toggle')).not.toBeNull()
+    expect(bodyText).toContain('Yearly')
+    expect(bodyText).not.toContain('Data Prep')
+    expect(bodyText).not.toContain('Weekly Detail')
+    expect(bodyText).not.toContain('Weekly Strength')
+    expect(bodyText).not.toContain('Yearly Detail')
+    expect(bodyText).not.toContain('Yearly Strength')
+    expect(bodyText).not.toContain('Confidence Band')
+    expect(bodyText).not.toContain('Uses the default Prophet weekly seasonality settings.')
+    expect(bodyText).not.toContain('Uses the default Prophet yearly seasonality settings.')
+    expect(document.body.querySelector('[aria-label="Explain Test Set Days"]')).not.toBeNull()
+    expect(document.body.querySelector('[aria-label="Explain Weekly"]')).not.toBeNull()
+    expect(document.body.querySelector('[aria-label="Explain Trend Type"]')).not.toBeNull()
+  })
+
+  it('shows a clear validation message when loaded history is too old for the forecast year', async () => {
+    const staleHistoryRows = Array.from({ length: 14 }, (_, index) => {
+      const day = index + 18
+      return {
+        ds: `2024-12-${String(day).padStart(2, '0')}`,
+        y: 800 + index,
+        cap: null,
+        floor: null,
+        holidayLabel: ''
+      }
+    })
+
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-history-gap-validation-spec',
+        projectSeed: createForecastProject({
+          groupName: 'Consumer Voice',
+          planningYear: 2027,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2027,
+            groupName: 'Consumer Voice'
+          },
+          uploadedFileName: 'forecasting_daily_volume_sample_2022_2024.csv',
+          uploadedHeaders: ['service_date', 'call_volume'],
+          uploadedRows: staleHistoryRows.map((row) => ({
+            service_date: row.ds,
+            call_volume: String(row.y)
+          })),
+          historyRows: staleHistoryRows,
+          columnMapping: {
+            dateColumn: 'service_date',
+            volumeColumn: 'call_volume',
+            capColumn: '',
+            floorColumn: ''
+          }
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
+    await flushUi()
+
+    const bodyText = document.body.textContent || ''
+    expect(bodyText).toContain('Loaded history ends Dec 31, 2024.')
+    expect(bodyText).toContain('would require 1,095 forecast days')
+    expect(bodyText).toContain('maximum supported horizon is 730 days')
+    expect(bodyText).toContain('Load more recent history or choose an earlier forecast year.')
+  })
+
+  it('shows manual adjustments only on the forecast tab', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-adjustments-rail-spec',
+        projectSeed: createProjectWithRun({
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          }
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Range adjustment rules')
+    expect(wrapper.find('button[aria-label="Collapse manual adjustments dock"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Expand manual adjustments dock"]').exists()).toBe(false)
+
+    await findButtonByText(wrapper, 'Components').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).not.toContain('Range adjustment rules')
+
+    await findButtonByText(wrapper, 'Monthly Rollup').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).not.toContain('Range adjustment rules')
+
+    await findButtonByText(wrapper, 'Forecast').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Range adjustment rules')
+  })
+
+  it('shows a monthly component card when monthly seasonality is enabled', async () => {
+    const runResults = createForecastRunResults()
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-monthly-component-spec',
+        projectSeed: createProjectWithRun({
+          modelConfig: {
+            monthlySeasonalityEnabled: true
+          },
+          lastRun: {
+            ...runResults,
+            components: {
+              ...runResults.components,
+              monthly: [
+                { label: 'Jan 01', value: 0 },
+                { label: 'Jan 02', value: 0 }
+              ]
+            }
+          },
+          name: 'Consumer Voice 2026 Budget Forecast'
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    await findButtonByText(wrapper, 'Components').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Monthly Seasonality')
+  })
+
+  it('adds adjustment rules to the list and supports editing and removing them', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-adjustment-rules-spec',
+        projectSeed: createProjectWithRun({
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          }
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    await wrapper.findComponent(AppNumberField).vm.$emit('update:modelValue', 125)
+    await flushUi()
+
+    await findButtonByText(wrapper, 'Add').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Edit')
+    expect(wrapper.text()).toContain('Remove')
+    expect(wrapper.text()).toContain('+125')
+
+    await findButtonByText(wrapper, 'Edit').trigger('click')
+    await flushUi()
+
+    await wrapper.findComponent(AppNumberField).vm.$emit('update:modelValue', 150)
+    await flushUi()
+
+    await findButtonByText(wrapper, 'Save', { last: true }).trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('+150')
+    expect(wrapper.text()).not.toContain('+125')
+    expect(wrapper.text()).toContain('Add')
+    expect(
+      [...wrapper.findAll('button')].some((button) => button.text().trim() === 'Save')
+    ).toBe(false)
+
+    await findButtonByText(wrapper, 'Remove').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('No adjustment rules yet')
+  })
+
+  it('moves the rerun action into the inspector drawer while settings are open', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => createForecastRunResults()
+    })
+
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-inspector-run-action-spec',
+        projectSeed: createProjectWithRun({
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          }
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    expect(
+      [...wrapper.findAll('button')].some((button) => button.text().trim() === 'Run')
+    ).toBe(true)
+
+    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
+    await flushUi()
+
+    expect(
+      [...wrapper.findAll('button')].some((button) => button.text().trim() === 'Run')
+    ).toBe(false)
+    expect(document.body.textContent || '').toContain('Run')
+    expect(document.body.textContent || '').toContain('Settings are current for the latest completed run.')
+
+    await clickBodyButton('Run', { last: true })
+    await flushUi()
+    await flushUi()
+
+    expect(
+      [...wrapper.findAll('button')].some((button) => button.text().trim() === 'Run')
+    ).toBe(true)
   })
 
   it('marks workbench results stale when settings change and reruns only on explicit action', async () => {
@@ -604,7 +931,7 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('Outputs Stale')
     expect(global.fetch).not.toHaveBeenCalled()
 
-    await findButtonByText(wrapper, 'Run Forecast').trigger('click')
+    await findButtonByText(wrapper, 'Run').trigger('click')
     await flushUi()
     await flushUi()
     await flushUi()

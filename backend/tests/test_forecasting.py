@@ -47,6 +47,7 @@ class FakeProphet:
                     "trend": baseline - 2,
                     "weekly": float(index % 7),
                     "yearly": float(index) / 10.0,
+                    "monthly": float(index % 30) / 5.0,
                     "holidays": 0.0,
                 }
             )
@@ -56,6 +57,13 @@ class FakeProphet:
 class BrokenProphet:
     def __init__(self, **kwargs) -> None:
         raise AttributeError("stan backend unavailable")
+
+
+class ZeroMonthlyProphet(FakeProphet):
+    def predict(self, future: pd.DataFrame) -> pd.DataFrame:
+        forecast = super().predict(future)
+        forecast["monthly"] = 0.0
+        return forecast
 
 
 class ForecastingTests(unittest.TestCase):
@@ -93,6 +101,7 @@ class ForecastingTests(unittest.TestCase):
                 "seasonalityMode": "additive",
                 "weeklySeasonality": {"enabled": True, "fourierOrder": 3, "priorScale": 10},
                 "yearlySeasonality": {"enabled": True, "fourierOrder": 8, "priorScale": 12},
+                "monthlySeasonality": {"enabled": False, "periodDays": 30.5, "fourierOrder": 5, "priorScale": 10},
                 "builtInHolidayCountry": "US",
                 "holidaysPriorScale": 10,
                 "customSeasonalities": [
@@ -140,6 +149,50 @@ class ForecastingTests(unittest.TestCase):
         self.assertTrue(any(item["name"] == "billing_cycle" for item in fake_model.added_seasonalities))
         self.assertIn("cap", fake_model.fitted_frame.columns)
         self.assertIn("floor", fake_model.fitted_frame.columns)
+
+    @patch("backend.app.forecasting.Prophet", FakeProphet)
+    def test_monthly_seasonality_can_be_enabled(self) -> None:
+        base_payload = self._payload()
+        payload = self._payload(
+            modelConfig={
+                **base_payload.modelConfig.model_dump(),
+                "growth": "linear",
+                "monthlySeasonality": {
+                    "enabled": True,
+                    "periodDays": 30.5,
+                    "fourierOrder": 5,
+                    "priorScale": 10,
+                },
+            }
+        )
+
+        result = run_daily_volume_forecast(payload)
+
+        fake_model = FakeProphet.instances[-1]
+        self.assertTrue(any(item["name"] == "monthly" for item in fake_model.added_seasonalities))
+        self.assertIn("monthly", result["components"])
+
+    @patch("backend.app.forecasting.Prophet", ZeroMonthlyProphet)
+    def test_monthly_component_is_returned_even_when_flat(self) -> None:
+        base_payload = self._payload()
+        payload = self._payload(
+            modelConfig={
+                **base_payload.modelConfig.model_dump(),
+                "growth": "linear",
+                "monthlySeasonality": {
+                    "enabled": True,
+                    "periodDays": 30.5,
+                    "fourierOrder": 5,
+                    "priorScale": 10,
+                },
+            }
+        )
+
+        result = run_daily_volume_forecast(payload)
+
+        self.assertIn("monthly", result["components"])
+        self.assertGreater(len(result["components"]["monthly"]), 0)
+        self.assertTrue(all(item["value"] == 0.0 for item in result["components"]["monthly"]))
 
     def test_logistic_forecast_requires_a_default_cap(self) -> None:
         base_payload = self._payload()

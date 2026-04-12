@@ -1,18 +1,19 @@
 <script setup>
 import { computed } from 'vue'
 
-import ForecastHistoryPreviewChart from './ForecastHistoryPreviewChart.vue'
 import AppButton from '../ui/AppButton.vue'
-import AppEmptyState from '../ui/AppEmptyState.vue'
 import AppFileDropzone from '../ui/AppFileDropzone.vue'
 import AppInsetPanel from '../ui/AppInsetPanel.vue'
 import AppSelect from '../ui/AppSelect.vue'
-import { formatDate } from '../../forecasting/shared'
 
 const props = defineProps({
   columnOptions: {
     type: Array,
     default: () => []
+  },
+  showSummaryPane: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -24,59 +25,6 @@ const project = defineModel('project', {
 })
 
 const hasLoadedFile = computed(() => Boolean(project.value.uploadedFileName))
-const uploadedRowsCount = computed(() =>
-  Array.isArray(project.value.uploadedRows) ? project.value.uploadedRows.length : 0
-)
-const historyRowCount = computed(() =>
-  Array.isArray(project.value.historyRows) ? project.value.historyRows.length : 0
-)
-
-const totalContacts = computed(() =>
-  (project.value.historyRows || []).reduce((sum, row) => sum + (Number(row?.y) || 0), 0)
-)
-
-const uploadedDateRange = computed(() => {
-  if (!historyRowCount.value) {
-    return {
-      start: '—',
-      end: '—'
-    }
-  }
-
-  const firstRow = project.value.historyRows[0]
-  const lastRow = project.value.historyRows[historyRowCount.value - 1]
-
-  if (!firstRow?.ds || !lastRow?.ds) {
-    return {
-      start: '—',
-      end: '—'
-    }
-  }
-
-  return {
-    start: formatDate(firstRow.ds),
-    end: formatDate(lastRow.ds)
-  }
-})
-
-const summaryItems = computed(() => [
-  {
-    label: 'Parsed Rows',
-    value: uploadedRowsCount.value
-  },
-  {
-    label: 'Total Contacts',
-    value: new Intl.NumberFormat('en-US').format(totalContacts.value)
-  },
-  {
-    label: 'Start Date',
-    value: uploadedDateRange.value.start
-  },
-  {
-    label: 'End Date',
-    value: uploadedDateRange.value.end
-  }
-])
 
 const definitionRows = computed(() => [
   {
@@ -97,26 +45,29 @@ const definitionRows = computed(() => [
   },
   {
     id: 'ceiling',
-    label: 'Ceiling',
+    label: 'Daily Ceiling',
     required: 'N',
     example: '2500',
-    definition: 'Upper bound for growth trends.',
+    definition: 'Optional per-day ceiling override for logistic growth. If blank, the global upper forecast limit is used.',
     mappingKey: 'capColumn'
   },
   {
     id: 'floor',
-    label: 'Floor',
+    label: 'Daily Floor',
     required: 'N',
     example: '0',
-    definition: 'Lower bound for growth trends.',
+    definition: 'Optional per-day floor override for logistic growth. If blank, the global lower forecast limit is used.',
     mappingKey: 'floorColumn'
   }
 ])
 </script>
 
 <template>
-  <div class="grid gap-5 xl:grid-cols-[minmax(0,44rem)_minmax(0,1fr)] xl:items-stretch">
-    <div class="grid w-full max-w-[44rem] content-start gap-3">
+  <div
+    class="grid gap-5"
+    :class="props.showSummaryPane ? 'xl:grid-cols-[minmax(0,44rem)_minmax(0,1fr)] xl:items-stretch' : ''"
+  >
+    <div class="grid w-full content-start gap-3" :class="props.showSummaryPane ? 'max-w-[44rem]' : ''">
       <AppFileDropzone
         input-id="forecast-history-upload"
         title="Upload Daily History"
@@ -178,54 +129,5 @@ const definitionRows = computed(() => [
         </div>
       </AppInsetPanel>
     </div>
-
-    <AppInsetPanel tone="subtle" class="grid h-full min-h-0 grid-rows-[auto_1fr] gap-4 self-stretch">
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-sm font-semibold text-slate-950">File Summary</p>
-        <span
-          v-if="hasLoadedFile"
-          class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
-        >
-          Loaded
-        </span>
-      </div>
-
-      <template v-if="hasLoadedFile">
-        <div class="grid min-h-0 grid-rows-[auto_1fr] gap-4">
-          <div class="grid divide-y divide-[#1c446d] overflow-hidden rounded-[28px] border border-[#102f4f] bg-[#15395f] sm:grid-cols-2 sm:divide-x sm:divide-y-0 2xl:grid-cols-4">
-            <article
-              v-for="item in summaryItems"
-              :key="item.label"
-              class="grid gap-1.5 px-5 py-3.5"
-            >
-              <span class="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-200">
-                {{ item.label }}
-              </span>
-              <strong class="text-lg font-semibold tracking-[-0.03em] text-white">
-                {{ item.value }}
-              </strong>
-            </article>
-          </div>
-
-          <AppInsetPanel class="grid min-h-[22rem] min-w-0 grid-rows-[auto_1fr] gap-3">
-            <p class="text-sm font-semibold text-slate-950">Daily History</p>
-            <div class="min-h-0">
-              <ForecastHistoryPreviewChart v-if="historyRowCount" :rows="project.historyRows" />
-              <AppEmptyState
-                v-else
-                title="No mapped history yet"
-                description="Map the date and contacts columns to preview the daily history trend."
-              />
-            </div>
-          </AppInsetPanel>
-        </div>
-      </template>
-
-      <AppEmptyState
-        v-else
-        title="No file loaded"
-        description="Upload a CSV to preview file details and the daily history trend."
-      />
-    </AppInsetPanel>
   </div>
 </template>

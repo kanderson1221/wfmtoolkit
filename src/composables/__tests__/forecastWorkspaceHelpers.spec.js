@@ -184,4 +184,41 @@ describe('forecastWorkspaceHelpers', () => {
       }
     ])
   })
+
+  it('uses fixed default settings for built-in weekly and yearly seasonalities', () => {
+    const project = createForecastProject({
+      historyRows: [
+        { ds: '2024-01-01', y: 800, cap: null, floor: null },
+        { ds: '2024-01-02', y: 820, cap: null, floor: null }
+      ],
+      modelConfig: {
+        weeklySeasonalityEnabled: true,
+        monthlySeasonalityEnabled: true,
+        yearlySeasonalityEnabled: true,
+        weeklyFourierOrder: 12,
+        weeklyPriorScale: 2,
+        yearlyFourierOrder: 20,
+        yearlyPriorScale: 3
+      }
+    })
+
+    const payload = buildForecastPayload(project)
+
+    expect(payload.modelConfig.weeklySeasonality).toEqual({
+      enabled: true,
+      fourierOrder: 3,
+      priorScale: 10
+    })
+    expect(payload.modelConfig.yearlySeasonality).toEqual({
+      enabled: true,
+      fourierOrder: 10,
+      priorScale: 10
+    })
+    expect(payload.modelConfig.monthlySeasonality).toEqual({
+      enabled: true,
+      periodDays: 30.5,
+      fourierOrder: 5,
+      priorScale: 10
+    })
+  })
 })

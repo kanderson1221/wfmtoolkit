@@ -92,7 +92,7 @@ describe('planner demand sources', () => {
     })
   })
 
-  it('uses adjusted monthly totals when a forecast has manual daily overrides', () => {
+  it('uses adjusted monthly totals when a forecast has range adjustment rules', () => {
     const trailingDailyRows = Array.from({ length: 10 }, (_, index) => {
       const monthNumber = index + 3
       const monthStart = `2026-${String(monthNumber).padStart(2, '0')}-01`
@@ -114,8 +114,8 @@ describe('planner demand sources', () => {
           planningYear: 2026
         },
         manualAdjustments: [
-          { ds: '2026-01-02', delta: 250, reason: 'Launch campaign' },
-          { ds: '2026-02-01', delta: -100, reason: 'Weather event' }
+          { startDate: '2026-01-02', endDate: '2026-01-02', adjustmentType: 'delta', value: 250, reason: 'Launch campaign' },
+          { startDate: '2026-02-01', endDate: '2026-02-01', adjustmentType: 'delta', value: -100, reason: 'Weather event' }
         ],
         lastRun: {
           runAt: '2026-04-08T14:00:00Z',

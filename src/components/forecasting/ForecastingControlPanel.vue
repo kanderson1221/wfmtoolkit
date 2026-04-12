@@ -4,7 +4,6 @@ import { computed } from 'vue'
 import ForecastingConfigSection from './ForecastingConfigSection.vue'
 import ForecastHistoricalDataSection from './ForecastHistoricalDataSection.vue'
 import AppButton from '../ui/AppButton.vue'
-import AppCheckbox from '../ui/AppCheckbox.vue'
 import AppFieldGroup from '../ui/AppFieldGroup.vue'
 import AppInsetPanel from '../ui/AppInsetPanel.vue'
 import AppNumberField from '../ui/AppNumberField.vue'
@@ -13,6 +12,7 @@ import AppSelect from '../ui/AppSelect.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTextField from '../ui/AppTextField.vue'
 import AppTextArea from '../ui/AppTextArea.vue'
+import AppToggleSwitch from '../ui/AppToggleSwitch.vue'
 import {
   FORECAST_TYPE_OPTIONS,
   FORECAST_TYPE_REFORECAST,
@@ -145,6 +145,18 @@ const holdoutSummary = computed(() => {
   }
 
   return `Train on the first ${trainingRowCount.value} daily rows and compare the last ${holdoutDays.value} rows to actuals.`
+})
+const intervalWidthPercent = computed({
+  get: () => {
+    const intervalWidth = Number(project.value.modelConfig.intervalWidth)
+    return Number.isFinite(intervalWidth) ? Math.round(intervalWidth * 100) : 80
+  },
+  set: (value) => {
+    const percent = Number(value)
+    project.value.modelConfig.intervalWidth = Number.isFinite(percent)
+      ? Math.max(10, Math.min(99, percent)) / 100
+      : 0.8
+  }
 })
 
 const shouldShowValidationErrors = computed(() =>
@@ -283,6 +295,7 @@ const inheritedHolidayList = computed(() =>
                 id="forecast-horizon-custom"
                 v-model="project.forecastHorizonDays"
                 :min="1"
+                :max="730"
                 :step="1"
               />
             </div>
@@ -329,49 +342,78 @@ const inheritedHolidayList = computed(() =>
             />
           </AppFieldGroup>
 
-          <div class="grid gap-4 md:grid-cols-2">
-            <AppInsetPanel class="grid gap-2">
-              <AppCheckbox v-model="project.modelConfig.weeklySeasonalityEnabled">
-                Use a weekly pattern
-              </AppCheckbox>
-              <p class="text-sm text-slate-600">
-                Turn this on when weekdays behave differently from weekends.
-              </p>
-            </AppInsetPanel>
+          <div class="divide-y divide-slate-200">
+            <label for="forecast-config-weekly-toggle" class="flex items-center justify-between gap-4 py-3">
+              <span class="text-sm font-medium text-slate-950">Weekly</span>
+              <AppToggleSwitch
+                input-id="forecast-config-weekly-toggle"
+                aria-label="Toggle weekly seasonality"
+                v-model="project.modelConfig.weeklySeasonalityEnabled"
+              />
+            </label>
 
-            <AppInsetPanel class="grid gap-2">
-              <AppCheckbox v-model="project.modelConfig.yearlySeasonalityEnabled">
-                Use a yearly pattern
-              </AppCheckbox>
-              <p class="text-sm text-slate-600">
-                Turn this on when months, seasons, or annual events repeat.
-              </p>
-            </AppInsetPanel>
+            <label for="forecast-config-monthly-toggle" class="flex items-center justify-between gap-4 py-3">
+              <span class="text-sm font-medium text-slate-950">Monthly</span>
+              <AppToggleSwitch
+                input-id="forecast-config-monthly-toggle"
+                aria-label="Toggle monthly seasonality"
+                v-model="project.modelConfig.monthlySeasonalityEnabled"
+              />
+            </label>
+
+            <label for="forecast-config-yearly-toggle" class="flex items-center justify-between gap-4 py-3">
+              <span class="text-sm font-medium text-slate-950">Yearly</span>
+              <AppToggleSwitch
+                input-id="forecast-config-yearly-toggle"
+                aria-label="Toggle yearly seasonality"
+                v-model="project.modelConfig.yearlySeasonalityEnabled"
+              />
+            </label>
           </div>
         </div>
       </ForecastingConfigSection>
 
       <ForecastingConfigSection title="Accuracy">
-        <div class="grid gap-5">
-          <AppFieldGroup
-            label="Test Set Days"
-            input-id="forecast-holdout-days"
-          >
-            <AppNumberField
-              id="forecast-holdout-days"
-              v-model="project.modelConfig.holdoutDays"
-              :min="0"
-              :step="1"
-            />
-          </AppFieldGroup>
+        <div class="grid gap-3">
+          <div class="divide-y divide-slate-200">
+            <div class="grid grid-cols-[minmax(0,1fr)_5.4rem] items-center gap-3 py-1.5">
+              <label for="forecast-holdout-days" class="text-sm font-medium text-slate-950">
+                Test Set Days
+              </label>
+              <div class="w-full">
+                <AppNumberField
+                  id="forecast-holdout-days"
+                  v-model="project.modelConfig.holdoutDays"
+                  :min="0"
+                  :step="1"
+                  compact
+                  class="border-slate-200 bg-slate-50 text-right tabular-nums shadow-none focus:bg-white focus:ring-2"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-[minmax(0,1fr)_5.4rem] items-center gap-3 py-1.5">
+              <label for="forecast-interval-width" class="text-sm font-medium text-slate-950">
+                Confidence
+              </label>
+              <div class="w-full">
+                <AppNumberField
+                  id="forecast-interval-width"
+                  v-model="intervalWidthPercent"
+                  :min="10"
+                  :max="99"
+                  :step="5"
+                  suffix="%"
+                  compact
+                  class="border-slate-200 bg-slate-50 text-right tabular-nums shadow-none focus:bg-white focus:ring-2"
+                />
+              </div>
+            </div>
+          </div>
 
           <AppStatusMessage v-if="!holdoutIsValid" tone="error">
             {{ holdoutSummary }}
           </AppStatusMessage>
-
-          <p v-else class="text-sm text-slate-600">
-            {{ holdoutSummary }}
-          </p>
         </div>
       </ForecastingConfigSection>
 
@@ -381,7 +423,7 @@ const inheritedHolidayList = computed(() =>
             <h4 class="text-sm font-semibold text-slate-950">Model Tuning</h4>
             <div class="grid gap-4 md:grid-cols-2">
               <AppFieldGroup
-                label="Trend Shape"
+                label="Trend Type"
                 input-id="forecast-growth-mode"
                 help-text="Most forecasts can stay on steady growth."
               >
@@ -393,7 +435,7 @@ const inheritedHolidayList = computed(() =>
               </AppFieldGroup>
 
               <AppFieldGroup
-                label="Pattern Style"
+                label="Seasonality Type"
                 input-id="forecast-seasonality-mode"
                 help-text="Use additive unless patterns clearly grow as volume grows."
               >
@@ -401,17 +443,6 @@ const inheritedHolidayList = computed(() =>
                   id="forecast-seasonality-mode"
                   v-model="project.modelConfig.seasonalityMode"
                   :options="seasonalityModeOptions"
-                />
-              </AppFieldGroup>
-
-              <AppFieldGroup label="Confidence Band" input-id="forecast-interval-width">
-                <AppNumberField
-                  id="forecast-interval-width"
-                  v-model="project.modelConfig.intervalWidth"
-                  :min="0.1"
-                  :max="0.99"
-                  :step="0.05"
-                  :max-fraction-digits="2"
                 />
               </AppFieldGroup>
 
@@ -424,7 +455,7 @@ const inheritedHolidayList = computed(() =>
                 />
               </AppFieldGroup>
 
-              <AppFieldGroup label="Trend Flexibility" input-id="forecast-changepoint-prior">
+              <AppFieldGroup label="Trend Sensitivity" input-id="forecast-changepoint-prior">
                 <AppNumberField
                   id="forecast-changepoint-prior"
                   v-model="project.modelConfig.changepointPriorScale"
@@ -456,9 +487,22 @@ const inheritedHolidayList = computed(() =>
 
               <template v-if="project.modelConfig.growth === 'logistic'">
                 <AppFieldGroup
-                  label="Upper Limit"
+                  label="Lower Forecast Limit"
+                  input-id="forecast-default-floor"
+                  help-text="Default floor used for logistic growth unless a daily floor column is mapped from the file."
+                >
+                  <AppNumberField
+                    id="forecast-default-floor"
+                    v-model="project.modelConfig.defaultFloor"
+                    :min="0"
+                    :step="1"
+                  />
+                </AppFieldGroup>
+
+                <AppFieldGroup
+                  label="Upper Forecast Limit"
                   input-id="forecast-default-cap"
-                  help-text="Used when growth with ceiling is selected and no upper-limit column is mapped."
+                  help-text="Default ceiling used for logistic growth unless a daily ceiling column is mapped from the file."
                 >
                   <AppNumberField
                     id="forecast-default-cap"
@@ -467,70 +511,36 @@ const inheritedHolidayList = computed(() =>
                     :step="1"
                   />
                 </AppFieldGroup>
-
-                <AppFieldGroup label="Lower Limit" input-id="forecast-default-floor">
-                  <AppNumberField
-                    id="forecast-default-floor"
-                    v-model="project.modelConfig.defaultFloor"
-                    :min="0"
-                    :step="1"
-                  />
-                </AppFieldGroup>
               </template>
             </div>
 
-            <div class="grid gap-4 md:grid-cols-2">
-              <AppInsetPanel class="grid gap-3">
-                <AppCheckbox v-model="project.modelConfig.weeklySeasonalityEnabled">
-                  Use a weekly pattern
-                </AppCheckbox>
-                <div class="grid gap-3 md:grid-cols-2">
-                  <AppFieldGroup label="Weekly Detail" input-id="forecast-weekly-fourier" compact>
-                    <AppNumberField
-                      id="forecast-weekly-fourier"
-                      v-model="project.modelConfig.weeklyFourierOrder"
-                      :min="1"
-                      :step="1"
-                      compact
-                    />
-                  </AppFieldGroup>
-                  <AppFieldGroup label="Weekly Strength" input-id="forecast-weekly-prior" compact>
-                    <AppNumberField
-                      id="forecast-weekly-prior"
-                      v-model="project.modelConfig.weeklyPriorScale"
-                      :min="0.1"
-                      :step="0.5"
-                      compact
-                    />
-                  </AppFieldGroup>
-                </div>
-              </AppInsetPanel>
+            <div class="divide-y divide-slate-200">
+              <label for="forecast-workbench-weekly-toggle" class="flex items-center justify-between gap-4 py-3">
+                <span class="text-sm font-medium text-slate-950">Weekly</span>
+                <AppToggleSwitch
+                  input-id="forecast-workbench-weekly-toggle"
+                  aria-label="Toggle weekly seasonality"
+                  v-model="project.modelConfig.weeklySeasonalityEnabled"
+                />
+              </label>
 
-              <AppInsetPanel class="grid gap-3">
-                <AppCheckbox v-model="project.modelConfig.yearlySeasonalityEnabled">
-                  Use a yearly pattern
-                </AppCheckbox>
-                <div class="grid gap-3 md:grid-cols-2">
-                  <AppFieldGroup label="Yearly Detail" input-id="forecast-yearly-fourier" compact>
-                    <AppNumberField
-                      id="forecast-yearly-fourier"
-                      v-model="project.modelConfig.yearlyFourierOrder"
-                      :min="1"
-                      :step="1"
-                      compact
-                    />
-                  </AppFieldGroup>
-                  <AppFieldGroup label="Yearly Strength" input-id="forecast-yearly-prior" compact>
-                    <AppNumberField
-                      id="forecast-yearly-prior"
-                      v-model="project.modelConfig.yearlyPriorScale"
-                      :min="0.1"
-                      :step="0.5"
-                      compact
-                    />
-                  </AppFieldGroup>
-                </div>
-              </AppInsetPanel>
+              <label for="forecast-workbench-monthly-toggle" class="flex items-center justify-between gap-4 py-3">
+                <span class="text-sm font-medium text-slate-950">Monthly</span>
+                <AppToggleSwitch
+                  input-id="forecast-workbench-monthly-toggle"
+                  aria-label="Toggle monthly seasonality"
+                  v-model="project.modelConfig.monthlySeasonalityEnabled"
+                />
+              </label>
+
+              <label for="forecast-workbench-yearly-toggle" class="flex items-center justify-between gap-4 py-3">
+                <span class="text-sm font-medium text-slate-950">Yearly</span>
+                <AppToggleSwitch
+                  input-id="forecast-workbench-yearly-toggle"
+                  aria-label="Toggle yearly seasonality"
+                  v-model="project.modelConfig.yearlySeasonalityEnabled"
+                />
+              </label>
             </div>
           </div>
 
@@ -558,7 +568,7 @@ const inheritedHolidayList = computed(() =>
                 <AppTextArea
                   id="forecast-manual-changepoints"
                   v-model="project.modelConfig.manualChangepoints"
-                  rows="4"
+                  rows="3"
                 />
               </AppFieldGroup>
             </div>
@@ -596,7 +606,7 @@ const inheritedHolidayList = computed(() =>
                     <AppFieldGroup label="Strength" :input-id="`seasonality-prior-${seasonality.id}`" compact>
                       <AppNumberField :id="`seasonality-prior-${seasonality.id}`" v-model="seasonality.priorScale" :min="0.1" :step="0.5" compact />
                     </AppFieldGroup>
-                    <AppFieldGroup label="Pattern Style" :input-id="`seasonality-mode-${seasonality.id}`" compact>
+                    <AppFieldGroup label="Seasonality Type" :input-id="`seasonality-mode-${seasonality.id}`" compact>
                       <AppSelect
                         :id="`seasonality-mode-${seasonality.id}`"
                         v-model="seasonality.mode"

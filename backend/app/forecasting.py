@@ -29,6 +29,10 @@ class SeasonalityConfig(BaseModel):
     priorScale: float = Field(default=10, gt=0)
 
 
+class MonthlySeasonalityConfig(SeasonalityConfig):
+    periodDays: float = Field(default=30.5, gt=0)
+
+
 class CustomSeasonalityConfig(BaseModel):
     name: str = Field(min_length=1)
     periodDays: float = Field(gt=0)
@@ -58,13 +62,16 @@ class ForecastModelConfig(BaseModel):
     yearlySeasonality: SeasonalityConfig = Field(
         default_factory=lambda: SeasonalityConfig(enabled=True, fourierOrder=10, priorScale=10)
     )
+    monthlySeasonality: MonthlySeasonalityConfig = Field(
+        default_factory=lambda: MonthlySeasonalityConfig(enabled=False, periodDays=30.5, fourierOrder=5, priorScale=10)
+    )
     builtInHolidayCountry: str = ""
     holidaysPriorScale: float = Field(default=10, gt=0)
     customSeasonalities: list[CustomSeasonalityConfig] = Field(default_factory=list)
     customHolidays: list[CustomHolidayConfig] = Field(default_factory=list)
     intervalWidth: float = Field(default=0.8, gt=0, lt=1)
     mcmcSamples: int = Field(default=0, ge=0)
-    holdoutDays: int = Field(default=30, ge=0)
+    holdoutDays: int = Field(default=60, ge=0)
 
 
 class ForecastRunRequest(BaseModel):
@@ -406,6 +413,15 @@ def _build_prophet_model(
             mode=config.seasonalityMode,
         )
 
+    if config.monthlySeasonality.enabled:
+        model.add_seasonality(
+            name="monthly",
+            period=float(config.monthlySeasonality.periodDays),
+            fourier_order=int(config.monthlySeasonality.fourierOrder),
+            prior_scale=float(config.monthlySeasonality.priorScale),
+            mode=config.seasonalityMode,
+        )
+
     for seasonality in config.customSeasonalities:
         model.add_seasonality(
             name=seasonality.name,
@@ -719,6 +735,7 @@ def _build_components(forecast: pd.DataFrame) -> dict[str, list[dict[str, Any]]]
         "trend": [],
         "weekly": [],
         "yearly": [],
+        "monthly": [],
         "holidays": [],
     }
 
@@ -748,6 +765,12 @@ def _build_components(forecast: pd.DataFrame) -> dict[str, list[dict[str, Any]]]
     if "yearly" in forecast.columns and forecast["yearly"].abs().sum() > 0:
         components["yearly"] = [
             {"label": row["ds"].strftime("%b %d"), "value": _safe_float(row["yearly"], 3)}
+            for _, row in forecast.iloc[:: max(1, len(forecast) // 120 or 1)].iterrows()
+        ]
+
+    if "monthly" in forecast.columns:
+        components["monthly"] = [
+            {"label": row["ds"].strftime("%b %d"), "value": _safe_float(row["monthly"], 3)}
             for _, row in forecast.iloc[:: max(1, len(forecast) // 120 or 1)].iterrows()
         ]
 
