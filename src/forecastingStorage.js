@@ -48,6 +48,18 @@ export const normalizeForecastProject = (draftProject = {}, timestamp = new Date
     historyRows: Array.isArray(snapshot.historyRows) ? snapshot.historyRows.map((row) => ({ ...row })) : [],
     parserIssues: Array.isArray(snapshot.parserIssues) ? [...snapshot.parserIssues] : [],
     normalizationIssues: Array.isArray(snapshot.normalizationIssues) ? [...snapshot.normalizationIssues] : [],
+    sourceKind: snapshot.sourceKind,
+    sourceData: snapshot.sourceData && typeof snapshot.sourceData === 'object'
+      ? {
+          fileName: snapshot.sourceData.fileName || '',
+          headers: Array.isArray(snapshot.sourceData.headers) ? [...snapshot.sourceData.headers] : [],
+          rows: Array.isArray(snapshot.sourceData.rows) ? snapshot.sourceData.rows.map((row) => ({ ...row })) : [],
+          mapping: snapshot.sourceData.mapping && typeof snapshot.sourceData.mapping === 'object'
+            ? { ...snapshot.sourceData.mapping }
+            : {},
+          issues: Array.isArray(snapshot.sourceData.issues) ? [...snapshot.sourceData.issues] : []
+        }
+      : {},
     modelConfig: {
       ...createForecastProject().modelConfig,
       ...(snapshot.modelConfig || {}),

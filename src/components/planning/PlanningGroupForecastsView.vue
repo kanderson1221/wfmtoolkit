@@ -75,6 +75,14 @@ const fallbackScopes = computed(() => {
   )]
 })
 
+const handleSaveComplete = () => {
+  window.location.hash = buildPlanningGroupHash(props.center.id, props.group.id, props.planningYear)
+}
+
+const handleCancelCreate = () => {
+  window.location.hash = buildPlanningGroupHash(props.center.id, props.group.id, props.planningYear)
+}
+
 </script>
 
 <template>
@@ -85,9 +93,11 @@ const fallbackScopes = computed(() => {
     :initial-project-id="props.selectedForecastId"
     :fallback-scopes="fallbackScopes"
     :breadcrumbs="breadcrumbs"
-    :show-description="false"
-    :show-library-actions="false"
+    :show-library-actions="true"
+    enable-source-kind-creation
     :show-duplicate-action="false"
     project-dialog-description="Open a saved forecast for this staffing group. Older center-level forecasts still appear here until they are resaved into the staffing-group workspace."
+    @save-complete="handleSaveComplete"
+    @cancel-create="handleCancelCreate"
   />
 </template>

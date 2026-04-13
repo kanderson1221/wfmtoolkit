@@ -37,12 +37,12 @@ test('opens the batch planner workspace', async ({ page }) => {
 test('opens the forecasting workspace', async ({ page }) => {
   await page.goto('/#calculators/forecasting')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Forecasting' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: 'Erlang Calculators' })).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 3, name: 'Erlang Calculators' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Forecasting Workspace Open' })).toHaveCount(0)
-  await expect(page.getByText('Upload daily call volume, run Prophet, and keep the monthly rollup ready for planning.')).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'Untitled Forecast' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New Forecast' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open Forecast' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeVisible()
   await expect(page.getByLabel('Forecast workflow')).toHaveCount(0)
   await page.getByRole('button', { name: 'Cancel' }).click()

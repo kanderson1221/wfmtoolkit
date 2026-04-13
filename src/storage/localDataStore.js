@@ -432,6 +432,7 @@ const flattenForecastWorkspace = (projects, scope = DEFAULT_SCOPE) => {
       scope: normalizedScope,
       id: project.id,
       name: project.name,
+      sourceKind: project.sourceKind || '',
       centerId: project.centerId || project.planningContext?.centerId || '',
       centerName: project.centerName || '',
       groupId: project.groupId || project.planningContext?.groupId || '',
@@ -453,6 +454,7 @@ const flattenForecastWorkspace = (projects, scope = DEFAULT_SCOPE) => {
       manualAdjustments: clonePlain(project.manualAdjustments || []),
       parserIssues: [...(project.parserIssues || [])],
       normalizationIssues: [...(project.normalizationIssues || [])],
+      sourceData: clonePlain(project.sourceData || {}),
       columnMapping: clonePlain(project.columnMapping || {}),
       modelConfig,
       planningContext: clonePlain(project.planningContext || {}),
@@ -607,6 +609,7 @@ const hydrateForecastWorkspace = (scope, rows) => {
         {
           id: row.id,
           name: row.name,
+          sourceKind: row.sourceKind || '',
           centerId: row.centerId,
           centerName: row.centerName,
           groupId: row.groupId,
@@ -628,6 +631,7 @@ const hydrateForecastWorkspace = (scope, rows) => {
           manualAdjustments: clonePlain(row.manualAdjustments || []),
           parserIssues: [...(row.parserIssues || [])],
           normalizationIssues: [...(row.normalizationIssues || [])],
+          sourceData: clonePlain(row.sourceData || {}),
           columnMapping: clonePlain(row.columnMapping || {}),
           modelConfig: {
             ...clonePlain(row.modelConfig || {}),

@@ -1,50 +1,32 @@
 <script setup>
 import { computed } from 'vue'
 
-import { FORECAST_TYPE_OPTIONS, FORECAST_TYPE_REFORECAST } from '../../forecasting/shared'
+import { FORECAST_SOURCE_KIND_OPTIONS } from '../../forecasting/shared'
 import AppButton from '../ui/AppButton.vue'
 import AppDialog from '../ui/AppDialog.vue'
 import AppFieldGroup from '../ui/AppFieldGroup.vue'
 import AppSelect from '../ui/AppSelect.vue'
-import AppStatusMessage from '../ui/AppStatusMessage.vue'
 
 const props = defineProps({
   yearOptions: {
     type: Array,
     required: true
   },
-  startMonthOptions: {
-    type: Array,
-    required: true
-  },
   canCreate: {
     type: Boolean,
     default: false
-  },
-  statusMessage: {
-    type: String,
-    default: ''
-  },
-  existingForecastHref: {
-    type: String,
-    default: ''
   }
 })
 
 const emit = defineEmits(['cancel', 'create'])
 
-const planningYear = defineModel('planningYear', {
-  type: [Number, String],
-  required: true
-})
-
-const forecastType = defineModel('forecastType', {
+const sourceKind = defineModel('sourceKind', {
   type: String,
   required: true
 })
 
-const coverageStartMonthIndex = defineModel('coverageStartMonthIndex', {
-  type: Number,
+const planningYear = defineModel('planningYear', {
+  type: [Number, String],
   required: true
 })
 
@@ -62,49 +44,38 @@ const planYearOptions = computed(() => [
   ...props.yearOptions
 ])
 
-const forecastTypeOptions = computed(() => [
-  { label: 'Select forecast type', value: '' },
-  ...FORECAST_TYPE_OPTIONS
+const sourceKindOptions = computed(() => [
+  { label: 'Select forecast source', value: '' },
+  ...FORECAST_SOURCE_KIND_OPTIONS.map((item) => ({
+    label: item.label,
+    value: item.id
+  }))
 ])
+
 </script>
 
 <template>
   <AppDialog
     v-model:visible="dialogOpen"
-    title="Create Forecast"
-    description="Choose the planning year and forecast type before opening the forecast workspace."
+    title="New Forecast"
+    description="Choose the forecast source and planning year before opening the staffing-group forecast flow."
     kicker="Forecast"
     max-width="max-w-xl"
     @close="emit('cancel')"
   >
     <div class="grid gap-4">
-      <AppFieldGroup label="Plan Year" input-id="forecast-create-year">
-        <AppSelect id="forecast-create-year" v-model="planningYear" :options="planYearOptions" autofocus />
-      </AppFieldGroup>
-
-      <AppFieldGroup label="Forecast Type" input-id="forecast-create-type">
-        <AppSelect id="forecast-create-type" v-model="forecastType" :options="forecastTypeOptions" />
-      </AppFieldGroup>
-
-      <AppFieldGroup
-        v-if="forecastType === FORECAST_TYPE_REFORECAST"
-        label="Reforecast Start Month"
-        input-id="forecast-create-start-month"
-      >
+      <AppFieldGroup label="Forecast Source" input-id="forecast-create-source">
         <AppSelect
-          id="forecast-create-start-month"
-          v-model="coverageStartMonthIndex"
-          :options="props.startMonthOptions"
+          id="forecast-create-source"
+          v-model="sourceKind"
+          :options="sourceKindOptions"
+          autofocus
         />
       </AppFieldGroup>
 
-      <AppStatusMessage v-if="props.statusMessage" tone="info">
-        {{ props.statusMessage }}
-      </AppStatusMessage>
-
-      <div v-if="props.existingForecastHref" class="flex justify-end">
-        <AppButton variant="secondary" :href="props.existingForecastHref">Open Existing Forecast</AppButton>
-      </div>
+      <AppFieldGroup label="Plan Year" input-id="forecast-create-year">
+        <AppSelect id="forecast-create-year" v-model="planningYear" :options="planYearOptions" />
+      </AppFieldGroup>
     </div>
 
     <template #footer>

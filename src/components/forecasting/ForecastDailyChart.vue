@@ -168,12 +168,6 @@ const chartOption = computed(() => ({
   dataZoom: shouldShowZoom.value
     ? [
         {
-          type: 'inside',
-          zoomOnMouseWheel: true,
-          moveOnMouseMove: true,
-          moveOnMouseWheel: false
-        },
-        {
           type: 'slider',
           height: 18,
           bottom: 18,

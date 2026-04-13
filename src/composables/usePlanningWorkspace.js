@@ -9,11 +9,10 @@ import {
 } from '../appRoutes'
 import { buildForecastStorageScope } from '../forecastingRepository'
 import {
+  FORECAST_SOURCE_MODELED_DAILY,
   FORECAST_TYPE_BUDGET,
-  FORECAST_TYPE_REFORECAST,
   createForecastCenterSnapshot,
-  createForecastHoliday,
-  getDefaultReforecastStartMonthIndex
+  createForecastHoliday
 } from '../forecasting/shared'
 import {
   HOLIDAY_CALENDAR_NONE,
@@ -180,12 +179,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         adherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent
       },
       forecastStorageScope: buildForecastStorageScope(storageScope.value, currentCenter.value.id, currentGroup.value.id),
-      forecastFallbackScopes,
-      forecastWorkspaceHref: buildPlanningGroupForecastsHash(
-        currentCenter.value.id,
-        currentGroup.value.id,
-        resolvedPlanningYear
-      )
+      forecastFallbackScopes
     }
   })
 
@@ -226,13 +220,12 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         : customHolidays.length
           ? `${customHolidays.length} custom holiday${customHolidays.length === 1 ? '' : 's'}`
           : 'No holiday calendar'
-    const seededForecastType = currentRoute.value.page === 'group-forecasts'
-      ? (currentRoute.value.forecastType || FORECAST_TYPE_BUDGET)
-      : FORECAST_TYPE_BUDGET
-    const seededCoverageStartMonthIndex =
-      currentRoute.value.page === 'group-forecasts' && seededForecastType === FORECAST_TYPE_REFORECAST
-        ? currentRoute.value.coverageStartMonthIndex ?? getDefaultReforecastStartMonthIndex(resolvedPlanningYear)
-        : 0
+    const seededForecastType = FORECAST_TYPE_BUDGET
+    const seededCoverageStartMonthIndex = 0
+    const seededSourceKind =
+      currentRoute.value.page === 'group-forecasts'
+        ? (currentRoute.value.sourceKind || FORECAST_SOURCE_MODELED_DAILY)
+        : FORECAST_SOURCE_MODELED_DAILY
 
     return {
       centerId: currentCenter.value.id,
@@ -240,6 +233,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       groupId: currentGroup.value.id,
       groupName,
       planningYear: resolvedPlanningYear,
+      sourceKind: seededSourceKind,
       forecastType: seededForecastType,
       coverageStartMonthIndex: seededCoverageStartMonthIndex,
       centerManagedHolidays: true,
@@ -268,12 +262,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         customHolidays
       },
       forecastStorageScope: buildForecastStorageScope(storageScope.value, currentCenter.value.id, currentGroup.value.id),
-      fallbackScopes: buildForecastFallbackScopes(currentCenter.value.id, currentGroup.value.id).slice(1),
-      forecastWorkspaceHref: buildPlanningGroupForecastsHash(
-        currentCenter.value.id,
-        currentGroup.value.id,
-        resolvedPlanningYear
-      )
+      fallbackScopes: buildForecastFallbackScopes(currentCenter.value.id, currentGroup.value.id).slice(1)
     }
   })
 

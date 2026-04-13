@@ -78,7 +78,7 @@ class ForecastRunRequest(BaseModel):
     timezone: str = "America/New_York"
     forecastHorizonDays: int = Field(default=365, ge=0, le=730)
     planningYear: int | None = Field(default=None, ge=2000, le=2100)
-    forecastType: Literal["budget", "reforecast"] | None = None
+    forecastType: Literal["budget"] | None = None
     coverageStartDate: str = ""
     coverageEndDate: str = ""
     history: list[ForecastHistoryRow] = Field(min_length=1)
@@ -194,27 +194,18 @@ def _resolve_coverage_window(payload: ForecastRunRequest) -> CoverageWindow:
     if start_date.year != planning_year or end_date.year != planning_year:
         raise ValueError("Forecast coverage must stay inside the selected planning year.")
 
-    if forecast_type == "budget":
-        expected_start = pd.Timestamp(year=planning_year, month=1, day=1)
-        expected_end = pd.Timestamp(year=planning_year, month=12, day=31)
-        if start_date != expected_start or end_date != expected_end:
-            raise ValueError("Budget forecasts must cover January 1 through December 31 of the plan year.")
-    elif forecast_type == "reforecast":
-        expected_end = pd.Timestamp(year=planning_year, month=12, day=31)
-        if start_date.day != 1 or end_date != expected_end:
-            raise ValueError("Reforecasts must start on the first day of a month and end on December 31 of the plan year.")
-    else:
-        raise ValueError("forecastType must be budget or reforecast when using plan-aligned coverage.")
-
-    expected_month_count = (end_date.month - start_date.month) + 1
+    expected_start = pd.Timestamp(year=planning_year, month=1, day=1)
+    expected_end = pd.Timestamp(year=planning_year, month=12, day=31)
+    if start_date != expected_start or end_date != expected_end:
+        raise ValueError("Budget forecasts must cover January 1 through December 31 of the plan year.")
 
     return CoverageWindow(
         planning_year=planning_year,
         forecast_type=forecast_type,
         start_date=start_date,
         end_date=end_date,
-        start_month_index=start_date.month - 1,
-        expected_month_count=expected_month_count,
+        start_month_index=0,
+        expected_month_count=12,
         plan_aligned=True,
     )
 

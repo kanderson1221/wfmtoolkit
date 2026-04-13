@@ -2,7 +2,6 @@ import { computed, nextTick, ref } from 'vue'
 
 import {
   buildPlanningCenterHash,
-  buildPlanningGroupForecastsHash,
   buildPlanningGroupHash,
   buildPlanningHomeHash,
   buildPlanningNewPlanHash,
@@ -155,8 +154,7 @@ describe('usePlanningWorkspace', () => {
         occupancyPercent: 90,
         adherencePercent: 95
       },
-      forecastStorageScope: 'user-1:center:center-1:group:group-1:forecasts',
-      forecastWorkspaceHref: buildPlanningGroupForecastsHash('center-1', 'group-1', 2026)
+      forecastStorageScope: 'user-1:center:center-1:group:group-1:forecasts'
     })
     expect(workspace.forecastSeed.value).toMatchObject({
       centerId: 'center-1',
@@ -179,8 +177,7 @@ describe('usePlanningWorkspace', () => {
         holidayCalendarLabel: '1 custom holiday'
       },
       forecastStorageScope: 'user-1:center:center-1:group:group-1:forecasts',
-      fallbackScopes: ['user-1:center:center-1:forecasts', 'user-1'],
-      forecastWorkspaceHref: buildPlanningGroupForecastsHash('center-1', 'group-1', 2026)
+      fallbackScopes: ['user-1:center:center-1:forecasts', 'user-1']
     })
     expect(workspace.plannerDraftKey.value).toBe('user-1:plan:plan-1')
   })

@@ -65,6 +65,11 @@ const handleOpenProject = (projectId) => {
                 {{ project.name }}
               </h3>
               <span
+                class="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-600"
+              >
+                {{ project.sourceKindLabel }}
+              </span>
+              <span
                 v-if="project.id === props.currentProjectId"
                 class="inline-flex items-center rounded-full border border-[#d5e0ea] bg-[#eef4f8] px-2.5 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[#15395f]"
               >
@@ -72,7 +77,7 @@ const handleOpenProject = (projectId) => {
               </span>
             </div>
             <p class="text-sm leading-6 text-slate-600">
-              {{ project.observationCount }} observations | {{ project.dateRangeLabel }}
+              {{ project.summaryLine }} | {{ project.dateRangeLabel }}
             </p>
             <p class="text-[0.82rem] leading-5 text-slate-500">
               Updated {{ project.updatedAtLabel }} | Last run {{ project.runAtLabel }}

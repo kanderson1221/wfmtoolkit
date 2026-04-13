@@ -3,11 +3,7 @@ import { mount } from '@vue/test-utils'
 import PlanningCenterView from '../planning/PlanningCenterView.vue'
 import { buildForecastStorageScope, forecastingRepository } from '../../forecastingRepository'
 import { buildPlanningGroupForecastsHash, buildPlanningGroupNewForecastHash } from '../../appRoutes'
-import {
-  createForecastProject,
-  createSavedForecastName,
-  getDefaultReforecastStartMonthIndex
-} from '../../forecasting/shared'
+import { createForecastProject } from '../../forecasting/shared'
 import { clearLocalDataStore } from '../../storage/localDataStore'
 
 const AppButtonStub = {
@@ -68,21 +64,19 @@ const AppConfirmDialogStub = {
 const PlanningForecastCreateModalStub = {
   name: 'PlanningForecastCreateModal',
   props: [
+    'sourceKind',
     'planningYear',
-    'forecastType',
-    'coverageStartMonthIndex',
     'yearOptions',
-    'startMonthOptions',
-    'statusMessage',
-    'existingForecastHref',
     'canCreate'
   ],
-  emits: ['cancel', 'create', 'update:planningYear', 'update:forecastType', 'update:coverageStartMonthIndex'],
+  emits: ['cancel', 'create', 'update:sourceKind', 'update:planningYear'],
   template: `
     <div>
-      <p>Create Forecast</p>
+      <p>New Forecast</p>
+      <p>Source: {{ sourceKind || 'empty' }}</p>
+      <button @click="$emit('update:sourceKind', 'imported_daily')">Set Imported Daily</button>
+      <button @click="$emit('update:sourceKind', 'modeled_daily')">Set Modeled Daily</button>
       <button @click="$emit('update:planningYear', 2027)">Set Year</button>
-      <button @click="$emit('update:forecastType', 'budget')">Set Budget</button>
       <button @click="$emit('create')">Create Forecast</button>
     </div>
   `
@@ -228,25 +222,49 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('New Forecast')
   })
 
-  it('opens a create-forecast modal and routes new forecasts through an explicit year and type', async () => {
+  it('opens a create-forecast modal and routes new forecasts through source and year', async () => {
     window.location.hash = '#planning'
 
     const wrapper = buildWrapper()
     const newForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Forecast')
     await newForecastButton.trigger('click')
 
-    expect(wrapper.text()).toContain('Create Forecast')
+    expect(wrapper.text()).toContain('New Forecast')
+    expect(wrapper.text()).toContain('Source: empty')
 
     const setYearButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Year')
-    const setBudgetButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Budget')
     const createForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Create Forecast')
 
+    const setModeledButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Modeled Daily')
+    await setModeledButton.trigger('click')
     await setYearButton.trigger('click')
-    await setBudgetButton.trigger('click')
     await createForecastButton.trigger('click')
 
     expect(window.location.hash).toBe(
       buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'budget' })
+    )
+  })
+
+  it('routes imported daily forecasts through the staffing-group forecast launcher', async () => {
+    window.location.hash = '#planning'
+
+    const wrapper = buildWrapper()
+    const newForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Forecast')
+    await newForecastButton.trigger('click')
+
+    const setImportedButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Imported Daily')
+    const setYearButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Year')
+    const createForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Create Forecast')
+
+    await setImportedButton.trigger('click')
+    await setYearButton.trigger('click')
+    await createForecastButton.trigger('click')
+
+    expect(window.location.hash).toBe(
+      buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, {
+        sourceKind: 'imported_daily',
+        forecastType: 'budget'
+      })
     )
   })
 
@@ -549,7 +567,7 @@ describe('PlanningCenterView', () => {
     await flushPromises()
   })
 
-  it('creates a reforecast from a saved budget forecast in the staffing-group summary menu', async () => {
+  it('does not offer reforecast creation actions in the staffing-group summary list', async () => {
     const forecastScope = buildForecastStorageScope('default', 'center-1', 'group-1')
     const centerFallbackScope = buildForecastStorageScope('default', 'center-1')
     let workspaceProjects = []
@@ -607,17 +625,7 @@ describe('PlanningCenterView', () => {
     await flushPromises()
     await flushPromises()
 
-    const reforecastButtons = wrapper.findAll('button').filter((node) => node.text().trim() === 'New Reforecast')
-    await reforecastButtons[reforecastButtons.length - 1].trigger('click')
-    await flushPromises()
-    await flushPromises()
-    await flushPromises()
-
-    const expectedStartMonthIndex = getDefaultReforecastStartMonthIndex(2026)
-    expect(workspaceProjects).toHaveLength(1)
-    expect(workspaceProjects[0].forecastType).toBe('reforecast')
-    expect(workspaceProjects[0].coverageStartMonthIndex).toBe(expectedStartMonthIndex)
-    expect(workspaceProjects[0].name).toBe(createSavedForecastName([], workspaceProjects[0]))
-    expect(wrapper.text()).toContain('Reforecast (Apr)')
+    expect(wrapper.text()).not.toContain('New Reforecast')
+    expect(workspaceProjects).toHaveLength(0)
   })
 })

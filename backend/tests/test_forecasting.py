@@ -291,40 +291,18 @@ class ForecastingTests(unittest.TestCase):
         self.assertEqual(result["monthlyRollup"][0]["monthStart"], "2025-01-01")
         self.assertEqual(result["monthlyRollup"][-1]["monthStart"], "2025-12-01")
 
-    @patch("backend.app.forecasting.Prophet", FakeProphet)
-    def test_reforecast_blends_start_month_actuals_with_forecast_remainder(self) -> None:
-        base_payload = self._payload()
-        august_history = []
-
-        for index, row in enumerate(base_payload.history):
-            row_snapshot = row.model_dump()
-            row_snapshot["ds"] = f"2025-08-{index + 1:02d}"
-            august_history.append(row_snapshot)
-
+    def test_plan_aligned_budget_forecast_requires_full_year_window(self) -> None:
         payload = self._payload(
-            history=august_history,
             planningYear=2025,
-            forecastType="reforecast",
+            forecastType="budget",
             coverageStartDate="2025-08-01",
             coverageEndDate="2025-12-31",
-            modelConfig={**base_payload.modelConfig.model_dump(), "growth": "linear", "holdoutDays": 0},
         )
 
-        result = run_daily_volume_forecast(payload)
-        august_contacts = next(
-            month["contacts"]
-            for month in result["monthlyRollup"]
-            if month["monthStart"] == "2025-08-01"
-        )
-        actual_august_total = sum(row["y"] for row in august_history)
-        forecast_august_remainder = sum(100 + index for index in range(14, 31))
+        with self.assertRaises(ValueError) as raised:
+            run_daily_volume_forecast(payload)
 
-        self.assertEqual(result["summary"]["forecastType"], "reforecast")
-        self.assertTrue(result["summary"]["planningReady"])
-        self.assertEqual(result["summary"]["coverageStartMonthIndex"], 7)
-        self.assertEqual(len(result["monthlyRollup"]), 5)
-        self.assertEqual(result["monthlyRollup"][0]["monthStart"], "2025-08-01")
-        self.assertEqual(august_contacts, actual_august_total + forecast_august_remainder)
+        self.assertIn("Budget forecasts must cover January 1 through December 31", str(raised.exception))
 
     @patch("backend.app.forecasting.Prophet", BrokenProphet)
     def test_forecast_run_surfaces_backend_initialization_errors(self) -> None:

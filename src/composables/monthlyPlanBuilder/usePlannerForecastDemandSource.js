@@ -3,12 +3,18 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { buildForecastStorageScope, forecastingRepository } from '../../forecastingRepository'
 import {
   computeForecastPlanningReady,
+  createForecastEntityId,
+  createForecastProject,
+  createSavedForecastName,
+  FORECAST_SOURCE_MANUAL_MONTHLY,
+  getForecastProjectSourceKind,
+  getForecastSourceKindLabel,
   forecastProjectBelongsToPlanningContext,
   formatDateTime,
   getForecastPlanningYear,
-  getForecastTypeLabel,
   mergeForecastProjectCollections
 } from '../../forecasting/shared'
+import { createManualMonthlyForecastResults } from '../../forecasting/sourceArtifacts'
 import {
   DEMAND_SOURCE_FORECAST,
   DEMAND_SOURCE_MANUAL,
@@ -46,6 +52,13 @@ export const usePlannerForecastDemandSource = ({
     )]
   })
 
+  const isPlanAssignableForecast = (project) => (
+    Array.isArray(project?.lastRun?.monthlyRollup) &&
+    project.lastRun.monthlyRollup.length &&
+    getForecastPlanningYear(project) === planningYear.value &&
+    computeForecastPlanningReady(project)
+  )
+
   const loadForecastProjects = async () => {
     forecastsLoading.value = true
     forecastsError.value = ''
@@ -77,31 +90,20 @@ export const usePlannerForecastDemandSource = ({
 
     forecastsLoading.value = false
 
+    const assignableForecasts = availableForecastProjects.value.filter((project) =>
+      isPlanAssignableForecast(project)
+    )
+
     if (
       !selectedForecastProjectId.value &&
-      availableForecastProjects.value.filter((project) => Array.isArray(project?.lastRun?.monthlyRollup) && project.lastRun.monthlyRollup.length).length === 1
+      assignableForecasts.length === 1
     ) {
-      selectedForecastProjectId.value = availableForecastProjects.value.find(
-        (project) => Array.isArray(project?.lastRun?.monthlyRollup) && project.lastRun.monthlyRollup.length
-      )?.id || ''
+      selectedForecastProjectId.value = assignableForecasts[0]?.id || ''
     }
   }
 
-  const setDemandSourceMode = (mode) => {
-    demandSource.value = createPlanDemandSource({
-      ...demandSource.value,
-      mode: mode === DEMAND_SOURCE_FORECAST ? DEMAND_SOURCE_FORECAST : DEMAND_SOURCE_MANUAL
-    })
-  }
-
   const forecastProjectsWithResults = computed(() =>
-    availableForecastProjects.value.filter(
-      (project) =>
-        Array.isArray(project?.lastRun?.monthlyRollup) &&
-        project.lastRun.monthlyRollup.length &&
-        getForecastPlanningYear(project) === planningYear.value &&
-        computeForecastPlanningReady(project)
-    )
+    availableForecastProjects.value.filter((project) => isPlanAssignableForecast(project))
   )
 
   const savedForecastProjectCount = computed(() => availableForecastProjects.value.length)
@@ -110,8 +112,8 @@ export const usePlannerForecastDemandSource = ({
     { label: 'Select a saved forecast', value: '' },
     ...forecastProjectsWithResults.value.map((project) => ({
       label: project.lastRun?.runAt
-        ? `${project.name} · ${getForecastTypeLabel(project.forecastType)} · ${formatDateTime(project.lastRun.runAt)}`
-        : project.name,
+        ? `${project.name} · ${getForecastSourceKindLabel(project.sourceKind)} · ${formatDateTime(project.lastRun.runAt)}`
+        : `${project.name} · ${getForecastSourceKindLabel(project.sourceKind)}`,
       value: project.id
     }))
   ])
@@ -119,6 +121,35 @@ export const usePlannerForecastDemandSource = ({
   const selectedForecastProject = computed(() =>
     forecastProjectsWithResults.value.find((project) => project.id === selectedForecastProjectId.value) || null
   )
+
+  watch(
+    forecastProjectsWithResults,
+    (projects) => {
+      if (!selectedForecastProjectId.value) {
+        return
+      }
+
+      if (!projects.some((project) => project.id === selectedForecastProjectId.value)) {
+        selectedForecastProjectId.value = ''
+      }
+    },
+    { immediate: true }
+  )
+
+  const appliedForecastProjectMissing = computed(() => {
+    if (demandSource.value.mode !== DEMAND_SOURCE_FORECAST) {
+      return false
+    }
+
+    const appliedForecastId = String(demandSource.value.forecastProjectId || '').trim()
+    if (!appliedForecastId || !demandSource.value.forecastMonthSnapshot.length) {
+      return false
+    }
+
+    return !availableForecastProjects.value.some(
+      (project) => String(project?.id || '').trim() === appliedForecastId
+    )
+  })
 
   const selectedForecastSnapshot = computed(() =>
     selectedForecastProject.value
@@ -132,6 +163,8 @@ export const usePlannerForecastDemandSource = ({
 
       return {
         projectName: selectedForecastProject.value.name,
+        sourceKind: getForecastProjectSourceKind(selectedForecastProject.value),
+        sourceKindLabel: getForecastSourceKindLabel(selectedForecastProject.value.sourceKind),
         forecastType: selectedForecastProject.value.forecastType || '',
         runAt: selectedForecastProject.value.lastRun?.runAt || '',
         importedAt: demandSource.value.importedAt || '',
@@ -153,12 +186,15 @@ export const usePlannerForecastDemandSource = ({
 
       return {
         projectName: demandSource.value.forecastProjectName || 'Saved Forecast',
+        sourceKind: demandSource.value.forecastSourceKind || '',
+        sourceKindLabel: getForecastSourceKindLabel(demandSource.value.forecastSourceKind),
         forecastType: demandSource.value.forecastType || '',
         runAt: demandSource.value.forecastRunAt || '',
         importedAt: demandSource.value.importedAt || '',
         forecastDateRange: '',
         coverageStartMonthIndex: demandSource.value.coverageStartMonthIndex ?? null,
         coverageWindowLabel: '',
+        sourceMissing: appliedForecastProjectMissing.value,
         ...snapshotSummary
       }
     }
@@ -175,11 +211,14 @@ export const usePlannerForecastDemandSource = ({
       return
     }
 
-    planMonths.value = applyForecastSnapshotToPlanMonths(planMonths.value, selectedForecastSnapshot.value)
+    planMonths.value = applyForecastSnapshotToPlanMonths(planMonths.value, selectedForecastSnapshot.value, {
+      sourceKind: getForecastProjectSourceKind(selectedForecastProject.value)
+    })
     demandSource.value = createPlanDemandSource({
       mode: DEMAND_SOURCE_FORECAST,
       forecastProjectId: selectedForecastProject.value.id,
       forecastProjectName: selectedForecastProject.value.name,
+      forecastSourceKind: getForecastProjectSourceKind(selectedForecastProject.value),
       forecastType: selectedForecastProject.value.forecastType || '',
       forecastRunAt: selectedForecastProject.value.lastRun?.runAt || '',
       importedAt: new Date().toISOString(),
@@ -187,6 +226,95 @@ export const usePlannerForecastDemandSource = ({
       coverageStartMonthIndex: selectedForecastProject.value.coverageStartMonthIndex ?? null,
       forecastMonthSnapshot: selectedForecastSnapshot.value
     })
+  }
+
+  const hasLegacyManualDemandSource = computed(() =>
+    Boolean(props.initialPlan?.id) && demandSource.value.mode !== DEMAND_SOURCE_FORECAST
+  )
+
+  const legacyManualSummary = computed(() => {
+    if (!hasLegacyManualDemandSource.value) {
+      return null
+    }
+
+    const totalContacts = (Array.isArray(planMonths.value) ? planMonths.value : [])
+      .reduce((sum, month) => sum + Number(month?.contacts || 0), 0)
+
+    return {
+      totalContacts,
+      monthCount: (Array.isArray(planMonths.value) ? planMonths.value : []).length
+    }
+  })
+
+  const convertLegacyManualDemandSource = async () => {
+    if (!hasLegacyManualDemandSource.value) {
+      return false
+    }
+
+    const workspaceProjects = await forecastingRepository.loadWorkspace(forecastStorageScope.value)
+    const planningContext = {
+      centerId: props.centerDefaults?.centerId || '',
+      groupId: props.centerDefaults?.groupId || '',
+      planningYear: planningYear.value,
+      groupName: props.centerDefaults?.groupName || '',
+      centerName: props.centerDefaults?.centerName || ''
+    }
+    const sourceRows = (Array.isArray(planMonths.value) ? planMonths.value : []).map((month, monthIndex) => ({
+      monthIndex,
+      monthStart: `${planningYear.value}-${String(monthIndex + 1).padStart(2, '0')}-01`,
+      monthLabel: new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(
+        new Date(planningYear.value, monthIndex, 1)
+      ),
+      contacts: Number(month?.contacts || 0)
+    }))
+    const baseProject = createForecastProject({
+      id: createForecastEntityId('forecast-project'),
+      centerId: props.centerDefaults?.centerId || '',
+      centerName: props.centerDefaults?.centerName || '',
+      groupId: props.centerDefaults?.groupId || '',
+      groupName: props.centerDefaults?.groupName || '',
+      planningYear: planningYear.value,
+      planningContext,
+      sourceKind: FORECAST_SOURCE_MANUAL_MONTHLY,
+      sourceData: {
+        fileName: '',
+        headers: [],
+        rows: sourceRows,
+        mapping: {},
+        issues: []
+      },
+      lastRun: createManualMonthlyForecastResults({
+        rows: sourceRows,
+        planningYear: planningYear.value,
+        forecastType: '',
+        coverageStartMonthIndex: 0
+      })
+    })
+    const projectToSave = {
+      ...baseProject,
+      name: createSavedForecastName(workspaceProjects, baseProject)
+    }
+    const nextProjects = forecastingRepository.saveProject(workspaceProjects, projectToSave)
+    await forecastingRepository.persistWorkspace(nextProjects, forecastStorageScope.value)
+    await loadForecastProjects()
+
+    const savedProject = nextProjects.find((project) => project.id === projectToSave.id) || projectToSave
+    const savedSnapshot = buildForecastDemandSnapshot(savedProject, planningYear.value)
+
+    demandSource.value = createPlanDemandSource({
+      mode: DEMAND_SOURCE_FORECAST,
+      forecastProjectId: savedProject.id,
+      forecastProjectName: savedProject.name,
+      forecastSourceKind: FORECAST_SOURCE_MANUAL_MONTHLY,
+      forecastType: savedProject.forecastType || '',
+      forecastRunAt: savedProject.lastRun?.runAt || '',
+      importedAt: new Date().toISOString(),
+      importedPlanningYear: planningYear.value,
+      coverageStartMonthIndex: savedProject.coverageStartMonthIndex ?? 0,
+      forecastMonthSnapshot: savedSnapshot
+    })
+    selectedForecastProjectId.value = savedProject.id
+    return true
   }
 
   watch(
@@ -224,6 +352,25 @@ export const usePlannerForecastDemandSource = ({
     }
   )
 
+  watch(
+    [forecastProjectsWithResults, selectedForecastProjectId],
+    ([projects, selectedForecastId]) => {
+      const normalizedSelectedForecastId = String(selectedForecastId || '').trim()
+
+      if (!normalizedSelectedForecastId) {
+        return
+      }
+
+      const stillAvailable = projects.some(
+        (project) => String(project?.id || '').trim() === normalizedSelectedForecastId
+      )
+
+      if (!stillAvailable) {
+        selectedForecastProjectId.value = ''
+      }
+    }
+  )
+
   return {
     availableForecastProjects,
     savedForecastProjectCount,
@@ -234,8 +381,10 @@ export const usePlannerForecastDemandSource = ({
     selectedForecastPreviewSummary,
     demandSourceSummary,
     forecastCanApply,
-    setDemandSourceMode,
     applyForecastToDemand,
+    convertLegacyManualDemandSource,
+    hasLegacyManualDemandSource,
+    legacyManualSummary,
     reloadForecastProjects: loadForecastProjects
   }
 }

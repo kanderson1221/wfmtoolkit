@@ -7,6 +7,7 @@ export const defaultRoute = {
   planId: null,
   year: null,
   forecastId: null,
+  sourceKind: null,
   forecastType: null,
   coverageStartMonthIndex: null
 }
@@ -73,16 +74,13 @@ export const buildPlanningGroupNewForecastHash = (
     return buildPlanningGroupForecastsHash(centerId, groupId)
   }
 
-  const normalizedForecastType = String(options.forecastType || '').trim().toLowerCase()
-  const normalizedStartMonthIndex = Number(options.coverageStartMonthIndex)
+  const normalizedSourceKind = String(options.sourceKind || '').trim().toLowerCase()
+  const sourceSegment =
+    normalizedSourceKind && normalizedSourceKind !== 'modeled_daily'
+      ? `/source/${encodeURIComponent(normalizedSourceKind)}`
+      : ''
 
-  if (normalizedForecastType === 'reforecast') {
-    return Number.isInteger(normalizedStartMonthIndex) && normalizedStartMonthIndex >= 0 && normalizedStartMonthIndex <= 11
-      ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new/type/reforecast/month/${normalizedStartMonthIndex}`
-      : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new/type/reforecast`
-  }
-
-  return `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new/type/budget`
+  return `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new${sourceSegment}/type/budget`
 }
 
 export const buildPlanningGroupHash = (centerId, groupId, year = null) => {
@@ -225,49 +223,34 @@ export const parseHashRoute = (hash) => {
       parts[5] === 'forecasts' &&
       parts[6] === 'year' &&
       parts[7] &&
-      parts[8] === 'new' &&
-      parts[9] === 'type' &&
-      parts[10] === 'reforecast' &&
-      parts[11] === 'month' &&
-      parts[12]
+      parts[8] === 'new'
     ) {
-      return {
-        app: 'planning',
-        page: 'group-forecasts',
-        tool: null,
-        centerId: parts[2],
-        groupId: parts[4],
-        planId: null,
-        year: Number(parts[7]) || null,
-        forecastId: null,
-        forecastType: 'reforecast',
-        coverageStartMonthIndex: Number(parts[12])
-      }
-    }
+      const year = Number(parts[7]) || null
+      let cursor = 9
+      let sourceKind = null
 
-    if (
-      parts[1] === 'center' &&
-      parts[2] &&
-      parts[3] === 'group' &&
-      parts[4] &&
-      parts[5] === 'forecasts' &&
-      parts[6] === 'year' &&
-      parts[7] &&
-      parts[8] === 'new' &&
-      parts[9] === 'type' &&
-      parts[10] === 'reforecast'
-    ) {
-      return {
-        app: 'planning',
-        page: 'group-forecasts',
-        tool: null,
-        centerId: parts[2],
-        groupId: parts[4],
-        planId: null,
-        year: Number(parts[7]) || null,
-        forecastId: null,
-        forecastType: 'reforecast',
-        coverageStartMonthIndex: null
+      if (parts[cursor] === 'source' && parts[cursor + 1]) {
+        sourceKind = decodeURIComponent(parts[cursor + 1])
+        cursor += 2
+      }
+
+      if (parts[cursor] === 'type' && parts[cursor + 1]) {
+        const forecastType = String(parts[cursor + 1] || '').trim().toLowerCase()
+        if (forecastType === 'budget') {
+          return {
+            app: 'planning',
+            page: 'group-forecasts',
+            tool: null,
+            centerId: parts[2],
+            groupId: parts[4],
+            planId: null,
+            year,
+            forecastId: null,
+            sourceKind,
+            forecastType: 'budget',
+            coverageStartMonthIndex: 0
+          }
+        }
       }
     }
 
@@ -317,6 +300,7 @@ export const parseHashRoute = (hash) => {
         planId: null,
         year: Number(parts[7]) || null,
         forecastId: decodeURIComponent(parts[9]),
+        sourceKind: null,
         forecastType: null,
         coverageStartMonthIndex: null
       }
@@ -332,6 +316,7 @@ export const parseHashRoute = (hash) => {
         planId: null,
         year: Number(parts[7]) || null,
         forecastId: null,
+        sourceKind: null,
         forecastType: null,
         coverageStartMonthIndex: null
       }

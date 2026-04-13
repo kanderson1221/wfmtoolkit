@@ -3,16 +3,17 @@ import { computed, ref, watch } from 'vue'
 import { buildForecastStorageScope, forecastingRepository } from '../../forecastingRepository'
 import { DEMAND_SOURCE_FORECAST } from '../../planner/demandSources'
 import {
-  clonePlain,
   computeForecastPlanningReady,
-  FORECAST_TYPE_REFORECAST,
-  createSavedForecastName,
+  FORECAST_SOURCE_IMPORTED_DAILY,
+  FORECAST_SOURCE_MANUAL_MONTHLY,
+  FORECAST_SOURCE_MODELED_DAILY,
   forecastProjectBelongsToPlanningContext,
   formatDate,
   formatDateTime,
-  getDefaultReforecastStartMonthIndex,
   getForecastPlanningYear,
   getForecastProjectMonthlyRollup,
+  getForecastProjectSourceKind,
+  getForecastSourceKindLabel,
   getForecastTypeLabel,
   parseForecastDateValue,
   resolveForecastCoverageWindow,
@@ -23,8 +24,6 @@ const formatWhole = (value) =>
   new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 0
   }).format(value || 0)
-
-const MONTH_SHORT_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const buildForecastUsageSummary = (plans = [], forecastId = '') => {
   const matchingPlans = (Array.isArray(plans) ? plans : []).filter((plan) =>
@@ -211,76 +210,12 @@ export function usePlanningCenterForecastLibrary({
     }
   }
 
-  const saveForecastCopy = async (forecast, overrides = {}, errorMessage = 'Unable to save this forecast on this device.') => {
-    const sourceForecast = savedForecasts.value.find((project) => project?.id === forecast?.id) || forecast
-    const targetScope = String(forecastWorkspaceScopes.value[0] || sourceForecast?.storageScope || '').trim()
-    const forecastId = String(sourceForecast?.id || '').trim()
-
-    if (!targetScope || !forecastId) {
-      forecastsError.value = errorMessage
-      return
-    }
-
-    forecastsLoading.value = true
-
-    try {
-      const targetWorkspaceProjects = await forecastingRepository.loadWorkspace(targetScope)
-      const duplicateSeed = {
-        ...clonePlain(sourceForecast),
-        ...clonePlain(overrides || {}),
-        id: '',
-        name: createSavedForecastName(targetWorkspaceProjects, {
-          ...sourceForecast,
-          ...overrides
-        }),
-        createdAt: '',
-        updatedAt: '',
-        lastRun: {},
-        planningReady: false
-      }
-      const nextProjects = forecastingRepository.saveProject(targetWorkspaceProjects, duplicateSeed)
-      await forecastingRepository.persistWorkspace(nextProjects, targetScope)
-      forecastsError.value = ''
-      await loadSelectedGroupForecasts()
-    } catch (error) {
-      console.error(errorMessage, error)
-      forecastsError.value = errorMessage
-    } finally {
-      forecastsLoading.value = false
-    }
-  }
-
-  const createReforecastFromBudget = async (forecast) => {
-    const sourceForecast = savedForecasts.value.find((project) => project?.id === forecast?.id) || forecast
-    const planningYear = getForecastPlanningYear(sourceForecast)
-    const coverageStartMonthIndex = getDefaultReforecastStartMonthIndex(planningYear)
-
-    await saveForecastCopy(
-      forecast,
-      {
-        forecastType: FORECAST_TYPE_REFORECAST,
-        coverageStartMonthIndex
-      },
-      'Unable to create a reforecast on this device.'
-    )
-  }
-
-  const duplicateForecast = async (forecast) => {
-    await saveForecastCopy(
-      forecast,
-      {
-        forecastType: resolveForecastType(forecast?.forecastType, forecast),
-        coverageStartMonthIndex: forecast?.coverageStartMonthIndex
-      },
-      'Unable to duplicate this forecast on this device.'
-    )
-  }
-
   const forecastRows = computed(() =>
     savedForecasts.value.map((forecast) => {
       const forecastId = String(forecast?.id || '').trim()
       const historyRows = Array.isArray(forecast.historyRows) ? forecast.historyRows : []
       const monthlyRollup = getForecastProjectMonthlyRollup(forecast)
+      const sourceKind = getForecastProjectSourceKind(forecast)
       const forecastType = resolveForecastType(forecast.forecastType, forecast)
       const planningYear = getForecastPlanningYear(forecast)
       const coverageWindow = resolveForecastCoverageWindow({
@@ -292,14 +227,15 @@ export function usePlanningCenterForecastLibrary({
         forecast.lastRun?.summary?.projectedTotalContacts ??
           monthlyRollup.reduce((sum, row) => sum + Number(row?.contacts || 0), 0)
       ) || 0
-      const historyRangeLabel = historyRows.length
-        ? `${formatDate(historyRows[0].ds)} to ${formatDate(historyRows[historyRows.length - 1].ds)}`
-        : 'No history loaded'
-      const displayName = forecastType === FORECAST_TYPE_REFORECAST
-        ? `Reforecast (${MONTH_SHORT_LABELS[coverageWindow.coverageStartMonthIndex] || 'Jan'})`
-        : forecastType
-          ? 'Budget Forecast'
-          : forecast.name
+      const importedDailyRowCount = Array.isArray(forecast.lastRun?.dailyForecast) ? forecast.lastRun.dailyForecast.length : 0
+      const historyRangeLabel = sourceKind === FORECAST_SOURCE_MODELED_DAILY
+        ? historyRows.length
+          ? `${formatDate(historyRows[0].ds)} to ${formatDate(historyRows[historyRows.length - 1].ds)}`
+          : 'No history loaded'
+        : ''
+      const displayName = forecastType
+        ? 'Budget Forecast'
+        : forecast.name
       const usageSummary = buildForecastUsageSummary(selectedGroup.value?.plans, forecastId)
 
       return {
@@ -314,11 +250,17 @@ export function usePlanningCenterForecastLibrary({
         planningYearLabel: Number(planningYear) > 0
           ? String(planningYear)
           : '',
+        sourceKind,
+        sourceKindLabel: getForecastSourceKindLabel(sourceKind),
         forecastType,
         forecastTypeLabel: getForecastTypeLabel(forecastType),
         coverageWindowLabel: coverageWindow.coverageMonthLabel || 'Legacy coverage',
         historyRangeLabel,
-        observationCountLabel: formatWhole(historyRows.length),
+        observationCountLabel: sourceKind === FORECAST_SOURCE_IMPORTED_DAILY
+          ? `${formatWhole((forecast.lastRun?.dailyForecast || []).length)} rows`
+          : sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY
+            ? `${formatWhole(monthlyRollup.length)} months`
+            : formatWhole(historyRows.length),
         monthlyCoverageLabel: monthlyRollup.length
           ? `${monthlyRollup.length}/${coverageWindow.expectedMonthCount || monthlyRollup.length} months`
           : 'Not run yet',
@@ -348,8 +290,6 @@ export function usePlanningCenterForecastLibrary({
   )
 
   return {
-    createReforecastFromBudget,
-    duplicateForecast,
     deleteForecast,
     forecastRows,
     forecastStatusTone,

@@ -7,6 +7,10 @@ import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
 import { DEMAND_SOURCE_FORECAST } from '../../planner/demandSources'
+import {
+  FORECAST_SOURCE_IMPORTED_DAILY,
+  FORECAST_SOURCE_MANUAL_MONTHLY
+} from '../../forecasting/shared'
 
 const props = defineProps({
   monthlyRecords: {
@@ -92,7 +96,21 @@ const summaryItems = computed(() => [
 
 const contactsSourceMessage = computed(() => {
   if (props.demandSource?.mode === DEMAND_SOURCE_FORECAST && props.currentDemandSourceSummary?.projectName) {
-    return `Monthly contacts come from ${props.currentDemandSourceSummary.projectName}. Manage contact volume in Forecast.`
+    if (props.currentDemandSourceSummary.sourceMissing) {
+      return `Monthly contacts came from ${props.currentDemandSourceSummary.projectName}, which has been deleted. Current contact volume remains in this plan until you apply a different forecast.`
+    }
+
+    const sourceKind = String(
+      props.currentDemandSourceSummary.sourceKind ||
+      props.demandSource?.forecastSourceKind ||
+      ''
+    ).trim()
+
+    if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY || sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
+      return `Monthly contacts come from ${props.currentDemandSourceSummary.projectName}. Replace that saved forecast in Staffing Group Forecasts to change contact volume.`
+    }
+
+    return `Monthly contacts come from ${props.currentDemandSourceSummary.projectName}. Update contact volume in Staffing Group Forecasts.`
   }
 
   return 'Monthly contacts are managed in Forecast. Update contact volume there, then review workload and staffing outputs here.'

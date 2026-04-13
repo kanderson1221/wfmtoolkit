@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 
 import {
-  FORECAST_TYPE_REFORECAST,
+  canForecastProjectRun,
   FORECAST_HORIZON_PRESETS,
   createEmptyForecastResults,
   createForecastHoliday,
@@ -9,7 +9,10 @@ import {
   formatDate,
   formatDateTime,
   formatWhole,
-  getDefaultReforecastStartMonthIndex,
+  getForecastProjectResultTabs,
+  getForecastProjectSourceKind,
+  getForecastProjectMonthlyRollup,
+  getForecastSourceKindLabel,
   getForecastPlanningYear,
   getForecastTypeLabel,
   isPlanAlignedForecast,
@@ -67,6 +70,45 @@ const HORIZON_PRESET_VALUES = Object.fromEntries(
 )
 const DAY_IN_MS = 1000 * 60 * 60 * 24
 const MAX_SUPPORTED_FORECAST_HORIZON_DAYS = 730
+
+const buildProjectSummarySnapshot = (project = {}) => {
+  const sourceKind = getForecastProjectSourceKind(project)
+  const dailyForecast = Array.isArray(project?.lastRun?.dailyForecast) ? project.lastRun.dailyForecast : []
+  const monthlyRollup = getForecastProjectMonthlyRollup(project)
+  const historyRows = Array.isArray(project?.historyRows) ? project.historyRows : []
+  const firstHistoryRow = historyRows[0]
+  const lastHistoryRow = historyRows[historyRows.length - 1]
+  const firstDailyRow = dailyForecast[0]
+  const lastDailyRow = dailyForecast[dailyForecast.length - 1]
+
+  if (sourceKind === 'imported_daily') {
+    return {
+      observationCountLabel: `${formatWhole(dailyForecast.length)} daily rows`,
+      dateRangeLabel: dailyForecast.length
+        ? `${formatDate(firstDailyRow?.ds)} to ${formatDate(lastDailyRow?.ds)}`
+        : 'No forecast imported',
+      descriptionLabel: 'Imported daily forecast'
+    }
+  }
+
+  if (sourceKind === 'manual_monthly') {
+    return {
+      observationCountLabel: `${formatWhole(monthlyRollup.length)} monthly values`,
+      dateRangeLabel: monthlyRollup.length
+        ? `${monthlyRollup[0]?.monthLabel || ''} to ${monthlyRollup.at(-1)?.monthLabel || ''}`
+        : 'No monthly forecast entered',
+      descriptionLabel: 'Monthly forecast'
+    }
+  }
+
+  return {
+    observationCountLabel: `${formatWhole(historyRows.length)} observations`,
+    dateRangeLabel: historyRows.length
+      ? `${formatDate(firstHistoryRow?.ds)} to ${formatDate(lastHistoryRow?.ds)}`
+      : 'No history loaded',
+    descriptionLabel: 'Modeled forecast'
+  }
+}
 
 const getPlanAlignedHorizonValidationMessage = (project) => {
   if (!isPlanAlignedForecast(project) || !Array.isArray(project?.historyRows) || !project.historyRows.length) {
@@ -210,6 +252,11 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     saveStatusMessage.value = ''
     saveError.value = ''
 
+    if (!canForecastProjectRun(currentProject.value)) {
+      runError.value = 'Only modeled forecasts can be rerun.'
+      return false
+    }
+
     if (validationMessages.value.length > 0) {
       runError.value = validationMessages.value[0]
       return false
@@ -264,30 +311,28 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
   const lastRunAvailable = computed(() => Boolean(currentProject.value.lastRun?.runAt))
 
   const historySummary = computed(() => {
-    const historyRows = Array.isArray(currentProject.value.historyRows) ? currentProject.value.historyRows : []
-    const firstRow = historyRows[0]
-    const lastRow = historyRows[historyRows.length - 1]
+    const summary = buildProjectSummarySnapshot(currentProject.value)
 
     return {
-      observationCount: historyRows.length,
-      dateRangeLabel: historyRows.length ? `${formatDate(firstRow.ds)} to ${formatDate(lastRow.ds)}` : 'No history loaded',
-      historyStartDate: firstRow?.ds || '',
-      historyEndDate: lastRow?.ds || ''
+      observationCount: summary.observationCountLabel,
+      dateRangeLabel: summary.dateRangeLabel,
+      descriptionLabel: summary.descriptionLabel
     }
   })
 
   const projectSummaries = computed(() =>
     savedProjects.value.map((project) => {
-      const historyRows = Array.isArray(project.historyRows) ? project.historyRows : []
+      const summary = buildProjectSummarySnapshot(project)
 
       return {
         id: project.id,
         name: project.name,
+        sourceKind: getForecastProjectSourceKind(project),
+        sourceKindLabel: getForecastSourceKindLabel(project.sourceKind),
         seriesLabel: project.seriesLabel,
-        observationCount: historyRows.length,
-        dateRangeLabel: historyRows.length
-          ? `${formatDate(historyRows[0].ds)} to ${formatDate(historyRows[historyRows.length - 1].ds)}`
-          : 'No history loaded',
+        observationCountLabel: summary.observationCountLabel,
+        dateRangeLabel: summary.dateRangeLabel,
+        summaryLine: `${getForecastSourceKindLabel(project.sourceKind)} • ${summary.observationCountLabel}`,
         updatedAtLabel: formatDateTime(project.updatedAt),
         runAtLabel: project.lastRun?.runAt ? formatDateTime(project.lastRun.runAt) : 'Not run yet'
       }
@@ -295,6 +340,10 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
   )
 
   const validationMessages = computed(() => {
+    if (!canForecastProjectRun(currentProject.value)) {
+      return []
+    }
+
     const messages = [
       ...currentProject.value.parserIssues,
       ...currentProject.value.normalizationIssues
@@ -344,9 +393,11 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
 
   const currentProjectMeta = computed(() => ({
     name: currentProject.value.name,
+    sourceKind: getForecastProjectSourceKind(currentProject.value),
+    sourceKindLabel: getForecastSourceKindLabel(currentProject.value.sourceKind),
     seriesLabel: currentProject.value.seriesLabel,
     uploadedFileName: currentProject.value.uploadedFileName,
-    observationCountLabel: formatWhole(historySummary.value.observationCount),
+    observationCountLabel: historySummary.value.observationCount,
     historyRangeLabel: historySummary.value.dateRangeLabel,
     lastSavedAtLabel: currentProject.value.updatedAt ? formatDateTime(currentProject.value.updatedAt) : 'Not saved yet'
   }))
@@ -372,6 +423,17 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
   )
 
   watch(
+    () => [currentProject.value.sourceKind, activeResultTab.value],
+    () => {
+      const availableTabs = getForecastProjectResultTabs(currentProject.value)
+      if (!availableTabs.some((tab) => tab.id === activeResultTab.value)) {
+        activeResultTab.value = availableTabs[0]?.id || 'daily'
+      }
+    },
+    { immediate: true }
+  )
+
+  watch(
     () => [
       currentProject.value.planningYear,
       currentProject.value.forecastType,
@@ -389,13 +451,6 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       if (currentProject.value.forecastType !== resolvedForecastType) {
         currentProject.value.forecastType = resolvedForecastType
         return
-      }
-
-      if (
-        resolvedForecastType === FORECAST_TYPE_REFORECAST &&
-        (currentProject.value.coverageStartMonthIndex == null || currentProject.value.coverageStartMonthIndex === '')
-      ) {
-        currentProject.value.coverageStartMonthIndex = getDefaultReforecastStartMonthIndex(resolvedPlanningYear)
       }
 
       const coverageWindow = resolveForecastCoverageWindow({

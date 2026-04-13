@@ -114,6 +114,7 @@ const sampleForecasts = [
   {
     id: 'forecast-1',
     name: 'Consumer Voice 2026 Forecast',
+    sourceKind: 'imported_daily',
     centerId: 'center-1',
     planningContext: {
       centerId: 'center-1',
@@ -126,6 +127,20 @@ const sampleForecasts = [
       { ds: '2025-01-01', y: 100 },
       { ds: '2025-01-02', y: 120 }
     ],
+    sourceData: {
+      fileName: 'imported-forecast.csv',
+      headers: ['date', 'forecast'],
+      rows: [
+        { rowIndex: 2, date: '2026-01-01', forecast: '110' }
+      ],
+      mapping: {
+        dateColumn: 'date',
+        forecastColumn: 'forecast',
+        lowerColumn: '',
+        upperColumn: ''
+      },
+      issues: []
+    },
     manualAdjustments: [
       { startDate: '2026-01-01', endDate: '2026-01-03', adjustmentType: 'delta', value: 25, reason: 'Promo spike' }
     ],
@@ -217,6 +232,8 @@ describe('localDataStore', () => {
     const loadedDraft = await loadPlannerDraftFromDexie('user-1:plan:plan-1')
 
     expect(loadedCenters[0].groups[0].plans[0].planningYear).toBe(2026)
+    expect(loadedForecasts[0].sourceKind).toBe('imported_daily')
+    expect(loadedForecasts[0].sourceData.fileName).toBe('imported-forecast.csv')
     expect(loadedForecasts[0].lastRun.monthlyRollup[0].contacts).toBe(3400)
     expect(loadedForecasts[0].lastRun.components.monthly[0].value).toBe(5.7)
     expect(loadedForecasts[0].manualAdjustments[0]).toMatchObject({
@@ -253,6 +270,7 @@ describe('localDataStore', () => {
     expect(migrationResult.migrated).toBe(true)
     expect(loadedCenters).toHaveLength(1)
     expect(loadedForecasts).toHaveLength(1)
+    expect(loadedForecasts[0].sourceKind).toBe('imported_daily')
     expect(loadedForecasts[0].lastRun.components.monthly[0].value).toBe(5.7)
     expect(loadedDraft?.ui?.activeSection).toBe('forecast')
   })

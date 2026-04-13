@@ -23,7 +23,9 @@ describe('appRoutes', () => {
     expect(buildPlanningGroupForecastsHash('center-1', 'group-1')).toBe('#planning/center/center-1/group/group-1/forecasts')
     expect(buildPlanningGroupForecastsHash('center-1', 'group-1', 2027)).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027')
     expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'budget' })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/budget')
-    expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'reforecast', coverageStartMonthIndex: 3 })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/reforecast/month/3')
+    expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { sourceKind: 'imported_daily', forecastType: 'budget' })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/imported_daily/type/budget')
+    expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'reforecast', coverageStartMonthIndex: 3 })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/budget')
+    expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { sourceKind: 'manual_monthly', forecastType: 'reforecast', coverageStartMonthIndex: 3 })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget')
     expect(buildPlanningPlanHash('center-1', 'group-1', 'plan-1')).toBe('#planning/center/center-1/group/group-1/plan/plan-1')
     expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027)).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027')
   })
@@ -74,16 +76,17 @@ describe('appRoutes', () => {
       centerId: 'center-1',
       groupId: 'group-1',
       year: 2027,
+      sourceKind: null,
       forecastType: 'budget'
     })
-    expect(parseHashRoute('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/reforecast/month/4')).toMatchObject({
+    expect(parseHashRoute('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/imported_daily/type/budget')).toMatchObject({
       app: 'planning',
       page: 'group-forecasts',
       centerId: 'center-1',
       groupId: 'group-1',
       year: 2027,
-      forecastType: 'reforecast',
-      coverageStartMonthIndex: 4
+      sourceKind: 'imported_daily',
+      forecastType: 'budget'
     })
     expect(parseHashRoute('#planning/center/center-1/forecasts')).toMatchObject({
       app: 'planning',

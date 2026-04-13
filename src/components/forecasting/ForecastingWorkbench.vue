@@ -7,12 +7,19 @@ import ForecastingWorkbenchInspector from './ForecastingWorkbenchInspector.vue'
 import AppButton from '../ui/AppButton.vue'
 import AppDrawer from '../ui/AppDrawer.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
+import AppOptionPills from '../ui/AppOptionPills.vue'
 import {
-  FORECAST_RESULT_TABS,
+  canForecastProjectAdjust,
+  canForecastProjectRun,
+  canForecastProjectShowInspector,
   formatDateTime,
   formatWhole,
   getForecastProjectDailyRows,
-  getForecastProjectManualAdjustments
+  getForecastProjectManualAdjustments,
+  getForecastProjectResultTabs,
+  getForecastProjectSourceKind,
+  getForecastSourceActionLabel,
+  isForecastProjectReadOnly
 } from '../../forecasting/shared'
 import { buildForecastRunInputSignature } from '../../composables/forecasting/forecastWorkspaceHelpers'
 
@@ -57,7 +64,7 @@ const emit = defineEmits([
   'remove-custom-seasonality',
   'add-custom-holiday',
   'remove-custom-holiday',
-  'open-history-modal'
+  'open-source-modal'
 ])
 
 const project = defineModel('project', {
@@ -72,10 +79,30 @@ const activeResultTab = defineModel('activeResultTab', {
 
 const inspectorOpen = ref(false)
 
-const resultTabs = computed(() => FORECAST_RESULT_TABS)
-const hasHistory = computed(() =>
-  Array.isArray(project.value?.historyRows) && project.value.historyRows.length > 0
+const sourceKind = computed(() => getForecastProjectSourceKind(project.value))
+const resultTabs = computed(() => getForecastProjectResultTabs(project.value))
+const isForecastTab = computed(() => activeResultTab.value === 'daily')
+const canRunForecast = computed(() => canForecastProjectRun(project.value))
+const showInspector = computed(() => canForecastProjectShowInspector(project.value))
+const canAdjustForecast = computed(() => canForecastProjectAdjust(project.value))
+const isReadOnlyProject = computed(() => isForecastProjectReadOnly(project.value))
+const canOpenSourceModal = computed(() =>
+  isForecastTab.value || isReadOnlyProject.value
 )
+const showDuplicateProjectAction = computed(() =>
+  props.showDuplicateAction
+)
+const hasHistory = computed(() => {
+  if (sourceKind.value === 'manual_monthly') {
+    return Boolean(project.value?.lastRun?.monthlyRollup?.length)
+  }
+
+  if (sourceKind.value === 'imported_daily') {
+    return Boolean(project.value?.lastRun?.dailyForecast?.length)
+  }
+
+  return Array.isArray(project.value?.historyRows) && project.value.historyRows.length > 0
+})
 const hasResults = computed(() => Boolean(project.value?.lastRun?.runAt))
 const forecastRows = computed(() =>
   getForecastProjectDailyRows(project.value).filter((row) => !row?.isHistory)
@@ -84,6 +111,7 @@ const manualAdjustments = computed(() => getForecastProjectManualAdjustments(pro
 const currentInputSignature = computed(() => buildForecastRunInputSignature(project.value))
 const resultsStale = computed(() =>
   Boolean(
+    canRunForecast.value &&
     hasResults.value &&
     project.value?.lastRun?.inputSignature &&
     project.value.lastRun.inputSignature !== currentInputSignature.value
@@ -107,6 +135,14 @@ const headerStatus = computed(() => {
   return null
 })
 const inspectorFooterMessage = computed(() => {
+  if (!isForecastTab.value) {
+    return ''
+  }
+
+  if (!canRunForecast.value) {
+    return ''
+  }
+
   if (props.validationMessages.length) {
     return 'Resolve the validation issues before rerunning the forecast.'
   }
@@ -128,7 +164,7 @@ const collapsedRailStatusClass = computed(() => {
 
   return 'bg-slate-400'
 })
-const historyActionLabel = computed(() => 'Data')
+const historyActionLabel = computed(() => getForecastSourceActionLabel(project.value))
 const currentRunLabel = computed(() =>
   hasResults.value && project.value?.lastRun?.runAt
     ? `Current run: ${formatDateTime(project.value.lastRun.runAt)}`
@@ -192,14 +228,19 @@ const handleInspectorRun = () => {
             Open Forecast
           </AppButton>
           <AppButton
-            v-if="props.showDuplicateAction"
+            v-if="showDuplicateProjectAction"
             size="sm"
             variant="secondary"
             @click="emit('duplicate-project')"
           >
             Duplicate Forecast
           </AppButton>
-          <AppButton size="sm" variant="secondary" @click="emit('save-project')">
+          <AppButton
+            v-if="!isReadOnlyProject"
+            size="sm"
+            variant="secondary"
+            @click="emit('save-project')"
+          >
             Save Forecast
           </AppButton>
           <span
@@ -208,27 +249,29 @@ const handleInspectorRun = () => {
           >
             {{ currentRunLabel }}
           </span>
-          <AppButton size="sm" variant="secondary" @click="emit('open-history-modal')">
+          <AppButton
+            v-if="canOpenSourceModal"
+            size="sm"
+            variant="secondary"
+            @click="emit('open-source-modal')"
+          >
             {{ historyActionLabel }}
           </AppButton>
-          <AppButton size="sm" variant="secondary" class="xl:hidden" @click="inspectorOpen = true">
+          <AppButton
+            v-if="showInspector"
+            size="sm"
+            variant="secondary"
+            class="xl:hidden"
+            @click="inspectorOpen = true"
+          >
             Model Parameters
           </AppButton>
           <span
-            v-if="resultsStale"
+            v-if="canRunForecast && isForecastTab && resultsStale"
             class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-amber-700"
           >
             Outputs Stale
           </span>
-          <AppButton
-            v-if="!inspectorOpen"
-            size="sm"
-            variant="primary"
-            :disabled="props.isRunningForecast || props.validationMessages.length > 0"
-            @click="emit('run-forecast')"
-          >
-            {{ props.isRunningForecast ? 'Running...' : 'Run' }}
-          </AppButton>
         </div>
       </div>
 
@@ -247,18 +290,11 @@ const handleInspectorRun = () => {
         <div class="min-w-0 grid gap-4">
           <section class="overflow-hidden bg-white">
             <div v-if="hasHistory" class="border-b border-slate-200 px-4 py-4">
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="tab in resultTabs"
-                  :key="tab.id"
-                  type="button"
-                  class="rounded-[16px] border px-4 py-2 text-sm font-semibold transition"
-                  :class="activeResultTab === tab.id ? 'border-[#102f4f] bg-[#15395f] text-white shadow-[0_10px_20px_rgba(16,47,79,0.18)]' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-[#a7bbce] hover:bg-white hover:text-[#15395f]'"
-                  @click="activeResultTab = tab.id"
-                >
-                  {{ tab.label }}
-                </button>
-              </div>
+              <AppOptionPills
+                v-model="activeResultTab"
+                aria-label="Forecast result tabs"
+                :items="resultTabs"
+              />
             </div>
 
             <div v-if="hasHistory" class="pt-4">
@@ -266,9 +302,6 @@ const handleInspectorRun = () => {
                 v-model:active-result-tab="activeResultTab"
                 :project="project"
                 :run-error="props.runError"
-                embedded
-                :show-header="false"
-                :show-forecast-table="false"
               />
             </div>
 
@@ -278,7 +311,7 @@ const handleInspectorRun = () => {
                 description="Upload a CSV to start configuring and running the forecast."
               >
                 <div class="pt-3">
-                  <AppButton size="sm" variant="primary" @click="emit('open-history-modal')">
+                  <AppButton size="sm" variant="primary" @click="emit('open-source-modal')">
                     Upload History
                   </AppButton>
                 </div>
@@ -288,7 +321,7 @@ const handleInspectorRun = () => {
         </div>
 
         <button
-          v-if="!inspectorOpen"
+          v-if="showInspector && !inspectorOpen"
           type="button"
           class="hidden xl:flex xl:absolute xl:right-0 xl:top-0 xl:bottom-0 xl:z-10 xl:w-11 xl:flex-col xl:items-center xl:border-l xl:border-slate-200 xl:bg-slate-50 xl:px-1 xl:py-3 xl:text-slate-700 xl:shadow-[0_18px_36px_rgba(15,23,42,0.1)] xl:transition xl:hover:bg-white"
           aria-label="Expand model parameters"
@@ -312,7 +345,7 @@ const handleInspectorRun = () => {
       </div>
 
       <section
-        v-if="hasHistory && activeResultTab === 'daily'"
+        v-if="canAdjustForecast && hasHistory && activeResultTab === 'daily'"
         class="overflow-visible border border-slate-200 bg-white shadow-sm"
       >
         <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3 xl:flex-row xl:items-start xl:justify-between">
@@ -350,6 +383,7 @@ const handleInspectorRun = () => {
     </div>
 
     <AppDrawer
+      v-if="showInspector"
       v-model:visible="inspectorOpen"
       title="Model Parameters"
       kicker="Prophet Configuration"
@@ -370,8 +404,11 @@ const handleInspectorRun = () => {
       </div>
 
       <template #footer>
-        <div class="flex w-full flex-col gap-3 border-t border-slate-200 px-6 py-4 xl:flex-row xl:items-center xl:justify-between">
-          <p class="text-sm text-slate-600">
+        <div
+          class="flex w-full flex-col gap-3 border-t border-slate-200 px-6 py-4"
+          :class="isForecastTab && canRunForecast ? 'xl:flex-row xl:items-center xl:justify-between' : 'items-end'"
+        >
+          <p v-if="isForecastTab && canRunForecast" class="text-sm text-slate-600">
             {{ inspectorFooterMessage }}
           </p>
 
@@ -380,6 +417,7 @@ const handleInspectorRun = () => {
               Close
             </AppButton>
             <AppButton
+              v-if="isForecastTab && canRunForecast"
               size="sm"
               variant="primary"
               :disabled="props.isRunningForecast || props.validationMessages.length > 0"

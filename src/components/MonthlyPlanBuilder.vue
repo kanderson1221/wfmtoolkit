@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive } from 'vue'
 import { FULL_MONTH_LABELS, toNumber } from '../plannerModel'
 
 import PlannerActualsPanel from './planner/PlannerActualsPanel.vue'
@@ -21,7 +21,6 @@ import {
   buildPlanningHomeHash
 } from '../appRoutes'
 import { useMonthlyPlanBuilder } from '../composables/useMonthlyPlanBuilder'
-import { DEMAND_SOURCE_FORECAST, DEMAND_SOURCE_MANUAL } from '../planner/demandSources'
 
 const props = defineProps({
   initialPlan: {
@@ -61,32 +60,6 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel'])
 
 const builder = reactive(useMonthlyPlanBuilder(props, emit))
-const forecastEntryMode = ref(
-  builder.demandSource.mode === DEMAND_SOURCE_FORECAST
-    ? DEMAND_SOURCE_FORECAST
-    : DEMAND_SOURCE_MANUAL
-)
-
-const handleForecastEntryModeChange = (mode) => {
-  const nextMode = mode === DEMAND_SOURCE_FORECAST ? DEMAND_SOURCE_FORECAST : DEMAND_SOURCE_MANUAL
-  forecastEntryMode.value = nextMode
-
-  if (nextMode === DEMAND_SOURCE_MANUAL) {
-    builder.setDemandSourceMode(DEMAND_SOURCE_MANUAL)
-    return
-  }
-
-  void builder.reloadForecastProjects()
-}
-
-watch(
-  () => builder.demandSource.mode,
-  (mode) => {
-    forecastEntryMode.value = mode === DEMAND_SOURCE_FORECAST
-      ? DEMAND_SOURCE_FORECAST
-      : DEMAND_SOURCE_MANUAL
-  }
-)
 
 const TOTAL_PLAN_MONTHS = FULL_MONTH_LABELS.length
 const reviewedSections = computed(() => new Set(builder.reviewedSections))
@@ -458,24 +431,21 @@ const breadcrumbItems = computed(() => {
                 class="grid gap-3"
               >
                 <PlannerForecastPanel
-                  :entry-mode="forecastEntryMode"
-                  v-model:plan-months="builder.planMonths"
                   v-model:demand-source="builder.demandSource"
                   v-model:selected-forecast-project-id="builder.selectedForecastProjectId"
-                  v-model:selected-month-index="builder.selectedMonthIndex"
-                  :monthly-records="builder.monthlyRecords"
                   :saved-forecast-project-count="builder.savedForecastProjectCount"
                   :forecast-select-options="builder.forecastSelectOptions"
                   :forecasts-loading="builder.forecastsLoading"
                   :forecasts-error="builder.forecastsError"
                   :selected-forecast-preview-summary="builder.selectedForecastPreviewSummary"
                   :current-demand-source-summary="builder.demandSourceSummary"
+                  :has-legacy-manual-demand-source="builder.hasLegacyManualDemandSource"
+                  :legacy-manual-summary="builder.legacyManualSummary"
                   :forecast-can-apply="builder.forecastCanApply"
-                  :forecast-workspace-href="props.forecastSeed?.forecastWorkspaceHref || props.centerDefaults?.forecastWorkspaceHref || ''"
                   :format-whole="builder.formatWhole"
                   :format-number="builder.formatNumber"
-                  @update:entry-mode="handleForecastEntryModeChange"
                   @apply-forecast="builder.applyForecastToDemand"
+                  @convert-legacy-manual-demand-source="builder.convertLegacyManualDemandSource"
                 />
               </div>
 

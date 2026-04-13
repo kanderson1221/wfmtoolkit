@@ -24,8 +24,8 @@ const plannerStubs = {
     `
   },
   PlannerForecastPanel: {
-    props: ['forecastWorkspaceHref', 'entryMode'],
-    template: '<div data-test="planner-forecast-panel">planner-forecast {{ entryMode }} {{ forecastWorkspaceHref }}</div>'
+    props: ['hasLegacyManualDemandSource'],
+    template: '<div data-test="planner-forecast-panel">planner-forecast {{ hasLegacyManualDemandSource ? "legacy" : "saved" }}</div>'
   },
   PlannerPresenceTab: {
     template: '<div data-test="presence-tab">presence</div>'
@@ -70,7 +70,6 @@ const centerDefaults = {
     occupancyPercent: 90,
     adherencePercent: 95
   },
-  forecastWorkspaceHref: '#planning/center/center-1/group/group-1/forecasts/year/2026',
   startingHeadcount: 18,
   startingFrontlineHeadcount: 16
 }
@@ -157,8 +156,7 @@ describe('MonthlyPlanBuilder', () => {
     await wrapper.find('[data-section-id="forecast"]').trigger('click')
 
     expect(wrapper.find('[data-test="planner-forecast-panel"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="planner-forecast-panel"]').text()).toContain('manual')
-    expect(wrapper.find('[data-test="planner-forecast-panel"]').text()).toContain('#planning/center/center-1/group/group-1/forecasts/year/2026')
+    expect(wrapper.find('[data-test="planner-forecast-panel"]').text()).toContain('saved')
     expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(false)
 
     await wrapper.find('[data-section-id="availability"]').trigger('click')
@@ -438,6 +436,7 @@ describe('MonthlyPlanBuilder', () => {
       {
         id: 'forecast-1',
         name: '2026 Demand Forecast',
+        planningYear: 2026,
         lastRun: {
           runAt: '2026-01-10T12:00:00.000Z',
           monthlyRollup: [
@@ -445,6 +444,8 @@ describe('MonthlyPlanBuilder', () => {
               monthStart: '2026-01-01',
               monthLabel: 'Jan 2026',
               contacts: 14000,
+              averageDailyVolume: 700,
+              peakDailyVolume: 910,
               lowerBoundContacts: 13200,
               upperBoundContacts: 14800
             },
@@ -452,6 +453,8 @@ describe('MonthlyPlanBuilder', () => {
               monthStart: '2026-02-01',
               monthLabel: 'Feb 2026',
               contacts: 15500,
+              averageDailyVolume: 775,
+              peakDailyVolume: 930,
               lowerBoundContacts: 14900,
               upperBoundContacts: 16200
             }
@@ -460,6 +463,31 @@ describe('MonthlyPlanBuilder', () => {
           diagnostics: {},
           summary: {
             forecastDateRange: '2026-01-01 to 2026-02-28'
+          }
+        }
+      },
+      {
+        id: 'forecast-2',
+        name: '2026 Incomplete Forecast',
+        planningYear: 2026,
+        forecastType: 'budget',
+        lastRun: {
+          runAt: '2026-04-10T12:00:00.000Z',
+          monthlyRollup: [
+            {
+              monthStart: '2026-04-01',
+              monthLabel: 'Apr 2026',
+              contacts: 18000,
+              averageDailyVolume: 900,
+              peakDailyVolume: 1100,
+              lowerBoundContacts: 17100,
+              upperBoundContacts: 18900
+            }
+          ],
+          components: {},
+          diagnostics: {},
+          summary: {
+            forecastDateRange: '2026-04-01 to 2026-04-30'
           }
         }
       }
@@ -505,8 +533,8 @@ describe('MonthlyPlanBuilder', () => {
     await flushPromises()
 
     expect(wrapper.vm.builder.forecastSelectOptions.some((option) => option.value === 'forecast-1')).toBe(true)
+    expect(wrapper.vm.builder.forecastSelectOptions.some((option) => option.value === 'forecast-2')).toBe(false)
 
-    wrapper.vm.builder.setDemandSourceMode('forecast')
     wrapper.vm.builder.selectedForecastProjectId = 'forecast-1'
     await flushPromises()
 
@@ -524,10 +552,50 @@ describe('MonthlyPlanBuilder', () => {
       }
     })
     expect(wrapper.emitted('save')[0][0].planMonths[0]).toMatchObject({
-      contacts: 14000
+      contacts: 14000,
+      peakDayUpliftPercent: 30
     })
     expect(wrapper.emitted('save')[0][0].planMonths[1]).toMatchObject({
-      contacts: 15500
+      contacts: 15500,
+      peakDayUpliftPercent: 20
     })
+  })
+
+  it('shows a subtle warning when the plan references a deleted forecast source', async () => {
+    vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
+      projects: [],
+      error: null
+    })
+
+    const wrapper = await mountBuilder({
+      draftKey: 'deleted-forecast-plan',
+      prefilledYear: 2026,
+      storageScope: 'deleted-forecast-plan-spec',
+      initialPlan: {
+        id: 'deleted-forecast-plan',
+        name: '2026 Plan',
+        planningYear: 2026,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-deleted',
+          forecastProjectName: 'Deleted Staffing Forecast',
+          importedAt: '2026-04-12T15:00:00.000Z',
+          forecastMonthSnapshot: [
+            {
+              monthIndex: 0,
+              monthLabel: 'Jan 2026',
+              monthStart: '2026-01-01',
+              contacts: 14000
+            }
+          ]
+        })
+      }
+    })
+
+    await wrapper.find('[data-section-id="forecast"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Deleted Staffing Forecast was deleted.')
+    expect(wrapper.text()).toContain('Current monthly contacts remain in this plan until you apply a different forecast.')
   })
 })

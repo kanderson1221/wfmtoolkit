@@ -3,13 +3,9 @@ import { nextTick, ref, watch } from 'vue'
 import { forecastingRepository } from '../../forecastingRepository'
 import {
   clonePlain,
-  FORECAST_TYPE_BUDGET,
   createSavedForecastName,
-  getForecastGroupId,
-  getForecastPlanningYear,
   forecastProjectBelongsToPlanningContext,
-  mergeForecastProjectCollections,
-  resolveForecastType
+  mergeForecastProjectCollections
 } from '../../forecasting/shared'
 import { describeBrowserStorageError } from '../../storage/browserStorage'
 import {
@@ -104,8 +100,8 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
     isLoadingProjects.value = false
   }
 
-  const createNewProject = () => {
-    replaceCurrentProject({})
+  const createNewProject = (overrides = {}) => {
+    replaceCurrentProject(overrides)
   }
 
   const openProjectById = (projectId) => {
@@ -128,25 +124,6 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
           excludeId: currentProject.value.id || ''
         })
       }
-      const planningYear = getForecastPlanningYear(projectToSave)
-      const groupId = getForecastGroupId(projectToSave)
-      const forecastType = resolveForecastType(projectToSave.forecastType, projectToSave)
-
-      if (planningYear && groupId && forecastType === FORECAST_TYPE_BUDGET) {
-        const existingBudgetForecast = savedProjects.value.find(
-          (project) =>
-            String(project?.id || '').trim() !== String(projectToSave.id || '').trim() &&
-            getForecastPlanningYear(project) === planningYear &&
-            getForecastGroupId(project) === groupId &&
-            resolveForecastType(project?.forecastType, project) === FORECAST_TYPE_BUDGET
-        )
-
-        if (existingBudgetForecast) {
-          saveError.value = `A budget forecast already exists for ${planningYear}. Open ${existingBudgetForecast.name} or create a reforecast instead.`
-          return false
-        }
-      }
-
       const nextProjects = forecastingRepository.saveProject(workspaceProjects.value, projectToSave)
       const persistedProjects = await forecastingRepository.persistWorkspace(nextProjects, activeScope.value)
       workspaceProjects.value = Array.isArray(persistedProjects) ? persistedProjects : nextProjects

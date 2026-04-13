@@ -17,19 +17,21 @@ describe('appRoutes', () => {
 
   it('builds and parses staffing-group new forecast routes with a creation seed', () => {
     const hash = buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, {
+      sourceKind: 'manual_monthly',
       forecastType: 'reforecast',
       coverageStartMonthIndex: 5
     })
 
-    expect(hash).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/reforecast/month/5')
+    expect(hash).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget')
     expect(parseHashRoute(hash)).toMatchObject({
       app: 'planning',
       page: 'group-forecasts',
       centerId: 'center-1',
       groupId: 'group-1',
       year: 2027,
-      forecastType: 'reforecast',
-      coverageStartMonthIndex: 5
+      sourceKind: 'manual_monthly',
+      forecastType: 'budget',
+      coverageStartMonthIndex: 0
     })
   })
 })

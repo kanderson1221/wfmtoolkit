@@ -2,11 +2,28 @@
 import { computed, nextTick, ref, toRef, watch } from 'vue'
 
 import ForecastHistoryModal from './forecasting/ForecastHistoryModal.vue'
+import ForecastCreateDialog from './forecasting/ForecastCreateDialog.vue'
+import ForecastImportDailyModal from './forecasting/ForecastImportDailyModal.vue'
+import ForecastMonthlyEntryModal from './forecasting/ForecastMonthlyEntryModal.vue'
 import ForecastProjectDialog from './forecasting/ForecastProjectDialog.vue'
 import ForecastingWorkbench from './forecasting/ForecastingWorkbench.vue'
 import AppBreadcrumbs from './ui/AppBreadcrumbs.vue'
 import AppStatusMessage from './ui/AppStatusMessage.vue'
 import { useForecastingWorkspace } from '../composables/useForecastingWorkspace'
+import {
+  createForecastProject,
+  FORECAST_SOURCE_IMPORTED_DAILY,
+  FORECAST_SOURCE_MANUAL_MONTHLY,
+  FORECAST_SOURCE_MODELED_DAILY,
+  FORECAST_TYPE_BUDGET,
+  getForecastProjectSourceKind
+} from '../forecasting/shared'
+import {
+  createImportedDailyForecastResults,
+  createManualMonthlyForecastResults
+} from '../forecasting/sourceArtifacts'
+
+const emit = defineEmits(['save-complete', 'cancel-create'])
 
 const props = defineProps({
   storageScope: {
@@ -33,14 +50,6 @@ const props = defineProps({
     type: String,
     default: 'Forecasting'
   },
-  description: {
-    type: String,
-    default: 'Upload daily call volume, run Prophet, and keep the monthly rollup ready for planning.'
-  },
-  showDescription: {
-    type: Boolean,
-    default: true
-  },
   contextSummaryItems: {
     type: Array,
     default: () => []
@@ -48,6 +57,10 @@ const props = defineProps({
   showLibraryActions: {
     type: Boolean,
     default: true
+  },
+  enableSourceKindCreation: {
+    type: Boolean,
+    default: false
   },
   showDuplicateAction: {
     type: Boolean,
@@ -68,9 +81,12 @@ const props = defineProps({
 })
 
 const projectDialogOpen = ref(false)
+const createDialogOpen = ref(false)
 const historyModalOpen = ref(false)
+const importedDailyModalOpen = ref(false)
+const monthlyForecastModalOpen = ref(false)
 const lastAppliedInitialProjectId = ref('')
-const lastAutoOpenedHistoryProjectId = ref('')
+const lastAutoOpenedSourceProjectId = ref('')
 
 const {
   currentProject,
@@ -111,7 +127,39 @@ const projectDialogDescription = computed(() =>
 )
 
 const handleCreateNewProject = () => {
+  if (props.enableSourceKindCreation) {
+    createDialogOpen.value = true
+    return
+  }
+
   createNewProject()
+  historyModalOpen.value = true
+}
+
+const buildProjectSeedForSourceKind = (sourceKind) =>
+  createForecastProject({
+    ...(props.projectSeed || {}),
+    sourceKind,
+    forecastType: FORECAST_TYPE_BUDGET,
+    coverageStartMonthIndex: 0
+  })
+
+const handleCreateProjectFromSourceKind = (sourceKind) => {
+  createDialogOpen.value = false
+
+  if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
+    importedDailyModalOpen.value = true
+    return
+  }
+
+  if (sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
+    monthlyForecastModalOpen.value = true
+    return
+  }
+
+  createNewProject({
+    ...buildProjectSeedForSourceKind(FORECAST_SOURCE_MODELED_DAILY)
+  })
   historyModalOpen.value = true
 }
 
@@ -125,6 +173,132 @@ const handleRunForecast = async () => {
   const didSucceed = await runForecast()
   if (didSucceed) {
     await saveCurrentProject()
+  }
+}
+
+const handleSaveProject = async () => {
+  const didSave = await saveCurrentProject()
+
+  if (!didSave) {
+    return
+  }
+
+  emit('save-complete')
+}
+
+const isUnsavedSourceCreation = (sourceKind) =>
+  getForecastProjectSourceKind(currentProject.value) === sourceKind &&
+  !currentProject.value?.lastRun?.runAt
+
+const handleHistoryModalClose = () => {
+  historyModalOpen.value = false
+
+  if (
+    isUnsavedSourceCreation(FORECAST_SOURCE_MODELED_DAILY) &&
+    !currentProject.value?.historyRows?.length &&
+    !currentProject.value?.uploadedRows?.length
+  ) {
+    emit('cancel-create')
+  }
+}
+
+const handleImportedDailyClose = () => {
+  importedDailyModalOpen.value = false
+
+  if (isUnsavedSourceCreation(FORECAST_SOURCE_IMPORTED_DAILY)) {
+    emit('cancel-create')
+  }
+}
+
+const handleMonthlyForecastClose = () => {
+  monthlyForecastModalOpen.value = false
+
+  if (isUnsavedSourceCreation(FORECAST_SOURCE_MANUAL_MONTHLY)) {
+    emit('cancel-create')
+  }
+}
+
+const saveReadOnlyProject = async (nextProject, successMessage = 'Forecast saved.') => {
+  currentProject.value = createForecastProject(nextProject)
+  await nextTick()
+  return saveCurrentProject(successMessage)
+}
+
+const handleApplyImportedDaily = async ({ sourceData, importedDailyRows } = {}) => {
+  const isReplacingCurrentProject = getForecastProjectSourceKind(currentProject.value) === FORECAST_SOURCE_IMPORTED_DAILY
+  const baseProject = isReplacingCurrentProject
+    ? createForecastProject(currentProject.value)
+    : buildProjectSeedForSourceKind(FORECAST_SOURCE_IMPORTED_DAILY)
+  const nextForecastType = FORECAST_TYPE_BUDGET
+  const nextCoverageStartMonthIndex = 0
+  const lastRun = createImportedDailyForecastResults({
+    rows: importedDailyRows,
+    planningYear: baseProject.planningYear,
+    forecastType: nextForecastType,
+    coverageStartMonthIndex: nextCoverageStartMonthIndex
+  })
+  const nextProject = createForecastProject({
+    ...baseProject,
+    sourceKind: FORECAST_SOURCE_IMPORTED_DAILY,
+    forecastType: nextForecastType,
+    coverageStartMonthIndex: nextCoverageStartMonthIndex,
+    uploadedFileName: '',
+    uploadedHeaders: [],
+    uploadedRows: [],
+    historyRows: [],
+    parserIssues: [],
+    normalizationIssues: [],
+    manualAdjustments: [],
+    sourceData,
+    lastRun
+  })
+
+  importedDailyModalOpen.value = false
+  const didSave = await saveReadOnlyProject(nextProject, isReplacingCurrentProject ? 'Forecast updated.' : 'Forecast saved.')
+  if (didSave) {
+    emit('save-complete')
+  }
+}
+
+const handleApplyManualMonthly = async ({ monthlyRows } = {}) => {
+  const isReplacingCurrentProject = getForecastProjectSourceKind(currentProject.value) === FORECAST_SOURCE_MANUAL_MONTHLY
+  const baseProject = isReplacingCurrentProject
+    ? createForecastProject(currentProject.value)
+    : buildProjectSeedForSourceKind(FORECAST_SOURCE_MANUAL_MONTHLY)
+  const nextForecastType = FORECAST_TYPE_BUDGET
+  const nextCoverageStartMonthIndex = 0
+  const lastRun = createManualMonthlyForecastResults({
+    rows: monthlyRows,
+    planningYear: baseProject.planningYear,
+    forecastType: nextForecastType,
+    coverageStartMonthIndex: nextCoverageStartMonthIndex
+  })
+  const nextProject = createForecastProject({
+    ...baseProject,
+    sourceKind: FORECAST_SOURCE_MANUAL_MONTHLY,
+    forecastType: nextForecastType,
+    coverageStartMonthIndex: nextCoverageStartMonthIndex,
+    uploadedFileName: '',
+    uploadedHeaders: [],
+    uploadedRows: [],
+    historyRows: [],
+    parserIssues: [],
+    normalizationIssues: [],
+    manualAdjustments: [],
+    sourceData: {
+      fileName: '',
+      headers: [],
+      rows: monthlyRows,
+      mapping: {},
+      issues: []
+    },
+    lastRun
+  })
+
+  monthlyForecastModalOpen.value = false
+  const didSave = await saveReadOnlyProject(nextProject, isReplacingCurrentProject ? 'Forecast updated.' : 'Forecast saved.')
+  if (didSave) {
+    emit('save-complete')
   }
 }
 
@@ -172,23 +346,44 @@ watch(
 )
 
 watch(
-  () => [isLoadingProjects.value, currentProject.value?.id, currentProject.value?.historyRows?.length || 0],
-  ([isLoading, projectId, historyRowCount]) => {
+  () => [
+    isLoadingProjects.value,
+    currentProject.value?.id,
+    getForecastProjectSourceKind(currentProject.value),
+    currentProject.value?.historyRows?.length || 0,
+    currentProject.value?.lastRun?.dailyForecast?.length || 0,
+    currentProject.value?.lastRun?.monthlyRollup?.length || 0
+  ],
+  ([isLoading, projectId, sourceKind, historyRowCount, dailyForecastCount, monthlyRollupCount]) => {
     if (isLoading) {
       return
     }
 
     const normalizedProjectId = String(projectId || '').trim()
-    if (!normalizedProjectId || historyRowCount > 0) {
+    if (!normalizedProjectId) {
       return
     }
 
-    if (lastAutoOpenedHistoryProjectId.value === normalizedProjectId) {
+    if (lastAutoOpenedSourceProjectId.value === normalizedProjectId) {
       return
     }
 
-    historyModalOpen.value = true
-    lastAutoOpenedHistoryProjectId.value = normalizedProjectId
+    if (sourceKind === FORECAST_SOURCE_MODELED_DAILY && historyRowCount === 0) {
+      historyModalOpen.value = true
+      lastAutoOpenedSourceProjectId.value = normalizedProjectId
+      return
+    }
+
+    if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY && dailyForecastCount === 0) {
+      importedDailyModalOpen.value = true
+      lastAutoOpenedSourceProjectId.value = normalizedProjectId
+      return
+    }
+
+    if (sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY && monthlyRollupCount === 0) {
+      monthlyForecastModalOpen.value = true
+      lastAutoOpenedSourceProjectId.value = normalizedProjectId
+    }
   },
   { immediate: true }
 )
@@ -241,14 +436,27 @@ watch(
         @create-new-project="handleCreateNewProject"
         @open-project-dialog="projectDialogOpen = true"
         @duplicate-project="duplicateCurrentProject"
-        @save-project="saveCurrentProject()"
+        @save-project="handleSaveProject"
         @add-custom-seasonality="addCustomSeasonality"
         @remove-custom-seasonality="removeCustomSeasonality"
         @add-custom-holiday="addCustomHoliday"
         @remove-custom-holiday="removeCustomHoliday"
-        @open-history-modal="historyModalOpen = true"
+        @open-source-modal="
+          getForecastProjectSourceKind(currentProject) === FORECAST_SOURCE_IMPORTED_DAILY
+            ? (importedDailyModalOpen = true)
+            : getForecastProjectSourceKind(currentProject) === FORECAST_SOURCE_MANUAL_MONTHLY
+              ? (monthlyForecastModalOpen = true)
+              : (historyModalOpen = true)
+        "
       />
     </div>
+
+    <ForecastCreateDialog
+      v-if="props.enableSourceKindCreation"
+      v-model:visible="createDialogOpen"
+      @close="createDialogOpen = false"
+      @select="handleCreateProjectFromSourceKind"
+    />
 
     <ForecastProjectDialog
       v-model:visible="projectDialogOpen"
@@ -263,7 +471,21 @@ watch(
       v-model:visible="historyModalOpen"
       :project="currentProject"
       @apply="handleApplyHistoryImport"
-      @close="historyModalOpen = false"
+      @close="handleHistoryModalClose"
+    />
+
+    <ForecastImportDailyModal
+      v-model:visible="importedDailyModalOpen"
+      :project="getForecastProjectSourceKind(currentProject) === FORECAST_SOURCE_IMPORTED_DAILY ? currentProject : buildProjectSeedForSourceKind(FORECAST_SOURCE_IMPORTED_DAILY)"
+      @apply="handleApplyImportedDaily"
+      @close="handleImportedDailyClose"
+    />
+
+    <ForecastMonthlyEntryModal
+      v-model:visible="monthlyForecastModalOpen"
+      :project="getForecastProjectSourceKind(currentProject) === FORECAST_SOURCE_MANUAL_MONTHLY ? currentProject : buildProjectSeedForSourceKind(FORECAST_SOURCE_MANUAL_MONTHLY)"
+      @apply="handleApplyManualMonthly"
+      @close="handleMonthlyForecastClose"
     />
   </section>
 </template>

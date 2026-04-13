@@ -5,11 +5,30 @@ export const FORECAST_RESULT_TABS = [
 ]
 
 export const FORECAST_TYPE_BUDGET = 'budget'
-export const FORECAST_TYPE_REFORECAST = 'reforecast'
+export const FORECAST_SOURCE_MODELED_DAILY = 'modeled_daily'
+export const FORECAST_SOURCE_IMPORTED_DAILY = 'imported_daily'
+export const FORECAST_SOURCE_MANUAL_MONTHLY = 'manual_monthly'
 
 export const FORECAST_TYPE_OPTIONS = [
-  { label: 'Budget Forecast', value: FORECAST_TYPE_BUDGET },
-  { label: 'Reforecast', value: FORECAST_TYPE_REFORECAST }
+  { label: 'Budget Forecast', value: FORECAST_TYPE_BUDGET }
+]
+
+export const FORECAST_SOURCE_KIND_OPTIONS = [
+  {
+    id: FORECAST_SOURCE_MODELED_DAILY,
+    label: 'Build Forecast',
+    description: 'Upload history and generate a modeled daily forecast.'
+  },
+  {
+    id: FORECAST_SOURCE_IMPORTED_DAILY,
+    label: 'Import Daily Forecast',
+    description: 'Upload an existing daily forecast without using Prophet.'
+  },
+  {
+    id: FORECAST_SOURCE_MANUAL_MONTHLY,
+    label: 'Enter Monthly Forecast',
+    description: 'Enter monthly contacts directly for this staffing group.'
+  }
 ]
 
 export const FORECAST_HORIZON_PRESETS = [
@@ -87,20 +106,72 @@ export const createForecastEntityId = (prefix = 'forecast') => {
 export const DEFAULT_FORECAST_TIMEZONE = resolveDefaultTimeZone()
 
 const padMonthDay = (value) => String(value).padStart(2, '0')
-const clampMonthIndex = (value, fallback = 0) => Math.max(0, Math.min(11, Math.round(toNumber(value, fallback))))
 const isSupportedForecastType = (value) =>
-  value === FORECAST_TYPE_BUDGET || value === FORECAST_TYPE_REFORECAST
+  value === FORECAST_TYPE_BUDGET
+const isSupportedForecastSourceKind = (value) => (
+  value === FORECAST_SOURCE_MODELED_DAILY ||
+  value === FORECAST_SOURCE_IMPORTED_DAILY ||
+  value === FORECAST_SOURCE_MANUAL_MONTHLY
+)
 
-export const getDefaultReforecastStartMonthIndex = (planningYear = null) => {
-  const resolvedPlanningYear = Math.round(toNumber(planningYear, 0))
-  const today = new Date()
-  const currentYear = today.getFullYear()
+export const resolveForecastSourceKind = (value) =>
+  isSupportedForecastSourceKind(value) ? value : FORECAST_SOURCE_MODELED_DAILY
 
-  if (resolvedPlanningYear > 0 && resolvedPlanningYear === currentYear) {
-    return today.getMonth()
+export const getForecastProjectSourceKind = (snapshot = {}) =>
+  resolveForecastSourceKind(snapshot?.sourceKind)
+
+export const getForecastSourceKindLabel = (value) => {
+  const sourceKind = resolveForecastSourceKind(value)
+
+  if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
+    return 'Imported Daily'
   }
 
-  return 0
+  if (sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
+    return 'Monthly'
+  }
+
+  return 'Modeled'
+}
+
+export const isForecastProjectReadOnly = (snapshot = {}) =>
+  getForecastProjectSourceKind(snapshot) !== FORECAST_SOURCE_MODELED_DAILY
+
+export const canForecastProjectRun = (snapshot = {}) =>
+  getForecastProjectSourceKind(snapshot) === FORECAST_SOURCE_MODELED_DAILY
+
+export const canForecastProjectShowInspector = (snapshot = {}) =>
+  getForecastProjectSourceKind(snapshot) === FORECAST_SOURCE_MODELED_DAILY
+
+export const canForecastProjectAdjust = (snapshot = {}) =>
+  getForecastProjectSourceKind(snapshot) === FORECAST_SOURCE_MODELED_DAILY
+
+export const getForecastProjectResultTabs = (snapshot = {}) => {
+  const sourceKind = getForecastProjectSourceKind(snapshot)
+
+  if (sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
+    return FORECAST_RESULT_TABS.filter((tab) => tab.id === 'monthly')
+  }
+
+  if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
+    return FORECAST_RESULT_TABS.filter((tab) => tab.id !== 'components')
+  }
+
+  return FORECAST_RESULT_TABS
+}
+
+export const getForecastSourceActionLabel = (snapshot = {}) => {
+  const sourceKind = getForecastProjectSourceKind(snapshot)
+
+  if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
+    return 'Replace Data'
+  }
+
+  if (sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
+    return 'Replace Forecast'
+  }
+
+  return 'Data'
 }
 
 export const getForecastPlanningYear = (snapshot = {}) => {
@@ -123,10 +194,6 @@ export const getForecastTypeLabel = (forecastType = '') => {
     return 'Budget Forecast'
   }
 
-  if (forecastType === FORECAST_TYPE_REFORECAST) {
-    return 'Reforecast'
-  }
-
   return 'Legacy Forecast'
 }
 
@@ -141,13 +208,11 @@ export const resolveForecastType = (value, snapshot = {}) => {
 export const resolveForecastCoverageWindow = ({
   planningYear,
   forecastType,
-  coverageStartMonthIndex
+  coverageStartMonthIndex: _coverageStartMonthIndex
 } = {}) => {
   const resolvedPlanningYear = Math.round(toNumber(planningYear, 0))
   const resolvedForecastType = resolveForecastType(forecastType, { planningYear: resolvedPlanningYear })
-  const normalizedStartMonthIndex = resolvedForecastType === FORECAST_TYPE_REFORECAST
-    ? clampMonthIndex(coverageStartMonthIndex, getDefaultReforecastStartMonthIndex(resolvedPlanningYear))
-    : 0
+  const normalizedStartMonthIndex = 0
 
   if (resolvedPlanningYear <= 0) {
     return {
@@ -165,12 +230,8 @@ export const resolveForecastCoverageWindow = ({
 
   const coverageStartDate = `${resolvedPlanningYear}-${padMonthDay(normalizedStartMonthIndex + 1)}-01`
   const coverageEndDate = `${resolvedPlanningYear}-12-31`
-  const coverageMonthLabel = resolvedForecastType === FORECAST_TYPE_REFORECAST
-    ? `${MONTH_SHORT_LABELS[normalizedStartMonthIndex]}-${MONTH_SHORT_LABELS[11]} ${resolvedPlanningYear}`
-    : `${MONTH_SHORT_LABELS[0]}-${MONTH_SHORT_LABELS[11]} ${resolvedPlanningYear}`
-  const expectedMonthCount = resolvedForecastType === FORECAST_TYPE_REFORECAST
-    ? 12 - normalizedStartMonthIndex
-    : 12
+  const coverageMonthLabel = `${MONTH_SHORT_LABELS[0]}-${MONTH_SHORT_LABELS[11]} ${resolvedPlanningYear}`
+  const expectedMonthCount = 12
 
   return {
     planningYear: resolvedPlanningYear,
@@ -179,9 +240,7 @@ export const resolveForecastCoverageWindow = ({
     coverageStartDate,
     coverageEndDate,
     expectedMonthCount,
-    coverageLabel: resolvedForecastType === FORECAST_TYPE_REFORECAST
-      ? `${coverageStartDate} to ${coverageEndDate}`
-      : `${resolvedPlanningYear}-01-01 to ${coverageEndDate}`,
+    coverageLabel: `${resolvedPlanningYear}-01-01 to ${coverageEndDate}`,
     coverageMonthLabel,
     coverageMonthCountLabel: `${expectedMonthCount}/${expectedMonthCount} months`
   }
@@ -247,7 +306,7 @@ export const computeForecastPlanningReady = (snapshot = {}) => {
   }
 
   return expectedMonthIndices.every((monthIndex, index) => actualMonthIndices[index] === monthIndex) &&
-    (forecastType === FORECAST_TYPE_REFORECAST || coverageStartMonthIndex === 0)
+    coverageStartMonthIndex === 0
 }
 
 export const createForecastHoliday = (overrides = {}) => ({
@@ -376,6 +435,16 @@ const normalizeForecastColumnMapping = (mapping = {}) => ({
   floorColumn: mapping?.floorColumn || ''
 })
 
+const normalizeForecastSourceData = (sourceData = {}) => ({
+  fileName: sourceData?.fileName || '',
+  headers: Array.isArray(sourceData?.headers) ? [...sourceData.headers] : [],
+  rows: Array.isArray(sourceData?.rows) ? sourceData.rows.map((row) => ({ ...row })) : [],
+  mapping: sourceData?.mapping && typeof sourceData.mapping === 'object'
+    ? { ...sourceData.mapping }
+    : {},
+  issues: Array.isArray(sourceData?.issues) ? [...sourceData.issues] : []
+})
+
 const normalizeMonthlyRollupRows = (rows = [], dailyForecastRows = []) => {
   const normalizedDailyRows = normalizeDailyForecastRows(dailyForecastRows)
 
@@ -484,17 +553,10 @@ export function getForecastProjectDailyRows(snapshot = {}) {
 export const getForecastProjectManualAdjustments = (snapshot = {}) =>
   normalizeForecastManualAdjustments(snapshot?.manualAdjustments)
 
-export function getForecastProjectMonthlyRollup(snapshot = {}) {
-  const dailyForecastRows = getForecastProjectDailyRows(snapshot)
-  const hasManualAdjustments = normalizeForecastManualAdjustments(snapshot?.manualAdjustments).length > 0
-
-  if (!hasManualAdjustments) {
-    return normalizeMonthlyRollupRows(snapshot?.lastRun?.monthlyRollup, dailyForecastRows)
-  }
-
+export function buildMonthlyRollupFromDailyForecastRows(rows = []) {
   const monthlyRollupMap = new Map()
 
-  dailyForecastRows
+  normalizeDailyForecastRows(rows)
     .filter((row) => !row?.isHistory && typeof row?.ds === 'string' && row.ds.length >= 7)
     .forEach((row) => {
       const monthStart = `${row.ds.slice(0, 7)}-01`
@@ -509,7 +571,6 @@ export function getForecastProjectMonthlyRollup(snapshot = {}) {
         upperBoundContacts: 0,
         _dayCount: 0
       }
-
       const forecastValue = toNumber(row?.yhat, 0)
       const lowerBound = toNumber(row?.yhatLower, 0)
       const upperBound = toNumber(row?.yhatUpper, 0)
@@ -534,6 +595,17 @@ export function getForecastProjectMonthlyRollup(snapshot = {}) {
       contacts,
       averageDailyVolume: _dayCount > 0 ? contacts / _dayCount : 0
     }))
+}
+
+export function getForecastProjectMonthlyRollup(snapshot = {}) {
+  const dailyForecastRows = getForecastProjectDailyRows(snapshot)
+  const hasManualAdjustments = normalizeForecastManualAdjustments(snapshot?.manualAdjustments).length > 0
+
+  if (!hasManualAdjustments) {
+    return normalizeMonthlyRollupRows(snapshot?.lastRun?.monthlyRollup, dailyForecastRows)
+  }
+
+  return buildMonthlyRollupFromDailyForecastRows(dailyForecastRows)
 }
 
 export const createEmptyForecastResults = (overrides = {}) => {
@@ -594,11 +666,13 @@ export const createForecastProject = (overrides = {}) => {
     coverageStartMonthIndex: snapshot.coverageStartMonthIndex
   })
   const normalizedLastRun = snapshot.lastRun?.runAt ? createEmptyForecastResults(snapshot.lastRun) : createEmptyForecastResults()
+  const sourceKind = resolveForecastSourceKind(snapshot.sourceKind)
 
   return {
     ...projectSnapshot,
     id: snapshot.id || '',
     name: snapshot.name || buildForecastBaseName(snapshot),
+    sourceKind,
     centerId: snapshot.centerId || snapshot.planningContext?.centerId || '',
     centerName: snapshot.centerName || '',
     groupId,
@@ -631,6 +705,7 @@ export const createForecastProject = (overrides = {}) => {
     parserIssues: Array.isArray(snapshot.parserIssues) ? [...snapshot.parserIssues] : [],
     normalizationIssues: Array.isArray(snapshot.normalizationIssues) ? [...snapshot.normalizationIssues] : [],
     columnMapping: normalizeForecastColumnMapping(snapshot.columnMapping),
+    sourceData: normalizeForecastSourceData(snapshot.sourceData),
     modelConfig: {
       growth: 'linear',
       defaultCap: null,
@@ -784,17 +859,45 @@ export function buildForecastBaseName(seed = {}) {
       ''
   ).trim()
   const forecastType = resolveForecastType(snapshot.forecastType, snapshot)
-  const coverageStartMonthIndex = resolveForecastCoverageWindow({
-    planningYear,
-    forecastType,
-    coverageStartMonthIndex: snapshot.coverageStartMonthIndex
-  }).coverageStartMonthIndex
+  const sourceKind = resolveForecastSourceKind(snapshot.sourceKind)
 
-  if (groupName && planningYear > 0) {
-    if (forecastType === FORECAST_TYPE_REFORECAST) {
-      return `${groupName} ${planningYear} Reforecast (${MONTH_SHORT_LABELS[coverageStartMonthIndex]})`
+  if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
+    if (groupName && planningYear > 0) {
+      return `${groupName} ${planningYear} Imported Daily Forecast`
     }
 
+    if (groupName) {
+      return `${groupName} Imported Daily Forecast`
+    }
+
+    if (centerName && planningYear > 0) {
+      return `${centerName} ${planningYear} Imported Daily Forecast`
+    }
+
+    if (centerName) {
+      return `${centerName} Imported Daily Forecast`
+    }
+  }
+
+  if (sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
+    if (groupName && planningYear > 0) {
+      return `${groupName} ${planningYear} Monthly Forecast`
+    }
+
+    if (groupName) {
+      return `${groupName} Monthly Forecast`
+    }
+
+    if (centerName && planningYear > 0) {
+      return `${centerName} ${planningYear} Monthly Forecast`
+    }
+
+    if (centerName) {
+      return `${centerName} Monthly Forecast`
+    }
+  }
+
+  if (groupName && planningYear > 0) {
     if (forecastType === FORECAST_TYPE_BUDGET) {
       return `${groupName} ${planningYear} Budget Forecast`
     }

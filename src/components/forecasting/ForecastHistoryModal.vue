@@ -121,7 +121,6 @@ const handleApply = () => {
       <ForecastHistoricalDataSection
         v-model:project="draftProject"
         :column-options="columnOptions"
-        :show-summary-pane="false"
         @file-select="handleFileSelect"
       />
 

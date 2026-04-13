@@ -61,7 +61,7 @@ const splitCsvText = (text) => {
   return rows.filter((row) => row.some((cell) => String(cell || '').trim() !== ''))
 }
 
-const parseDateValue = (value) => {
+export const parseDateValue = (value) => {
   const normalized = String(value || '').trim()
   if (!normalized) {
     return ''
@@ -88,7 +88,7 @@ const parseDateValue = (value) => {
   return parsed.toISOString().slice(0, 10)
 }
 
-const parseNumberValue = (value) => {
+export const parseNumberValue = (value) => {
   if (value == null || String(value).trim() === '') {
     return null
   }

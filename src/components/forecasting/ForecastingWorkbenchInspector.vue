@@ -11,13 +11,10 @@ import AppTextField from '../ui/AppTextField.vue'
 import AppToggleSwitch from '../ui/AppToggleSwitch.vue'
 import {
   FORECAST_HORIZON_PRESETS,
-  FORECAST_TYPE_REFORECAST,
   GROWTH_OPTIONS,
   HOLIDAY_CALENDAR_OPTIONS,
   SEASONALITY_MODE_OPTIONS,
-  getForecastPlanningYear,
-  isPlanAlignedForecast,
-  resolveForecastCoverageWindow
+  isPlanAlignedForecast
 } from '../../forecasting/shared'
 
 const props = defineProps({
@@ -41,14 +38,6 @@ const project = defineModel('project', {
 
 const usesCenterManagedHolidays = computed(() => Boolean(project.value.centerManagedHolidays))
 const isPlanAligned = computed(() => isPlanAlignedForecast(project.value))
-const planningYear = computed(() => getForecastPlanningYear(project.value))
-const planAlignedCoverageWindow = computed(() =>
-  resolveForecastCoverageWindow({
-    planningYear: planningYear.value,
-    forecastType: project.value.forecastType,
-    coverageStartMonthIndex: project.value.coverageStartMonthIndex
-  })
-)
 const historyRowCount = computed(() =>
   Array.isArray(project.value.historyRows) ? project.value.historyRows.length : 0
 )
@@ -85,21 +74,9 @@ const intervalWidthPercent = computed({
   }
 })
 
-const reforecastStartMonthOptions = computed(() =>
-  Array.from({ length: 12 }, (_, monthIndex) => ({
-    label: `${planAlignedCoverageWindow.value.planningYear || planningYear.value || 'Plan'} ${new Intl.DateTimeFormat('en-US', {
-      month: 'long'
-    }).format(new Date(2026, monthIndex, 1))}`,
-    value: monthIndex
-  }))
-)
-const showPlanAlignedScopeControls = computed(() =>
-  isPlanAligned.value && project.value.forecastType === FORECAST_TYPE_REFORECAST
-)
-const showScopeSection = computed(() => !isPlanAligned.value || showPlanAlignedScopeControls.value)
+const showScopeSection = computed(() => !isPlanAligned.value)
 
 const inspectorHelp = {
-  reforecastStartMonth: 'Choose the month where this reforecast should begin replacing the original plan. Saved monthly outputs will start from this month and continue through the end of the planning year.',
   forecastHorizonDays: 'Number of future days to predict after the end of the uploaded daily history. Max 730 days.',
   holdoutDays: 'Holds back the last N historical days as a scored test set. These days are excluded from training and used for the MAPE and MAE accuracy checks.',
   confidence: 'Controls the width of the forecast interval shown around the forecast line. Higher percentages create a wider confidence band.',
@@ -134,24 +111,10 @@ const inspectorHelp = {
   <div class="grid gap-7">
     <section v-if="showScopeSection" class="grid gap-3">
       <h3 class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
-        {{ showPlanAlignedScopeControls ? 'Reforecast Window' : 'Forecast Horizon' }}
+        Forecast Horizon
       </h3>
 
-      <div v-if="showPlanAlignedScopeControls" class="grid gap-1.5">
-        <div class="flex items-center gap-1.5">
-          <label for="forecast-reforecast-start-month" class="text-sm font-medium text-slate-950">
-            Start Month
-          </label>
-          <AppInfoTooltip label="Start Month" :content="inspectorHelp.reforecastStartMonth" />
-        </div>
-        <AppSelect
-          id="forecast-reforecast-start-month"
-          v-model="project.coverageStartMonthIndex"
-          :options="reforecastStartMonthOptions"
-        />
-      </div>
-
-      <div v-else class="grid gap-3">
+      <div class="grid gap-3">
         <div class="flex flex-wrap gap-2">
           <AppButton
             v-for="preset in FORECAST_HORIZON_PRESETS"
@@ -338,11 +301,11 @@ const inspectorHelp = {
           No custom holidays.
         </div>
 
-        <div v-else class="grid gap-3">
-          <article
+        <div v-else class="overflow-hidden border border-slate-200 bg-white">
+          <div
             v-for="holiday in project.modelConfig.customHolidays"
             :key="holiday.id"
-            class="grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm"
+            class="grid gap-3 border-t border-slate-200 p-4 first:border-t-0"
           >
             <div class="grid gap-3 sm:grid-cols-2">
               <div class="grid gap-1.5">
@@ -355,7 +318,7 @@ const inspectorHelp = {
                 <AppTextField
                   :id="`holiday-name-${holiday.id}`"
                   v-model.trim="holiday.name"
-                  class="rounded-xl px-3 py-2 text-sm shadow-none"
+                  compact
                 />
               </div>
               <div class="grid gap-1.5">
@@ -369,7 +332,7 @@ const inspectorHelp = {
                   :id="`holiday-date-${holiday.id}`"
                   v-model="holiday.date"
                   type="date"
-                  class="rounded-xl px-3 py-2 text-sm shadow-none"
+                  compact
                 />
               </div>
               <div class="grid gap-1.5">
@@ -406,7 +369,7 @@ const inspectorHelp = {
                 Remove
               </AppButton>
             </div>
-          </article>
+          </div>
         </div>
       </div>
     </section>
@@ -571,11 +534,11 @@ const inspectorHelp = {
           No custom patterns.
         </div>
 
-        <div v-else class="grid gap-3">
-          <article
+        <div v-else class="overflow-hidden border border-slate-200 bg-white">
+          <div
             v-for="seasonality in project.modelConfig.customSeasonalities"
             :key="seasonality.id"
-            class="grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm"
+            class="grid gap-3 border-t border-slate-200 p-4 first:border-t-0"
           >
             <div class="grid gap-3 sm:grid-cols-2">
               <div class="grid gap-1.5">
@@ -588,7 +551,7 @@ const inspectorHelp = {
                 <AppTextField
                   :id="`seasonality-name-${seasonality.id}`"
                   v-model.trim="seasonality.name"
-                  class="rounded-xl px-3 py-2 text-sm shadow-none"
+                  compact
                 />
               </div>
               <div class="grid gap-1.5">
@@ -639,7 +602,7 @@ const inspectorHelp = {
                 Remove
               </AppButton>
             </div>
-          </article>
+          </div>
         </div>
       </div>
     </section>

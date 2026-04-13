@@ -81,9 +81,6 @@ const fallbackScopes = computed(() => {
   return [baseScope]
 })
 
-const workspaceDescription = computed(() =>
-  `Build daily forecasts for ${props.center.name} using the call center calendar and operating setup as the starting point.`
-)
 </script>
 
 <template>
@@ -93,7 +90,6 @@ const workspaceDescription = computed(() =>
     :fallback-scopes="fallbackScopes"
     :breadcrumbs="breadcrumbs"
     :title="props.embedded ? 'Forecasts' : `${props.center.name} Forecasts`"
-    :description="workspaceDescription"
     :context-summary-items="contextSummaryItems"
     project-dialog-description="Open a saved forecast for this call center. Legacy forecasts from the older shared workspace also appear here until they are resaved into the center."
     :embedded="props.embedded"

@@ -38,6 +38,7 @@ import {
   toNumber
 } from '../plannerModel'
 import {
+  DEMAND_SOURCE_FORECAST,
   createPlanDemandSource
 } from '../planner/demandSources'
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
@@ -113,6 +114,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       centerDefaults: props.centerDefaults,
       prefilledYear
     })
+    if (!sourcePlan?.id && initialState.demandSource?.mode !== DEMAND_SOURCE_FORECAST) {
+      initialState.demandSource = createPlanDemandSource({
+        ...initialState.demandSource,
+        mode: DEMAND_SOURCE_FORECAST
+      })
+    }
     const initialSelectedForecastProjectId = initialUi.selectedForecastProjectId || initialState.demandSource.forecastProjectId || ''
     const legacyInitialTab = initialUi.activeTab === 'random' || initialUi.activeTab === 'plan'
       ? initialUi.activeTab
@@ -398,8 +405,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     selectedForecastPreviewSummary,
     demandSourceSummary,
     forecastCanApply,
-    setDemandSourceMode,
+    hasLegacyManualDemandSource,
+    legacyManualSummary,
     applyForecastToDemand,
+    convertLegacyManualDemandSource: convertLegacyManualDemandSourceBase,
     reloadForecastProjects: loadForecastProjects
   } = usePlannerForecastDemandSource({
     props,
@@ -669,6 +678,18 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     emit('save', buildPlanPayload())
   }
 
+  const convertLegacyManualDemandSource = async () => {
+    const didConvert = await convertLegacyManualDemandSourceBase()
+
+    if (!didConvert) {
+      return
+    }
+
+    const savedAt = new Date().toISOString()
+    void completeManualSave(savedAt)
+    emit('save', buildPlanPayload())
+  }
+
   const cancelEditor = () => {
     void flushAutosave()
     emit('cancel')
@@ -758,6 +779,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     selectedForecastPreviewSummary,
     demandSourceSummary,
     forecastCanApply,
+    hasLegacyManualDemandSource,
+    legacyManualSummary,
     actualsMonths,
     trainingSettings,
     nextYearOpening,
@@ -795,8 +818,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     handlePresenceCopyAction,
     handleRandomCopyAction,
     setRandomOverrideMode,
-    setDemandSourceMode,
     applyForecastToDemand,
+    convertLegacyManualDemandSource,
     reloadForecastProjects: loadForecastProjects,
     loadExamplePlan,
     resetPlanner,

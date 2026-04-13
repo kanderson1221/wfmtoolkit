@@ -1,24 +1,20 @@
 import {
   computeForecastPlanningReady,
+  FORECAST_SOURCE_MODELED_DAILY,
+  FORECAST_SOURCE_MANUAL_MONTHLY,
   getForecastPlanningYear,
-  getForecastProjectMonthlyRollup,
-  resolveForecastCoverageWindow,
-  resolveForecastType
+  getForecastProjectMonthlyRollup
 } from '../forecasting/shared'
 import { MONTH_LABELS, createPlanMonth, resolvePlanningYear, toNumber } from './shared'
 
 export const DEMAND_SOURCE_MANUAL = 'manual'
 export const DEMAND_SOURCE_FORECAST = 'forecast'
 
-export const DEMAND_SOURCE_OPTIONS = [
-  { id: DEMAND_SOURCE_MANUAL, label: 'Manual Monthly Inputs' },
-  { id: DEMAND_SOURCE_FORECAST, label: 'Saved Forecast' }
-]
-
 export const createPlanDemandSource = (overrides = {}) => ({
   mode: overrides.mode === DEMAND_SOURCE_FORECAST ? DEMAND_SOURCE_FORECAST : DEMAND_SOURCE_MANUAL,
   forecastProjectId: overrides.forecastProjectId || '',
   forecastProjectName: overrides.forecastProjectName || '',
+  forecastSourceKind: overrides.forecastSourceKind || FORECAST_SOURCE_MODELED_DAILY,
   forecastType: overrides.forecastType || '',
   forecastRunAt: overrides.forecastRunAt || '',
   importedAt: overrides.importedAt || '',
@@ -33,7 +29,9 @@ export const createPlanDemandSource = (overrides = {}) => ({
         monthStart: month.monthStart || '',
         contacts: Math.max(toNumber(month.contacts, 0), 0),
         lowerBoundContacts: Math.max(toNumber(month.lowerBoundContacts, 0), 0),
-        upperBoundContacts: Math.max(toNumber(month.upperBoundContacts, 0), 0)
+        upperBoundContacts: Math.max(toNumber(month.upperBoundContacts, 0), 0),
+        averageDailyVolume: Math.max(toNumber(month.averageDailyVolume, 0), 0),
+        peakDailyVolume: Math.max(toNumber(month.peakDailyVolume, 0), 0)
       }))
     : []
 })
@@ -55,12 +53,6 @@ const parseMonthStart = (value) => {
 
 export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
   const resolvedPlanningYear = resolvePlanningYear(planningYear)
-  const resolvedForecastType = resolveForecastType(forecastProject?.forecastType, forecastProject)
-  const coverageWindow = resolveForecastCoverageWindow({
-    planningYear: getForecastPlanningYear(forecastProject) || resolvedPlanningYear,
-    forecastType: resolvedForecastType,
-    coverageStartMonthIndex: forecastProject?.coverageStartMonthIndex
-  })
   const monthlyRollup = getForecastProjectMonthlyRollup(forecastProject)
 
   if (
@@ -78,9 +70,6 @@ export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
       }
 
       const monthIndex = parsedMonthStart.getUTCMonth()
-      if (monthIndex < coverageWindow.coverageStartMonthIndex) {
-        return null
-      }
 
       return {
         monthIndex,
@@ -88,17 +77,32 @@ export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
         monthStart: row.monthStart || '',
         contacts: Math.max(toNumber(row.contacts, 0), 0),
         lowerBoundContacts: Math.max(toNumber(row.lowerBoundContacts, 0), 0),
-        upperBoundContacts: Math.max(toNumber(row.upperBoundContacts, 0), 0)
+        upperBoundContacts: Math.max(toNumber(row.upperBoundContacts, 0), 0),
+        averageDailyVolume: Math.max(toNumber(row.averageDailyVolume, 0), 0),
+        peakDailyVolume: Math.max(toNumber(row.peakDailyVolume, 0), 0)
       }
     })
     .filter(Boolean)
     .sort((left, right) => left.monthIndex - right.monthIndex)
 }
 
-export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot) => {
+const derivePeakDayUpliftPercent = (month = {}) => {
+  const averageDailyVolume = Math.max(toNumber(month.averageDailyVolume, 0), 0)
+  const peakDailyVolume = Math.max(toNumber(month.peakDailyVolume, 0), 0)
+
+  if (averageDailyVolume <= 0 || peakDailyVolume <= 0) {
+    return 0
+  }
+
+  const upliftPercent = ((peakDailyVolume / averageDailyVolume) - 1) * 100
+  return Math.max(Number(upliftPercent.toFixed(1)), 0)
+}
+
+export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot, options = {}) => {
   const nextPlanMonths = Array.isArray(planMonths)
     ? planMonths.map((month) => createPlanMonth(month))
     : MONTH_LABELS.map(() => createPlanMonth())
+  const sourceKind = String(options?.sourceKind || FORECAST_SOURCE_MODELED_DAILY)
 
   ;(Array.isArray(snapshot) ? snapshot : []).forEach((month) => {
     if (!nextPlanMonths[month.monthIndex]) {
@@ -107,7 +111,10 @@ export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot) => {
 
     nextPlanMonths[month.monthIndex] = createPlanMonth({
       ...nextPlanMonths[month.monthIndex],
-      contacts: Math.round(Math.max(toNumber(month.contacts, 0), 0))
+      contacts: Math.round(Math.max(toNumber(month.contacts, 0), 0)),
+      peakDayUpliftPercent: sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY
+        ? nextPlanMonths[month.monthIndex].peakDayUpliftPercent
+        : derivePeakDayUpliftPercent(month)
     })
   })
 

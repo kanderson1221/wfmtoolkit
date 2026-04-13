@@ -73,9 +73,9 @@ test('opens staffing-group forecasts from the call-center workspace', async ({ p
   await page.getByRole('button', { name: 'Forecasts' }).click()
   await expect(page.getByText('No forecasts yet')).toBeVisible()
   await page.getByRole('button', { name: 'New Forecast' }).first().click()
-  await expect(page.getByRole('heading', { name: 'Create Forecast' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'New Forecast' })).toBeVisible()
+  await page.getByLabel('Forecast Source').selectOption({ label: 'Build Forecast' })
   await page.getByLabel('Plan Year').selectOption({ label: '2026' })
-  await page.getByLabel('Forecast Type').selectOption({ label: 'Budget Forecast' })
   await page.getByRole('button', { name: 'Create Forecast' }).last().click()
 
   await expect(page.getByRole('heading', { level: 2, name: 'Consumer Voice 2026 Budget Forecast' })).toBeVisible()
@@ -221,7 +221,9 @@ test('creates a staffing group and opens a new plan from the call-center detail 
   await expect(page.locator('[data-section-id="staffing"]')).toBeVisible()
 
   await page.locator('[data-section-id="forecast"]').click()
-  await expect(page.getByText('Manual monthly contacts are maintained here.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Open Staffing Group Forecasts' })).toBeVisible()
+  await expect(page.getByText('Demand Source')).toBeVisible()
+  await expect(page.getByText('No saved forecasts available')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Manual Monthly Inputs' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Open Staffing Group Forecasts' })).toHaveCount(0)
   await expect(page.getByLabel('Forecast workflow').getByRole('button', { name: /Data/ })).toHaveCount(0)
 })

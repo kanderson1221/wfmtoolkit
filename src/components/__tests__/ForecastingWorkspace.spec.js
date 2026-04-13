@@ -2,6 +2,8 @@ import { mount } from '@vue/test-utils'
 
 import ForecastingWorkspace from '../ForecastingWorkspace.vue'
 import ForecastHistoryModal from '../forecasting/ForecastHistoryModal.vue'
+import ForecastImportDailyModal from '../forecasting/ForecastImportDailyModal.vue'
+import ForecastMonthlyEntryModal from '../forecasting/ForecastMonthlyEntryModal.vue'
 import ForecastingWorkbench from '../forecasting/ForecastingWorkbench.vue'
 import AppNumberField from '../ui/AppNumberField.vue'
 import { buildForecastRunInputSignature } from '../../composables/forecasting/forecastWorkspaceHelpers'
@@ -269,6 +271,7 @@ describe('ForecastingWorkspace', () => {
     expect(bodyText).toContain('Mapped Column')
     expect(bodyText).not.toContain('Field Mapping')
     expect(bodyText).not.toContain('File Summary')
+    expect(document.body.querySelector('table')).not.toBeNull()
     expect(document.body.querySelector('#forecast-date-column')).not.toBeNull()
     expect(document.body.querySelector('#forecast-contacts-column')).not.toBeNull()
     expect(document.body.querySelector('#forecast-ceiling-column')).not.toBeNull()
@@ -341,6 +344,111 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('Forecasted demand vs historical volume')
     expect(wrapper.text()).toContain('Current run:')
     expect(document.body.textContent || '').not.toContain('Upload Daily History')
+  })
+
+  it('emits save-complete after importing a read-only daily forecast', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-imported-daily-save-spec',
+        projectSeed: createForecastProject({
+          groupName: 'Consumer Voice',
+          planningYear: 2025,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planningYear: 2025,
+            groupName: 'Consumer Voice'
+          },
+          sourceKind: 'imported_daily'
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    await wrapper.findComponent(ForecastImportDailyModal).vm.$emit('apply', {
+      forecastType: 'budget',
+      coverageStartMonthIndex: 0,
+      sourceData: {
+        fileName: 'consumer-voice-2025-forecast.csv',
+        headers: ['date', 'forecast'],
+        rows: [
+          { rowIndex: 2, date: '2025-01-01', forecast: '1000' },
+          { rowIndex: 3, date: '2025-01-02', forecast: '1020' }
+        ],
+        mapping: {
+          dateColumn: 'date',
+          forecastColumn: 'forecast'
+        },
+        issues: []
+      },
+      importedDailyRows: [
+        { ds: '2025-01-01', yhat: 1000, yhatLower: 1000, yhatUpper: 1000, actualValue: null, isHistory: false },
+        { ds: '2025-01-02', yhat: 1020, yhatLower: 1020, yhatUpper: 1020, actualValue: null, isHistory: false }
+      ]
+    })
+    await flushUi()
+    await flushUi()
+
+    expect(wrapper.emitted('save-complete')).toHaveLength(1)
+  })
+
+  it('emits cancel-create when a new manual monthly forecast is cancelled before save', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-manual-monthly-cancel-spec',
+        projectSeed: createForecastProject({
+          groupName: 'Consumer Voice',
+          planningYear: 2025,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planningYear: 2025,
+            groupName: 'Consumer Voice'
+          },
+          sourceKind: 'manual_monthly'
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    await wrapper.findComponent(ForecastMonthlyEntryModal).vm.$emit('close')
+    await flushUi()
+
+    expect(wrapper.emitted('cancel-create')).toHaveLength(1)
+  })
+
+  it('emits cancel-create when a new modeled forecast history upload is cancelled before load', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-modeled-cancel-spec',
+        projectSeed: createForecastProject({
+          groupName: 'Consumer Voice',
+          planningYear: 2025,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planningYear: 2025,
+            groupName: 'Consumer Voice'
+          },
+          sourceKind: 'modeled_daily'
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    await wrapper.findComponent(ForecastHistoryModal).vm.$emit('close')
+    await flushUi()
+
+    expect(wrapper.emitted('cancel-create')).toHaveLength(1)
   })
 
   it('can hide the duplicate action in the workspace header', async () => {
@@ -579,8 +687,7 @@ describe('ForecastingWorkspace', () => {
           ...secondProject,
           id: 'forecast-2',
           name: 'Consumer Voice 2026 Reforecast (Apr)',
-          forecastType: 'reforecast',
-          coverageStartMonthIndex: 3
+          forecastType: 'budget'
         }
       ],
       'forecast-initial-project-spec'
@@ -597,18 +704,10 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).toContain('Consumer Voice 2026 Reforecast (Apr)')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Budget Forecast 2')
     expect(wrapper.text()).toContain('Data')
-    expect(wrapper.find('#forecast-type').exists()).toBe(false)
-    expect(wrapper.find('#forecast-planning-year').exists()).toBe(false)
     expect(wrapper.find('button[aria-label="Expand model parameters"]').exists()).toBe(true)
-
-    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
-    await flushUi()
-
-    expect(document.body.textContent || '').toContain('Reforecast Window')
-    expect(document.body.querySelector('#forecast-reforecast-start-month')).not.toBeNull()
-    expect(document.body.querySelector('#forecast-reforecast-start-month')?.value).toBe('3')
+    expect(wrapper.findAll('button').some((button) => button.text().trim() === 'Run')).toBe(false)
   })
 
   it('opens forecasts with prior results directly in the workbench and shows the docked worksheet', async () => {
@@ -739,24 +838,46 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
     await flushUi()
 
+    const hasWorkbenchButton = (label) =>
+      [...wrapper.findAll('button')].some((button) => button.text().trim() === label)
+    const hasBodyButton = (label) =>
+      [...document.body.querySelectorAll('button')].some(
+        (button) => button.textContent?.trim() === label
+      )
+
     expect(wrapper.text()).toContain('Range adjustment rules')
     expect(wrapper.find('button[aria-label="Collapse manual adjustments dock"]').exists()).toBe(false)
     expect(wrapper.find('button[aria-label="Expand manual adjustments dock"]').exists()).toBe(false)
+    expect(hasWorkbenchButton('Data')).toBe(true)
+    expect(hasWorkbenchButton('Run')).toBe(false)
 
     await findButtonByText(wrapper, 'Components').trigger('click')
     await flushUi()
 
     expect(wrapper.text()).not.toContain('Range adjustment rules')
+    expect(hasWorkbenchButton('Data')).toBe(false)
+    expect(hasWorkbenchButton('Run')).toBe(false)
+
+    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
+    await flushUi()
+
+    expect(hasBodyButton('Run')).toBe(false)
+
+    await clickBodyButton('Close')
 
     await findButtonByText(wrapper, 'Monthly Rollup').trigger('click')
     await flushUi()
 
     expect(wrapper.text()).not.toContain('Range adjustment rules')
+    expect(hasWorkbenchButton('Data')).toBe(false)
+    expect(hasWorkbenchButton('Run')).toBe(false)
 
     await findButtonByText(wrapper, 'Forecast').trigger('click')
     await flushUi()
 
     expect(wrapper.text()).toContain('Range adjustment rules')
+    expect(hasWorkbenchButton('Data')).toBe(true)
+    expect(hasWorkbenchButton('Run')).toBe(false)
   })
 
   it('shows a monthly component card when monthly seasonality is enabled', async () => {
@@ -876,7 +997,7 @@ describe('ForecastingWorkspace', () => {
 
     expect(
       [...wrapper.findAll('button')].some((button) => button.text().trim() === 'Run')
-    ).toBe(true)
+    ).toBe(false)
 
     await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
     await flushUi()
@@ -893,7 +1014,7 @@ describe('ForecastingWorkspace', () => {
 
     expect(
       [...wrapper.findAll('button')].some((button) => button.text().trim() === 'Run')
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('marks workbench results stale when settings change and reruns only on explicit action', async () => {
@@ -931,7 +1052,10 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('Outputs Stale')
     expect(global.fetch).not.toHaveBeenCalled()
 
-    await findButtonByText(wrapper, 'Run').trigger('click')
+    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
+    await flushUi()
+
+    await clickBodyButton('Run', { last: true })
     await flushUi()
     await flushUi()
     await flushUi()

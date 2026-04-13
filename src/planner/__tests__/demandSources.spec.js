@@ -10,8 +10,7 @@ describe('planner demand sources', () => {
     const snapshot = buildForecastDemandSnapshot(
       {
         planningYear: 2026,
-        forecastType: 'reforecast',
-        coverageStartMonthIndex: 10,
+        forecastType: 'budget',
         planningContext: {
           groupId: 'group-1',
           planningYear: 2026
@@ -20,55 +19,69 @@ describe('planner demand sources', () => {
           runAt: '2026-04-08T14:00:00Z',
           monthlyRollup: [
             { monthStart: '2025-12-01', monthLabel: 'Dec 2025', contacts: 9000, lowerBoundContacts: 8400, upperBoundContacts: 9700 },
-            { monthStart: '2026-11-01', monthLabel: 'Nov 2026', contacts: 12000, lowerBoundContacts: 11300, upperBoundContacts: 12700 },
-            { monthStart: '2026-12-01', monthLabel: 'Dec 2026', contacts: 11000, lowerBoundContacts: 10500, upperBoundContacts: 11800 }
+            ...Array.from({ length: 12 }, (_, index) => ({
+              monthStart: `2026-${String(index + 1).padStart(2, '0')}-01`,
+              monthLabel: `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]} 2026`,
+              contacts: 10000 + (index * 100),
+              lowerBoundContacts: 9500 + (index * 100),
+              upperBoundContacts: 10500 + (index * 100)
+            }))
           ]
         }
       },
       2026
     )
 
-    expect(snapshot).toEqual([
-      {
-        monthIndex: 10,
-        monthLabel: 'Nov 2026',
-        monthStart: '2026-11-01',
-        contacts: 12000,
-        lowerBoundContacts: 11300,
-        upperBoundContacts: 12700
-      },
-      {
-        monthIndex: 11,
-        monthLabel: 'Dec 2026',
-        monthStart: '2026-12-01',
-        contacts: 11000,
-        lowerBoundContacts: 10500,
-        upperBoundContacts: 11800
-      }
-    ])
+    expect(snapshot).toHaveLength(12)
+    expect(snapshot[0]).toMatchObject({
+      monthIndex: 0,
+      monthLabel: 'Jan 2026',
+      monthStart: '2026-01-01',
+      contacts: 10000
+    })
+    expect(snapshot.at(-1)).toMatchObject({
+      monthIndex: 11,
+      monthLabel: 'Dec 2026',
+      monthStart: '2026-12-01',
+      contacts: 11100
+    })
   })
 
-  it('applies a forecast snapshot into monthly contacts without disturbing AHT inputs', () => {
+  it('applies a forecast snapshot into monthly contacts and derives peak-day uplift without disturbing AHT inputs', () => {
     const appliedMonths = applyForecastSnapshotToPlanMonths(
       [
         { contacts: '', ahtSeconds: 300, peakDayUpliftPercent: 0 },
         { contacts: 5000, ahtSeconds: 320, peakDayUpliftPercent: 10 }
       ],
       [
-        { monthIndex: 0, monthLabel: 'Jan 2026', monthStart: '2026-01-01', contacts: 14000 },
-        { monthIndex: 1, monthLabel: 'Feb 2026', monthStart: '2026-02-01', contacts: 15000 }
+        {
+          monthIndex: 0,
+          monthLabel: 'Jan 2026',
+          monthStart: '2026-01-01',
+          contacts: 14000,
+          averageDailyVolume: 700,
+          peakDailyVolume: 910
+        },
+        {
+          monthIndex: 1,
+          monthLabel: 'Feb 2026',
+          monthStart: '2026-02-01',
+          contacts: 15000,
+          averageDailyVolume: 750,
+          peakDailyVolume: 900
+        }
       ]
     )
 
     expect(appliedMonths[0]).toMatchObject({
       contacts: 14000,
       ahtSeconds: 300,
-      peakDayUpliftPercent: 0
+      peakDayUpliftPercent: 30
     })
     expect(appliedMonths[1]).toMatchObject({
       contacts: 15000,
       ahtSeconds: 320,
-      peakDayUpliftPercent: 10
+      peakDayUpliftPercent: 20
     })
   })
 
@@ -78,8 +91,8 @@ describe('planner demand sources', () => {
       forecastProjectId: 'forecast-1',
       forecastProjectName: 'Q1 Forecast',
       forecastMonthSnapshot: [
-        { monthIndex: 0, monthLabel: 'Jan 2026', monthStart: '2026-01-01', contacts: 14000 },
-        { monthIndex: 1, monthLabel: 'Feb 2026', monthStart: '2026-02-01', contacts: 15500 }
+        { monthIndex: 0, monthLabel: 'Jan 2026', monthStart: '2026-01-01', contacts: 14000, averageDailyVolume: 700, peakDailyVolume: 910 },
+        { monthIndex: 1, monthLabel: 'Feb 2026', monthStart: '2026-02-01', contacts: 15500, averageDailyVolume: 775, peakDailyVolume: 930 }
       ]
     })
 
@@ -142,7 +155,9 @@ describe('planner demand sources', () => {
         monthStart: '2026-01-01',
         contacts: 2250,
         lowerBoundContacts: 2050,
-        upperBoundContacts: 2450
+        upperBoundContacts: 2450,
+        averageDailyVolume: 1125,
+        peakDailyVolume: 1250
       },
       {
         monthIndex: 1,
@@ -150,7 +165,9 @@ describe('planner demand sources', () => {
         monthStart: '2026-02-01',
         contacts: 1100,
         lowerBoundContacts: 1000,
-        upperBoundContacts: 1200
+        upperBoundContacts: 1200,
+        averageDailyVolume: 1100,
+        peakDailyVolume: 1100
       }
     ])
     expect(snapshot).toHaveLength(12)

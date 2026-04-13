@@ -20,9 +20,7 @@ import { currentYear, yearOptions } from '../../composables/monthlyPlanBuilder/s
 import { usePlanningCenterForecastLibrary } from '../../composables/planning/usePlanningCenterForecastLibrary'
 import { usePlanningCenterWorkspace } from '../../composables/planning/usePlanningCenterWorkspace'
 import {
-  FORECAST_TYPE_BUDGET,
-  FORECAST_TYPE_REFORECAST,
-  getDefaultReforecastStartMonthIndex
+  FORECAST_TYPE_BUDGET
 } from '../../forecasting/shared'
 import AppAttachedTabs from '../ui/AppAttachedTabs.vue'
 import AppButton from '../ui/AppButton.vue'
@@ -69,9 +67,8 @@ const planSettingsOpen = ref(false)
 const forecastCreateOpen = ref(false)
 const groupDraft = ref(createPlanningGroupDraft())
 const newPlanYear = ref(currentYear)
+const newForecastSourceKind = ref('')
 const newForecastYear = ref('')
-const newForecastType = ref('')
-const newForecastStartMonthIndex = ref(0)
 const {
   dialogVisible: confirmationDialogOpen,
   dialogTitle: confirmationDialogTitle,
@@ -86,7 +83,7 @@ const selectedForecastId = ref('')
 const planComparisonGridClass =
   'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(5.5rem,0.68fr)_minmax(6rem,0.76fr)_minmax(5.5rem,0.68fr)_minmax(6rem,0.72fr)_minmax(8.25rem,1fr)_minmax(8.25rem,1fr)] items-center'
 const forecastComparisonGridClass =
-  'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(11rem,1.15fr)_minmax(6rem,0.72fr)_minmax(6rem,0.72fr)_minmax(6.75rem,0.78fr)_minmax(6.75rem,0.8fr)_minmax(8.75rem,1fr)] items-center'
+  'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(9.5rem,1fr)_minmax(7.25rem,0.8fr)_minmax(6rem,0.72fr)_minmax(6rem,0.72fr)_minmax(6.75rem,0.78fr)_minmax(6.75rem,0.8fr)_minmax(8.75rem,1fr)] items-center'
 
 const planListRowGridClass = 'grid grid-cols-[auto_minmax(0,1fr)_8.25rem] items-center gap-2'
 const forecastListRowGridClass = 'grid grid-cols-[auto_minmax(0,1fr)_8.25rem] items-center gap-2'
@@ -97,21 +94,6 @@ const STAFFING_GROUP_TABS = [
   { id: 'forecasts', label: 'Forecasts' },
   { id: 'plans', label: 'Plans' }
 ]
-const FORECAST_MONTH_OPTIONS = [
-  { label: 'January', value: 0 },
-  { label: 'February', value: 1 },
-  { label: 'March', value: 2 },
-  { label: 'April', value: 3 },
-  { label: 'May', value: 4 },
-  { label: 'June', value: 5 },
-  { label: 'July', value: 6 },
-  { label: 'August', value: 7 },
-  { label: 'September', value: 8 },
-  { label: 'October', value: 9 },
-  { label: 'November', value: 10 },
-  { label: 'December', value: 11 }
-]
-
 const {
   availableYearOptions,
   breadcrumbItems,
@@ -137,8 +119,6 @@ const {
 })
 
 const {
-  createReforecastFromBudget,
-  duplicateForecast,
   deleteForecast,
   forecastRows,
   forecastStatusTone,
@@ -172,9 +152,8 @@ const openForecastCreate = () => {
     return
   }
 
+  newForecastSourceKind.value = ''
   newForecastYear.value = ''
-  newForecastType.value = ''
-  newForecastStartMonthIndex.value = 0
   selectedForecastId.value = ''
   forecastCreateOpen.value = true
 }
@@ -300,24 +279,7 @@ const planMenuItems = [
 ]
 
 const buildForecastMenuItems = (forecast) => {
-  if (forecast.forecastType === 'budget') {
-    return [
-      {
-        id: 'new-reforecast',
-        label: 'New Reforecast'
-      },
-      {
-        id: 'delete-forecast',
-        label: 'Delete'
-      }
-    ]
-  }
-
   return [
-    {
-      id: 'duplicate-forecast',
-      label: 'Duplicate Reforecast'
-    },
     {
       id: 'delete-forecast',
       label: 'Delete'
@@ -366,43 +328,18 @@ const openForecast = (forecast) => {
   navigateToHash(buildForecastOpenHref(forecast))
 }
 
-const existingBudgetForecast = computed(() => {
-  const targetYear = Number(newForecastYear.value)
-  if (newForecastType.value !== FORECAST_TYPE_BUDGET || !Number.isInteger(targetYear) || targetYear <= 0) {
-    return null
-  }
-
-  return forecastRows.value.find(
-    (forecast) =>
-      forecast.forecastType === FORECAST_TYPE_BUDGET &&
-      Number(forecast.planningYear) === targetYear
-  ) || null
-})
-
-const existingBudgetForecastHref = computed(() =>
-  existingBudgetForecast.value ? buildForecastOpenHref(existingBudgetForecast.value) : ''
-)
-
-const forecastCreateStatusMessage = computed(() => {
-  if (existingBudgetForecast.value) {
-    return `A budget forecast already exists for ${existingBudgetForecast.value.planningYearLabel}. Open it or choose Reforecast instead.`
-  }
-
-  return ''
-})
-
 const canCreateForecast = computed(() => {
   const planningYear = Number(newForecastYear.value)
 
-  if (!selectedGroup.value || !Number.isInteger(planningYear) || planningYear <= 0 || !newForecastType.value) {
+  if (
+    !selectedGroup.value ||
+    !newForecastSourceKind.value ||
+    !Number.isInteger(planningYear) ||
+    planningYear <= 0
+  ) {
     return false
   }
-
-  if (newForecastType.value === FORECAST_TYPE_BUDGET) {
-    return !existingBudgetForecast.value
-  }
-
-  return newForecastType.value === FORECAST_TYPE_REFORECAST
+  return true
 })
 
 const createForecast = () => {
@@ -411,16 +348,13 @@ const createForecast = () => {
   }
 
   const planningYear = Number(newForecastYear.value)
-  const coverageStartMonthIndex = newForecastType.value === FORECAST_TYPE_REFORECAST
-    ? Number(newForecastStartMonthIndex.value)
-    : 0
 
   forecastCreateOpen.value = false
   selectedForecastId.value = ''
   navigateToHash(
     buildPlanningGroupNewForecastHash(props.center.id, selectedGroup.value.id, planningYear, {
-      forecastType: newForecastType.value,
-      coverageStartMonthIndex
+      sourceKind: newForecastSourceKind.value,
+      forecastType: FORECAST_TYPE_BUDGET
     })
   )
 }
@@ -437,16 +371,6 @@ const confirmDeleteForecast = (forecast) => {
 }
 
 const handleForecastMenuSelect = (forecast, item) => {
-  if (item.id === 'new-reforecast') {
-    void createReforecastFromBudget(forecast)
-    return
-  }
-
-  if (item.id === 'duplicate-forecast') {
-    void duplicateForecast(forecast)
-    return
-  }
-
   if (item.id === 'delete-forecast') {
     confirmDeleteForecast(forecast)
   }
@@ -469,18 +393,6 @@ watch(
   { immediate: true }
 )
 
-watch(
-  [newForecastType, newForecastYear],
-  ([forecastType, planningYear], [previousForecastType, previousPlanningYear]) => {
-    if (forecastType !== FORECAST_TYPE_REFORECAST) {
-      return
-    }
-
-    if (forecastType !== previousForecastType || planningYear !== previousPlanningYear) {
-      newForecastStartMonthIndex.value = getDefaultReforecastStartMonthIndex(planningYear)
-    }
-  }
-)
 </script>
 
 <template>
@@ -649,18 +561,7 @@ watch(
                     v-if="!forecastRows.length"
                     title="No forecasts yet"
                     :description="`Create the first saved forecast for ${selectedGroup.name}. Forecasts stay owned by this staffing group and plans can import the monthly rollup later.`"
-                  >
-                    <div class="pt-2">
-                      <AppButton
-                        variant="primary"
-                        :icon="mdiChartLineVariant"
-                        :aria-label="`Create the first forecast for ${selectedGroup.name}`"
-                        @click="openForecastCreate"
-                      >
-                        New Forecast
-                      </AppButton>
-                    </div>
-                  </AppEmptyState>
+                  />
                 </div>
 
                 <div v-else class="grid gap-0">
@@ -674,6 +575,9 @@ watch(
                           </span>
                           <span :class="planHeaderCellClass">
                             Type
+                          </span>
+                          <span :class="planHeaderCellClass">
+                            Source
                           </span>
                           <span :class="planHeaderCellRightClass">
                             Coverage
@@ -738,6 +642,11 @@ watch(
                               {{ forecast.historyRangeLabel }}
                             </span>
                           </div>
+                          <span class="px-3">
+                            <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-600">
+                              {{ forecast.sourceKindLabel }}
+                            </span>
+                          </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
                             {{ forecast.monthlyCoverageLabel }}
                           </span>
@@ -935,13 +844,9 @@ watch(
 
     <PlanningForecastCreateModal
       v-if="forecastCreateOpen && selectedGroup"
+      v-model:source-kind="newForecastSourceKind"
       v-model:planning-year="newForecastYear"
-      v-model:forecast-type="newForecastType"
-      v-model:coverage-start-month-index="newForecastStartMonthIndex"
       :year-options="forecastYearOptions"
-      :start-month-options="FORECAST_MONTH_OPTIONS"
-      :status-message="forecastCreateStatusMessage"
-      :existing-forecast-href="existingBudgetForecastHref"
       :can-create="canCreateForecast"
       @cancel="closeForecastCreate"
       @create="createForecast"

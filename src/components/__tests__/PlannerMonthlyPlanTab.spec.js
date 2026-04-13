@@ -84,19 +84,56 @@ describe('PlannerMonthlyPlanTab', () => {
     expect(wrapper.findAll('input')).toHaveLength(2)
   })
 
-  it('explains that forecast-sourced contacts are managed in Forecast', () => {
+  it('explains that modeled forecast contacts are updated in staffing-group forecasts', () => {
     const wrapper = mountTab({
       demandSource: createPlanDemandSource({
         mode: 'forecast',
-        forecastProjectName: 'Consumer Voice 2026 Forecast'
+        forecastProjectName: 'Consumer Voice 2026 Forecast',
+        forecastSourceKind: 'modeled_daily'
       }),
       currentDemandSourceSummary: {
-        projectName: 'Consumer Voice 2026 Forecast'
+        projectName: 'Consumer Voice 2026 Forecast',
+        sourceKind: 'modeled_daily'
       }
     })
 
     expect(wrapper.text()).toContain('Monthly contacts come from Consumer Voice 2026 Forecast.')
-    expect(wrapper.text()).toContain('Manage contact volume in Forecast.')
+    expect(wrapper.text()).toContain('Update contact volume in Staffing Group Forecasts.')
+  })
+
+  it('explains that imported forecast contacts must be replaced in staffing-group forecasts', () => {
+    const wrapper = mountTab({
+      demandSource: createPlanDemandSource({
+        mode: 'forecast',
+        forecastProjectName: 'Imported Daily Forecast',
+        forecastSourceKind: 'imported_daily'
+      }),
+      currentDemandSourceSummary: {
+        projectName: 'Imported Daily Forecast',
+        sourceKind: 'imported_daily'
+      }
+    })
+
+    expect(wrapper.text()).toContain('Monthly contacts come from Imported Daily Forecast.')
+    expect(wrapper.text()).toContain('Replace that saved forecast in Staffing Group Forecasts to change contact volume.')
+  })
+
+  it('explains when the original forecast source was deleted', () => {
+    const wrapper = mountTab({
+      demandSource: createPlanDemandSource({
+        mode: 'forecast',
+        forecastProjectName: 'Deleted Staffing Forecast',
+        forecastSourceKind: 'modeled_daily'
+      }),
+      currentDemandSourceSummary: {
+        projectName: 'Deleted Staffing Forecast',
+        sourceKind: 'modeled_daily',
+        sourceMissing: true
+      }
+    })
+
+    expect(wrapper.text()).toContain('Monthly contacts came from Deleted Staffing Forecast, which has been deleted.')
+    expect(wrapper.text()).toContain('Current contact volume remains in this plan until you apply a different forecast.')
   })
 
   it('renders plan warnings through the shared status message pattern', () => {
