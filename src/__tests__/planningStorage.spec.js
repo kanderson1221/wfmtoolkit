@@ -187,6 +187,56 @@ describe('planningStorage', () => {
     expect(createPlanningCenterDraft({ operatingWeekdays: undefined }).operatingWeekdays).toEqual([1, 2, 3, 4, 5])
   })
 
+  it('migrates legacy staffing-group actuals years into one shared actuals history', () => {
+    ensurePlanningStorageApi().setItem(
+      'wfmtoolkit.callCenters.v1.default',
+      JSON.stringify([
+        {
+          id: 'center-1',
+          name: 'North America Operations',
+          timezone: 'America/New_York',
+          operatingWeekdays: [1, 2, 3, 4, 5],
+          defaultPaidHoursPerDay: 8,
+          defaultOccupancyPercent: 90,
+          defaultAdherencePercent: 95,
+          groups: [
+            {
+              id: 'group-1',
+              name: 'Consumer Voice',
+              actualsYears: [
+                {
+                  year: 2025,
+                  dailyRows: [
+                    { serviceDate: '2025-12-31', contacts: 90, ahtSeconds: 280 }
+                  ]
+                },
+                {
+                  year: 2026,
+                  dailyRows: [
+                    { serviceDate: '2026-01-01', contacts: 110, ahtSeconds: 300 }
+                  ],
+                  uploadedFileName: 'latest.csv'
+                }
+              ],
+              plans: []
+            }
+          ]
+        }
+      ])
+    )
+
+    const centers = loadPlanningCenters('default')
+
+    expect(centers[0].groups[0].actuals).toMatchObject({
+      uploadedFileName: 'latest.csv'
+    })
+    expect(centers[0].groups[0].actuals.dailyRows).toEqual([
+      { serviceDate: '2025-12-31', contacts: 90, ahtSeconds: 280 },
+      { serviceDate: '2026-01-01', contacts: 110, ahtSeconds: 300 }
+    ])
+    expect(centers[0].groups[0]).not.toHaveProperty('actualsYears')
+  })
+
   it('keeps year-scoped holiday profiles on center drafts', () => {
     const draft = createPlanningCenterDraft({
       holidayProfiles: [

@@ -10,6 +10,7 @@ import {
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode
 } from './planner/holidayCalendars'
+import { createPlanningGroupActuals, resolvePlanningGroupActuals } from './planner/groupActuals'
 import { createPlanDemandSource } from './planner/demandSources'
 import { createNextYearOpening, getCurrentCalendarYear, resolvePlanningYear } from './planner/shared'
 import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/browserStorage'
@@ -249,6 +250,7 @@ export const normalizePlanningGroup = (draftGroup, timestamp = new Date().toISOS
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, defaultAdherencePercent), 1)),
     holidayCalendarId: normalizeGroupHolidayCalendarId(snapshot.holidayCalendarId, GROUP_HOLIDAY_CALENDAR_INHERIT),
     holidayScheduleMode: normalizeHolidayScheduleMode(snapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
+    actuals: resolvePlanningGroupActuals(snapshot),
     createdAt: snapshot.createdAt || timestamp,
     updatedAt: snapshot.updatedAt || timestamp,
     plans: uniquePlansByYear(
@@ -397,16 +399,22 @@ export const createPlanningCenterDraft = (overrides = {}) => {
   }
 }
 
-export const createPlanningGroupDraft = (overrides = {}) => ({
-  name: '',
-  operatingWeekdays: [1, 2, 3, 4, 5],
-  defaultPaidHoursPerDay: 8,
-  defaultOccupancyPercent: 90,
-  defaultAdherencePercent: 95,
-  holidayCalendarId: GROUP_HOLIDAY_CALENDAR_INHERIT,
-  holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED,
-  ...overrides
-})
+export const createPlanningGroupDraft = (overrides = {}) => {
+  const snapshot = clonePlain(overrides || {})
+  const { actualsYears: _legacyActualsYears, ...groupSnapshot } = snapshot
+
+  return {
+    name: '',
+    operatingWeekdays: [1, 2, 3, 4, 5],
+    defaultPaidHoursPerDay: 8,
+    defaultOccupancyPercent: 90,
+    defaultAdherencePercent: 95,
+    holidayCalendarId: GROUP_HOLIDAY_CALENDAR_INHERIT,
+    holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED,
+    actuals: resolvePlanningGroupActuals(snapshot),
+    ...groupSnapshot
+  }
+}
 
 export const loadPlanningCenters = (scope = 'default') => {
   const scopedStorageKey = buildScopedStorageKey(CENTERS_STORAGE_KEY, scope)
@@ -541,6 +549,7 @@ export const upsertPlanningGroup = (centers, centerId, draftGroup) => {
         nextGroups[existingIndex] = {
           ...nextGroups[existingIndex],
           ...nextGroup,
+          actuals: nextGroup.actuals || nextGroups[existingIndex].actuals || createPlanningGroupActuals(),
           plans: nextGroups[existingIndex].plans || nextGroup.plans || []
         }
       }

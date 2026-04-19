@@ -4,8 +4,7 @@ import {
   buildPlanningCenterHash,
   buildPlanningGroupHash,
   buildPlanningHomeHash,
-  buildPlanningNewPlanHash,
-  buildPlanningPlanHash
+  buildPlanningNewPlanHash
 } from '../../appRoutes'
 import { createHolidayTemplateHolidays } from '../../planner/holidayCalendars'
 import { getCurrentCalendarYear } from '../../planner/shared'
@@ -319,7 +318,7 @@ describe('usePlanningWorkspace', () => {
 
     expect(planningRepository.savePlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
-    expect(window.location.hash).toBe(buildPlanningPlanHash('center-1', 'group-1', 'plan-1'))
+    expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', 2026))
   })
 
   it('persists guest workspace changes to the default local scope', async () => {

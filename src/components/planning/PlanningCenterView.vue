@@ -8,6 +8,7 @@ import {
 } from '@mdi/js'
 
 import PlanningForecastCreateModal from './PlanningForecastCreateModal.vue'
+import PlanningGroupActualsView from './PlanningGroupActualsView.vue'
 import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
 import {
@@ -22,6 +23,7 @@ import { usePlanningCenterWorkspace } from '../../composables/planning/usePlanni
 import {
   FORECAST_TYPE_BUDGET
 } from '../../forecasting/shared'
+import { createPlanningGroupActuals } from '../../planner/groupActuals'
 import AppAttachedTabs from '../ui/AppAttachedTabs.vue'
 import AppButton from '../ui/AppButton.vue'
 import AppBreadcrumbs from '../ui/AppBreadcrumbs.vue'
@@ -77,7 +79,9 @@ const {
   requestConfirmation,
   confirmPendingAction: runPendingConfirmation
 } = useConfirmDialog()
-const activeGroupWorkspaceTab = ref('forecasts')
+const activeGroupWorkspaceTab = ref('data')
+const actualsViewRef = ref(null)
+const selectedActualsScope = ref(null)
 const selectedForecastId = ref('')
 
 const planComparisonGridClass =
@@ -91,6 +95,7 @@ const planHeaderCellClass =
   'px-3 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap'
 const planHeaderCellRightClass = `${planHeaderCellClass} text-right`
 const STAFFING_GROUP_TABS = [
+  { id: 'data', label: 'Data' },
   { id: 'forecasts', label: 'Forecasts' },
   { id: 'plans', label: 'Plans' }
 ]
@@ -221,6 +226,111 @@ const saveGroup = () => {
     operatingWeekdays: props.center.operatingWeekdays
   })
   groupSettingsOpen.value = false
+}
+
+const saveGroupActuals = (actuals) => {
+  if (!selectedGroup.value) {
+    return
+  }
+
+  emit('save-group', {
+    ...selectedGroup.value,
+    actuals: createPlanningGroupActuals(actuals)
+  })
+}
+
+const handleActualsSelectionChange = (selection) => {
+  selectedActualsScope.value = selection ? { ...selection } : null
+}
+
+const clearActualsSelection = () => {
+  selectedActualsScope.value = null
+  actualsViewRef.value?.clearSelection?.()
+}
+
+const hasActualsData = computed(() =>
+  createPlanningGroupActuals(selectedGroup.value?.actuals).dailyRows.length > 0
+)
+
+const actualsMenuItems = computed(() => {
+  if (!hasActualsData.value) {
+    return []
+  }
+
+  const items = []
+
+  if (selectedActualsScope.value?.type === 'year' || selectedActualsScope.value?.type === 'month') {
+    items.push({
+      id: 'delete-selected',
+      label: `Delete ${selectedActualsScope.value.label}`,
+      tone: 'danger'
+    })
+  }
+
+  items.push({
+    id: 'clear-all',
+    label: 'Delete All Data',
+    tone: 'danger'
+  })
+
+  return items
+})
+
+const openActualsImport = () => {
+  actualsViewRef.value?.openImportModal?.()
+}
+
+const confirmDeleteActualsSelection = () => {
+  if (!selectedGroup.value || !selectedActualsScope.value) {
+    return
+  }
+
+  const scopeLabel = selectedActualsScope.value.label
+  const scopeDescription =
+    selectedActualsScope.value.type === 'year'
+      ? `Delete all loaded data for ${scopeLabel}? This removes every stored day in that year.`
+      : `Delete all loaded data for ${scopeLabel}? This removes every stored day in that month.`
+
+  requestConfirmation({
+    title: 'Delete Data?',
+    description: `${scopeDescription} This cannot be undone.`,
+    confirmLabel: `Delete ${scopeLabel}`,
+    onConfirm: () => {
+      actualsViewRef.value?.deleteSelectedScope?.()
+      selectedActualsScope.value = null
+    }
+  })
+}
+
+const confirmClearAllActuals = () => {
+  if (!selectedGroup.value) {
+    return
+  }
+
+  requestConfirmation({
+    title: 'Delete All Data?',
+    description: `Delete all loaded actuals for ${selectedGroup.value.name}? This removes the shared history used by forecasting and staffing. This cannot be undone.`,
+    confirmLabel: 'Delete All Data',
+    onConfirm: () => {
+      actualsViewRef.value?.clearAllData?.()
+      selectedActualsScope.value = null
+    }
+  })
+}
+
+const handleActualsMenuSelect = (item) => {
+  if (!item) {
+    return
+  }
+
+  if (item.id === 'delete-selected') {
+    confirmDeleteActualsSelection()
+    return
+  }
+
+  if (item.id === 'clear-all') {
+    confirmClearAllActuals()
+  }
 }
 
 const confirmDeleteGroup = (group) => {
@@ -393,15 +503,24 @@ watch(
   { immediate: true }
 )
 
+watch(
+  [selectedGroup, activeGroupWorkspaceTab],
+  () => {
+    selectedActualsScope.value = null
+    actualsViewRef.value?.clearSelection?.()
+  },
+  { immediate: true }
+)
+
 </script>
 
 <template>
-  <section class="bg-slate-50/80 py-2">
-    <div class="app-frame grid gap-2.5">
-      <div class="flex flex-col gap-1.5 lg:flex-row lg:items-end lg:justify-between">
+  <section class="bg-slate-50/80 py-1.5">
+    <div class="app-frame grid gap-2">
+      <div class="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
         <div class="grid gap-0.5">
           <AppBreadcrumbs :items="breadcrumbItems" />
-          <h1 class="text-[clamp(1.35rem,1.8vw,1.75rem)] font-semibold tracking-[-0.04em] text-slate-950">
+          <h1 class="text-[clamp(1.25rem,1.55vw,1.6rem)] font-semibold tracking-[-0.04em] text-slate-950">
             {{ props.center.name }}
           </h1>
         </div>
@@ -410,9 +529,9 @@ watch(
       <AppPanel :padded="false">
         <div class="grid h-[calc(100vh-12.5rem)] min-h-[36rem] xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
           <div class="flex min-h-0 flex-col border-b border-slate-200 xl:border-b-0 xl:border-r">
-            <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-5 py-3.5 xl:h-[8.75rem]">
-              <div class="flex h-full flex-col justify-between gap-2.5">
-                <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">
+            <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-4 py-3 xl:h-[6rem]">
+              <div class="flex h-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:items-start">
+                <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">
                   Staffing Groups
                 </h2>
 
@@ -420,6 +539,7 @@ watch(
                   size="sm"
                   :icon="mdiPlus"
                   variant="primary"
+                  class="self-start sm:self-auto"
                   @click="openCreateGroup"
                 >
                   New Group
@@ -488,17 +608,38 @@ watch(
 
           <div class="flex min-h-0 flex-col bg-slate-50/30">
             <div v-if="selectedGroup" class="flex min-h-0 flex-col">
-              <div class="border-b border-slate-200 px-5 py-3.5 xl:h-[8.75rem]">
-                <div class="flex h-full flex-col justify-between gap-2">
-                  <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                    <div class="grid gap-1">
-                      <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">
+              <div class="border-b border-slate-200 px-4 py-3 xl:h-[6rem]">
+                <div class="flex h-full flex-col justify-between gap-1.5">
+                  <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="grid gap-0.5">
+                      <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">
                         {{ selectedGroup.name }}
                       </h2>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2">
-                      <template v-if="activeGroupWorkspaceTab === 'forecasts'">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      <template v-if="activeGroupWorkspaceTab === 'data'">
+                        <AppButton
+                          size="sm"
+                          variant="primary"
+                          :icon="mdiPlus"
+                          :aria-label="`Add actuals data for ${selectedGroup.name}`"
+                          @click="openActualsImport"
+                        >
+                          Add Data
+                        </AppButton>
+                        <AppMenu
+                          v-if="actualsMenuItems.length"
+                          :items="actualsMenuItems"
+                          :trigger-icon="mdiDotsVertical"
+                          :trigger-label="`Manage data for ${selectedGroup.name}`"
+                          compact
+                          trigger-variant="icon-quiet"
+                          @select="handleActualsMenuSelect"
+                        />
+                      </template>
+
+                      <template v-else-if="activeGroupWorkspaceTab === 'forecasts'">
                         <AppButton
                           size="sm"
                           variant="primary"
@@ -511,7 +652,7 @@ watch(
                       </template>
 
                       <AppButton
-                        v-else
+                        v-else-if="activeGroupWorkspaceTab === 'plans'"
                         size="sm"
                         variant="primary"
                         :icon="mdiPlus"
@@ -523,13 +664,13 @@ watch(
                     </div>
                   </div>
 
-                  <div class="flex flex-wrap gap-2">
+                  <div class="flex flex-wrap gap-1.5">
                     <div
                       v-for="item in selectedGroupDefaults"
                       :key="item.label"
-                      class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
+                      class="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.82rem] text-slate-700"
                     >
-                      <span class="mr-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      <span class="mr-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                         {{ item.label }}
                       </span>
                       <strong class="font-semibold text-slate-950">{{ item.value }}</strong>
@@ -543,7 +684,9 @@ watch(
                   v-model:active-id="activeGroupWorkspaceTab"
                   :items="STAFFING_GROUP_TABS"
                   aria-label="Staffing group workspace sections"
-                  tab-width-class="w-[9.5rem]"
+                  height-class="h-12"
+                  button-padding-class="px-4"
+                  tab-width-class="w-[8.75rem]"
                 />
               </div>
 
@@ -691,6 +834,22 @@ watch(
                 </div>
               </div>
 
+              <div
+                v-else-if="activeGroupWorkspaceTab === 'data'"
+                class="flex-1 min-h-0 overflow-y-auto"
+                @click="clearActualsSelection"
+              >
+                <PlanningGroupActualsView
+                  ref="actualsViewRef"
+                  :center="props.center"
+                  :group="selectedGroup"
+                  :format-whole="formatWhole"
+                  :format-number="formatNumber"
+                  @save-actuals="saveGroupActuals"
+                  @selection-change="handleActualsSelectionChange"
+                />
+              </div>
+
               <div v-else-if="planRows.length" class="flex-1 min-h-0 overflow-y-auto">
                 <div class="border-b border-slate-200 bg-white/80 px-3 py-3">
                   <div :class="planListRowGridClass">
@@ -807,7 +966,7 @@ watch(
             <div v-else class="flex-1 min-h-0 overflow-y-auto p-5">
               <AppEmptyState
                 title="Select a staffing group"
-                description="Choose a staffing group from the left to review its defaults, forecasts, and yearly plans."
+                description="Choose a staffing group from the left to review its defaults, data, forecasts, and yearly plans."
               />
             </div>
           </div>

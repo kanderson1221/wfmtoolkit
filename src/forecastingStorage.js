@@ -44,7 +44,7 @@ export const normalizeForecastProject = (draftProject = {}, timestamp = new Date
     name: defaultName,
     forecastHorizonDays: Math.max(1, Math.round(toNumber(snapshot.forecastHorizonDays, 365))),
     uploadedHeaders: Array.isArray(snapshot.uploadedHeaders) ? [...snapshot.uploadedHeaders] : [],
-    uploadedRows: Array.isArray(snapshot.uploadedRows) ? snapshot.uploadedRows.map((row) => ({ ...row })) : [],
+    uploadedRows: [],
     historyRows: Array.isArray(snapshot.historyRows) ? snapshot.historyRows.map((row) => ({ ...row })) : [],
     parserIssues: Array.isArray(snapshot.parserIssues) ? [...snapshot.parserIssues] : [],
     normalizationIssues: Array.isArray(snapshot.normalizationIssues) ? [...snapshot.normalizationIssues] : [],

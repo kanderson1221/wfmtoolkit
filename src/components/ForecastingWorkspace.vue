@@ -196,7 +196,7 @@ const handleHistoryModalClose = () => {
   if (
     isUnsavedSourceCreation(FORECAST_SOURCE_MODELED_DAILY) &&
     !currentProject.value?.historyRows?.length &&
-    !currentProject.value?.uploadedRows?.length
+    !currentProject.value?.uploadedFileName
   ) {
     emit('cancel-create')
   }

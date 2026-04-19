@@ -13,6 +13,14 @@ const props = defineProps({
   tabWidthClass: {
     type: String,
     default: ''
+  },
+  heightClass: {
+    type: String,
+    default: 'h-14'
+  },
+  buttonPaddingClass: {
+    type: String,
+    default: 'px-5'
   }
 })
 
@@ -34,7 +42,7 @@ const handleSelect = (item) => {
 
 <template>
   <nav class="border-b border-slate-200 bg-white" :aria-label="props.ariaLabel">
-    <div class="flex h-14 w-fit items-stretch gap-0">
+    <div class="flex w-fit items-stretch gap-0" :class="props.heightClass">
       <AppButton
         v-for="item in props.items"
         :key="item.id"
@@ -42,7 +50,8 @@ const handleSelect = (item) => {
         :active="activeId === item.id"
         :disabled="item.disabled"
         :class="[
-          'relative -mb-px h-full self-stretch rounded-none !border-t-0 !border-b-0 px-5 py-0 shadow-none',
+          'relative -mb-px h-full self-stretch rounded-none !border-t-0 !border-b-0 py-0 shadow-none',
+          props.buttonPaddingClass,
           props.tabWidthClass,
           item.class
         ]"

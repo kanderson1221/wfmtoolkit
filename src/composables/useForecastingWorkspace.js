@@ -27,8 +27,7 @@ import {
 import { useForecastProjectLibrary } from './forecasting/useForecastProjectLibrary'
 import {
   applyForecastHistoryState,
-  buildForecastHistoryStateFromFile,
-  normalizeForecastHistoryDraft
+  buildForecastHistoryStateFromFile
 } from '../forecasting/historyImport'
 
 const extractApiErrorMessage = async (response) => {
@@ -171,16 +170,6 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       activeResultTab.value = 'daily'
     }
   })
-
-  const applyNormalization = () => {
-    const normalized = normalizeForecastHistoryDraft({
-      rows: currentProject.value.uploadedRows,
-      mapping: currentProject.value.columnMapping
-    })
-
-    currentProject.value.historyRows = normalized.historyRows
-    currentProject.value.normalizationIssues = normalized.issues
-  }
 
   const handleHistoryFileSelect = async (event) => {
     const input = event?.target
@@ -349,7 +338,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       ...currentProject.value.normalizationIssues
     ]
 
-    if (!currentProject.value.uploadedRows.length) {
+    if (!currentProject.value.historyRows.length) {
       messages.push('Upload a CSV with daily history before running a forecast.')
     }
 
@@ -401,14 +390,6 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     historyRangeLabel: historySummary.value.dateRangeLabel,
     lastSavedAtLabel: currentProject.value.updatedAt ? formatDateTime(currentProject.value.updatedAt) : 'Not saved yet'
   }))
-
-  watch(
-    () => [currentProject.value.uploadedRows, currentProject.value.columnMapping],
-    () => {
-      applyNormalization()
-    },
-    { deep: true, immediate: true }
-  )
 
   watch(
     () => [currentProject.value.id, currentProject.value.lastRun?.runAt, currentProject.value.lastRun?.inputSignature],

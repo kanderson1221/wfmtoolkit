@@ -5,9 +5,7 @@ export const sanitizeForecastColumnMapping = (headers = [], mapping = {}, guesse
 
   return {
     dateColumn: availableHeaders.has(mapping.dateColumn) ? mapping.dateColumn : guessed.dateColumn || '',
-    volumeColumn: availableHeaders.has(mapping.volumeColumn) ? mapping.volumeColumn : guessed.volumeColumn || '',
-    capColumn: availableHeaders.has(mapping.capColumn) ? mapping.capColumn : guessed.capColumn || '',
-    floorColumn: availableHeaders.has(mapping.floorColumn) ? mapping.floorColumn : guessed.floorColumn || ''
+    volumeColumn: availableHeaders.has(mapping.volumeColumn) ? mapping.volumeColumn : guessed.volumeColumn || ''
   }
 }
 
@@ -62,9 +60,7 @@ export const applyForecastHistoryState = (project, nextState = {}) => {
 
   project.uploadedFileName = nextState.uploadedFileName || ''
   project.uploadedHeaders = Array.isArray(nextState.uploadedHeaders) ? [...nextState.uploadedHeaders] : []
-  project.uploadedRows = Array.isArray(nextState.uploadedRows)
-    ? nextState.uploadedRows.map((row) => ({ ...row }))
-    : []
+  project.uploadedRows = []
   project.parserIssues = Array.isArray(nextState.parserIssues) ? [...nextState.parserIssues] : []
   project.historyRows = Array.isArray(nextState.historyRows)
     ? nextState.historyRows.map((row) => ({ ...row }))
@@ -74,8 +70,6 @@ export const applyForecastHistoryState = (project, nextState = {}) => {
     : []
   project.columnMapping = {
     dateColumn: nextState.columnMapping?.dateColumn || '',
-    volumeColumn: nextState.columnMapping?.volumeColumn || '',
-    capColumn: nextState.columnMapping?.capColumn || '',
-    floorColumn: nextState.columnMapping?.floorColumn || ''
+    volumeColumn: nextState.columnMapping?.volumeColumn || ''
   }
 }

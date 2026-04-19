@@ -379,8 +379,8 @@ const handleCenterMenuSelect = (center, item) => {
         description="Manage call centers, staffing groups, and saved annual plans."
       >
         <template #actions>
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="flex flex-wrap items-center gap-2.5">
+          <div class="flex flex-wrap items-end gap-2">
+            <div class="grid min-w-[6.75rem] gap-1">
               <label
                 for="portfolio-year"
                 class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500"

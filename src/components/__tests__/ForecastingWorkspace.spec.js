@@ -90,9 +90,7 @@ const createLoadedProject = (fileName = 'history.csv') => createForecastProject(
   normalizationIssues: [],
   columnMapping: {
     dateColumn: 'service_date',
-    volumeColumn: 'call_volume',
-    capColumn: '',
-    floorColumn: ''
+    volumeColumn: 'call_volume'
   },
   modelConfig: {
     holdoutDays: 0
@@ -185,7 +183,6 @@ const createForecastRunResults = () => ({
 const buildHistoryImportState = (project) => ({
   uploadedFileName: project.uploadedFileName,
   uploadedHeaders: project.uploadedHeaders,
-  uploadedRows: project.uploadedRows,
   parserIssues: project.parserIssues,
   historyRows: project.historyRows,
   normalizationIssues: project.normalizationIssues,
@@ -274,8 +271,8 @@ describe('ForecastingWorkspace', () => {
     expect(document.body.querySelector('table')).not.toBeNull()
     expect(document.body.querySelector('#forecast-date-column')).not.toBeNull()
     expect(document.body.querySelector('#forecast-contacts-column')).not.toBeNull()
-    expect(document.body.querySelector('#forecast-ceiling-column')).not.toBeNull()
-    expect(document.body.querySelector('#forecast-floor-column')).not.toBeNull()
+    expect(document.body.querySelector('#forecast-ceiling-column')).toBeNull()
+    expect(document.body.querySelector('#forecast-floor-column')).toBeNull()
   })
 
   it('automatically runs the forecast after the first successful history load', async () => {
@@ -322,9 +319,7 @@ describe('ForecastingWorkspace', () => {
       normalizationIssues: [],
       columnMapping: {
         dateColumn: 'service_date',
-        volumeColumn: 'call_volume',
-        capColumn: '',
-        floorColumn: ''
+        volumeColumn: 'call_volume'
       }
     })
     await wrapper.findComponent(ForecastHistoryModal).vm.$emit('apply', buildHistoryImportState(loadedProject))
@@ -389,8 +384,9 @@ describe('ForecastingWorkspace', () => {
         { ds: '2025-01-02', yhat: 1020, yhatLower: 1020, yhatUpper: 1020, actualValue: null, isHistory: false }
       ]
     })
-    await flushUi()
-    await flushUi()
+    for (let attempt = 0; attempt < 6 && !wrapper.emitted('save-complete')?.length; attempt += 1) {
+      await flushUi()
+    }
 
     expect(wrapper.emitted('save-complete')).toHaveLength(1)
   })
@@ -794,9 +790,7 @@ describe('ForecastingWorkspace', () => {
           historyRows: staleHistoryRows,
           columnMapping: {
             dateColumn: 'service_date',
-            volumeColumn: 'call_volume',
-            capColumn: '',
-            floorColumn: ''
+            volumeColumn: 'call_volume'
           }
         })
       }

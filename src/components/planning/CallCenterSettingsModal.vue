@@ -424,7 +424,7 @@ const holidayYearStatusMessage = computed(() => {
 
       <AppWorkspaceSection
         title="Closed Dates"
-        :description="`Year-specific holiday defaults for ${selectedHolidayYear}. Saved plans keep their own holiday snapshot.`"
+        :description="`Forecasting depends on holiday schedules being set up for historical and future years. Saved plans keep their own ${selectedHolidayYear} holiday snapshot.`"
       >
         <div class="grid gap-4">
           <div class="grid gap-3 rounded-[20px] border border-slate-200 bg-slate-50/70 p-4 lg:grid-cols-[minmax(0,12rem)_1fr] lg:items-end">

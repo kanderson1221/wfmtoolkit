@@ -27,9 +27,13 @@ const visible = defineModel('visible', {
 })
 
 const draftProject = ref(createForecastProject())
+const draftUploadedRows = ref([])
 
 const resetDraftProject = () => {
   draftProject.value = createForecastProject(props.project)
+  draftUploadedRows.value = Array.isArray(props.project?.uploadedRows)
+    ? props.project.uploadedRows.map((row) => ({ ...row }))
+    : []
 }
 
 watch(
@@ -43,10 +47,14 @@ watch(
 )
 
 watch(
-  () => [draftProject.value.uploadedRows, draftProject.value.columnMapping],
+  () => [draftUploadedRows.value, draftProject.value.columnMapping],
   () => {
+    if (!draftUploadedRows.value.length) {
+      return
+    }
+
     const normalized = normalizeForecastHistoryDraft({
-      rows: draftProject.value.uploadedRows,
+      rows: draftUploadedRows.value,
       mapping: draftProject.value.columnMapping
     })
     draftProject.value.historyRows = normalized.historyRows
@@ -71,6 +79,7 @@ const historyIssues = computed(() => [
 const canApply = computed(() =>
   draftProject.value.historyRows.length > 0 && historyIssues.value.length === 0
 )
+const canEditMapping = computed(() => draftUploadedRows.value.length > 0)
 
 const handleClose = () => {
   visible.value = false
@@ -90,6 +99,9 @@ const handleFileSelect = async (event) => {
     draftProject.value.columnMapping
   )
 
+  draftUploadedRows.value = Array.isArray(historyState.uploadedRows)
+    ? historyState.uploadedRows.map((row) => ({ ...row }))
+    : []
   applyForecastHistoryState(draftProject.value, historyState)
 }
 
@@ -97,7 +109,6 @@ const handleApply = () => {
   emit('apply', {
     uploadedFileName: draftProject.value.uploadedFileName,
     uploadedHeaders: draftProject.value.uploadedHeaders,
-    uploadedRows: draftProject.value.uploadedRows,
     parserIssues: draftProject.value.parserIssues,
     historyRows: draftProject.value.historyRows,
     normalizationIssues: draftProject.value.normalizationIssues,
@@ -120,6 +131,7 @@ const handleApply = () => {
     <div class="grid gap-4">
       <ForecastHistoricalDataSection
         v-model:project="draftProject"
+        :can-edit-mapping="canEditMapping"
         :column-options="columnOptions"
         @file-select="handleFileSelect"
       />

@@ -4,7 +4,6 @@ import {
   buildPlanningGroupForecastsHash,
   buildPlanningGroupHash,
   buildPlanningHomeHash,
-  buildPlanningPlanHash,
   navigateToHash
 } from '../appRoutes'
 import { buildForecastStorageScope } from '../forecastingRepository'
@@ -381,12 +380,13 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       ? savedGroup?.plans.find((plan) => plan.id === planDraft.id)
       : savedGroup?.plans.find((plan) => Number(plan.planningYear) === Number(planDraft.planningYear))
 
-    if (savedPlan?.id) {
-      navigateToHash(buildPlanningPlanHash(targetCenterId, targetGroupId, savedPlan.id))
-      return
-    }
-
-    navigateToHash(buildPlanningGroupHash(targetCenterId, targetGroupId, planDraft.planningYear))
+    navigateToHash(
+      buildPlanningGroupHash(
+        targetCenterId,
+        targetGroupId,
+        savedPlan?.planningYear || planDraft.planningYear
+      )
+    )
   }
 
   const handleDeletePlan = async ({ centerId, groupId, planId, planningYear }) => {

@@ -1,8 +1,6 @@
 const CANDIDATE_HEADERS = {
   dateColumn: ['date', 'service_date', 'day', 'ds'],
-  volumeColumn: ['call_volume', 'volume', 'calls', 'daily_calls', 'y'],
-  capColumn: ['cap', 'upper_cap', 'capacity_cap'],
-  floorColumn: ['floor', 'lower_floor']
+  volumeColumn: ['call_volume', 'volume', 'calls', 'daily_calls', 'y']
 }
 
 const normalizeHeader = (value) =>
@@ -163,8 +161,6 @@ export const normalizeUploadedRows = ({ rows = [], mapping = {} } = {}) => {
 
   const dateColumn = mapping.dateColumn || ''
   const volumeColumn = mapping.volumeColumn || ''
-  const capColumn = mapping.capColumn || ''
-  const floorColumn = mapping.floorColumn || ''
 
   if (!dateColumn) {
     issues.push('Choose the date column before running a forecast.')
@@ -184,8 +180,6 @@ export const normalizeUploadedRows = ({ rows = [], mapping = {} } = {}) => {
   rows.forEach((row) => {
     const ds = parseDateValue(row[dateColumn])
     const rawVolume = parseNumberValue(row[volumeColumn])
-    const cap = capColumn ? parseNumberValue(row[capColumn]) : null
-    const floor = floorColumn ? parseNumberValue(row[floorColumn]) : null
 
     if (!ds) {
       issues.push(`Row ${row.rowIndex}: enter a valid date in "${dateColumn}".`)
@@ -203,22 +197,12 @@ export const normalizeUploadedRows = ({ rows = [], mapping = {} } = {}) => {
       return
     }
 
-    if (cap != null && cap < 0) {
-      issues.push(`Row ${row.rowIndex}: cap must be zero or greater.`)
-      return
-    }
-
-    if (floor != null && floor < 0) {
-      issues.push(`Row ${row.rowIndex}: floor must be zero or greater.`)
-      return
-    }
-
     historyRows.push({
       sourceRowIndex: row.rowIndex,
       ds,
       y,
-      cap,
-      floor
+      cap: null,
+      floor: null
     })
   })
 

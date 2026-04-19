@@ -96,9 +96,7 @@ export const sanitizeColumnMapping = (headers = [], mapping = {}, guessed = {}) 
 
   return {
     dateColumn: availableHeaders.has(mapping.dateColumn) ? mapping.dateColumn : guessed.dateColumn || '',
-    volumeColumn: availableHeaders.has(mapping.volumeColumn) ? mapping.volumeColumn : guessed.volumeColumn || '',
-    capColumn: availableHeaders.has(mapping.capColumn) ? mapping.capColumn : guessed.capColumn || '',
-    floorColumn: availableHeaders.has(mapping.floorColumn) ? mapping.floorColumn : guessed.floorColumn || ''
+    volumeColumn: availableHeaders.has(mapping.volumeColumn) ? mapping.volumeColumn : guessed.volumeColumn || ''
   }
 }
 

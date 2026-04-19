@@ -153,6 +153,12 @@ const findSpanByText = (wrapper, label) =>
 const findHeadingByText = (wrapper, label) =>
   wrapper.findAll('h2').find((node) => node.text().trim() === label)
 
+const openTab = async (wrapper, label) => {
+  const tab = wrapper.findAll('button').find((node) => node.text().trim() === label)
+  expect(tab).toBeTruthy()
+  await tab.trigger('click')
+}
+
 const flushPromises = async () => {
   await Promise.resolve()
   await Promise.resolve()
@@ -196,15 +202,15 @@ describe('PlanningCenterView', () => {
     expect(averageHeader.classes()).not.toContain('truncate')
   })
 
-  it('uses matching fixed xl header heights for the group and plan panes', () => {
+  it('uses matching compact xl header heights for the group and plan panes', () => {
     const wrapper = buildWrapper()
     const staffingGroupsHeading = findHeadingByText(wrapper, 'Staffing Groups')
     const groupWorkspaceHeading = findHeadingByText(wrapper, 'Voice Support')
     const staffingGroupsHeader = staffingGroupsHeading.element.closest('.border-b')
     const groupWorkspaceHeader = groupWorkspaceHeading.element.closest('.border-b')
 
-    expect(staffingGroupsHeader.className).toContain('xl:h-[8.75rem]')
-    expect(groupWorkspaceHeader.className).toContain('xl:h-[8.75rem]')
+    expect(staffingGroupsHeader.className).toContain('xl:h-[6rem]')
+    expect(groupWorkspaceHeader.className).toContain('xl:h-[6rem]')
   })
 
   it('shows the saved hours of operation in the group defaults summary', () => {
@@ -214,18 +220,80 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('08:00 to 18:00')
   })
 
-  it('shows forecast and plan tabs in the selected staffing-group workspace', async () => {
+  it('shows data as the left-most staffing-group tab', async () => {
     const wrapper = buildWrapper()
+    const tabButtons = wrapper
+      .findAll('button')
+      .map((node) => node.text().trim())
+      .filter((label) => ['Data', 'Forecasts', 'Plans'].includes(label))
 
-    expect(wrapper.text()).toContain('Forecasts')
-    expect(wrapper.text()).toContain('Plans')
-    expect(wrapper.text()).toContain('New Forecast')
+    expect(tabButtons).toEqual(['Data', 'Forecasts', 'Plans'])
+    expect(wrapper.text()).toContain('Add Data')
+    expect(wrapper.text()).not.toContain('New Forecast')
+  })
+
+  it('offers one manage-data action that deletes the selected data scope', async () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 85,
+            defaultAdherencePercent: 95,
+            actuals: {
+              sourceMode: 'daily_upload',
+              uploadedFileName: 'actuals.csv',
+              dailyRows: [
+                { serviceDate: '2025-12-31', contacts: 100, ahtSeconds: 290 },
+                { serviceDate: '2026-01-01', contacts: 90, ahtSeconds: 280 },
+                { serviceDate: '2026-01-05', contacts: 110, ahtSeconds: 300 }
+              ]
+            },
+            plans: []
+          }
+        ]
+      }
+    })
+
+    const currentYearRow = wrapper.find('[aria-label="Select 2026 data"]')
+    await currentYearRow.trigger('click')
+
+    expect(wrapper.text()).toContain('Delete 2026')
+
+    const deleteSelectedButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Delete 2026')
+    await deleteSelectedButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Delete Data?')
+
+    const confirmButton = wrapper.findAll('button').filter((node) => node.text().trim() === 'Delete 2026').at(-1)
+    await confirmButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('save-group')).toBeTruthy()
+    expect(wrapper.emitted('save-group').at(-1)[0]).toMatchObject({
+      id: 'group-1',
+      actuals: {
+        dailyRows: [
+          { serviceDate: '2025-12-31', contacts: 100, ahtSeconds: 290 }
+        ]
+      }
+    })
   })
 
   it('opens a create-forecast modal and routes new forecasts through source and year', async () => {
     window.location.hash = '#planning'
 
     const wrapper = buildWrapper()
+    await openTab(wrapper, 'Forecasts')
     const newForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Forecast')
     await newForecastButton.trigger('click')
 
@@ -249,6 +317,7 @@ describe('PlanningCenterView', () => {
     window.location.hash = '#planning'
 
     const wrapper = buildWrapper()
+    await openTab(wrapper, 'Forecasts')
     const newForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Forecast')
     await newForecastButton.trigger('click')
 
@@ -342,6 +411,7 @@ describe('PlanningCenterView', () => {
 
     await flushPromises()
     await flushPromises()
+    await openTab(wrapper, 'Forecasts')
 
     expect(wrapper.text()).toContain('Used By')
     expect(wrapper.text()).toContain('2026 Plan')
@@ -376,6 +446,7 @@ describe('PlanningCenterView', () => {
     const wrapper = buildWrapper()
     await flushPromises()
     await flushPromises()
+    await openTab(wrapper, 'Forecasts')
 
     const forecastRow = wrapper.find('[aria-label="Select Budget Forecast for Voice Support"]')
     expect(forecastRow.exists()).toBe(true)
@@ -463,6 +534,7 @@ describe('PlanningCenterView', () => {
     await flushPromises()
     await flushPromises()
     await flushPromises()
+    await openTab(wrapper, 'Forecasts')
 
     expect(wrapper.text()).toContain('Budget Forecast')
 
@@ -550,6 +622,7 @@ describe('PlanningCenterView', () => {
     await flushPromises()
     await flushPromises()
     await flushPromises()
+    await openTab(wrapper, 'Forecasts')
 
     const deleteButtons = wrapper.findAll('button').filter((node) => node.text().trim() === 'Delete')
     await deleteButtons[deleteButtons.length - 1].trigger('click')
@@ -624,6 +697,7 @@ describe('PlanningCenterView', () => {
     await flushPromises()
     await flushPromises()
     await flushPromises()
+    await openTab(wrapper, 'Forecasts')
 
     expect(wrapper.text()).not.toContain('New Reforecast')
     expect(workspaceProjects).toHaveLength(0)

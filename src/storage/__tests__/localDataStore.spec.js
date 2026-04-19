@@ -55,6 +55,19 @@ const sampleCenters = [
         defaultAdherencePercent: 95,
         holidayCalendarId: 'inherit',
         holidayScheduleMode: 'closed',
+        actuals: {
+          sourceMode: 'daily_upload',
+          dailyRows: [
+            { serviceDate: '2026-01-02', contacts: 110, ahtSeconds: 300 }
+          ],
+          uploadedFileName: 'group-actuals.csv',
+          uploadedHeaders: ['service_date', 'contacts', 'average_handle_time_seconds'],
+          columnMapping: {
+            dateColumn: 'service_date',
+            volumeColumn: 'contacts',
+            ahtColumn: 'average_handle_time_seconds'
+          }
+        },
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
         plans: [
@@ -126,6 +139,11 @@ const sampleForecasts = [
     historyRows: [
       { ds: '2025-01-01', y: 100 },
       { ds: '2025-01-02', y: 120 }
+    ],
+    uploadedFileName: 'history.csv',
+    uploadedHeaders: ['service_date', 'call_volume', 'internal_notes'],
+    uploadedRows: [
+      { rowIndex: 2, service_date: '2025-01-01', call_volume: '100', internal_notes: 'sensitive' }
     ],
     sourceData: {
       fileName: 'imported-forecast.csv',
@@ -232,8 +250,19 @@ describe('localDataStore', () => {
     const loadedDraft = await loadPlannerDraftFromDexie('user-1:plan:plan-1')
 
     expect(loadedCenters[0].groups[0].plans[0].planningYear).toBe(2026)
+    expect(loadedCenters[0].groups[0].actuals).toMatchObject({
+      sourceMode: 'daily_upload',
+      uploadedFileName: 'group-actuals.csv'
+    })
+    expect(loadedCenters[0].groups[0].actuals.dailyRows[0]).toMatchObject({
+      serviceDate: '2026-01-02',
+      contacts: 110,
+      ahtSeconds: 300
+    })
     expect(loadedForecasts[0].sourceKind).toBe('imported_daily')
     expect(loadedForecasts[0].sourceData.fileName).toBe('imported-forecast.csv')
+    expect(loadedForecasts[0].uploadedHeaders).toEqual(['service_date', 'call_volume', 'internal_notes'])
+    expect(loadedForecasts[0].uploadedRows).toEqual([])
     expect(loadedForecasts[0].lastRun.monthlyRollup[0].contacts).toBe(3400)
     expect(loadedForecasts[0].lastRun.components.monthly[0].value).toBe(5.7)
     expect(loadedForecasts[0].manualAdjustments[0]).toMatchObject({

@@ -7,10 +7,6 @@ import AppSelect from '../ui/AppSelect.vue'
 import AppTableShell from '../ui/AppTableShell.vue'
 
 const props = defineProps({
-  canEditMapping: {
-    type: Boolean,
-    default: false
-  },
   columnOptions: {
     type: Array,
     default: () => []
@@ -19,20 +15,19 @@ const props = defineProps({
 
 const emit = defineEmits(['file-select'])
 
-const project = defineModel('project', {
+const state = defineModel('state', {
   type: Object,
   required: true
 })
 
-const hasLoadedFile = computed(() => Boolean(project.value.uploadedFileName))
-const mappingLocked = computed(() => hasLoadedFile.value && !props.canEditMapping)
+const hasLoadedFile = computed(() => Boolean(state.value.uploadedFileName))
 
 const definitionRows = computed(() => [
   {
     id: 'date',
     label: 'Date',
     required: 'Y',
-    example: '2025-01-01',
+    example: '2026-01-15',
     definition: 'Service date.',
     mappingKey: 'dateColumn'
   },
@@ -41,8 +36,16 @@ const definitionRows = computed(() => [
     label: 'Contacts',
     required: 'Y',
     example: '1420',
-    definition: 'Offered contact volume.',
+    definition: 'Daily contact volume.',
     mappingKey: 'volumeColumn'
+  },
+  {
+    id: 'aht',
+    label: 'Avg AHT Sec',
+    required: 'Y',
+    example: '318',
+    definition: 'Average handle time in seconds for that day.',
+    mappingKey: 'ahtColumn'
   }
 ])
 </script>
@@ -50,8 +53,8 @@ const definitionRows = computed(() => [
 <template>
   <div class="grid gap-3">
     <AppFileDropzone
-      input-id="forecast-history-upload"
-      title="Upload Daily History"
+      input-id="planning-group-actuals-upload"
+      title="Upload Daily Actuals"
       button-label="Choose CSV"
       description="Drag and drop a CSV here."
       hint-text=""
@@ -68,16 +71,13 @@ const definitionRows = computed(() => [
         <div class="grid gap-0.5">
           <p class="text-sm font-semibold text-slate-950">File Definition</p>
           <p class="text-sm text-slate-600">
-            Map the service date and call volume columns used to train the forecast. Other file columns are ignored.
-          </p>
-          <p v-if="mappingLocked" class="text-sm text-slate-500">
-            Upload a replacement CSV to change the mapped columns.
+            Map the service date, contacts, and average handle time columns. Other file columns are ignored.
           </p>
         </div>
         <AppButton
           size="sm"
           variant="primary"
-          href="/forecasting_daily_volume_sample_2022_2024.csv"
+          href="/planning_group_daily_actuals_template.csv"
           download
         >
           Download Sample Template
@@ -85,11 +85,11 @@ const definitionRows = computed(() => [
       </div>
 
       <div class="overflow-x-auto">
-        <table class="min-w-[860px] w-full table-fixed border-collapse text-sm text-slate-700">
+        <table class="min-w-[920px] w-full table-fixed border-collapse text-sm text-slate-700">
           <colgroup>
-            <col class="w-[7.75rem]" />
+            <col class="w-[8.5rem]" />
             <col class="w-[6rem]" />
-            <col class="w-[7rem]" />
+            <col class="w-[8rem]" />
             <col />
             <col class="w-[12rem]" />
           </colgroup>
@@ -123,12 +123,12 @@ const definitionRows = computed(() => [
               <td class="px-4 py-3 leading-5">{{ row.definition }}</td>
               <td class="px-5 py-3">
                 <AppSelect
-                  :id="`forecast-${row.id}-column`"
-                  v-model="project.columnMapping[row.mappingKey]"
+                  :id="`group-actuals-${row.id}-column`"
+                  v-model="state.columnMapping[row.mappingKey]"
                   compact
                   class="w-full"
                   :options="props.columnOptions"
-                  :disabled="!hasLoadedFile || !props.canEditMapping"
+                  :disabled="!hasLoadedFile"
                 />
               </td>
             </tr>

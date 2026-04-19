@@ -73,6 +73,16 @@ const findButtonByText = (wrapper, label) =>
   wrapper.findAll('button').find((button) => button.text().trim() === label)
 
 describe('CallCenterSettingsModal', () => {
+  it('explains that holiday schedules should cover historical and future forecasting years', () => {
+    const wrapper = mountModal({
+      displayYear: 2026
+    })
+
+    expect(wrapper.text()).toContain(
+      'Forecasting depends on holiday schedules being set up for historical and future years. Saved plans keep their own 2026 holiday snapshot.'
+    )
+  })
+
   it('shows Monday through Friday as the default operating-day selection', () => {
     const wrapper = mountModal()
     const weekdayButtons = wrapper.findAll('button').filter((button) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].includes(button.text()))

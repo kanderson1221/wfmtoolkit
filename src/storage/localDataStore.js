@@ -177,6 +177,7 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
         defaultAdherencePercent: group.defaultAdherencePercent,
         holidayCalendarId: group.holidayCalendarId || '',
         holidayScheduleMode: group.holidayScheduleMode || '',
+        actuals: clonePlain(group.actuals || {}),
         createdAt: group.createdAt || nowIso(),
         updatedAt: group.updatedAt || nowIso()
       })
@@ -380,6 +381,8 @@ const hydratePlanningWorkspace = (scope, rows) => {
         defaultAdherencePercent: row.defaultAdherencePercent,
         holidayCalendarId: row.holidayCalendarId,
         holidayScheduleMode: row.holidayScheduleMode,
+        actuals: clonePlain(row.actuals || {}),
+        actualsYears: clonePlain(row.actualsYears || []),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         plans: clonePlain(plansByGroupId.get(row.id) || [])
@@ -450,7 +453,6 @@ const flattenForecastWorkspace = (projects, scope = DEFAULT_SCOPE) => {
       forecastHorizonPreset: project.forecastHorizonPreset || '',
       uploadedFileName: project.uploadedFileName || '',
       uploadedHeaders: [...(project.uploadedHeaders || [])],
-      uploadedRows: clonePlain(project.uploadedRows || []),
       manualAdjustments: clonePlain(project.manualAdjustments || []),
       parserIssues: [...(project.parserIssues || [])],
       normalizationIssues: [...(project.normalizationIssues || [])],
@@ -627,7 +629,6 @@ const hydrateForecastWorkspace = (scope, rows) => {
           forecastHorizonPreset: row.forecastHorizonPreset,
           uploadedFileName: row.uploadedFileName,
           uploadedHeaders: [...(row.uploadedHeaders || [])],
-          uploadedRows: clonePlain(row.uploadedRows || []),
           manualAdjustments: clonePlain(row.manualAdjustments || []),
           parserIssues: [...(row.parserIssues || [])],
           normalizationIssues: [...(row.normalizationIssues || [])],

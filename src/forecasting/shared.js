@@ -430,9 +430,7 @@ const normalizeForecastManualAdjustments = (adjustments = []) => {
 
 const normalizeForecastColumnMapping = (mapping = {}) => ({
   dateColumn: mapping?.dateColumn || '',
-  volumeColumn: mapping?.volumeColumn || '',
-  capColumn: mapping?.capColumn || '',
-  floorColumn: mapping?.floorColumn || ''
+  volumeColumn: mapping?.volumeColumn || ''
 })
 
 const normalizeForecastSourceData = (sourceData = {}) => ({
