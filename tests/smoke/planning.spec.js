@@ -19,6 +19,23 @@ const waitForCenterWorkspace = async (page) => {
   await expect(page).toHaveURL(/#planning\/center\//)
 }
 
+const buildDailyActualsCsv = (dayCount = 14) => {
+  const rows = ['service_date,contacts,average_handle_time_seconds']
+
+  for (let index = 0; index < dayCount; index += 1) {
+    const date = new Date(2025, 0, 1 + index, 12)
+    const serviceDate = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0')
+    ].join('-')
+
+    rows.push(`${serviceDate},${900 + index},${280 + (index % 10)}`)
+  }
+
+  return rows.join('\n')
+}
+
 test.beforeEach(async ({ page }) => {
   await clearBrowserData(page)
 })
@@ -70,17 +87,24 @@ test('opens staffing-group forecasts from the call-center workspace', async ({ p
   await page.getByLabel('Staffing Group Name').fill('Consumer Voice')
   await page.getByRole('button', { name: 'Create Staffing Group' }).last().click()
 
+  await page.getByRole('button', { name: 'Add actuals data for Consumer Voice' }).click()
+  await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily Actuals' })).toBeVisible()
+  await page.locator('#planning-group-actuals-upload').setInputFiles({
+    name: 'consumer-voice-actuals.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(buildDailyActualsCsv())
+  })
+  await page.getByRole('button', { name: 'Add Daily Actuals' }).last().click()
+
   await page.getByRole('button', { name: 'Forecasts' }).click()
   await expect(page.getByText('No forecasts yet')).toBeVisible()
   await page.getByRole('button', { name: 'New Forecast' }).first().click()
   await expect(page.getByRole('heading', { name: 'New Forecast' })).toBeVisible()
-  await page.getByLabel('Forecast Source').selectOption({ label: 'Build Forecast' })
   await page.getByLabel('Plan Year').selectOption({ label: '2026' })
   await page.getByRole('button', { name: 'Create Forecast' }).last().click()
 
   await expect(page.getByRole('heading', { level: 2, name: 'Consumer Voice 2026 Budget Forecast' })).toBeVisible()
-  await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Load', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeHidden()
 })
 
 test('opens the hamburger menu and exposes primary destinations', async ({ page }) => {

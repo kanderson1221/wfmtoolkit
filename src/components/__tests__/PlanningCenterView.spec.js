@@ -64,23 +64,36 @@ const AppConfirmDialogStub = {
 const PlanningForecastCreateModalStub = {
   name: 'PlanningForecastCreateModal',
   props: [
-    'sourceKind',
     'planningYear',
     'yearOptions',
     'canCreate'
   ],
-  emits: ['cancel', 'create', 'update:sourceKind', 'update:planningYear'],
+  emits: ['cancel', 'create', 'update:planningYear'],
   template: `
     <div>
       <p>New Forecast</p>
-      <p>Source: {{ sourceKind || 'empty' }}</p>
-      <button @click="$emit('update:sourceKind', 'imported_daily')">Set Imported Daily</button>
-      <button @click="$emit('update:sourceKind', 'modeled_daily')">Set Modeled Daily</button>
+      <p>Plan Year: {{ planningYear || 'empty' }}</p>
       <button @click="$emit('update:planningYear', 2027)">Set Year</button>
       <button @click="$emit('create')">Create Forecast</button>
     </div>
   `
 }
+
+const buildActualsRows = (count = 14, startDay = 1) =>
+  Array.from({ length: count }, (_, index) => {
+    const date = new Date(2025, 0, startDay + index, 12)
+    const serviceDate = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0')
+    ].join('-')
+
+    return {
+      serviceDate,
+      contacts: 900 + index,
+      ahtSeconds: 280 + (index % 10)
+    }
+  })
 
 const buildWrapper = (props = {}) =>
   mount(PlanningCenterView, {
@@ -99,6 +112,10 @@ const buildWrapper = (props = {}) =>
             defaultPaidHoursPerDay: 8,
             defaultOccupancyPercent: 85,
             defaultAdherencePercent: 95,
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: buildActualsRows()
+            },
             plans: [
               {
                 id: 'plan-1',
@@ -232,6 +249,15 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).not.toContain('New Forecast')
   })
 
+  it('opens the staffing-group workspace on the requested route tab', async () => {
+    const wrapper = buildWrapper({
+      selectedGroupTab: 'forecasts'
+    })
+
+    expect(wrapper.text()).toContain('New Forecast')
+    expect(wrapper.text()).not.toContain('Add Data')
+  })
+
   it('offers one manage-data action that deletes the selected data scope', async () => {
     const wrapper = buildWrapper({
       center: {
@@ -289,7 +315,7 @@ describe('PlanningCenterView', () => {
     })
   })
 
-  it('opens a create-forecast modal and routes new forecasts through source and year', async () => {
+  it('opens a year-only create-forecast modal and routes new forecasts through shared history', async () => {
     window.location.hash = '#planning'
 
     const wrapper = buildWrapper()
@@ -298,13 +324,11 @@ describe('PlanningCenterView', () => {
     await newForecastButton.trigger('click')
 
     expect(wrapper.text()).toContain('New Forecast')
-    expect(wrapper.text()).toContain('Source: empty')
+    expect(wrapper.text()).toContain('Plan Year: 2026')
 
     const setYearButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Year')
     const createForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Create Forecast')
 
-    const setModeledButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Modeled Daily')
-    await setModeledButton.trigger('click')
     await setYearButton.trigger('click')
     await createForecastButton.trigger('click')
 
@@ -313,28 +337,38 @@ describe('PlanningCenterView', () => {
     )
   })
 
-  it('routes imported daily forecasts through the staffing-group forecast launcher', async () => {
-    window.location.hash = '#planning'
+  it('blocks forecast creation when the staffing group does not have enough shared history', async () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 85,
+            defaultAdherencePercent: 95,
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: buildActualsRows(7)
+            },
+            plans: []
+          }
+        ]
+      }
+    })
 
-    const wrapper = buildWrapper()
     await openTab(wrapper, 'Forecasts')
     const newForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Forecast')
     await newForecastButton.trigger('click')
 
-    const setImportedButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Imported Daily')
-    const setYearButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Year')
-    const createForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Create Forecast')
-
-    await setImportedButton.trigger('click')
-    await setYearButton.trigger('click')
-    await createForecastButton.trigger('click')
-
-    expect(window.location.hash).toBe(
-      buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, {
-        sourceKind: 'imported_daily',
-        forecastType: 'budget'
-      })
-    )
+    expect(wrapper.text()).toContain('Add at least 14 daily history rows in Data before building a forecast.')
+    expect(wrapper.text()).not.toContain('Plan Year:')
   })
 
   it('shows a device-based error message when staffing-group forecasts cannot be read locally', async () => {

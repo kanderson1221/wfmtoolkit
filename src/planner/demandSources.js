@@ -5,10 +5,24 @@ import {
   getForecastPlanningYear,
   getForecastProjectMonthlyRollup
 } from '../forecasting/shared'
+import { buildForecastMonthlyHandleTimeAssumptions } from '../forecasting/handleTimeAssumptions'
 import { MONTH_LABELS, createPlanMonth, resolvePlanningYear, toNumber } from './shared'
 
 export const DEMAND_SOURCE_MANUAL = 'manual'
 export const DEMAND_SOURCE_FORECAST = 'forecast'
+
+const normalizeNullableAhtSeconds = (value) => {
+  if (value == null) {
+    return null
+  }
+
+  if (typeof value === 'string' && !value.trim()) {
+    return null
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}
 
 export const createPlanDemandSource = (overrides = {}) => ({
   mode: overrides.mode === DEMAND_SOURCE_FORECAST ? DEMAND_SOURCE_FORECAST : DEMAND_SOURCE_MANUAL,
@@ -28,6 +42,7 @@ export const createPlanDemandSource = (overrides = {}) => ({
         monthLabel: month.monthLabel || MONTH_LABELS[Math.max(0, Math.min(MONTH_LABELS.length - 1, Math.round(toNumber(month.monthIndex, 0))))],
         monthStart: month.monthStart || '',
         contacts: Math.max(toNumber(month.contacts, 0), 0),
+        ahtSeconds: normalizeNullableAhtSeconds(month.ahtSeconds),
         lowerBoundContacts: Math.max(toNumber(month.lowerBoundContacts, 0), 0),
         upperBoundContacts: Math.max(toNumber(month.upperBoundContacts, 0), 0),
         averageDailyVolume: Math.max(toNumber(month.averageDailyVolume, 0), 0),
@@ -54,6 +69,9 @@ const parseMonthStart = (value) => {
 export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
   const resolvedPlanningYear = resolvePlanningYear(planningYear)
   const monthlyRollup = getForecastProjectMonthlyRollup(forecastProject)
+  const ahtAssumptionsByMonthStart = new Map(
+    buildForecastMonthlyHandleTimeAssumptions(forecastProject).map((row) => [row.monthStart, row])
+  )
 
   if (
     !computeForecastPlanningReady(forecastProject) ||
@@ -76,6 +94,9 @@ export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
         monthLabel: row.monthLabel || MONTH_LABELS[monthIndex],
         monthStart: row.monthStart || '',
         contacts: Math.max(toNumber(row.contacts, 0), 0),
+        ahtSeconds: normalizeNullableAhtSeconds(
+          ahtAssumptionsByMonthStart.get(row.monthStart)?.assumedAhtSeconds
+        ),
         lowerBoundContacts: Math.max(toNumber(row.lowerBoundContacts, 0), 0),
         upperBoundContacts: Math.max(toNumber(row.upperBoundContacts, 0), 0),
         averageDailyVolume: Math.max(toNumber(row.averageDailyVolume, 0), 0),
@@ -112,6 +133,7 @@ export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot, options 
     nextPlanMonths[month.monthIndex] = createPlanMonth({
       ...nextPlanMonths[month.monthIndex],
       contacts: Math.round(Math.max(toNumber(month.contacts, 0), 0)),
+      ahtSeconds: normalizeNullableAhtSeconds(month.ahtSeconds) ?? nextPlanMonths[month.monthIndex].ahtSeconds,
       peakDayUpliftPercent: sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY
         ? nextPlanMonths[month.monthIndex].peakDayUpliftPercent
         : derivePeakDayUpliftPercent(month)
@@ -124,6 +146,16 @@ export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot, options 
 export const summarizeForecastDemandSnapshot = (snapshot) => {
   const normalizedSnapshot = Array.isArray(snapshot) ? snapshot : []
   const totalContacts = normalizedSnapshot.reduce((sum, month) => sum + Math.max(toNumber(month.contacts, 0), 0), 0)
+  const weightedAhtTotal = normalizedSnapshot.reduce((sum, month) => (
+    normalizeNullableAhtSeconds(month.ahtSeconds) != null && toNumber(month.contacts, 0) > 0
+      ? sum + (toNumber(month.contacts, 0) * normalizeNullableAhtSeconds(month.ahtSeconds))
+      : sum
+  ), 0)
+  const weightedAhtContacts = normalizedSnapshot.reduce((sum, month) => (
+    normalizeNullableAhtSeconds(month.ahtSeconds) != null && toNumber(month.contacts, 0) > 0
+      ? sum + toNumber(month.contacts, 0)
+      : sum
+  ), 0)
   const peakMonth = normalizedSnapshot.reduce(
     (currentPeak, month) => (
       toNumber(month.contacts, 0) > toNumber(currentPeak?.contacts, -1)
@@ -136,6 +168,7 @@ export const summarizeForecastDemandSnapshot = (snapshot) => {
   return {
     matchedMonthCount: normalizedSnapshot.length,
     totalContacts,
+    averageAhtSeconds: weightedAhtContacts > 0 ? weightedAhtTotal / weightedAhtContacts : null,
     peakMonthLabel: peakMonth?.monthLabel || '',
     peakMonthContacts: peakMonth ? Math.max(toNumber(peakMonth.contacts, 0), 0) : 0,
     coverageLabel: `${normalizedSnapshot.length}/${MONTH_LABELS.length} months`

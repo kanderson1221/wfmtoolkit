@@ -2,6 +2,28 @@ import { buildForecastPayload } from '../forecasting/forecastWorkspaceHelpers'
 import { createForecastProject } from '../../forecasting/shared'
 
 describe('forecastWorkspaceHelpers', () => {
+  it('limits modeled training history to the selected training window', () => {
+    const project = createForecastProject({
+      historyRows: [
+        { ds: '2024-01-01', y: 800, cap: null, floor: null },
+        { ds: '2024-01-02', y: 820, cap: null, floor: null },
+        { ds: '2024-01-03', y: 840, cap: null, floor: null },
+        { ds: '2024-01-04', y: 860, cap: null, floor: null }
+      ],
+      modelConfig: {
+        trainingStartDate: '2024-01-02',
+        trainingEndDate: '2024-01-03'
+      }
+    })
+
+    const payload = buildForecastPayload(project)
+
+    expect(payload.history).toEqual([
+      { ds: '2024-01-02', y: 820, cap: null, floor: null },
+      { ds: '2024-01-03', y: 840, cap: null, floor: null }
+    ])
+  })
+
   it('expands recurring custom holidays across the training and forecast years', () => {
     const project = createForecastProject({
       planningYear: 2025,

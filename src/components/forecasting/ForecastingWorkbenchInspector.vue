@@ -10,10 +10,20 @@ import AppTextArea from '../ui/AppTextArea.vue'
 import AppTextField from '../ui/AppTextField.vue'
 import AppToggleSwitch from '../ui/AppToggleSwitch.vue'
 import {
+  FORECAST_AHT_ASSUMPTION_METHOD_OPTIONS,
+  formatForecastAhtSeconds,
+  summarizeForecastAhtTrainingData
+} from '../../forecasting/handleTimeAssumptions'
+import {
   FORECAST_HORIZON_PRESETS,
   GROWTH_OPTIONS,
   HOLIDAY_CALENDAR_OPTIONS,
   SEASONALITY_MODE_OPTIONS,
+  formatDate,
+  formatNumber,
+  getForecastProjectSourceKind,
+  getForecastTrainingHistoryRows,
+  getForecastTrainingWindow,
   isPlanAlignedForecast
 } from '../../forecasting/shared'
 
@@ -36,30 +46,97 @@ const project = defineModel('project', {
   required: true
 })
 
+const sourceKind = computed(() => getForecastProjectSourceKind(project.value))
 const usesCenterManagedHolidays = computed(() => Boolean(project.value.centerManagedHolidays))
 const isPlanAligned = computed(() => isPlanAlignedForecast(project.value))
-const historyRowCount = computed(() =>
-  Array.isArray(project.value.historyRows) ? project.value.historyRows.length : 0
-)
+const availableTrainingWindow = computed(() => getForecastTrainingWindow(project.value))
+const historyRowCount = computed(() => availableTrainingWindow.value.availableRowCount)
+const trainingHistoryRows = computed(() => getForecastTrainingHistoryRows(project.value))
+const trainingRowCount = computed(() => trainingHistoryRows.value.length)
 const holdoutDays = computed(() => Math.max(0, Number(project.value.modelConfig.holdoutDays) || 0))
-const trainingRowCount = computed(() => Math.max(historyRowCount.value - holdoutDays.value, 0))
+const scoredTrainingRowCount = computed(() => Math.max(trainingRowCount.value - holdoutDays.value, 0))
 const holdoutIsValid = computed(() =>
-  historyRowCount.value === 0 || holdoutDays.value === 0 || trainingRowCount.value >= 14
+  trainingRowCount.value === 0 || holdoutDays.value === 0 || scoredTrainingRowCount.value >= 14
 )
-const holdoutSummary = computed(() => {
+const showTrainingDataSection = computed(() => sourceKind.value === 'modeled_daily')
+const ahtTrainingSummary = computed(() => summarizeForecastAhtTrainingData(project.value))
+const ahtHistoryRowCount = computed(() => ahtTrainingSummary.value.availableRowCount)
+const showHandleTimeSection = computed(() => showTrainingDataSection.value && ahtHistoryRowCount.value > 0)
+const usingSharedPlanningHistory = computed(() =>
+  showTrainingDataSection.value && Boolean(project.value?.planningContext?.groupId)
+)
+const trainingDataSourceSummary = computed(() =>
+  usingSharedPlanningHistory.value
+    ? 'Using shared staffing-group history from Data. Adjust this forecast’s training window without changing the underlying dataset.'
+    : 'Using the loaded daily history. Adjust this forecast’s training window without changing the source data.'
+)
+const availableTrainingSummary = computed(() => {
   if (!historyRowCount.value) {
+    return 'Load history first, then choose the date range used to train this forecast.'
+  }
+
+  return `Available data: ${formatDate(availableTrainingWindow.value.availableStartDate)} through ${formatDate(availableTrainingWindow.value.availableEndDate)} • ${historyRowCount.value} daily rows`
+})
+const trainingWindowIsValid = computed(() => availableTrainingWindow.value.windowIsValid)
+const trainingWindowSummary = computed(() => {
+  if (!historyRowCount.value) {
+    return 'Load history first, then choose how much history this forecast should train on.'
+  }
+
+  if (!trainingWindowIsValid.value) {
+    return 'Choose a training start date that is on or before the training end date.'
+  }
+
+  if (holdoutDays.value === 0) {
+    return `Training window contains ${trainingRowCount.value} daily rows. No test set will be scored.`
+  }
+
+  return `Training window contains ${trainingRowCount.value} daily rows. The last ${holdoutDays.value} rows in this window will be scored against actuals, leaving ${scoredTrainingRowCount.value} rows for training.`
+})
+const handleTimeSourceSummary = computed(() =>
+  usingSharedPlanningHistory.value
+    ? 'Build monthly AHT assumptions from the shared staffing-group history in Data. These assumptions travel with the forecast and can be reviewed in Monthly Rollup before planning imports them.'
+    : 'Build monthly AHT assumptions from the available daily AHT history for this forecast.'
+)
+const availableAhtSummary = computed(() => {
+  if (!ahtHistoryRowCount.value) {
+    return 'No daily AHT history is available for this forecast.'
+  }
+
+  return `Available AHT data: ${formatDate(ahtTrainingSummary.value.availableStartDate)} through ${formatDate(ahtTrainingSummary.value.availableEndDate)} • ${ahtHistoryRowCount.value} daily rows • weighted average ${formatForecastAhtSeconds(ahtTrainingSummary.value.availableWeightedAverageAhtSeconds)}`
+})
+const handleTimeWindowSummary = computed(() => {
+  if (!ahtHistoryRowCount.value) {
+    return 'Load shared history first, then choose how the forecast should build monthly handle time assumptions.'
+  }
+
+  const recentMonthsWindow = Math.max(1, Math.round(Number(project.value.modelConfig.ahtRecentMonthsWindow) || 3))
+  const method = String(project.value.modelConfig.ahtAssumptionMethod || '')
+
+  if (method === 'weighted_average') {
+    return `This forecast will use the weighted AHT average from ${ahtTrainingSummary.value.monthlyHistoryCount} historical months inside the selected training window. Selected window: ${ahtTrainingSummary.value.trainingRowCount} daily AHT rows with a weighted average of ${formatForecastAhtSeconds(ahtTrainingSummary.value.trainingWeightedAverageAhtSeconds)}.`
+  }
+
+  if (method === 'seasonal_by_month') {
+    return `This forecast will use same-month historical AHT patterns and fall back to the weighted training average when a month has no prior match. Selected window: ${ahtTrainingSummary.value.trainingRowCount} daily AHT rows across ${ahtTrainingSummary.value.monthlyHistoryCount} months.`
+  }
+
+  return `This forecast will blend same-month history with the most recent ${formatNumber(recentMonthsWindow, 0)} historical months inside the selected training window. Selected window: ${ahtTrainingSummary.value.trainingRowCount} daily AHT rows with a weighted average of ${formatForecastAhtSeconds(ahtTrainingSummary.value.trainingWeightedAverageAhtSeconds)}.`
+})
+const holdoutSummary = computed(() => {
+  if (!trainingRowCount.value) {
     return 'Load history first, then choose how many trailing days to compare against actuals.'
   }
 
   if (holdoutDays.value === 0) {
-    return `Train on all ${historyRowCount.value} daily rows. No test set will be scored.`
+    return `Train on all ${trainingRowCount.value} daily rows in the selected window. No test set will be scored.`
   }
 
   if (!holdoutIsValid.value) {
     return 'Use fewer test-set days so at least 14 training days remain.'
   }
 
-  return `Train on the first ${trainingRowCount.value} daily rows and compare the last ${holdoutDays.value} rows to actuals.`
+  return `Train on the first ${scoredTrainingRowCount.value} daily rows in the selected window and compare the last ${holdoutDays.value} rows to actuals.`
 })
 const intervalWidthPercent = computed({
   get: () => {
@@ -143,6 +220,115 @@ const inspectorHelp = {
             :step="1"
           />
         </div>
+      </div>
+    </section>
+
+    <section v-if="showTrainingDataSection" class="grid gap-3">
+      <h3 class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        Training Data
+      </h3>
+
+      <div class="grid gap-3">
+        <p class="text-sm leading-6 text-slate-600">
+          {{ trainingDataSourceSummary }}
+        </p>
+
+        <div class="rounded-[20px] border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
+          {{ availableTrainingSummary }}
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="grid gap-1.5">
+            <label for="forecast-training-start-date" class="text-sm font-medium text-slate-950">
+              Start Date
+            </label>
+            <AppTextField
+              id="forecast-training-start-date"
+              v-model.trim="project.modelConfig.trainingStartDate"
+              type="date"
+              :min="availableTrainingWindow.availableStartDate"
+              :max="availableTrainingWindow.availableEndDate"
+              :disabled="!historyRowCount"
+              compact
+              class="border-slate-200 bg-slate-50 shadow-none focus:bg-white focus:ring-2"
+            />
+          </div>
+
+          <div class="grid gap-1.5">
+            <label for="forecast-training-end-date" class="text-sm font-medium text-slate-950">
+              End Date
+            </label>
+            <AppTextField
+              id="forecast-training-end-date"
+              v-model.trim="project.modelConfig.trainingEndDate"
+              type="date"
+              :min="availableTrainingWindow.availableStartDate"
+              :max="availableTrainingWindow.availableEndDate"
+              :disabled="!historyRowCount"
+              compact
+              class="border-slate-200 bg-slate-50 shadow-none focus:bg-white focus:ring-2"
+            />
+          </div>
+        </div>
+
+        <AppStatusMessage v-if="historyRowCount > 0 && !trainingWindowIsValid" tone="error">
+          {{ trainingWindowSummary }}
+        </AppStatusMessage>
+
+        <p v-else class="text-sm leading-6 text-slate-600">
+          {{ trainingWindowSummary }}
+        </p>
+      </div>
+    </section>
+
+    <section v-if="showHandleTimeSection" class="grid gap-3">
+      <h3 class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        Handle Time Assumptions
+      </h3>
+
+      <div class="grid gap-3">
+        <p class="text-sm leading-6 text-slate-600">
+          {{ handleTimeSourceSummary }}
+        </p>
+
+        <div class="rounded-[20px] border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
+          {{ availableAhtSummary }}
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
+          <div class="grid gap-1.5">
+            <label for="forecast-aht-assumption-method" class="text-sm font-medium text-slate-950">
+              Method
+            </label>
+            <AppSelect
+              id="forecast-aht-assumption-method"
+              v-model="project.modelConfig.ahtAssumptionMethod"
+              :options="FORECAST_AHT_ASSUMPTION_METHOD_OPTIONS"
+            />
+          </div>
+
+          <div
+            v-if="project.modelConfig.ahtAssumptionMethod === 'blend_recent_seasonal'"
+            class="grid gap-1.5"
+          >
+            <label for="forecast-aht-recent-months-window" class="text-sm font-medium text-slate-950">
+              Recent Months
+            </label>
+            <AppNumberField
+              id="forecast-aht-recent-months-window"
+              v-model="project.modelConfig.ahtRecentMonthsWindow"
+              :min="1"
+              :max="12"
+              :step="1"
+              compact
+              class="border-slate-200 bg-slate-50 text-right tabular-nums shadow-none focus:bg-white focus:ring-2"
+            />
+          </div>
+        </div>
+
+        <p class="text-sm leading-6 text-slate-600">
+          {{ handleTimeWindowSummary }}
+        </p>
       </div>
     </section>
 

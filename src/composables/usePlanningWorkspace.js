@@ -19,6 +19,7 @@ import {
   HOLIDAY_SCHEDULE_CLOSED,
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
+import { buildForecastTrainingSeedFromPlanningGroupActuals } from '../planner/groupActualsForecastSeed'
 import { findLinkedPriorPlan, getCurrentCalendarYear, resolveLinkedOpeningPosition, resolvePlanningYear } from '../plannerModel'
 import { resolveCenterHolidayProfile, resolveCenterHolidayProfiles } from '../planningStorage'
 import { planningRepository } from '../planningRepository'
@@ -225,6 +226,11 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       currentRoute.value.page === 'group-forecasts'
         ? (currentRoute.value.sourceKind || FORECAST_SOURCE_MODELED_DAILY)
         : FORECAST_SOURCE_MODELED_DAILY
+    const sharedHistorySeed =
+      currentRoute.value.page === 'group-forecasts' &&
+      seededSourceKind === FORECAST_SOURCE_MODELED_DAILY
+        ? buildForecastTrainingSeedFromPlanningGroupActuals(currentGroup.value?.actuals)
+        : { historyRows: [] }
 
     return {
       centerId: currentCenter.value.id,
@@ -237,6 +243,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       coverageStartMonthIndex: seededCoverageStartMonthIndex,
       centerManagedHolidays: true,
       timezone: currentCenter.value.timezone,
+      ...sharedHistorySeed,
       planningContext: {
         centerId: currentCenter.value.id,
         groupId: currentGroup.value.id,

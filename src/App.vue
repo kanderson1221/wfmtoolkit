@@ -160,6 +160,7 @@ onBeforeUnmount(() => {
         v-else-if="currentRoute.app === 'planning' && currentCenter && (currentRoute.page === 'center' || currentRoute.page === 'forecasts')"
         :center="currentCenter"
         :selected-group-id="currentRoute.groupId"
+        :selected-group-tab="currentRoute.groupTab"
         :selected-year="currentRoute.year"
         :storage-scope="storageScope"
         :storage-refresh-token="storageRefreshToken"

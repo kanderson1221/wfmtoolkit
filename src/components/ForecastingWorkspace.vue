@@ -66,6 +66,10 @@ const props = defineProps({
     type: Boolean,
     default: true
   },
+  showSourceActionButton: {
+    type: Boolean,
+    default: true
+  },
   projectDialogDescription: {
     type: String,
     default: ''
@@ -132,8 +136,26 @@ const handleCreateNewProject = () => {
     return
   }
 
-  createNewProject()
-  historyModalOpen.value = true
+  const seededSourceKind = getForecastProjectSourceKind(props.projectSeed || {})
+
+  if (seededSourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
+    createNewProject(buildProjectSeedForSourceKind(FORECAST_SOURCE_IMPORTED_DAILY))
+    importedDailyModalOpen.value = true
+    return
+  }
+
+  if (seededSourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
+    createNewProject(buildProjectSeedForSourceKind(FORECAST_SOURCE_MANUAL_MONTHLY))
+    monthlyForecastModalOpen.value = true
+    return
+  }
+
+  const modeledSeed = buildProjectSeedForSourceKind(FORECAST_SOURCE_MODELED_DAILY)
+  createNewProject(modeledSeed)
+
+  if (!modeledSeed.historyRows.length) {
+    historyModalOpen.value = true
+  }
 }
 
 const buildProjectSeedForSourceKind = (sourceKind) =>
@@ -432,6 +454,7 @@ watch(
         :project-meta="currentProjectMeta"
         :show-library-actions="props.showLibraryActions"
         :show-duplicate-action="props.showDuplicateAction"
+        :show-source-action-button="props.showSourceActionButton"
         @run-forecast="handleRunForecast"
         @create-new-project="handleCreateNewProject"
         @open-project-dialog="projectDialogOpen = true"

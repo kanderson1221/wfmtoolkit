@@ -97,7 +97,7 @@ const summaryItems = computed(() => [
 const contactsSourceMessage = computed(() => {
   if (props.demandSource?.mode === DEMAND_SOURCE_FORECAST && props.currentDemandSourceSummary?.projectName) {
     if (props.currentDemandSourceSummary.sourceMissing) {
-      return `Monthly contacts came from ${props.currentDemandSourceSummary.projectName}, which has been deleted. Current contact volume remains in this plan until you apply a different forecast.`
+      return `Monthly contacts and any imported AHT assumptions came from ${props.currentDemandSourceSummary.projectName}, which has been deleted. Current values remain in this plan until you apply a different forecast.`
     }
 
     const sourceKind = String(
@@ -107,13 +107,13 @@ const contactsSourceMessage = computed(() => {
     ).trim()
 
     if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY || sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
-      return `Monthly contacts come from ${props.currentDemandSourceSummary.projectName}. Replace that saved forecast in Staffing Group Forecasts to change contact volume.`
+      return `Monthly contacts and starting AHT assumptions come from ${props.currentDemandSourceSummary.projectName}. Replace that saved forecast in Staffing Group Forecasts to refresh those imported values.`
     }
 
-    return `Monthly contacts come from ${props.currentDemandSourceSummary.projectName}. Update contact volume in Staffing Group Forecasts.`
+    return `Monthly contacts come from ${props.currentDemandSourceSummary.projectName}. Starting AHT assumptions were loaded from the same forecast and can still be edited here.`
   }
 
-  return 'Monthly contacts are managed in Forecast. Update contact volume there, then review workload and staffing outputs here.'
+  return 'Monthly contacts are managed in Forecast. Starting AHT assumptions can come from Forecast too, then be refined here before reviewing workload and staffing outputs.'
 })
 </script>
 

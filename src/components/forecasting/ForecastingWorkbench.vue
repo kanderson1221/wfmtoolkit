@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import ForecastingManualAdjustmentsDock from './ForecastingManualAdjustmentsDock.vue'
 import ForecastingResultsPanel from './ForecastingResultsPanel.vue'
@@ -48,6 +48,10 @@ const props = defineProps({
     type: Boolean,
     default: true
   },
+  showSourceActionButton: {
+    type: Boolean,
+    default: true
+  },
   projectMeta: {
     type: Object,
     default: () => ({})
@@ -78,6 +82,7 @@ const activeResultTab = defineModel('activeResultTab', {
 })
 
 const inspectorOpen = ref(false)
+const autoOpenedInspectorProjectIds = new Set()
 
 const sourceKind = computed(() => getForecastProjectSourceKind(project.value))
 const resultTabs = computed(() => getForecastProjectResultTabs(project.value))
@@ -86,8 +91,11 @@ const canRunForecast = computed(() => canForecastProjectRun(project.value))
 const showInspector = computed(() => canForecastProjectShowInspector(project.value))
 const canAdjustForecast = computed(() => canForecastProjectAdjust(project.value))
 const isReadOnlyProject = computed(() => isForecastProjectReadOnly(project.value))
+const isUnsavedProject = computed(() =>
+  !String(project.value?.updatedAt || '').trim() && !String(project.value?.createdAt || '').trim()
+)
 const canOpenSourceModal = computed(() =>
-  isForecastTab.value || isReadOnlyProject.value
+  props.showSourceActionButton && (isForecastTab.value || isReadOnlyProject.value)
 )
 const showDuplicateProjectAction = computed(() =>
   props.showDuplicateAction
@@ -165,6 +173,15 @@ const collapsedRailStatusClass = computed(() => {
   return 'bg-slate-400'
 })
 const historyActionLabel = computed(() => getForecastSourceActionLabel(project.value))
+const shouldAutoOpenInspector = computed(() =>
+  showInspector.value &&
+  sourceKind.value === 'modeled_daily' &&
+  hasHistory.value &&
+  !hasResults.value &&
+  isUnsavedProject.value &&
+  !String(project.value?.uploadedFileName || '').trim() &&
+  Boolean(project.value?.planningContext?.groupId)
+)
 const currentRunLabel = computed(() =>
   hasResults.value && project.value?.lastRun?.runAt
     ? `Current run: ${formatDateTime(project.value.lastRun.runAt)}`
@@ -198,6 +215,38 @@ const handleInspectorRun = () => {
   inspectorOpen.value = false
   emit('run-forecast')
 }
+
+watch(
+  () => [project.value?.id, shouldAutoOpenInspector.value, showInspector.value],
+  ([projectId, nextShouldAutoOpen, nextShowInspector], previousValue = []) => {
+    const previousProjectId = previousValue[0]
+    const normalizedProjectId = String(projectId || '').trim()
+    const projectChanged = normalizedProjectId !== String(previousProjectId || '').trim()
+
+    if (!nextShowInspector) {
+      inspectorOpen.value = false
+      return
+    }
+
+    if (!projectChanged) {
+      return
+    }
+
+    if (!normalizedProjectId) {
+      inspectorOpen.value = false
+      return
+    }
+
+    if (nextShouldAutoOpen && !autoOpenedInspectorProjectIds.has(normalizedProjectId)) {
+      inspectorOpen.value = true
+      autoOpenedInspectorProjectIds.add(normalizedProjectId)
+      return
+    }
+
+    inspectorOpen.value = false
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -235,6 +284,12 @@ const handleInspectorRun = () => {
           >
             Duplicate Forecast
           </AppButton>
+          <span
+            v-if="currentRunLabel"
+            class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600"
+          >
+            {{ currentRunLabel }}
+          </span>
           <AppButton
             v-if="!isReadOnlyProject"
             size="sm"
@@ -243,12 +298,6 @@ const handleInspectorRun = () => {
           >
             Save Forecast
           </AppButton>
-          <span
-            v-if="currentRunLabel"
-            class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600"
-          >
-            {{ currentRunLabel }}
-          </span>
           <AppButton
             v-if="canOpenSourceModal"
             size="sm"

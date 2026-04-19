@@ -32,6 +32,22 @@ vi.mock('../../planningRepository', () => ({
 }))
 
 describe('usePlanningWorkspace', () => {
+  const buildActualsRows = (count = 14) =>
+    Array.from({ length: count }, (_, index) => {
+      const date = new Date(2025, 0, 1 + index, 12)
+      const serviceDate = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0')
+      ].join('-')
+
+      return {
+        serviceDate,
+        contacts: 900 + index,
+        ahtSeconds: 280 + (index % 7)
+      }
+    })
+
   const centers = [
     {
       id: 'center-1',
@@ -67,6 +83,10 @@ describe('usePlanningWorkspace', () => {
         {
           id: 'group-1',
           name: 'Consumer Voice',
+          actuals: {
+            sourceMode: 'daily_upload',
+            dailyRows: buildActualsRows()
+          },
           plans: [
             {
               id: 'plan-1',
@@ -222,6 +242,17 @@ describe('usePlanningWorkspace', () => {
       (holiday) => holiday.name === 'Independence Day'
     )
 
+    expect(workspace.forecastSeed.value?.historyRows).toHaveLength(14)
+    expect(workspace.forecastSeed.value?.historyRows?.[0]).toMatchObject({
+      ds: '2025-01-01',
+      y: 900
+    })
+    expect(workspace.forecastSeed.value?.ahtHistoryRows).toHaveLength(14)
+    expect(workspace.forecastSeed.value?.ahtHistoryRows?.[0]).toMatchObject({
+      ds: '2025-01-01',
+      contacts: 900,
+      ahtSeconds: 280
+    })
     expect(independenceDay).toMatchObject({
       sourceRuleId: 'independence_day',
       month: 7,

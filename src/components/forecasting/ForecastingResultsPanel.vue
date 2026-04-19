@@ -6,6 +6,11 @@ import ForecastDailyChart from './ForecastDailyChart.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import {
+  buildForecastMonthlyHandleTimeAssumptions,
+  formatForecastAhtSeconds,
+  summarizeForecastMonthlyHandleTimeAssumptions
+} from '../../forecasting/handleTimeAssumptions'
+import {
   FORECAST_SOURCE_MANUAL_MONTHLY,
   formatDate,
   formatNumber,
@@ -39,8 +44,24 @@ const sourceKind = computed(() => getForecastProjectSourceKind(props.project))
 
 const dailyRows = computed(() => getForecastProjectDailyRows(props.project))
 const monthlyRows = computed(() => getForecastProjectMonthlyRollup(props.project))
+const monthlyAhtAssumptions = computed(() => buildForecastMonthlyHandleTimeAssumptions(props.project))
+const monthlyAhtSummary = computed(() => summarizeForecastMonthlyHandleTimeAssumptions(props.project))
 const diagnostics = computed(() => lastRun.value?.diagnostics || {})
 const holdoutMetrics = computed(() => diagnostics.value?.holdout || null)
+const monthlyRowsWithAht = computed(() => {
+  const ahtByMonthStart = new Map(
+    monthlyAhtAssumptions.value.map((row) => [row.monthStart, row])
+  )
+
+  return monthlyRows.value.map((row) => ({
+    ...row,
+    assumedAhtSeconds: ahtByMonthStart.get(row.monthStart)?.assumedAhtSeconds ?? null,
+    ahtBasisLabel: ahtByMonthStart.get(row.monthStart)?.basisLabel || ''
+  }))
+})
+const showAhtAssumptions = computed(() =>
+  monthlyRowsWithAht.value.some((row) => Number.isFinite(Number(row?.assumedAhtSeconds)))
+)
 
 const noteMessages = computed(() =>
   Array.isArray(diagnostics.value?.validationNotes) ? diagnostics.value.validationNotes : []
@@ -144,6 +165,14 @@ const embeddedMonthlyHighlights = computed(() => {
       meta: runSummary.value.peakForecastDayVolume != null
         ? `${formatWhole(runSummary.value.peakForecastDayVolume)} contacts`
         : 'Highest forecast day'
+    })
+  }
+
+  if (showAhtAssumptions.value) {
+    highlights.push({
+      label: 'Assumed Avg AHT',
+      value: formatForecastAhtSeconds(monthlyAhtSummary.value.weightedAhtSeconds),
+      meta: monthlyAhtSummary.value.methodLabel
     })
   }
 
@@ -287,6 +316,13 @@ const dailyAccuracyHighlights = computed(() => {
             </div>
           </div>
 
+          <p
+            v-if="showAhtAssumptions"
+            class="mt-2 text-sm leading-6 text-slate-600"
+          >
+            Assumed AHT comes from shared staffing-group history using {{ monthlyAhtSummary.methodLabel.toLowerCase() }}.
+          </p>
+
           <div class="mt-3 overflow-hidden border border-slate-200 bg-white">
             <div class="max-h-[26rem] overflow-auto">
               <table class="min-w-[960px] w-full border-collapse text-sm text-slate-700">
@@ -294,6 +330,12 @@ const dailyAccuracyHighlights = computed(() => {
                   <tr>
                     <th class="px-5 py-3 text-left text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Month</th>
                     <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Contacts</th>
+                    <th
+                      v-if="showAhtAssumptions"
+                      class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                    >
+                      Assumed AHT
+                    </th>
                     <th
                       v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY"
                       class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
@@ -327,9 +369,10 @@ const dailyAccuracyHighlights = computed(() => {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200">
-                  <tr v-for="row in monthlyRows" :key="row.monthStart" class="bg-white">
+                  <tr v-for="row in monthlyRowsWithAht" :key="row.monthStart" class="bg-white">
                     <td class="px-5 py-3 font-medium text-slate-900">{{ row.monthLabel }}</td>
                     <td class="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{{ formatWhole(row.contacts) }}</td>
+                    <td v-if="showAhtAssumptions" class="px-4 py-3 text-right tabular-nums">{{ formatForecastAhtSeconds(row.assumedAhtSeconds) }}</td>
                     <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.averageDailyVolume) }}</td>
                     <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-4 py-3 text-right">{{ row.peakDailyDate ? formatDate(row.peakDailyDate) : '—' }}</td>
                     <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.peakDailyVolume) }}</td>

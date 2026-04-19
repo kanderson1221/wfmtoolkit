@@ -4,6 +4,7 @@ export const defaultRoute = {
   tool: null,
   centerId: null,
   groupId: null,
+  groupTab: null,
   planId: null,
   year: null,
   forecastId: null,
@@ -13,8 +14,14 @@ export const defaultRoute = {
 }
 
 const PLANNING_HOME_HASH = '#planning'
+const PLANNING_GROUP_TABS = ['data', 'forecasts', 'plans']
 
 export const normalizeHashPath = (hash = '') => hash.replace(/^#\/?/, '')
+
+const normalizePlanningGroupTab = (value) => {
+  const normalizedValue = String(value || '').trim().toLowerCase()
+  return PLANNING_GROUP_TABS.includes(normalizedValue) ? normalizedValue : ''
+}
 
 export const buildPlanningHomeHash = () => PLANNING_HOME_HASH
 
@@ -83,7 +90,7 @@ export const buildPlanningGroupNewForecastHash = (
   return `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new${sourceSegment}/type/budget`
 }
 
-export const buildPlanningGroupHash = (centerId, groupId, year = null) => {
+export const buildPlanningGroupHash = (centerId, groupId, year = null, options = {}) => {
   if (!centerId) {
     return buildPlanningHomeHash()
   }
@@ -93,10 +100,12 @@ export const buildPlanningGroupHash = (centerId, groupId, year = null) => {
   }
 
   const normalizedYear = Number(year)
+  const normalizedTab = normalizePlanningGroupTab(options.tab)
+  const tabSegment = normalizedTab ? `/tab/${normalizedTab}` : ''
 
   return Number.isInteger(normalizedYear) && normalizedYear > 0
-    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/year/${normalizedYear}`
-    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}`
+    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/year/${normalizedYear}${tabSegment}`
+    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}${tabSegment}`
 }
 
 export const buildPlanningPlanHash = (centerId, groupId, planId) => {
@@ -380,6 +389,28 @@ export const parseHashRoute = (hash) => {
         tool: null,
         centerId: parts[2],
         groupId: null,
+        groupTab: null,
+        planId: null,
+        year: null,
+        forecastId: null
+      }
+    }
+
+    if (
+      parts[1] === 'center' &&
+      parts[2] &&
+      parts[3] === 'group' &&
+      parts[4] &&
+      parts[5] === 'tab' &&
+      parts[6]
+    ) {
+      return {
+        app: 'planning',
+        page: 'center',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        groupTab: normalizePlanningGroupTab(parts[6]) || null,
         planId: null,
         year: null,
         forecastId: null
@@ -393,8 +424,32 @@ export const parseHashRoute = (hash) => {
         tool: null,
         centerId: parts[2],
         groupId: parts[4],
+        groupTab: null,
         planId: null,
         year: null,
+        forecastId: null
+      }
+    }
+
+    if (
+      parts[1] === 'center' &&
+      parts[2] &&
+      parts[3] === 'group' &&
+      parts[4] &&
+      parts[5] === 'year' &&
+      parts[6] &&
+      parts[7] === 'tab' &&
+      parts[8]
+    ) {
+      return {
+        app: 'planning',
+        page: 'center',
+        tool: null,
+        centerId: parts[2],
+        groupId: parts[4],
+        groupTab: normalizePlanningGroupTab(parts[8]) || null,
+        planId: null,
+        year: Number(parts[6]) || null,
         forecastId: null
       }
     }
@@ -406,6 +461,7 @@ export const parseHashRoute = (hash) => {
         tool: null,
         centerId: parts[2],
         groupId: parts[4],
+        groupTab: null,
         planId: null,
         year: Number(parts[6]) || null,
         forecastId: null

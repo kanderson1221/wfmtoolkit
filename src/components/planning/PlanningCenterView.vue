@@ -24,6 +24,10 @@ import {
   FORECAST_TYPE_BUDGET
 } from '../../forecasting/shared'
 import { createPlanningGroupActuals } from '../../planner/groupActuals'
+import {
+  buildForecastTrainingSeedFromPlanningGroupActuals,
+  MINIMUM_FORECAST_HISTORY_DAYS
+} from '../../planner/groupActualsForecastSeed'
 import AppAttachedTabs from '../ui/AppAttachedTabs.vue'
 import AppButton from '../ui/AppButton.vue'
 import AppBreadcrumbs from '../ui/AppBreadcrumbs.vue'
@@ -41,6 +45,10 @@ const props = defineProps({
     required: true
   },
   selectedGroupId: {
+    type: String,
+    default: ''
+  },
+  selectedGroupTab: {
     type: String,
     default: ''
   },
@@ -69,8 +77,8 @@ const planSettingsOpen = ref(false)
 const forecastCreateOpen = ref(false)
 const groupDraft = ref(createPlanningGroupDraft())
 const newPlanYear = ref(currentYear)
-const newForecastSourceKind = ref('')
 const newForecastYear = ref('')
+const forecastHistoryRequirementMessage = ref('')
 const {
   dialogVisible: confirmationDialogOpen,
   dialogTitle: confirmationDialogTitle,
@@ -99,6 +107,10 @@ const STAFFING_GROUP_TABS = [
   { id: 'forecasts', label: 'Forecasts' },
   { id: 'plans', label: 'Plans' }
 ]
+const resolveGroupWorkspaceTab = (value) => {
+  const normalizedValue = String(value || '').trim().toLowerCase()
+  return STAFFING_GROUP_TABS.some((item) => item.id === normalizedValue) ? normalizedValue : 'data'
+}
 const {
   availableYearOptions,
   breadcrumbItems,
@@ -157,8 +169,16 @@ const openForecastCreate = () => {
     return
   }
 
-  newForecastSourceKind.value = ''
-  newForecastYear.value = ''
+  if (!canLaunchModeledForecast.value) {
+    selectedForecastId.value = ''
+    forecastCreateOpen.value = false
+    activeGroupWorkspaceTab.value = 'data'
+    forecastHistoryRequirementMessage.value = `Add at least ${MINIMUM_FORECAST_HISTORY_DAYS} daily history rows in Data before building a forecast.`
+    return
+  }
+
+  forecastHistoryRequirementMessage.value = ''
+  newForecastYear.value = Number(selectedYearModel.value) > 0 ? Number(selectedYearModel.value) : currentYear
   selectedForecastId.value = ''
   forecastCreateOpen.value = true
 }
@@ -250,6 +270,14 @@ const clearActualsSelection = () => {
 
 const hasActualsData = computed(() =>
   createPlanningGroupActuals(selectedGroup.value?.actuals).dailyRows.length > 0
+)
+
+const selectedGroupForecastTrainingSeed = computed(() =>
+  buildForecastTrainingSeedFromPlanningGroupActuals(selectedGroup.value?.actuals)
+)
+
+const canLaunchModeledForecast = computed(() =>
+  selectedGroupForecastTrainingSeed.value.historyRows.length >= MINIMUM_FORECAST_HISTORY_DAYS
 )
 
 const actualsMenuItems = computed(() => {
@@ -441,15 +469,11 @@ const openForecast = (forecast) => {
 const canCreateForecast = computed(() => {
   const planningYear = Number(newForecastYear.value)
 
-  if (
-    !selectedGroup.value ||
-    !newForecastSourceKind.value ||
-    !Number.isInteger(planningYear) ||
-    planningYear <= 0
-  ) {
+  if (!selectedGroup.value || !Number.isInteger(planningYear) || planningYear <= 0) {
     return false
   }
-  return true
+
+  return canLaunchModeledForecast.value
 })
 
 const createForecast = () => {
@@ -463,7 +487,6 @@ const createForecast = () => {
   selectedForecastId.value = ''
   navigateToHash(
     buildPlanningGroupNewForecastHash(props.center.id, selectedGroup.value.id, planningYear, {
-      sourceKind: newForecastSourceKind.value,
       forecastType: FORECAST_TYPE_BUDGET
     })
   )
@@ -487,6 +510,28 @@ const handleForecastMenuSelect = (forecast, item) => {
 }
 
 watch(
+  [selectedGroup, () => props.selectedGroupTab],
+  ([group, routeTab], previousValue = []) => {
+    const previousGroup = previousValue[0]
+    const previousRouteTab = previousValue[1]
+    const normalizedRouteTab = resolveGroupWorkspaceTab(routeTab)
+
+    if (!group) {
+      activeGroupWorkspaceTab.value = 'data'
+      return
+    }
+
+    if (
+      group.id !== previousGroup?.id ||
+      String(routeTab || '').trim().toLowerCase() !== String(previousRouteTab || '').trim().toLowerCase()
+    ) {
+      activeGroupWorkspaceTab.value = normalizedRouteTab
+    }
+  },
+  { immediate: true }
+)
+
+watch(
   [selectedGroup, forecastRows],
   ([group, rows]) => {
     if (!group) {
@@ -508,6 +553,16 @@ watch(
   () => {
     selectedActualsScope.value = null
     actualsViewRef.value?.clearSelection?.()
+  },
+  { immediate: true }
+)
+
+watch(
+  [selectedGroup, canLaunchModeledForecast],
+  ([group]) => {
+    if (!group || canLaunchModeledForecast.value) {
+      forecastHistoryRequirementMessage.value = ''
+    }
   },
   { immediate: true }
 )
@@ -700,14 +755,26 @@ watch(
                     {{ forecastsError }}
                   </AppStatusMessage>
 
+                  <AppStatusMessage v-if="!forecastsLoading && !forecastsError && !canLaunchModeledForecast" tone="warning">
+                    Add at least {{ formatWhole(MINIMUM_FORECAST_HISTORY_DAYS) }} daily history rows in Data before building a forecast for {{ selectedGroup.name }}.
+                  </AppStatusMessage>
+
                   <AppEmptyState
                     v-if="!forecastRows.length"
                     title="No forecasts yet"
-                    :description="`Create the first saved forecast for ${selectedGroup.name}. Forecasts stay owned by this staffing group and plans can import the monthly rollup later.`"
+                    :description="canLaunchModeledForecast
+                      ? `Create the first saved forecast for ${selectedGroup.name}. Forecasts stay owned by this staffing group and plans can import the monthly rollup later.`
+                      : `Load shared history in Data before creating the first forecast for ${selectedGroup.name}.`"
                   />
                 </div>
 
                 <div v-else class="grid gap-0">
+                    <div v-if="!canLaunchModeledForecast" class="px-5 pt-5">
+                      <AppStatusMessage tone="warning">
+                        Add at least {{ formatWhole(MINIMUM_FORECAST_HISTORY_DAYS) }} daily history rows in Data before building a forecast for {{ selectedGroup.name }}.
+                      </AppStatusMessage>
+                    </div>
+
                     <div class="border-b border-slate-200 bg-white/80 px-3 py-3">
                       <div :class="forecastListRowGridClass">
                         <span class="h-9 w-1" aria-hidden="true" />
@@ -839,15 +906,23 @@ watch(
                 class="flex-1 min-h-0 overflow-y-auto"
                 @click="clearActualsSelection"
               >
-                <PlanningGroupActualsView
-                  ref="actualsViewRef"
-                  :center="props.center"
-                  :group="selectedGroup"
-                  :format-whole="formatWhole"
-                  :format-number="formatNumber"
-                  @save-actuals="saveGroupActuals"
-                  @selection-change="handleActualsSelectionChange"
-                />
+                <div class="grid gap-4">
+                  <div v-if="forecastHistoryRequirementMessage" class="px-5 pt-5">
+                    <AppStatusMessage tone="warning">
+                      {{ forecastHistoryRequirementMessage }}
+                    </AppStatusMessage>
+                  </div>
+
+                  <PlanningGroupActualsView
+                    ref="actualsViewRef"
+                    :center="props.center"
+                    :group="selectedGroup"
+                    :format-whole="formatWhole"
+                    :format-number="formatNumber"
+                    @save-actuals="saveGroupActuals"
+                    @selection-change="handleActualsSelectionChange"
+                  />
+                </div>
               </div>
 
               <div v-else-if="planRows.length" class="flex-1 min-h-0 overflow-y-auto">
@@ -1003,7 +1078,6 @@ watch(
 
     <PlanningForecastCreateModal
       v-if="forecastCreateOpen && selectedGroup"
-      v-model:source-kind="newForecastSourceKind"
       v-model:planning-year="newForecastYear"
       :year-options="forecastYearOptions"
       :can-create="canCreateForecast"

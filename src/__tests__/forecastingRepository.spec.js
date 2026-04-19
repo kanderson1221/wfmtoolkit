@@ -9,6 +9,13 @@ describe('forecastingRepository', () => {
         id: 'forecast-1',
         name: 'Guest Forecast',
         updatedAt: '2026-04-05T14:00:00.000Z',
+        ahtHistoryRows: [
+          {
+            ds: '2025-01-01',
+            contacts: 100,
+            ahtSeconds: 280
+          }
+        ],
         lastRun: {
           runAt: '2026-04-05T14:00:00.000Z',
           monthlyRollup: [
@@ -29,6 +36,13 @@ describe('forecastingRepository', () => {
 
     expect(loadedProjects).toHaveLength(1)
     expect(loadedProjects[0].id).toBe('forecast-1')
+    expect(loadedProjects[0].ahtHistoryRows).toEqual([
+      {
+        ds: '2025-01-01',
+        contacts: 100,
+        ahtSeconds: 280
+      }
+    ])
   })
 
   it('reports read failures without throwing when a forecast scope cannot be read', async () => {

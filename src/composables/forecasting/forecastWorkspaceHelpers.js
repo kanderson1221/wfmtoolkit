@@ -9,6 +9,7 @@ import {
   createSavedForecastName,
   FORECAST_WEEKLY_SEASONALITY_DEFAULTS,
   FORECAST_YEARLY_SEASONALITY_DEFAULTS,
+  getForecastTrainingHistoryRows,
   getForecastPlanningYear,
   isPlanAlignedForecast,
   resolveForecastCoverageWindow,
@@ -148,7 +149,7 @@ const formatDateInputValue = (date) => {
 }
 
 const resolveCustomHolidayYears = ({ project, coverageWindow, adHocForecastHorizonDays }) => {
-  const historyDates = (Array.isArray(project.historyRows) ? project.historyRows : [])
+  const historyDates = getForecastTrainingHistoryRows(project)
     .map((row) => parseDateInputValue(row?.ds || ''))
     .filter(Boolean)
 
@@ -281,7 +282,8 @@ export const buildForecastPayload = (project) => {
     coverageStartMonthIndex: project.coverageStartMonthIndex
   })
   const adHocForecastHorizonDays = Math.max(1, Number(project.forecastHorizonDays) || 365)
-  const historyEndTime = parseDateInputValue(project.historyRows.at(-1)?.ds || '')?.getTime() ?? Number.NaN
+  const trainingHistoryRows = getForecastTrainingHistoryRows(project)
+  const historyEndTime = parseDateInputValue(trainingHistoryRows.at(-1)?.ds || '')?.getTime() ?? Number.NaN
   const coverageEndTime = parseDateInputValue(coverageWindow.coverageEndDate || '')?.getTime() ?? Number.NaN
   const alignedForecastHorizonDays = Number.isFinite(historyEndTime) && Number.isFinite(coverageEndTime)
     ? Math.max(0, Math.ceil((coverageEndTime - historyEndTime) / (1000 * 60 * 60 * 24)))
@@ -296,7 +298,7 @@ export const buildForecastPayload = (project) => {
     forecastType,
     coverageStartDate: coverageWindow.coverageStartDate,
     coverageEndDate: coverageWindow.coverageEndDate,
-    history: project.historyRows.map((row) => ({
+    history: trainingHistoryRows.map((row) => ({
       ds: row.ds,
       y: row.y,
       cap: row.cap,

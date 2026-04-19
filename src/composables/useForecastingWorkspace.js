@@ -9,6 +9,8 @@ import {
   formatDate,
   formatDateTime,
   formatWhole,
+  getForecastTrainingHistoryRows,
+  getForecastTrainingWindow,
   getForecastProjectResultTabs,
   getForecastProjectSourceKind,
   getForecastProjectMonthlyRollup,
@@ -110,7 +112,9 @@ const buildProjectSummarySnapshot = (project = {}) => {
 }
 
 const getPlanAlignedHorizonValidationMessage = (project) => {
-  if (!isPlanAlignedForecast(project) || !Array.isArray(project?.historyRows) || !project.historyRows.length) {
+  const trainingHistoryRows = getForecastTrainingHistoryRows(project)
+
+  if (!isPlanAlignedForecast(project) || !trainingHistoryRows.length) {
     return ''
   }
 
@@ -122,7 +126,7 @@ const getPlanAlignedHorizonValidationMessage = (project) => {
     coverageStartMonthIndex: project.coverageStartMonthIndex
   })
 
-  const historyEndDate = parseForecastDateValue(project.historyRows.at(-1)?.ds || '')
+  const historyEndDate = parseForecastDateValue(trainingHistoryRows.at(-1)?.ds || '')
   const coverageEndDate = parseForecastDateValue(coverageWindow.coverageEndDate || '')
 
   if (!historyEndDate || !coverageEndDate) {
@@ -338,12 +342,20 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       ...currentProject.value.normalizationIssues
     ]
 
+    const trainingWindow = getForecastTrainingWindow(currentProject.value)
+    const trainingHistoryRows = getForecastTrainingHistoryRows(currentProject.value)
+    const trainingRowCount = trainingHistoryRows.length
+
     if (!currentProject.value.historyRows.length) {
       messages.push('Upload a CSV with daily history before running a forecast.')
     }
 
-    if (currentProject.value.historyRows.length > 0 && currentProject.value.historyRows.length < 14) {
-      messages.push('Use at least 14 days of history before running a forecast.')
+    if (currentProject.value.historyRows.length > 0 && !trainingWindow.windowIsValid) {
+      messages.push('Choose a training start date that is on or before the training end date.')
+    }
+
+    if (trainingRowCount > 0 && trainingRowCount < 14) {
+      messages.push('Use at least 14 days inside the training window before running a forecast.')
     }
 
     if (isPlanAlignedForecast(currentProject.value) && !getForecastPlanningYear(currentProject.value)) {
@@ -358,8 +370,8 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     const holdoutDays = Math.max(0, Number(currentProject.value.modelConfig.holdoutDays) || 0)
     if (
       holdoutDays > 0 &&
-      currentProject.value.historyRows.length > 0 &&
-      currentProject.value.historyRows.length < holdoutDays + 14
+      trainingRowCount > 0 &&
+      trainingRowCount < holdoutDays + 14
     ) {
       messages.push('Use fewer test-set days so at least 14 training days remain.')
     }
@@ -390,6 +402,30 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     historyRangeLabel: historySummary.value.dateRangeLabel,
     lastSavedAtLabel: currentProject.value.updatedAt ? formatDateTime(currentProject.value.updatedAt) : 'Not saved yet'
   }))
+
+  watch(
+    () => currentProject.value.historyRows.map((row) => row?.ds || ''),
+    () => {
+      const trainingWindow = getForecastTrainingWindow(currentProject.value)
+
+      if (!trainingWindow.availableRowCount) {
+        if (currentProject.value.modelConfig.trainingStartDate || currentProject.value.modelConfig.trainingEndDate) {
+          currentProject.value.modelConfig.trainingStartDate = ''
+          currentProject.value.modelConfig.trainingEndDate = ''
+        }
+        return
+      }
+
+      if (currentProject.value.modelConfig.trainingStartDate !== trainingWindow.trainingStartDate) {
+        currentProject.value.modelConfig.trainingStartDate = trainingWindow.trainingStartDate
+      }
+
+      if (currentProject.value.modelConfig.trainingEndDate !== trainingWindow.trainingEndDate) {
+        currentProject.value.modelConfig.trainingEndDate = trainingWindow.trainingEndDate
+      }
+    },
+    { immediate: true }
+  )
 
   watch(
     () => [currentProject.value.id, currentProject.value.lastRun?.runAt, currentProject.value.lastRun?.inputSignature],

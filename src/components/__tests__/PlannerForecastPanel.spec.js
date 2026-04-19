@@ -69,6 +69,7 @@ describe('PlannerForecastPanel', () => {
         projectName: 'Consumer Voice 2026 Forecast',
         coverageLabel: '12/12 months',
         totalContacts: 175000,
+        averageAhtSeconds: 286.4,
         peakMonthLabel: 'January',
         runAt: '2026-04-06T12:00:00Z',
         matchedMonthCount: 12
@@ -81,9 +82,10 @@ describe('PlannerForecastPanel', () => {
 
     expect(wrapper.text()).toContain('12/12 months')
     expect(wrapper.text()).toContain('175000')
+    expect(wrapper.text()).toContain('286.4 sec')
     expect(wrapper.text()).toContain('Applied')
     expect(wrapper.text()).toContain('Applied to this plan')
-    expect(wrapper.text()).toContain('Reapply Forecast to Contacts')
+    expect(wrapper.text()).toContain('Reapply Forecast to Contacts & AHT')
     expect(wrapper.text()).not.toContain('Open Staffing Group Forecasts')
   })
 
@@ -144,6 +146,6 @@ describe('PlannerForecastPanel', () => {
     })
 
     expect(wrapper.text()).toContain('Deleted Staffing Forecast was deleted.')
-    expect(wrapper.text()).toContain('Current monthly contacts remain in this plan until you apply a different forecast.')
+    expect(wrapper.text()).toContain('Current monthly contacts and any imported AHT assumptions remain in this plan until you apply a different forecast.')
   })
 })

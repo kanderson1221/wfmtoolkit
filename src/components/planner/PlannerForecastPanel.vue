@@ -8,7 +8,7 @@ import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
-import { getForecastTypeLabel } from '../../forecasting/shared'
+import { formatNumber, getForecastTypeLabel } from '../../forecasting/shared'
 
 const props = defineProps({
   forecastSelectOptions: {
@@ -117,6 +117,12 @@ const selectedForecastItems = computed(() => {
     {
       label: 'Forecast Contacts',
       value: props.formatWhole(props.selectedForecastPreviewSummary.totalContacts)
+    },
+    {
+      label: 'Assumed Avg AHT',
+      value: props.selectedForecastPreviewSummary.averageAhtSeconds != null
+        ? `${formatNumber(props.selectedForecastPreviewSummary.averageAhtSeconds, 1)} sec`
+        : '—'
     }
   ]
 })
@@ -156,7 +162,7 @@ const deletedForecastNote = computed(() => {
     return ''
   }
 
-  return `${props.currentDemandSourceSummary.projectName || 'The applied forecast'} was deleted. Current monthly contacts remain in this plan until you apply a different forecast.`
+  return `${props.currentDemandSourceSummary.projectName || 'The applied forecast'} was deleted. Current monthly contacts and any imported AHT assumptions remain in this plan until you apply a different forecast.`
 })
 </script>
 
@@ -166,7 +172,7 @@ const deletedForecastNote = computed(() => {
 
     <AppWorkspaceSection
       title="Demand Source"
-      description="Choose a saved staffing-group forecast to populate monthly contacts. Demand Model will use those contacts as read-only inputs."
+      description="Choose a saved staffing-group forecast to populate monthly contacts and starting AHT assumptions. Demand Model will keep forecasted contacts read-only and let planners adjust AHT after import."
     >
       <template v-if="props.hasLegacyManualDemandSource">
         <div class="grid gap-4">
@@ -228,7 +234,7 @@ const deletedForecastNote = computed(() => {
                   :disabled="!props.forecastCanApply"
                   @click="emit('apply-forecast')"
                 >
-                  {{ hasAppliedForecast ? 'Reapply Forecast to Contacts' : 'Apply Forecast to Contacts' }}
+                  {{ hasAppliedForecast ? 'Reapply Forecast to Contacts & AHT' : 'Apply Forecast to Contacts & AHT' }}
                 </AppButton>
               </div>
             </div>
@@ -286,7 +292,7 @@ const deletedForecastNote = computed(() => {
 
               <div
                 v-if="selectedForecastItems.length"
-                class="grid gap-0 overflow-hidden border-t border-slate-200 lg:grid-cols-4 lg:divide-x lg:divide-slate-200"
+                class="grid gap-0 overflow-hidden border-t border-slate-200 lg:grid-cols-5 lg:divide-x lg:divide-slate-200"
               >
                 <div
                   v-for="item in selectedForecastItems"

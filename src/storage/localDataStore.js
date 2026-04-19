@@ -490,6 +490,18 @@ const flattenForecastWorkspace = (projects, scope = DEFAULT_SCOPE) => {
         id: buildForecastConfigRowId(project.id, 'history', rowIndex),
         forecastId: project.id,
         rowIndex,
+        historyKind: 'volume',
+        ...clonePlain(row)
+      })
+    })
+
+    ;(project.ahtHistoryRows || []).forEach((row, rowIndex) => {
+      historyRows.push({
+        scope: normalizedScope,
+        id: buildForecastConfigRowId(project.id, 'aht-history', rowIndex),
+        forecastId: project.id,
+        rowIndex,
+        historyKind: 'aht',
         ...clonePlain(row)
       })
     })
@@ -644,8 +656,27 @@ const hydrateForecastWorkspace = (scope, rows) => {
               .map(({ id: _id, scope: _scope, forecastId: _forecastId, rowIndex: _rowIndex, ...holiday }) => holiday)
           },
           historyRows: (historyByForecastId.get(row.id) || [])
+            .filter((historyRow) => historyRow.historyKind !== 'aht')
             .sort((left, right) => left.rowIndex - right.rowIndex)
-            .map(({ id: _id, scope: _scope, forecastId: _forecastId, rowIndex: _rowIndex, ...historyRow }) => historyRow),
+            .map(({
+              id: _id,
+              scope: _scope,
+              forecastId: _forecastId,
+              rowIndex: _rowIndex,
+              historyKind: _historyKind,
+              ...historyRow
+            }) => historyRow),
+          ahtHistoryRows: (historyByForecastId.get(row.id) || [])
+            .filter((historyRow) => historyRow.historyKind === 'aht')
+            .sort((left, right) => left.rowIndex - right.rowIndex)
+            .map(({
+              id: _id,
+              scope: _scope,
+              forecastId: _forecastId,
+              rowIndex: _rowIndex,
+              historyKind: _historyKind,
+              ...historyRow
+            }) => historyRow),
           planningContext: clonePlain(row.planningContext || {}),
           lastRun: runRecord
             ? {

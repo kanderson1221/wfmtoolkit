@@ -140,6 +140,10 @@ const sampleForecasts = [
       { ds: '2025-01-01', y: 100 },
       { ds: '2025-01-02', y: 120 }
     ],
+    ahtHistoryRows: [
+      { ds: '2025-01-01', contacts: 100, ahtSeconds: 280 },
+      { ds: '2025-01-02', contacts: 120, ahtSeconds: 285 }
+    ],
     uploadedFileName: 'history.csv',
     uploadedHeaders: ['service_date', 'call_volume', 'internal_notes'],
     uploadedRows: [
@@ -261,6 +265,10 @@ describe('localDataStore', () => {
     })
     expect(loadedForecasts[0].sourceKind).toBe('imported_daily')
     expect(loadedForecasts[0].sourceData.fileName).toBe('imported-forecast.csv')
+    expect(loadedForecasts[0].ahtHistoryRows).toEqual([
+      { ds: '2025-01-01', contacts: 100, ahtSeconds: 280 },
+      { ds: '2025-01-02', contacts: 120, ahtSeconds: 285 }
+    ])
     expect(loadedForecasts[0].uploadedHeaders).toEqual(['service_date', 'call_volume', 'internal_notes'])
     expect(loadedForecasts[0].uploadedRows).toEqual([])
     expect(loadedForecasts[0].lastRun.monthlyRollup[0].contacts).toBe(3400)

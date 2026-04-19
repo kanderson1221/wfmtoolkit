@@ -98,7 +98,7 @@ describe('PlannerMonthlyPlanTab', () => {
     })
 
     expect(wrapper.text()).toContain('Monthly contacts come from Consumer Voice 2026 Forecast.')
-    expect(wrapper.text()).toContain('Update contact volume in Staffing Group Forecasts.')
+    expect(wrapper.text()).toContain('Starting AHT assumptions were loaded from the same forecast and can still be edited here.')
   })
 
   it('explains that imported forecast contacts must be replaced in staffing-group forecasts', () => {
@@ -114,8 +114,8 @@ describe('PlannerMonthlyPlanTab', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Monthly contacts come from Imported Daily Forecast.')
-    expect(wrapper.text()).toContain('Replace that saved forecast in Staffing Group Forecasts to change contact volume.')
+    expect(wrapper.text()).toContain('Monthly contacts and starting AHT assumptions come from Imported Daily Forecast.')
+    expect(wrapper.text()).toContain('Replace that saved forecast in Staffing Group Forecasts to refresh those imported values.')
   })
 
   it('explains when the original forecast source was deleted', () => {
@@ -132,8 +132,8 @@ describe('PlannerMonthlyPlanTab', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Monthly contacts came from Deleted Staffing Forecast, which has been deleted.')
-    expect(wrapper.text()).toContain('Current contact volume remains in this plan until you apply a different forecast.')
+    expect(wrapper.text()).toContain('Monthly contacts and any imported AHT assumptions came from Deleted Staffing Forecast, which has been deleted.')
+    expect(wrapper.text()).toContain('Current values remain in this plan until you apply a different forecast.')
   })
 
   it('renders plan warnings through the shared status message pattern', () => {

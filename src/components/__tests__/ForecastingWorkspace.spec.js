@@ -86,6 +86,22 @@ const createLoadedProject = (fileName = 'history.csv') => createForecastProject(
     { ds: '2025-01-13', y: 930, cap: null, floor: null, holidayLabel: '' },
     { ds: '2025-01-14', y: 955, cap: null, floor: null, holidayLabel: '' }
   ],
+  ahtHistoryRows: [
+    { ds: '2025-01-01', contacts: 820, ahtSeconds: 280 },
+    { ds: '2025-01-02', contacts: 910, ahtSeconds: 282 },
+    { ds: '2025-01-03', contacts: 965, ahtSeconds: 285 },
+    { ds: '2025-01-04', contacts: 640, ahtSeconds: 295 },
+    { ds: '2025-01-05', contacts: 590, ahtSeconds: 294 },
+    { ds: '2025-01-06', contacts: 905, ahtSeconds: 281 },
+    { ds: '2025-01-07', contacts: 930, ahtSeconds: 283 },
+    { ds: '2025-01-08', contacts: 890, ahtSeconds: 279 },
+    { ds: '2025-01-09', contacts: 940, ahtSeconds: 286 },
+    { ds: '2025-01-10', contacts: 975, ahtSeconds: 288 },
+    { ds: '2025-01-11', contacts: 660, ahtSeconds: 296 },
+    { ds: '2025-01-12', contacts: 615, ahtSeconds: 297 },
+    { ds: '2025-01-13', contacts: 930, ahtSeconds: 284 },
+    { ds: '2025-01-14', contacts: 955, ahtSeconds: 287 }
+  ],
   parserIssues: [],
   normalizationIssues: [],
   columnMapping: {
@@ -706,6 +722,85 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.findAll('button').some((button) => button.text().trim() === 'Run')).toBe(false)
   })
 
+  it('opens model parameters by default for a new planning forecast seeded from shared history', async () => {
+    const sharedHistorySeed = createLoadedProject('shared-history.csv')
+    const sharedHistoryProject = createForecastProject({
+      groupName: 'Consumer Voice',
+      planningYear: 2026,
+      planningContext: {
+        centerId: 'center-1',
+        groupId: 'group-1',
+        planId: null,
+        planningYear: 2026,
+        groupName: 'Consumer Voice'
+      },
+      uploadedFileName: '',
+      uploadedHeaders: [],
+      uploadedRows: [],
+      historyRows: sharedHistorySeed.historyRows,
+      ahtHistoryRows: sharedHistorySeed.ahtHistoryRows,
+      parserIssues: [],
+      normalizationIssues: []
+    })
+
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-planning-seeded-inspector-spec',
+        projectSeed: sharedHistoryProject
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    expect(wrapper.find('button[aria-label="Expand model parameters"]').exists()).toBe(false)
+    expect(document.body.textContent || '').toContain('Model Parameters')
+    expect(document.body.textContent || '').toContain('Training Data')
+    expect(document.body.textContent || '').toContain('Using shared staffing-group history from Data.')
+    expect(document.body.textContent || '').toContain('Handle Time Assumptions')
+    expect(document.body.textContent || '').toContain('Validation')
+    expect(document.body.querySelector('#forecast-training-start-date')?.value).toBe('2025-01-01')
+    expect(document.body.querySelector('#forecast-training-end-date')?.value).toBe('2025-01-14')
+  })
+
+  it('keeps model parameters collapsed when reopening a saved forecast without prior results', async () => {
+    await forecastingRepository.persistWorkspace(
+      [
+        createForecastProject({
+          ...createLoadedProject('saved-history.csv'),
+          id: 'saved-forecast',
+          name: 'Consumer Voice 2026 Budget Forecast',
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: null,
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          },
+          createdAt: '2026-04-19T09:00:00.000Z',
+          updatedAt: '2026-04-19T09:00:00.000Z'
+        })
+      ],
+      'forecast-reopen-no-run-inspector-spec'
+    )
+
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-reopen-no-run-inspector-spec',
+        initialProjectId: 'saved-forecast'
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    expect(wrapper.find('button[aria-label="Expand model parameters"]').exists()).toBe(true)
+  })
+
   it('opens forecasts with prior results directly in the workbench and shows the docked worksheet', async () => {
     const wrapper = mount(ForecastingWorkspace, {
       props: {
@@ -738,6 +833,8 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
 
     const bodyText = document.body.textContent || ''
+    expect(bodyText).toContain('Training Data')
+    expect(bodyText).toContain('Handle Time Assumptions')
     expect(bodyText).toContain('Validation')
     expect(bodyText).toContain('Confidence')
     expect(bodyText).toContain('Weekly')
