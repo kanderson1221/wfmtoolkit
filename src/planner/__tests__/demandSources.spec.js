@@ -126,7 +126,13 @@ describe('planner demand sources', () => {
         ],
         modelConfig: {
           ahtAssumptionMethod: 'blend_recent_seasonal',
-          ahtRecentMonthsWindow: 3
+          ahtRecentMonthsWindow: 3,
+          ahtMonthOverrides: [
+            {
+              monthStart: '2026-02-01',
+              ahtSeconds: 402
+            }
+          ]
         },
         lastRun: {
           runAt: '2026-04-08T14:00:00Z',
@@ -146,7 +152,7 @@ describe('planner demand sources', () => {
     })
     expect(snapshot[1]).toMatchObject({
       monthStart: '2026-02-01',
-      ahtSeconds: 325
+      ahtSeconds: 402
     })
 
     const appliedMonths = applyForecastSnapshotToPlanMonths(
@@ -163,7 +169,7 @@ describe('planner demand sources', () => {
     })
     expect(appliedMonths[1]).toMatchObject({
       contacts: 10500,
-      ahtSeconds: 325
+      ahtSeconds: 402
     })
   })
 

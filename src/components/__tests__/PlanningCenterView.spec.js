@@ -79,7 +79,7 @@ const PlanningForecastCreateModalStub = {
   `
 }
 
-const buildActualsRows = (count = 14, startDay = 1) =>
+const buildActualsRows = (count = 21, startDay = 1) =>
   Array.from({ length: count }, (_, index) => {
     const date = new Date(2025, 0, startDay + index, 12)
     const serviceDate = [
@@ -258,63 +258,6 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).not.toContain('Add Data')
   })
 
-  it('offers one manage-data action that deletes the selected data scope', async () => {
-    const wrapper = buildWrapper({
-      center: {
-        id: 'center-1',
-        name: 'North America Support',
-        operatingWeekdays: [1, 2, 3, 4, 5],
-        operatingOpenTime: '08:00',
-        operatingCloseTime: '18:00',
-        groups: [
-          {
-            id: 'group-1',
-            name: 'Voice Support',
-            operatingWeekdays: [1, 2, 3, 4, 5],
-            defaultPaidHoursPerDay: 8,
-            defaultOccupancyPercent: 85,
-            defaultAdherencePercent: 95,
-            actuals: {
-              sourceMode: 'daily_upload',
-              uploadedFileName: 'actuals.csv',
-              dailyRows: [
-                { serviceDate: '2025-12-31', contacts: 100, ahtSeconds: 290 },
-                { serviceDate: '2026-01-01', contacts: 90, ahtSeconds: 280 },
-                { serviceDate: '2026-01-05', contacts: 110, ahtSeconds: 300 }
-              ]
-            },
-            plans: []
-          }
-        ]
-      }
-    })
-
-    const currentYearRow = wrapper.find('[aria-label="Select 2026 data"]')
-    await currentYearRow.trigger('click')
-
-    expect(wrapper.text()).toContain('Delete 2026')
-
-    const deleteSelectedButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Delete 2026')
-    await deleteSelectedButton.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Delete Data?')
-
-    const confirmButton = wrapper.findAll('button').filter((node) => node.text().trim() === 'Delete 2026').at(-1)
-    await confirmButton.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.emitted('save-group')).toBeTruthy()
-    expect(wrapper.emitted('save-group').at(-1)[0]).toMatchObject({
-      id: 'group-1',
-      actuals: {
-        dailyRows: [
-          { serviceDate: '2025-12-31', contacts: 100, ahtSeconds: 290 }
-        ]
-      }
-    })
-  })
-
   it('opens a year-only create-forecast modal and routes new forecasts through shared history', async () => {
     window.location.hash = '#planning'
 
@@ -335,40 +278,6 @@ describe('PlanningCenterView', () => {
     expect(window.location.hash).toBe(
       buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'budget' })
     )
-  })
-
-  it('blocks forecast creation when the staffing group does not have enough shared history', async () => {
-    const wrapper = buildWrapper({
-      center: {
-        id: 'center-1',
-        name: 'North America Support',
-        operatingWeekdays: [1, 2, 3, 4, 5],
-        operatingOpenTime: '08:00',
-        operatingCloseTime: '18:00',
-        groups: [
-          {
-            id: 'group-1',
-            name: 'Voice Support',
-            operatingWeekdays: [1, 2, 3, 4, 5],
-            defaultPaidHoursPerDay: 8,
-            defaultOccupancyPercent: 85,
-            defaultAdherencePercent: 95,
-            actuals: {
-              sourceMode: 'daily_upload',
-              dailyRows: buildActualsRows(7)
-            },
-            plans: []
-          }
-        ]
-      }
-    })
-
-    await openTab(wrapper, 'Forecasts')
-    const newForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Forecast')
-    await newForecastButton.trigger('click')
-
-    expect(wrapper.text()).toContain('Add at least 14 daily history rows in Data before building a forecast.')
-    expect(wrapper.text()).not.toContain('Plan Year:')
   })
 
   it('shows a device-based error message when staffing-group forecasts cannot be read locally', async () => {

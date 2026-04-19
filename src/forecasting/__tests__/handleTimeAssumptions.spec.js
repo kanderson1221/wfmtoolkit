@@ -50,6 +50,50 @@ describe('handleTimeAssumptions', () => {
     ])
   })
 
+  it('applies month-level AHT overrides on top of the suggested assumptions', () => {
+    const project = createForecastProject({
+      planningYear: 2025,
+      historyRows: [
+        { ds: '2024-10-05', y: 100, cap: null, floor: null },
+        { ds: '2024-11-05', y: 100, cap: null, floor: null },
+        { ds: '2024-12-05', y: 100, cap: null, floor: null }
+      ],
+      ahtHistoryRows: [
+        { ds: '2024-10-05', contacts: 100, ahtSeconds: 350 },
+        { ds: '2024-11-05', contacts: 100, ahtSeconds: 360 },
+        { ds: '2024-12-05', contacts: 100, ahtSeconds: 370 }
+      ],
+      lastRun: {
+        runAt: '2026-04-19T12:00:00.000Z',
+        monthlyRollup: [
+          { monthStart: '2025-01-01', monthLabel: 'Jan 2025', contacts: 10000 },
+          { monthStart: '2025-02-01', monthLabel: 'Feb 2025', contacts: 10500 }
+        ]
+      },
+      modelConfig: {
+        ahtAssumptionMethod: 'weighted_average',
+        ahtMonthOverrides: [
+          { monthStart: '2025-02-01', ahtSeconds: 415 }
+        ]
+      }
+    })
+
+    expect(buildForecastMonthlyHandleTimeAssumptions(project)).toEqual([
+      expect.objectContaining({
+        monthStart: '2025-01-01',
+        suggestedAhtSeconds: 360,
+        overrideAhtSeconds: null,
+        assumedAhtSeconds: 360
+      }),
+      expect.objectContaining({
+        monthStart: '2025-02-01',
+        suggestedAhtSeconds: 360,
+        overrideAhtSeconds: 415,
+        assumedAhtSeconds: 415
+      })
+    ])
+  })
+
   it('summarizes available and in-window AHT training history separately', () => {
     const project = createForecastProject({
       historyRows: [

@@ -24,6 +24,40 @@ describe('forecastWorkspaceHelpers', () => {
     ])
   })
 
+  it('removes closed weekdays and closed holidays from the training payload', () => {
+    const project = createForecastProject({
+      centerManagedHolidays: true,
+      historyRows: [
+        { ds: '2025-01-01', y: 0, cap: null, floor: null },
+        { ds: '2025-01-02', y: 820, cap: null, floor: null },
+        { ds: '2025-01-04', y: 640, cap: null, floor: null }
+      ],
+      sourceCenterSnapshot: {
+        operatingWeekdays: [1, 2, 3, 4, 5]
+      },
+      sourceCenterHolidayProfiles: [
+        {
+          year: 2025,
+          customHolidays: [
+            {
+              label: "New Year's Day",
+              date: '2025-01-01',
+              sourceRuleId: 'new_years_day',
+              month: 1,
+              day: 1
+            }
+          ]
+        }
+      ]
+    })
+
+    const payload = buildForecastPayload(project)
+
+    expect(payload.history).toEqual([
+      { ds: '2025-01-02', y: 820, cap: null, floor: null }
+    ])
+  })
+
   it('expands recurring custom holidays across the training and forecast years', () => {
     const project = createForecastProject({
       planningYear: 2025,
@@ -200,6 +234,89 @@ describe('forecastWorkspaceHelpers', () => {
       {
         name: 'Independence Day',
         date: '2025-07-04',
+        lowerWindow: 0,
+        upperWindow: 0,
+        priorScale: 10
+      }
+    ])
+  })
+
+  it('projects center-managed rule-based holidays into missing historical years', () => {
+    const project = createForecastProject({
+      planningYear: 2026,
+      forecastType: 'budget',
+      centerManagedHolidays: true,
+      planningContext: {
+        groupId: 'group-1',
+        planningYear: 2026
+      },
+      historyRows: [
+        { ds: '2022-01-01', y: 800, cap: null, floor: null },
+        { ds: '2024-12-31', y: 975, cap: null, floor: null }
+      ],
+      sourceCenterHolidayProfiles: [
+        {
+          year: 2026,
+          customHolidays: [
+            {
+              label: 'Thanksgiving Day',
+              date: '2026-11-26',
+              sourceRuleId: 'thanksgiving_day',
+              month: 11,
+              day: 26
+            }
+          ]
+        }
+      ],
+      modelConfig: {
+        builtInHolidayCountry: '',
+        customHolidays: [
+          {
+            id: 'thanksgiving-day',
+            name: 'Thanksgiving Day',
+            date: '2026-11-26',
+            sourceRuleId: 'thanksgiving_day',
+            month: 11,
+            day: 26
+          }
+        ]
+      }
+    })
+
+    const payload = buildForecastPayload(project)
+
+    expect(payload.modelConfig.customHolidays).toEqual([
+      {
+        name: 'Thanksgiving Day',
+        date: '2022-11-24',
+        lowerWindow: 0,
+        upperWindow: 0,
+        priorScale: 10
+      },
+      {
+        name: 'Thanksgiving Day',
+        date: '2023-11-23',
+        lowerWindow: 0,
+        upperWindow: 0,
+        priorScale: 10
+      },
+      {
+        name: 'Thanksgiving Day',
+        date: '2024-11-28',
+        lowerWindow: 0,
+        upperWindow: 0,
+        priorScale: 10
+      },
+      {
+        name: 'Thanksgiving Day',
+        date: '2025-11-27',
+        lowerWindow: 0,
+        upperWindow: 0,
+        priorScale: 10
+      },
+      {
+        name: 'Thanksgiving Day',
+        date: '2026-11-26',
         lowerWindow: 0,
         upperWindow: 0,
         priorScale: 10

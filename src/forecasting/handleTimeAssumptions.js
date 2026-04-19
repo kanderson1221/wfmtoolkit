@@ -192,7 +192,22 @@ const describeAssumptionBasis = (method, seasonalCount, recentWindow) => {
     : `Blend fallback to ${recentWindow} recent months`
 }
 
-export const buildForecastMonthlyHandleTimeAssumptions = (snapshot = {}) => {
+const buildForecastAhtOverrideMap = (snapshot = {}) => new Map(
+  (Array.isArray(snapshot?.modelConfig?.ahtMonthOverrides) ? snapshot.modelConfig.ahtMonthOverrides : [])
+    .map((row) => {
+      const monthStart = typeof row?.monthStart === 'string' ? row.monthStart : ''
+      const ahtSeconds = Number(row?.ahtSeconds)
+
+      if (!monthStart || !Number.isFinite(ahtSeconds) || ahtSeconds < 0) {
+        return null
+      }
+
+      return [monthStart, ahtSeconds]
+    })
+    .filter(Boolean)
+)
+
+export const buildForecastBaseMonthlyHandleTimeAssumptions = (snapshot = {}) => {
   const monthlyRollup = getForecastProjectMonthlyRollup(snapshot)
   const monthlyHistory = buildForecastMonthlyAhtHistory(snapshot)
   const overallAhtSeconds = toAhtWeightedAverage(monthlyHistory)
@@ -217,8 +232,26 @@ export const buildForecastMonthlyHandleTimeAssumptions = (snapshot = {}) => {
       monthStart: row.monthStart || '',
       monthLabel: row.monthLabel || buildMonthLabel(row.monthStart),
       contacts: Number(row?.contacts ?? 0),
-      assumedAhtSeconds,
+      suggestedAhtSeconds: assumedAhtSeconds,
+      seasonalAhtSeconds,
       basisLabel: describeAssumptionBasis(method, seasonalHistory.length, recentMonthsWindow)
+    }
+  })
+}
+
+export const buildForecastMonthlyHandleTimeAssumptions = (snapshot = {}) => {
+  const overrideMap = buildForecastAhtOverrideMap(snapshot)
+
+  return buildForecastBaseMonthlyHandleTimeAssumptions(snapshot).map((row) => {
+    const overrideAhtSeconds = overrideMap.get(row.monthStart) ?? null
+    const assumedAhtSeconds = overrideAhtSeconds != null
+      ? overrideAhtSeconds
+      : row.suggestedAhtSeconds
+
+    return {
+      ...row,
+      overrideAhtSeconds,
+      assumedAhtSeconds
     }
   })
 }
@@ -242,6 +275,7 @@ export const summarizeForecastMonthlyHandleTimeAssumptions = (snapshot = {}) => 
     recentMonthsWindow,
     weightedAhtSeconds,
     monthCount: assumptions.filter((row) => Number.isFinite(row?.assumedAhtSeconds)).length,
+    overrideMonthCount: assumptions.filter((row) => Number.isFinite(row?.overrideAhtSeconds)).length,
     trainingWindowLabel:
       trainingWindow.availableStartDate && trainingWindow.availableEndDate
         ? `${formatDate(trainingWindow.availableStartDate)} through ${formatDate(trainingWindow.availableEndDate)}`

@@ -2,40 +2,26 @@ import {
   GROUP_HOLIDAY_CALENDAR_INHERIT,
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_CALENDAR_US_FEDERAL,
-  buildHolidayEntriesForYear,
   createHolidayTemplateHolidays,
   normalizeHolidayCalendarId
 } from './holidayCalendars'
 import {
+  buildDateFromIso,
+  buildMonthEndFromDate,
+  buildMonthStart,
+  buildMonthStartFromDate,
+  buildYearEnd,
+  buildYearStart,
+  countMatchingIsoDatesInRange,
+  dateToIsoValue,
+  maxIsoValue,
+  minIsoValue
+} from './dateValues'
+import {
   buildPlanningGroupMonthlyActualRecords,
   createPlanningGroupActuals
 } from './groupActuals'
-import { normalizeWeekdays } from './shared'
-import { resolveCenterHolidayProfile } from '../planningStorage'
-
-const buildDateFromIso = (value) => {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null
-  }
-
-  const [year, month, day] = value.split('-').map(Number)
-  const candidate = new Date(year, month - 1, day, 12)
-
-  return (
-    candidate.getFullYear() === year &&
-    candidate.getMonth() === month - 1 &&
-    candidate.getDate() === day
-  )
-    ? candidate
-    : null
-}
-
-const padTwo = (value) => String(value).padStart(2, '0')
-
-const dateToIsoValue = (date) =>
-  `${date.getFullYear()}-${padTwo(date.getMonth() + 1)}-${padTwo(date.getDate())}`
-
-const buildMonthStart = (serviceDate = '') => `${serviceDate.slice(0, 7)}-01`
+import { createPlanningGroupOpenDayChecker } from './groupOpenDays'
 
 const monthFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -45,133 +31,6 @@ const monthFormatter = new Intl.DateTimeFormat('en-US', {
 const formatMonthLabel = (monthStart) => {
   const candidate = buildDateFromIso(monthStart)
   return candidate ? monthFormatter.format(candidate) : monthStart || 'Unknown Month'
-}
-
-const maxIsoValue = (left, right) => {
-  if (!left) {
-    return right || null
-  }
-
-  if (!right) {
-    return left
-  }
-
-  return left > right ? left : right
-}
-
-const minIsoValue = (left, right) => {
-  if (!left) {
-    return right || null
-  }
-
-  if (!right) {
-    return left
-  }
-
-  return left < right ? left : right
-}
-
-const buildMonthStartFromDate = (date) => dateToIsoValue(new Date(date.getFullYear(), date.getMonth(), 1, 12))
-
-const buildMonthEndFromDate = (date) =>
-  dateToIsoValue(new Date(date.getFullYear(), date.getMonth() + 1, 0, 12))
-
-const buildYearStart = (year) => `${year}-01-01`
-
-const buildYearEnd = (year) => `${year}-12-31`
-
-const countExpectedOpenDaysInRange = (startIso, endIso, isExpectedOpenDay) => {
-  const startDate = buildDateFromIso(startIso)
-  const endDate = buildDateFromIso(endIso)
-
-  if (!startDate || !endDate || startDate.getTime() > endDate.getTime()) {
-    return 0
-  }
-
-  let expectedOpenDays = 0
-
-  for (
-    let cursor = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 12);
-    cursor.getTime() <= endDate.getTime();
-    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 12)
-  ) {
-    if (isExpectedOpenDay(dateToIsoValue(cursor))) {
-      expectedOpenDays += 1
-    }
-  }
-
-  return expectedOpenDays
-}
-
-const resolveHolidaySnapshotForYear = (group, center, year) => {
-  const centerHolidayProfile = resolveCenterHolidayProfile(center, year)
-  const groupHolidayCalendarId = group?.holidayCalendarId || GROUP_HOLIDAY_CALENDAR_INHERIT
-  const usesCenterHolidayProfile =
-    groupHolidayCalendarId === GROUP_HOLIDAY_CALENDAR_INHERIT ||
-    groupHolidayCalendarId == null ||
-    groupHolidayCalendarId === ''
-
-  if (usesCenterHolidayProfile) {
-    return {
-      holidayCalendarId: centerHolidayProfile.holidayCalendarId || HOLIDAY_CALENDAR_NONE,
-      disabledHolidayRuleIds: [...(centerHolidayProfile.disabledHolidayRuleIds || [])],
-      customHolidays: (centerHolidayProfile.customHolidays || []).map((holiday) => ({ ...holiday }))
-    }
-  }
-
-  const normalizedGroupCalendarId = normalizeHolidayCalendarId(
-    groupHolidayCalendarId,
-    HOLIDAY_CALENDAR_NONE
-  )
-
-  if (normalizedGroupCalendarId === HOLIDAY_CALENDAR_US_FEDERAL) {
-    return {
-      holidayCalendarId: HOLIDAY_CALENDAR_NONE,
-      disabledHolidayRuleIds: [],
-      customHolidays: createHolidayTemplateHolidays(HOLIDAY_CALENDAR_US_FEDERAL, year)
-    }
-  }
-
-  return {
-    holidayCalendarId: normalizedGroupCalendarId,
-    disabledHolidayRuleIds: [],
-    customHolidays: []
-  }
-}
-
-const createOpenDayChecker = (group, center) => {
-  const activeDays = normalizeWeekdays(group?.operatingWeekdays ?? center?.operatingWeekdays)
-  const holidaySetsByYear = new Map()
-
-  const resolveHolidaySet = (year) => {
-    if (!holidaySetsByYear.has(year)) {
-      const holidaySnapshot = resolveHolidaySnapshotForYear(group, center, year)
-      const holidayDates = new Set(
-        buildHolidayEntriesForYear({
-          year,
-          holidayCalendarId: holidaySnapshot.holidayCalendarId,
-          disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
-          customHolidays: holidaySnapshot.customHolidays
-        })
-          .filter((entry) => activeDays.includes(entry.date.getDay()))
-          .map((entry) => dateToIsoValue(entry.date))
-      )
-
-      holidaySetsByYear.set(year, holidayDates)
-    }
-
-    return holidaySetsByYear.get(year)
-  }
-
-  return (serviceDate) => {
-    const date = buildDateFromIso(serviceDate)
-
-    if (!date || !activeDays.includes(date.getDay())) {
-      return false
-    }
-
-    return !resolveHolidaySet(date.getFullYear()).has(serviceDate)
-  }
 }
 
 const createEmptySummary = () => ({
@@ -227,7 +86,7 @@ export const summarizePlanningGroupActualsDataset = ({
     return createEmptySummary()
   }
 
-  const isExpectedOpenDay = createOpenDayChecker(group, center)
+  const isExpectedOpenDay = createPlanningGroupOpenDayChecker(group, center)
   const actualsByMonth = new Map(
     buildPlanningGroupMonthlyActualRecords(dailyRows).map((record) => [record.monthStart, record])
   )
@@ -279,7 +138,7 @@ export const summarizePlanningGroupActualsDataset = ({
       const periodEndIso =
         summary.maxServiceDate ||
         minIsoValue(monthStartDate ? buildMonthEndFromDate(monthStartDate) : null, overallEndIso)
-      const expectedOpenDays = countExpectedOpenDaysInRange(periodStartIso, periodEndIso, isExpectedOpenDay)
+      const expectedOpenDays = countMatchingIsoDatesInRange(periodStartIso, periodEndIso, isExpectedOpenDay)
       const coveragePercent =
         expectedOpenDays > 0 ? (summary.loadedOpenDays / expectedOpenDays) * 100 : null
 
@@ -322,7 +181,7 @@ export const summarizePlanningGroupActualsDataset = ({
     .map((yearSummary) => {
       const yearStartIso = yearSummary.minServiceDate || maxIsoValue(buildYearStart(yearSummary.year), overallStartIso)
       const yearEndIso = yearSummary.maxServiceDate || minIsoValue(buildYearEnd(yearSummary.year), overallEndIso)
-      const expectedOpenDays = countExpectedOpenDaysInRange(yearStartIso, yearEndIso, isExpectedOpenDay)
+      const expectedOpenDays = countMatchingIsoDatesInRange(yearStartIso, yearEndIso, isExpectedOpenDay)
       const coveragePercent =
         expectedOpenDays > 0 ? (yearSummary.loadedOpenDays / expectedOpenDays) * 100 : null
 

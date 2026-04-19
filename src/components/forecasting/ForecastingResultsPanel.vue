@@ -1,16 +1,20 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
-import ForecastComponentChart from './ForecastComponentChart.vue'
-import ForecastDailyChart from './ForecastDailyChart.vue'
+import ForecastAhtResultsView from './results/ForecastAhtResultsView.vue'
+import ForecastContactsResultsView from './results/ForecastContactsResultsView.vue'
+import ForecastMonthlyRollupView from './results/ForecastMonthlyRollupView.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import {
+  buildForecastMonthlyAhtHistory,
   buildForecastMonthlyHandleTimeAssumptions,
   formatForecastAhtSeconds,
+  summarizeForecastAhtTrainingData,
   summarizeForecastMonthlyHandleTimeAssumptions
 } from '../../forecasting/handleTimeAssumptions'
 import {
+  FORECAST_SOURCE_IMPORTED_DAILY,
   FORECAST_SOURCE_MANUAL_MONTHLY,
   formatDate,
   formatNumber,
@@ -22,32 +26,70 @@ import {
 } from '../../forecasting/shared'
 
 const props = defineProps({
-  project: {
-    type: Object,
-    required: true
-  },
   runError: {
     type: String,
     default: ''
   }
 })
 
+const project = defineModel('project', {
+  type: Object,
+  required: true
+})
+
 const activeResultTab = defineModel('activeResultTab', {
   type: String,
   required: true
 })
+const activeContactsSubview = defineModel('activeContactsSubview', {
+  type: String,
+  default: 'forecast'
+})
 
-const lastRun = computed(() => props.project?.lastRun || null)
+const lastRun = computed(() => project.value?.lastRun || null)
 const runSummary = computed(() => lastRun.value?.summary || {})
 const hasResults = computed(() => Boolean(lastRun.value?.runAt))
-const sourceKind = computed(() => getForecastProjectSourceKind(props.project))
+const sourceKind = computed(() => getForecastProjectSourceKind(project.value))
 
-const dailyRows = computed(() => getForecastProjectDailyRows(props.project))
-const monthlyRows = computed(() => getForecastProjectMonthlyRollup(props.project))
-const monthlyAhtAssumptions = computed(() => buildForecastMonthlyHandleTimeAssumptions(props.project))
-const monthlyAhtSummary = computed(() => summarizeForecastMonthlyHandleTimeAssumptions(props.project))
+const dailyRows = computed(() => getForecastProjectDailyRows(project.value))
+const monthlyRows = computed(() => getForecastProjectMonthlyRollup(project.value))
+const monthlyAhtAssumptions = computed(() =>
+  buildForecastMonthlyHandleTimeAssumptions(project.value)
+)
+const monthlyAhtHistory = computed(() => buildForecastMonthlyAhtHistory(project.value))
+const monthlyAhtSummary = computed(() => summarizeForecastMonthlyHandleTimeAssumptions(project.value))
+const ahtTrainingSummary = computed(() => summarizeForecastAhtTrainingData(project.value))
 const diagnostics = computed(() => lastRun.value?.diagnostics || {})
 const holdoutMetrics = computed(() => diagnostics.value?.holdout || null)
+const chartDailyRows = computed(() => {
+  const holdoutRows = Array.isArray(holdoutMetrics.value?.rows) ? holdoutMetrics.value.rows : []
+
+  if (!holdoutRows.length) {
+    return dailyRows.value
+  }
+
+  const holdoutRowsByDate = new Map(
+    holdoutRows
+      .filter((row) => typeof row?.ds === 'string' && row.ds)
+      .map((row) => [row.ds, row])
+  )
+
+  return dailyRows.value.map((row) => {
+    const holdoutRow = holdoutRowsByDate.get(row.ds)
+    if (!holdoutRow) {
+      return row
+    }
+
+    return {
+      ...row,
+      actualValue: holdoutRow.actualValue ?? row.actualValue,
+      yhat: holdoutRow.forecastValue ?? row.yhat,
+      yhatLower: holdoutRow.lowerBound ?? row.yhatLower,
+      yhatUpper: holdoutRow.upperBound ?? row.yhatUpper
+    }
+  })
+})
+
 const monthlyRowsWithAht = computed(() => {
   const ahtByMonthStart = new Map(
     monthlyAhtAssumptions.value.map((row) => [row.monthStart, row])
@@ -59,8 +101,9 @@ const monthlyRowsWithAht = computed(() => {
     ahtBasisLabel: ahtByMonthStart.get(row.monthStart)?.basisLabel || ''
   }))
 })
+
 const showAhtAssumptions = computed(() =>
-  monthlyRowsWithAht.value.some((row) => Number.isFinite(Number(row?.assumedAhtSeconds)))
+  monthlyRowsWithAht.value.some((row) => Number.isFinite(row?.assumedAhtSeconds))
 )
 
 const noteMessages = computed(() =>
@@ -86,7 +129,7 @@ const peakMonth = computed(() =>
 )
 
 const monthlyComponentEnabled = computed(() =>
-  Boolean(props.project?.modelConfig?.monthlySeasonalityEnabled)
+  Boolean(project.value?.modelConfig?.monthlySeasonalityEnabled)
 )
 
 const componentSections = computed(() => [
@@ -119,6 +162,31 @@ const componentSections = computed(() => [
   sourceKind.value !== FORECAST_SOURCE_MANUAL_MONTHLY &&
   (section.points.length > 0 || (section.id === 'monthly' && monthlyComponentEnabled.value))
 ))
+const contactSubviewTabs = computed(() => {
+  const items = [{ id: 'forecast', label: 'Forecast' }]
+
+  if (
+    sourceKind.value !== FORECAST_SOURCE_MANUAL_MONTHLY &&
+    sourceKind.value !== FORECAST_SOURCE_IMPORTED_DAILY
+  ) {
+    items.push({ id: 'components', label: 'Components' })
+  }
+
+  return items
+})
+
+watch(
+  () => [activeResultTab.value, contactSubviewTabs.value.map((item) => item.id).join('|'), activeContactsSubview.value],
+  () => {
+    if (
+      activeResultTab.value === 'daily' &&
+      !contactSubviewTabs.value.some((item) => item.id === activeContactsSubview.value)
+    ) {
+      activeContactsSubview.value = 'forecast'
+    }
+  },
+  { immediate: true }
+)
 
 const embeddedInsightCards = computed(() => {
   const cards = []
@@ -169,10 +237,14 @@ const embeddedMonthlyHighlights = computed(() => {
   }
 
   if (showAhtAssumptions.value) {
+    const overrideLabel = monthlyAhtSummary.value.overrideMonthCount
+      ? `${formatWhole(monthlyAhtSummary.value.overrideMonthCount)} overridden month${monthlyAhtSummary.value.overrideMonthCount === 1 ? '' : 's'}`
+      : monthlyAhtSummary.value.methodLabel
+
     highlights.push({
-      label: 'Assumed Avg AHT',
+      label: 'Final Avg AHT',
       value: formatForecastAhtSeconds(monthlyAhtSummary.value.weightedAhtSeconds),
-      meta: monthlyAhtSummary.value.methodLabel
+      meta: overrideLabel
     })
   }
 
@@ -202,6 +274,76 @@ const dailyAccuracyHighlights = computed(() => {
     }
   ]
 })
+
+const ahtHighlights = computed(() => [
+  {
+    label: 'Method',
+    value: monthlyAhtSummary.value.methodLabel,
+    meta: ahtTrainingSummary.value.trainingRowCount
+      ? `${formatWhole(ahtTrainingSummary.value.trainingRowCount)} daily rows in the training window`
+      : 'No AHT history in the selected training window'
+  },
+  {
+    label: 'Training Avg AHT',
+    value: formatForecastAhtSeconds(ahtTrainingSummary.value.trainingWeightedAverageAhtSeconds),
+    meta: `${formatWhole(ahtTrainingSummary.value.monthlyHistoryCount)} historical month${ahtTrainingSummary.value.monthlyHistoryCount === 1 ? '' : 's'}`
+  },
+  {
+    label: 'Forecast Avg AHT',
+    value: formatForecastAhtSeconds(monthlyAhtSummary.value.weightedAhtSeconds),
+    meta: `${formatWhole(monthlyAhtSummary.value.monthCount)} forecast month${monthlyAhtSummary.value.monthCount === 1 ? '' : 's'}`
+  },
+  {
+    label: 'Overrides',
+    value: formatWhole(monthlyAhtSummary.value.overrideMonthCount),
+    meta: monthlyAhtSummary.value.overrideMonthCount
+      ? 'Months manually adjusted'
+      : 'No monthly overrides'
+  }
+])
+
+const getAhtMonthOverrideValue = (monthStart = '') => {
+  const match = monthlyAhtAssumptions.value.find((row) => row.monthStart === monthStart)
+  return match?.overrideAhtSeconds ?? null
+}
+
+const setAhtMonthOverride = (monthStart = '', nextValue) => {
+  if (!project.value?.modelConfig || !monthStart) {
+    return
+  }
+
+  const parsedValue = Number(nextValue)
+  const normalizedValue = Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : null
+  const nextOverrides = (
+    Array.isArray(project.value.modelConfig.ahtMonthOverrides)
+      ? project.value.modelConfig.ahtMonthOverrides.map((row) => ({ ...row }))
+      : []
+  ).filter((row) => row?.monthStart !== monthStart)
+
+  if (normalizedValue != null) {
+    nextOverrides.push({
+      monthStart,
+      ahtSeconds: normalizedValue
+    })
+    nextOverrides.sort((left, right) => left.monthStart.localeCompare(right.monthStart))
+  }
+
+  project.value.modelConfig = {
+    ...project.value.modelConfig,
+    ahtMonthOverrides: nextOverrides
+  }
+}
+
+const clearAhtMonthOverrides = () => {
+  if (!project.value?.modelConfig || !monthlyAhtSummary.value.overrideMonthCount) {
+    return
+  }
+
+  project.value.modelConfig = {
+    ...project.value.modelConfig,
+    ahtMonthOverrides: []
+  }
+}
 </script>
 
 <template>
@@ -218,231 +360,41 @@ const dailyAccuracyHighlights = computed(() => {
     </template>
 
     <template v-else-if="activeResultTab === 'daily'">
-      <section class="grid gap-4">
-        <div class="bg-white px-4 pb-1">
-          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div class="grid gap-1">
-              <h3 class="text-lg font-semibold tracking-[-0.02em] text-slate-950">
-                Forecasted demand vs historical volume
-              </h3>
-            </div>
+      <ForecastContactsResultsView
+        v-model:active-contacts-subview="activeContactsSubview"
+        :contact-subview-tabs="contactSubviewTabs"
+        :daily-accuracy-highlights="dailyAccuracyHighlights"
+        :chart-daily-rows="chartDailyRows"
+        :holdout-days="holdoutMetrics?.holdoutDays || 0"
+        :component-sections="componentSections"
+        :embedded-insight-cards="embeddedInsightCards"
+        :format-number="formatNumber"
+      />
+    </template>
 
-            <div v-if="dailyAccuracyHighlights.length" class="flex flex-wrap gap-2 lg:justify-end">
-              <span
-                v-for="item in dailyAccuracyHighlights"
-                :key="item.label"
-                class="inline-flex items-baseline gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
-              >
-                <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {{ item.label }}
-                </span>
-                <strong class="font-semibold text-slate-950">{{ item.value }}</strong>
-              </span>
-            </div>
-          </div>
-
-          <div class="mt-3 overflow-hidden bg-white">
-            <ForecastDailyChart
-              :rows="dailyRows"
-              :holdout-days="holdoutMetrics?.holdoutDays || 0"
-              :format-number="formatNumber"
-              height-class="h-[31.25rem]"
-              min-width-class="min-w-[760px]"
-              :show-legend="false"
-            />
-          </div>
-
-          <div class="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-600">
-            <span class="inline-flex items-center gap-2">
-              <span class="h-1.5 w-5 rounded-full bg-[#15395f]"></span>
-              Historical volume
-            </span>
-            <span class="inline-flex items-center gap-2">
-              <span class="h-1.5 w-5 rounded-full bg-[#0e7490]"></span>
-              Forecasted demand
-            </span>
-            <span class="inline-flex items-center gap-2">
-              <span class="h-3 w-5 rounded-full bg-[rgba(149,188,214,0.32)]"></span>
-              Confidence band
-            </span>
-            <span v-if="holdoutMetrics?.holdoutDays" class="inline-flex items-center gap-2">
-              <span class="h-3 w-5 rounded-sm bg-amber-100 ring-1 ring-amber-200"></span>
-              Test period
-            </span>
-          </div>
-        </div>
-
-        <div v-if="embeddedInsightCards.length" class="grid gap-3 lg:grid-cols-3">
-          <article
-            v-for="card in embeddedInsightCards"
-            :key="card.title"
-            class="grid gap-1 rounded-[20px] border border-slate-200 bg-white px-4 py-4"
-          >
-            <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              {{ card.title }}
-            </p>
-            <p class="text-sm font-medium leading-6 text-slate-800">
-              {{ card.body }}
-            </p>
-            <p v-if="card.meta" class="text-[0.82rem] text-slate-500">
-              {{ card.meta }}
-            </p>
-          </article>
-        </div>
-      </section>
+    <template v-else-if="activeResultTab === 'aht'">
+      <ForecastAhtResultsView
+        :aht-highlights="ahtHighlights"
+        :monthly-aht-history="monthlyAhtHistory"
+        :monthly-aht-assumptions="monthlyAhtAssumptions"
+        :monthly-aht-summary="monthlyAhtSummary"
+        :get-aht-month-override-value="getAhtMonthOverrideValue"
+        :set-aht-month-override="setAhtMonthOverride"
+        :clear-aht-month-overrides="clearAhtMonthOverrides"
+      />
     </template>
 
     <template v-else-if="activeResultTab === 'monthly'">
-      <section class="grid gap-4">
-        <div class="bg-white px-4 pb-1">
-          <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div class="grid gap-1">
-              <h3 class="text-lg font-semibold tracking-[-0.02em] text-slate-950">
-                Monthly Rollup
-              </h3>
-            </div>
-
-            <div class="flex flex-wrap gap-2 xl:justify-end">
-              <span
-                v-for="item in embeddedMonthlyHighlights"
-                :key="item.label"
-                class="inline-flex items-baseline gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
-              >
-                <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {{ item.label }}
-                </span>
-                <strong class="font-semibold text-slate-950">{{ item.value }}</strong>
-              </span>
-            </div>
-          </div>
-
-          <p
-            v-if="showAhtAssumptions"
-            class="mt-2 text-sm leading-6 text-slate-600"
-          >
-            Assumed AHT comes from shared staffing-group history using {{ monthlyAhtSummary.methodLabel.toLowerCase() }}.
-          </p>
-
-          <div class="mt-3 overflow-hidden border border-slate-200 bg-white">
-            <div class="max-h-[26rem] overflow-auto">
-              <table class="min-w-[960px] w-full border-collapse text-sm text-slate-700">
-                <thead class="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95">
-                  <tr>
-                    <th class="px-5 py-3 text-left text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Month</th>
-                    <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Contacts</th>
-                    <th
-                      v-if="showAhtAssumptions"
-                      class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                    >
-                      Assumed AHT
-                    </th>
-                    <th
-                      v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY"
-                      class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                    >
-                      Avg Daily
-                    </th>
-                    <th
-                      v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY"
-                      class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                    >
-                      Peak Day
-                    </th>
-                    <th
-                      v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY"
-                      class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                    >
-                      Peak Volume
-                    </th>
-                    <th
-                      v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY"
-                      class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                    >
-                      Lower
-                    </th>
-                    <th
-                      v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY"
-                      class="px-5 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                    >
-                      Upper
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200">
-                  <tr v-for="row in monthlyRowsWithAht" :key="row.monthStart" class="bg-white">
-                    <td class="px-5 py-3 font-medium text-slate-900">{{ row.monthLabel }}</td>
-                    <td class="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{{ formatWhole(row.contacts) }}</td>
-                    <td v-if="showAhtAssumptions" class="px-4 py-3 text-right tabular-nums">{{ formatForecastAhtSeconds(row.assumedAhtSeconds) }}</td>
-                    <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.averageDailyVolume) }}</td>
-                    <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-4 py-3 text-right">{{ row.peakDailyDate ? formatDate(row.peakDailyDate) : '—' }}</td>
-                    <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.peakDailyVolume) }}</td>
-                    <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.lowerBoundContacts) }}</td>
-                    <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-5 py-3 text-right tabular-nums">{{ formatWhole(row.upperBoundContacts) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="warningMessages.length || noteMessages.length" class="grid gap-3 lg:grid-cols-2">
-          <article
-            v-if="warningMessages.length"
-            class="grid gap-1 border border-slate-200 bg-white px-4 py-4"
-          >
-            <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Warnings
-            </p>
-            <p class="text-sm leading-6 text-slate-700">
-              {{ warningMessages[0] }}
-            </p>
-          </article>
-
-          <article
-            v-if="noteMessages.length"
-            class="grid gap-1 border border-slate-200 bg-white px-4 py-4"
-          >
-            <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Model Notes
-            </p>
-            <p class="text-sm leading-6 text-slate-700">
-              {{ noteMessages[0] }}
-            </p>
-          </article>
-        </div>
-      </section>
+      <ForecastMonthlyRollupView
+        :embedded-monthly-highlights="embeddedMonthlyHighlights"
+        :show-aht-assumptions="showAhtAssumptions"
+        :monthly-aht-summary="monthlyAhtSummary"
+        :monthly-rows-with-aht="monthlyRowsWithAht"
+        :source-kind="sourceKind"
+        :warning-messages="warningMessages"
+        :note-messages="noteMessages"
+      />
     </template>
 
-    <template v-else-if="activeResultTab === 'components'">
-      <div v-if="!componentSections.length" class="grid gap-3">
-        <AppEmptyState
-          title="No component output returned"
-          description="This forecast run did not return separate component series."
-        />
-      </div>
-
-      <div v-else class="grid gap-4 px-4 pb-1 2xl:grid-cols-2">
-        <article
-          v-for="section in componentSections"
-          :key="section.id"
-          class="grid gap-3 border border-slate-200 bg-white p-4"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h3 class="text-base font-semibold tracking-[-0.02em] text-slate-950">
-              {{ section.title }}
-            </h3>
-          </div>
-          <ForecastComponentChart
-            v-if="section.points.length"
-            :title="section.title"
-            :points="section.points"
-            :format-number="formatNumber"
-          />
-          <p v-else class="text-sm leading-6 text-slate-600">
-            This run did not return a monthly component series.
-          </p>
-        </article>
-      </div>
-    </template>
   </div>
 </template>

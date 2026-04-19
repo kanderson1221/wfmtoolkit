@@ -27,6 +27,10 @@ const props = defineProps({
     type: Array,
     required: true
   },
+  minimumHolidayYear: {
+    type: Number,
+    default: null
+  },
   title: {
     type: String,
     default: 'Call Center Settings'
@@ -129,9 +133,14 @@ const normalizedHolidayProfiles = computed(() =>
 
 const holidayYearOptions = computed(() => {
   const anchorYear = normalizeHolidayYear(props.displayYear)
+  const minimumHolidayYear = Number.isInteger(Number(props.minimumHolidayYear)) && Number(props.minimumHolidayYear) > 0
+    ? normalizeHolidayYear(props.minimumHolidayYear, anchorYear)
+    : anchorYear - 2
+  const startYear = Math.min(anchorYear - 2, minimumHolidayYear)
+  const endYear = anchorYear + 5
   const years = new Set(normalizedHolidayProfiles.value.map((profile) => profile.year))
 
-  buildPlanningYearRange(anchorYear).forEach((year) => {
+  buildPlanningYearRange(anchorYear, anchorYear - startYear, endYear - anchorYear).forEach((year) => {
     years.add(year)
   })
 

@@ -15,6 +15,12 @@ import {
   resolveForecastCoverageWindow,
   resolveForecastType
 } from '../../forecasting/shared'
+import {
+  formatDateInputValue,
+  parseDateInputValue
+} from '../../forecasting/forecastDateInputs'
+import { GROUP_HOLIDAY_CALENDAR_INHERIT } from '../../planner/holidayCalendars'
+import { createPlanningGroupOpenDayChecker } from '../../planner/groupOpenDays'
 import { buildHolidayEntriesForYear } from '../../planner/holidayCalendars'
 
 export const resolveMaybeRef = (value) => {
@@ -102,52 +108,6 @@ export const sanitizeColumnMapping = (headers = [], mapping = {}, guessed = {}) 
 }
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
-const DATE_INPUT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
-
-const parseDateInputValue = (value) => {
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime())
-      ? null
-      : new Date(value.getFullYear(), value.getMonth(), value.getDate(), 12)
-  }
-
-  if (typeof value === 'string') {
-    const match = value.match(DATE_INPUT_PATTERN)
-    if (match) {
-      const [, yearText, monthText, dayText] = match
-      const year = Number(yearText)
-      const monthIndex = Number(monthText) - 1
-      const day = Number(dayText)
-      const normalized = new Date(year, monthIndex, day, 12)
-
-      return normalized.getFullYear() === year &&
-        normalized.getMonth() === monthIndex &&
-        normalized.getDate() === day
-        ? normalized
-        : null
-    }
-  }
-
-  const normalized = new Date(value)
-  return Number.isNaN(normalized.getTime()) ? null : normalized
-}
-
-const formatDateInputValue = (date) => {
-  if (typeof date === 'string' && DATE_INPUT_PATTERN.test(date)) {
-    return date
-  }
-
-  const normalized = parseDateInputValue(date)
-  if (!normalized) {
-    return ''
-  }
-
-  const year = normalized.getFullYear()
-  const month = String(normalized.getMonth() + 1).padStart(2, '0')
-  const day = String(normalized.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 const resolveCustomHolidayYears = ({ project, coverageWindow, adHocForecastHorizonDays }) => {
   const historyDates = getForecastTrainingHistoryRows(project)
     .map((row) => parseDateInputValue(row?.ds || ''))
@@ -177,18 +137,12 @@ const formatHolidayPayloadEntry = (entry, project, item = {}) => ({
 })
 
 const expandCenterManagedHolidayProfilesForPayload = ({ project, targetYears }) => {
-  const targetYearSet = new Set(targetYears)
   const sourceCenterHolidayProfiles = Array.isArray(project.sourceCenterHolidayProfiles)
     ? project.sourceCenterHolidayProfiles
     : []
-
-  return sourceCenterHolidayProfiles.flatMap((profile) => {
-    const profileYear = Number(profile?.year || 0)
-    if (!targetYearSet.has(profileYear)) {
-      return []
-    }
-
-    const profileHolidays = Array.isArray(profile?.customHolidays)
+  const normalizedProfiles = sourceCenterHolidayProfiles.map((profile) => ({
+    year: Number(profile?.year || 0),
+    customHolidays: Array.isArray(profile?.customHolidays)
       ? profile.customHolidays.map((holiday) => ({
           id: holiday.id,
           label: typeof holiday.label === 'string' ? holiday.label.trim() : '',
@@ -198,10 +152,28 @@ const expandCenterManagedHolidayProfilesForPayload = ({ project, targetYears }) 
           day: holiday.day
         }))
       : []
+  }))
+  const fallbackTemplateHolidays = normalizedProfiles
+    .flatMap((profile) => profile.customHolidays)
+    .filter((holiday, index, collection) =>
+      collection.findIndex((candidate) => (
+        (candidate.sourceRuleId || candidate.id || '') === (holiday.sourceRuleId || holiday.id || '') &&
+        (candidate.label || '') === (holiday.label || '') &&
+        (candidate.date || '') === (holiday.date || '') &&
+        Number(candidate.month || 0) === Number(holiday.month || 0) &&
+        Number(candidate.day || 0) === Number(holiday.day || 0)
+      )) === index
+    )
+
+  return targetYears.flatMap((targetYear) => {
+    const matchingProfile = normalizedProfiles.find((profile) => profile.year === targetYear)
+    const customHolidays = matchingProfile?.customHolidays?.length
+      ? matchingProfile.customHolidays
+      : fallbackTemplateHolidays
 
     return buildHolidayEntriesForYear({
-      year: profileYear,
-      customHolidays: profileHolidays
+      year: targetYear,
+      customHolidays
     }).map((entry) =>
       formatHolidayPayloadEntry(entry, project)
     )
@@ -268,6 +240,31 @@ const expandCustomHolidaysForPayload = ({ project, coverageWindow, adHocForecast
     })
 }
 
+const filterTrainingHistoryRowsToOpenDays = (project, historyRows = []) => {
+  const operatingWeekdays = Array.isArray(project?.sourceCenterSnapshot?.operatingWeekdays)
+    ? project.sourceCenterSnapshot.operatingWeekdays
+    : []
+
+  if (!operatingWeekdays.length) {
+    return historyRows
+  }
+
+  const isOpenDay = createPlanningGroupOpenDayChecker(
+    {
+      operatingWeekdays,
+      holidayCalendarId: GROUP_HOLIDAY_CALENDAR_INHERIT
+    },
+    {
+      operatingWeekdays,
+      holidayProfiles: Array.isArray(project?.sourceCenterHolidayProfiles)
+        ? project.sourceCenterHolidayProfiles
+        : []
+    }
+  )
+
+  return historyRows.filter((row) => isOpenDay(row?.ds || ''))
+}
+
 export const buildForecastPayload = (project) => {
   const trimmedManualChangepoints = String(project.modelConfig.manualChangepoints || '')
     .split(/[\n,]/)
@@ -282,7 +279,10 @@ export const buildForecastPayload = (project) => {
     coverageStartMonthIndex: project.coverageStartMonthIndex
   })
   const adHocForecastHorizonDays = Math.max(1, Number(project.forecastHorizonDays) || 365)
-  const trainingHistoryRows = getForecastTrainingHistoryRows(project)
+  const trainingHistoryRows = filterTrainingHistoryRowsToOpenDays(
+    project,
+    getForecastTrainingHistoryRows(project)
+  )
   const historyEndTime = parseDateInputValue(trainingHistoryRows.at(-1)?.ds || '')?.getTime() ?? Number.NaN
   const coverageEndTime = parseDateInputValue(coverageWindow.coverageEndDate || '')?.getTime() ?? Number.NaN
   const alignedForecastHorizonDays = Number.isFinite(historyEndTime) && Number.isFinite(coverageEndTime)

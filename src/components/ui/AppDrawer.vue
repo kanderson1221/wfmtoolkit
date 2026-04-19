@@ -29,6 +29,10 @@ const props = defineProps({
   widthClass: {
     type: String,
     default: 'max-w-[74rem]'
+  },
+  showHeaderClose: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -70,7 +74,14 @@ const drawerPt = computed(() => buildDrawerPt(props.widthClass, props.side))
           </div>
         </div>
 
-        <AppButton size="sm" variant="quiet" @click="visible = false">Close</AppButton>
+        <AppButton
+          v-if="props.showHeaderClose"
+          size="sm"
+          variant="quiet"
+          @click="visible = false"
+        >
+          Close
+        </AppButton>
       </div>
 
       <slot name="header" />

@@ -1,4 +1,5 @@
 import { createPlanningGroupActuals } from './groupActuals'
+import { createPlanningGroupOpenDayChecker } from './groupOpenDays'
 
 export const MINIMUM_FORECAST_HISTORY_DAYS = 14
 
@@ -44,12 +45,21 @@ const createForecastAhtHistoryRow = (row = {}) => {
 // Keep the staffing-group-history -> forecast-training mapping at this boundary so
 // future AHT-aware forecasting can extend the same shared-history source without
 // changing the planning callers again.
-export const buildForecastTrainingSeedFromPlanningGroupActuals = (actuals = {}) => {
+export const buildForecastTrainingSeedFromPlanningGroupActuals = (
+  actuals = {},
+  { group = null, center = null } = {}
+) => {
   const normalizedActuals = createPlanningGroupActuals(actuals)
-  const historyRows = normalizedActuals.dailyRows
+  const isOpenDay = group || center
+    ? createPlanningGroupOpenDayChecker(group || {}, center || {})
+    : null
+  const eligibleDailyRows = isOpenDay
+    ? normalizedActuals.dailyRows.filter((row) => isOpenDay(row.serviceDate))
+    : normalizedActuals.dailyRows
+  const historyRows = eligibleDailyRows
     .map((row) => createForecastHistoryRow(row))
     .filter(Boolean)
-  const ahtHistoryRows = normalizedActuals.dailyRows
+  const ahtHistoryRows = eligibleDailyRows
     .map((row) => createForecastAhtHistoryRow(row))
     .filter(Boolean)
 
@@ -61,5 +71,6 @@ export const buildForecastTrainingSeedFromPlanningGroupActuals = (actuals = {}) 
 
 export const hasMinimumForecastTrainingHistory = (
   actuals = {},
-  minimumDays = MINIMUM_FORECAST_HISTORY_DAYS
-) => buildForecastTrainingSeedFromPlanningGroupActuals(actuals).historyRows.length >= minimumDays
+  minimumDays = MINIMUM_FORECAST_HISTORY_DAYS,
+  options = {}
+) => buildForecastTrainingSeedFromPlanningGroupActuals(actuals, options).historyRows.length >= minimumDays

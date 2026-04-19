@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, toRef, watch } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import {
   mdiChartLineVariant,
   mdiFolderOutline,
@@ -11,23 +11,13 @@ import PlanningForecastCreateModal from './PlanningForecastCreateModal.vue'
 import PlanningGroupActualsView from './PlanningGroupActualsView.vue'
 import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
-import {
-  buildPlanningGroupNewForecastHash,
-  buildPlanningGroupForecastsHash,
-  navigateToHash
-} from '../../appRoutes'
+import { navigateToHash } from '../../appRoutes'
 import { createPlanningGroupDraft } from '../../planningStorage'
-import { currentYear, yearOptions } from '../../composables/monthlyPlanBuilder/shared'
+import { currentYear } from '../../composables/monthlyPlanBuilder/shared'
 import { usePlanningCenterForecastLibrary } from '../../composables/planning/usePlanningCenterForecastLibrary'
+import { usePlanningGroupDataActions } from '../../composables/planning/usePlanningGroupDataActions'
+import { usePlanningGroupForecastActions } from '../../composables/planning/usePlanningGroupForecastActions'
 import { usePlanningCenterWorkspace } from '../../composables/planning/usePlanningCenterWorkspace'
-import {
-  FORECAST_TYPE_BUDGET
-} from '../../forecasting/shared'
-import { createPlanningGroupActuals } from '../../planner/groupActuals'
-import {
-  buildForecastTrainingSeedFromPlanningGroupActuals,
-  MINIMUM_FORECAST_HISTORY_DAYS
-} from '../../planner/groupActualsForecastSeed'
 import AppAttachedTabs from '../ui/AppAttachedTabs.vue'
 import AppButton from '../ui/AppButton.vue'
 import AppBreadcrumbs from '../ui/AppBreadcrumbs.vue'
@@ -74,11 +64,8 @@ const emit = defineEmits(['save-group', 'delete-group', 'delete-plan'])
 
 const groupSettingsOpen = ref(false)
 const planSettingsOpen = ref(false)
-const forecastCreateOpen = ref(false)
 const groupDraft = ref(createPlanningGroupDraft())
 const newPlanYear = ref(currentYear)
-const newForecastYear = ref('')
-const forecastHistoryRequirementMessage = ref('')
 const {
   dialogVisible: confirmationDialogOpen,
   dialogTitle: confirmationDialogTitle,
@@ -89,8 +76,6 @@ const {
 } = useConfirmDialog()
 const activeGroupWorkspaceTab = ref('data')
 const actualsViewRef = ref(null)
-const selectedActualsScope = ref(null)
-const selectedForecastId = ref('')
 
 const planComparisonGridClass =
   'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(5.5rem,0.68fr)_minmax(6rem,0.76fr)_minmax(5.5rem,0.68fr)_minmax(6rem,0.72fr)_minmax(8.25rem,1fr)_minmax(8.25rem,1fr)] items-center'
@@ -125,7 +110,6 @@ const {
   resolveNextPlanYear,
   selectedGroup,
   selectedGroupDefaults,
-  selectedGroupForecastWorkspaceHref,
   selectedYearModel
 } = usePlanningCenterWorkspace({
   center: toRef(props, 'center'),
@@ -164,31 +148,8 @@ const openPlanSettings = () => {
   planSettingsOpen.value = true
 }
 
-const openForecastCreate = () => {
-  if (!selectedGroup.value) {
-    return
-  }
-
-  if (!canLaunchModeledForecast.value) {
-    selectedForecastId.value = ''
-    forecastCreateOpen.value = false
-    activeGroupWorkspaceTab.value = 'data'
-    forecastHistoryRequirementMessage.value = `Add at least ${MINIMUM_FORECAST_HISTORY_DAYS} daily history rows in Data before building a forecast.`
-    return
-  }
-
-  forecastHistoryRequirementMessage.value = ''
-  newForecastYear.value = Number(selectedYearModel.value) > 0 ? Number(selectedYearModel.value) : currentYear
-  selectedForecastId.value = ''
-  forecastCreateOpen.value = true
-}
-
 const closePlanSettings = () => {
   planSettingsOpen.value = false
-}
-
-const closeForecastCreate = () => {
-  forecastCreateOpen.value = false
 }
 
 const createPlan = () => {
@@ -199,29 +160,6 @@ const createPlan = () => {
   planSettingsOpen.value = false
   navigateToHash(createPlanHref.value)
 }
-
-const forecastYearOptions = computed(() => {
-  const yearSet = new Set(yearOptions.map((year) => Number(year)))
-
-  if (Number(selectedYearModel.value) > 0) {
-    yearSet.add(Number(selectedYearModel.value))
-  }
-
-  ;(selectedGroup.value?.plans || []).forEach((plan) => {
-    const planningYear = Number(plan?.planningYear)
-    if (planningYear > 0) {
-      yearSet.add(planningYear)
-    }
-  })
-
-  return [...yearSet]
-    .filter((year) => Number.isInteger(year) && year > 0)
-    .sort((left, right) => right - left)
-    .map((year) => ({
-      label: String(year),
-      value: year
-    }))
-})
 
 const selectPlanYear = (planningYear) => {
   selectedYearModel.value = Number(planningYear) || currentYear
@@ -247,119 +185,24 @@ const saveGroup = () => {
   })
   groupSettingsOpen.value = false
 }
-
-const saveGroupActuals = (actuals) => {
-  if (!selectedGroup.value) {
-    return
-  }
-
-  emit('save-group', {
-    ...selectedGroup.value,
-    actuals: createPlanningGroupActuals(actuals)
-  })
-}
-
-const handleActualsSelectionChange = (selection) => {
-  selectedActualsScope.value = selection ? { ...selection } : null
-}
-
-const clearActualsSelection = () => {
-  selectedActualsScope.value = null
-  actualsViewRef.value?.clearSelection?.()
-}
-
-const hasActualsData = computed(() =>
-  createPlanningGroupActuals(selectedGroup.value?.actuals).dailyRows.length > 0
-)
-
-const selectedGroupForecastTrainingSeed = computed(() =>
-  buildForecastTrainingSeedFromPlanningGroupActuals(selectedGroup.value?.actuals)
-)
-
-const canLaunchModeledForecast = computed(() =>
-  selectedGroupForecastTrainingSeed.value.historyRows.length >= MINIMUM_FORECAST_HISTORY_DAYS
-)
-
-const actualsMenuItems = computed(() => {
-  if (!hasActualsData.value) {
-    return []
-  }
-
-  const items = []
-
-  if (selectedActualsScope.value?.type === 'year' || selectedActualsScope.value?.type === 'month') {
-    items.push({
-      id: 'delete-selected',
-      label: `Delete ${selectedActualsScope.value.label}`,
-      tone: 'danger'
-    })
-  }
-
-  items.push({
-    id: 'clear-all',
-    label: 'Delete All Data',
-    tone: 'danger'
-  })
-
-  return items
+const {
+  actualsMenuItems,
+  canLaunchModeledForecast,
+  clearActualsSelection,
+  forecastHistoryRequirementMessage,
+  handleActualsMenuSelect,
+  handleActualsSelectionChange,
+  minimumForecastHistoryDays,
+  openActualsImport,
+  saveGroupActuals,
+  showForecastHistoryRequirement
+} = usePlanningGroupDataActions({
+  center: toRef(props, 'center'),
+  selectedGroup,
+  actualsViewRef,
+  requestConfirmation,
+  onSaveGroup: (group) => emit('save-group', group)
 })
-
-const openActualsImport = () => {
-  actualsViewRef.value?.openImportModal?.()
-}
-
-const confirmDeleteActualsSelection = () => {
-  if (!selectedGroup.value || !selectedActualsScope.value) {
-    return
-  }
-
-  const scopeLabel = selectedActualsScope.value.label
-  const scopeDescription =
-    selectedActualsScope.value.type === 'year'
-      ? `Delete all loaded data for ${scopeLabel}? This removes every stored day in that year.`
-      : `Delete all loaded data for ${scopeLabel}? This removes every stored day in that month.`
-
-  requestConfirmation({
-    title: 'Delete Data?',
-    description: `${scopeDescription} This cannot be undone.`,
-    confirmLabel: `Delete ${scopeLabel}`,
-    onConfirm: () => {
-      actualsViewRef.value?.deleteSelectedScope?.()
-      selectedActualsScope.value = null
-    }
-  })
-}
-
-const confirmClearAllActuals = () => {
-  if (!selectedGroup.value) {
-    return
-  }
-
-  requestConfirmation({
-    title: 'Delete All Data?',
-    description: `Delete all loaded actuals for ${selectedGroup.value.name}? This removes the shared history used by forecasting and staffing. This cannot be undone.`,
-    confirmLabel: 'Delete All Data',
-    onConfirm: () => {
-      actualsViewRef.value?.clearAllData?.()
-      selectedActualsScope.value = null
-    }
-  })
-}
-
-const handleActualsMenuSelect = (item) => {
-  if (!item) {
-    return
-  }
-
-  if (item.id === 'delete-selected') {
-    confirmDeleteActualsSelection()
-    return
-  }
-
-  if (item.id === 'clear-all') {
-    confirmClearAllActuals()
-  }
-}
 
 const confirmDeleteGroup = (group) => {
   requestConfirmation({
@@ -416,15 +259,6 @@ const planMenuItems = [
   }
 ]
 
-const buildForecastMenuItems = (forecast) => {
-  return [
-    {
-      id: 'delete-forecast',
-      label: 'Delete'
-    }
-  ]
-}
-
 const handleGroupMenuSelect = (group, item) => {
   if (item.id === 'edit-group') {
     openEditGroup(group)
@@ -441,73 +275,33 @@ const handlePlanMenuSelect = (plan, item) => {
     confirmDeletePlan(plan)
   }
 }
-
-const selectForecast = (forecastId) => {
-  selectedForecastId.value = String(forecastId || '').trim()
-}
-
-const buildForecastOpenHref = (forecast) => {
-  if (!selectedGroup.value) {
-    return selectedGroupForecastWorkspaceHref.value
+const {
+  buildForecastMenuItems,
+  buildForecastOpenHref,
+  canCreateForecast,
+  closeForecastCreate,
+  createForecast,
+  forecastCreateOpen,
+  forecastYearOptions,
+  handleForecastMenuSelect,
+  newForecastYear,
+  openForecast,
+  openForecastCreate,
+  selectForecast,
+  selectedForecastId
+} = usePlanningGroupForecastActions({
+  center: toRef(props, 'center'),
+  selectedGroup,
+  selectedYearModel,
+  forecastRows,
+  canLaunchModeledForecast,
+  requestConfirmation,
+  deleteForecast,
+  onMissingHistory: () => {
+    activeGroupWorkspaceTab.value = 'data'
+    showForecastHistoryRequirement()
   }
-
-  const planningYear = Number(forecast?.planningYear) || Number(selectedYearModel.value) || currentYear
-
-  return buildPlanningGroupForecastsHash(
-    props.center.id,
-    selectedGroup.value.id,
-    planningYear,
-    forecast?.id
-  )
-}
-
-const openForecast = (forecast) => {
-  selectForecast(forecast?.id)
-  navigateToHash(buildForecastOpenHref(forecast))
-}
-
-const canCreateForecast = computed(() => {
-  const planningYear = Number(newForecastYear.value)
-
-  if (!selectedGroup.value || !Number.isInteger(planningYear) || planningYear <= 0) {
-    return false
-  }
-
-  return canLaunchModeledForecast.value
 })
-
-const createForecast = () => {
-  if (!selectedGroup.value || !canCreateForecast.value) {
-    return
-  }
-
-  const planningYear = Number(newForecastYear.value)
-
-  forecastCreateOpen.value = false
-  selectedForecastId.value = ''
-  navigateToHash(
-    buildPlanningGroupNewForecastHash(props.center.id, selectedGroup.value.id, planningYear, {
-      forecastType: FORECAST_TYPE_BUDGET
-    })
-  )
-}
-
-const confirmDeleteForecast = (forecast) => {
-  requestConfirmation({
-    title: 'Delete Forecast?',
-    description: `Delete the saved forecast "${forecast.name}" from ${selectedGroup.value?.name || 'this staffing group'}?`,
-    confirmLabel: 'Delete Forecast',
-    onConfirm: () => {
-      void deleteForecast(forecast)
-    }
-  })
-}
-
-const handleForecastMenuSelect = (forecast, item) => {
-  if (item.id === 'delete-forecast') {
-    confirmDeleteForecast(forecast)
-  }
-}
 
 watch(
   [selectedGroup, () => props.selectedGroupTab],
@@ -532,37 +326,9 @@ watch(
 )
 
 watch(
-  [selectedGroup, forecastRows],
-  ([group, rows]) => {
-    if (!group) {
-      selectedForecastId.value = ''
-      return
-    }
-
-    if (rows.some((forecast) => forecast.id === selectedForecastId.value)) {
-      return
-    }
-
-    selectedForecastId.value = rows[0]?.id || ''
-  },
-  { immediate: true }
-)
-
-watch(
   [selectedGroup, activeGroupWorkspaceTab],
   () => {
-    selectedActualsScope.value = null
-    actualsViewRef.value?.clearSelection?.()
-  },
-  { immediate: true }
-)
-
-watch(
-  [selectedGroup, canLaunchModeledForecast],
-  ([group]) => {
-    if (!group || canLaunchModeledForecast.value) {
-      forecastHistoryRequirementMessage.value = ''
-    }
+    clearActualsSelection()
   },
   { immediate: true }
 )
@@ -756,7 +522,7 @@ watch(
                   </AppStatusMessage>
 
                   <AppStatusMessage v-if="!forecastsLoading && !forecastsError && !canLaunchModeledForecast" tone="warning">
-                    Add at least {{ formatWhole(MINIMUM_FORECAST_HISTORY_DAYS) }} daily history rows in Data before building a forecast for {{ selectedGroup.name }}.
+                    Add at least {{ formatWhole(minimumForecastHistoryDays) }} daily history rows in Data before building a forecast for {{ selectedGroup.name }}.
                   </AppStatusMessage>
 
                   <AppEmptyState
@@ -771,7 +537,7 @@ watch(
                 <div v-else class="grid gap-0">
                     <div v-if="!canLaunchModeledForecast" class="px-5 pt-5">
                       <AppStatusMessage tone="warning">
-                        Add at least {{ formatWhole(MINIMUM_FORECAST_HISTORY_DAYS) }} daily history rows in Data before building a forecast for {{ selectedGroup.name }}.
+                        Add at least {{ formatWhole(minimumForecastHistoryDays) }} daily history rows in Data before building a forecast for {{ selectedGroup.name }}.
                       </AppStatusMessage>
                     </div>
 

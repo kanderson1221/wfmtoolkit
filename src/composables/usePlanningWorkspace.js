@@ -229,7 +229,10 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
     const sharedHistorySeed =
       currentRoute.value.page === 'group-forecasts' &&
       seededSourceKind === FORECAST_SOURCE_MODELED_DAILY
-        ? buildForecastTrainingSeedFromPlanningGroupActuals(currentGroup.value?.actuals)
+        ? buildForecastTrainingSeedFromPlanningGroupActuals(currentGroup.value?.actuals, {
+            group: currentGroup.value,
+            center: currentCenter.value
+          })
         : { historyRows: [] }
 
     return {
@@ -255,7 +258,10 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         centerId: currentCenter.value.id,
         centerName: currentCenter.value.name,
         timezone: currentCenter.value.timezone,
-        operatingWeekdays: currentCenter.value.operatingWeekdays,
+        operatingWeekdays:
+          Array.isArray(currentGroup.value?.operatingWeekdays) && currentGroup.value.operatingWeekdays.length
+            ? currentGroup.value.operatingWeekdays
+            : currentCenter.value.operatingWeekdays,
         operatingOpenTime: currentCenter.value.operatingOpenTime,
         operatingCloseTime: currentCenter.value.operatingCloseTime,
         holidayProfileYear,

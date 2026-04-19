@@ -128,6 +128,21 @@ const sampleForecasts = [
     id: 'forecast-1',
     name: 'Consumer Voice 2026 Forecast',
     sourceKind: 'imported_daily',
+    centerManagedHolidays: true,
+    sourceCenterHolidayProfiles: [
+      {
+        year: 2026,
+        customHolidays: [
+          {
+            label: 'Thanksgiving Day',
+            date: '2026-11-26',
+            sourceRuleId: 'thanksgiving_day',
+            month: 11,
+            day: 26
+          }
+        ]
+      }
+    ],
     centerId: 'center-1',
     planningContext: {
       centerId: 'center-1',
@@ -268,6 +283,20 @@ describe('localDataStore', () => {
     expect(loadedForecasts[0].ahtHistoryRows).toEqual([
       { ds: '2025-01-01', contacts: 100, ahtSeconds: 280 },
       { ds: '2025-01-02', contacts: 120, ahtSeconds: 285 }
+    ])
+    expect(loadedForecasts[0].sourceCenterHolidayProfiles).toEqual([
+      {
+        year: 2026,
+        customHolidays: [
+          {
+            label: 'Thanksgiving Day',
+            date: '2026-11-26',
+            sourceRuleId: 'thanksgiving_day',
+            month: 11,
+            day: 26
+          }
+        ]
+      }
     ])
     expect(loadedForecasts[0].uploadedHeaders).toEqual(['service_date', 'call_volume', 'internal_notes'])
     expect(loadedForecasts[0].uploadedRows).toEqual([])

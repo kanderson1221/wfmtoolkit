@@ -23,6 +23,7 @@ import { buildPlanningCenterHash, navigateToHash } from '../appRoutes'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { createPlanningCenterDraft, resolvePlanHolidaySnapshot } from '../planningStorage'
 import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
+import { resolvePlanningGroupActuals } from '../planner/groupActuals'
 import { getCurrentCalendarYear } from '../planner/shared'
 import { computeMonthlyRecords } from '../planner/demandModel'
 import { computeStaffingRecords } from '../planner/staffingModel'
@@ -307,6 +308,18 @@ const centerSettingsSubmitLabel = computed(() =>
   isEditingCenter.value ? 'Save Call Center' : 'Create Call Center'
 )
 
+const centerSettingsMinimumHolidayYear = computed(() => {
+  const earliestYears = getCenterGroups(centerDraft.value)
+    .map((group) => {
+      const earliestServiceDate = resolvePlanningGroupActuals(group).dailyRows[0]?.serviceDate || ''
+      const earliestYear = Number(earliestServiceDate.slice(0, 4))
+      return Number.isInteger(earliestYear) && earliestYear > 0 ? earliestYear : null
+    })
+    .filter(Boolean)
+
+  return earliestYears.length ? Math.min(...earliestYears) : null
+})
+
 const openCreateCenter = () => {
   centerDraft.value = createPlanningCenterDraft()
   centerSettingsOpen.value = true
@@ -546,6 +559,7 @@ const handleCenterMenuSelect = (center, item) => {
       v-model:operating-open-time="centerDraft.operatingOpenTime"
       v-model:operating-close-time="centerDraft.operatingCloseTime"
       :display-year="selectedPlanningYear"
+      :minimum-holiday-year="centerSettingsMinimumHolidayYear"
       :weekday-options="props.weekdayOptions"
       :allow-backdrop-close="false"
       :title="centerSettingsTitle"

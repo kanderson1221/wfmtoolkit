@@ -32,7 +32,7 @@ vi.mock('../../planningRepository', () => ({
 }))
 
 describe('usePlanningWorkspace', () => {
-  const buildActualsRows = (count = 14) =>
+  const buildActualsRows = (count = 21) =>
     Array.from({ length: count }, (_, index) => {
       const date = new Date(2025, 0, 1 + index, 12)
       const serviceDate = [
@@ -242,12 +242,12 @@ describe('usePlanningWorkspace', () => {
       (holiday) => holiday.name === 'Independence Day'
     )
 
-    expect(workspace.forecastSeed.value?.historyRows).toHaveLength(14)
+    expect(workspace.forecastSeed.value?.historyRows).toHaveLength(15)
     expect(workspace.forecastSeed.value?.historyRows?.[0]).toMatchObject({
       ds: '2025-01-01',
       y: 900
     })
-    expect(workspace.forecastSeed.value?.ahtHistoryRows).toHaveLength(14)
+    expect(workspace.forecastSeed.value?.ahtHistoryRows).toHaveLength(15)
     expect(workspace.forecastSeed.value?.ahtHistoryRows?.[0]).toMatchObject({
       ds: '2025-01-01',
       contacts: 900,

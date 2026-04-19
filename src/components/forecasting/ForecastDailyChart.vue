@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
+import { resolveAdaptiveYAxisBounds } from '../../forecasting/chartAxis'
 import { formatDate, parseForecastDateValue } from '../../forecasting/shared'
 import AppLineChart from '../ui/AppLineChart.vue'
 
@@ -62,8 +63,28 @@ const axisLabels = computed(() => chartRows.value.map((row) => row.ds || ''))
 const bandSpread = computed(() =>
   chartRows.value.map((row) => Math.max((Number(row.yhatUpper) || 0) - (Number(row.yhatLower) || 0), 0))
 )
+const numericSeriesValues = computed(() => chartRows.value.flatMap((row) => (
+  [
+    row.actualValue,
+    row.yhat,
+    row.yhatLower,
+    row.yhatUpper
+  ]
+    .filter((value) => value != null && value !== '')
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+)))
 const shouldShowZoom = computed(() => chartRows.value.length > 45)
 const hasHoldoutWindow = computed(() => holdoutStartIndex.value > -1 && holdoutEndIndex.value > -1)
+
+const yAxisBounds = computed(() => {
+  return resolveAdaptiveYAxisBounds(numericSeriesValues.value, {
+    emptyMax: 100,
+    singleValuePaddingFloor: 10,
+    paddingFloor: 10,
+    nearZeroFloor: 100
+  })
+})
 
 const resolveWindowLabel = (dataIndex) => {
   if (!chartRows.value[dataIndex]) {
@@ -146,7 +167,9 @@ const chartOption = computed(() => ({
   },
   yAxis: {
     type: 'value',
-    min: 0,
+    min: yAxisBounds.value.min,
+    max: yAxisBounds.value.max,
+    splitNumber: 5,
     axisLine: {
       show: false
     },

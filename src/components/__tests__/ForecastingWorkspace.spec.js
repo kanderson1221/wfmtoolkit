@@ -4,8 +4,10 @@ import ForecastingWorkspace from '../ForecastingWorkspace.vue'
 import ForecastHistoryModal from '../forecasting/ForecastHistoryModal.vue'
 import ForecastImportDailyModal from '../forecasting/ForecastImportDailyModal.vue'
 import ForecastMonthlyEntryModal from '../forecasting/ForecastMonthlyEntryModal.vue'
+import ForecastDailyChart from '../forecasting/ForecastDailyChart.vue'
 import ForecastingWorkbench from '../forecasting/ForecastingWorkbench.vue'
 import AppNumberField from '../ui/AppNumberField.vue'
+import AppTableNumberField from '../ui/AppTableNumberField.vue'
 import { buildForecastRunInputSignature } from '../../composables/forecasting/forecastWorkspaceHelpers'
 import { createForecastProject } from '../../forecasting/shared'
 import { forecastingRepository } from '../../forecastingRepository'
@@ -615,6 +617,74 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('1,025')
   })
 
+  it('uses held-out forecast rows in the chart when showing MAPE-scored test days', async () => {
+    const loadedProject = createLoadedProject()
+    const historyForecastRows = loadedProject.historyRows.map((row) => ({
+      ds: row.ds,
+      actualValue: row.y,
+      yhat: row.y,
+      yhatLower: row.y - 25,
+      yhatUpper: row.y + 25,
+      isHistory: true
+    }))
+
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-holdout-chart-spec',
+        projectSeed: {
+          ...loadedProject,
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          },
+          lastRun: {
+            ...createForecastRunResults(),
+            dailyForecast: [
+              ...historyForecastRows,
+              { ds: '2026-01-01', actualValue: null, yhat: 1005, yhatLower: 930, yhatUpper: 1085, isHistory: false }
+            ],
+            diagnostics: {
+              ...createForecastRunResults().diagnostics,
+              holdout: {
+                ...createForecastRunResults().diagnostics.holdout,
+                holdoutDays: 3,
+                rows: [
+                  {
+                    ds: '2025-01-12',
+                    actualValue: 615,
+                    forecastValue: 720,
+                    lowerBound: 680,
+                    upperBound: 760,
+                    absoluteError: 105,
+                    signedError: 105,
+                    percentError: 17.1,
+                    withinInterval: false
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    })
+    mountedWrappers.push(wrapper)
+    await flushUi()
+    await flushUi()
+
+    const chartRows = wrapper.findComponent(ForecastDailyChart).props('rows')
+    const heldOutRow = chartRows.find((row) => row.ds === '2025-01-12')
+
+    expect(heldOutRow.actualValue).toBe(615)
+    expect(heldOutRow.yhat).toBe(720)
+    expect(heldOutRow.yhatLower).toBe(680)
+    expect(heldOutRow.yhatUpper).toBe(760)
+  })
+
   it('saves a project and reopens it from the project dialog', async () => {
     const initialWrapper = mount(ForecastingWorkspace, {
       props: {
@@ -757,7 +827,7 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.find('button[aria-label="Expand model parameters"]').exists()).toBe(false)
     expect(document.body.textContent || '').toContain('Model Parameters')
     expect(document.body.textContent || '').toContain('Training Data')
-    expect(document.body.textContent || '').toContain('Using shared staffing-group history from Data.')
+    expect(document.body.textContent || '').toContain('Source: Shared staffing-group history')
     expect(document.body.textContent || '').toContain('Handle Time Assumptions')
     expect(document.body.textContent || '').toContain('Validation')
     expect(document.body.querySelector('#forecast-training-start-date')?.value).toBe('2025-01-01')
@@ -942,6 +1012,21 @@ describe('ForecastingWorkspace', () => {
     expect(hasWorkbenchButton('Data')).toBe(true)
     expect(hasWorkbenchButton('Run')).toBe(false)
 
+    expect(wrapper.text()).toContain('Forecast')
+    expect(wrapper.text()).toContain('Components')
+
+    await findButtonByText(wrapper, 'AHT').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Monthly Handle Time Assumptions')
+    expect(wrapper.text()).not.toContain('Range adjustment rules')
+    expect(hasWorkbenchButton('Data')).toBe(false)
+    expect(hasWorkbenchButton('Run')).toBe(false)
+    expect(wrapper.findAll('button').some((button) => button.text().trim() === 'Components')).toBe(false)
+
+    await findButtonByText(wrapper, 'Contacts').trigger('click')
+    await flushUi()
+
     await findButtonByText(wrapper, 'Components').trigger('click')
     await flushUi()
 
@@ -952,7 +1037,7 @@ describe('ForecastingWorkspace', () => {
     await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
     await flushUi()
 
-    expect(hasBodyButton('Run')).toBe(false)
+    expect(hasBodyButton('Run')).toBe(true)
 
     await clickBodyButton('Close')
 
@@ -962,13 +1047,90 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).not.toContain('Range adjustment rules')
     expect(hasWorkbenchButton('Data')).toBe(false)
     expect(hasWorkbenchButton('Run')).toBe(false)
+  })
 
-    await findButtonByText(wrapper, 'Forecast').trigger('click')
+  it('lets users review and override monthly AHT assumptions', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-aht-tab-spec',
+        projectSeed: createProjectWithRun({
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          }
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).toContain('Range adjustment rules')
-    expect(hasWorkbenchButton('Data')).toBe(true)
-    expect(hasWorkbenchButton('Run')).toBe(false)
+    await findButtonByText(wrapper, 'AHT').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Monthly Handle Time Assumptions')
+    expect(wrapper.text()).toContain('Monthly AHT Review')
+    expect(wrapper.text()).toContain('Blend Recent + Seasonal')
+
+    const overrideField = wrapper.findAllComponents(AppTableNumberField)[0]
+    expect(overrideField.exists()).toBe(true)
+
+    await overrideField.vm.$emit('update:modelValue', 415)
+    await flushUi()
+
+    expect(wrapper.text()).toContain('415.0 sec')
+    expect(wrapper.text()).toContain('Clear AHT Overrides')
+
+    await findButtonByText(wrapper, 'Monthly Rollup').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('415.0 sec')
+  })
+
+  it('shows a single footer close action and keeps run visible when the inspector opens from AHT', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-aht-inspector-actions-spec',
+        projectSeed: createProjectWithRun({
+          groupName: 'Consumer Voice',
+          planningYear: 2026,
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planId: 'plan-1',
+            planningYear: 2026,
+            groupName: 'Consumer Voice'
+          }
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    await findButtonByText(wrapper, 'AHT').trigger('click')
+    await flushUi()
+
+    await wrapper.find('button[aria-label="Expand model parameters"]').trigger('click')
+    await flushUi()
+
+    const closeButtons = [...document.body.querySelectorAll('button')].filter(
+      (button) => button.textContent?.trim() === 'Close'
+    )
+    const runButtons = [...document.body.querySelectorAll('button')].filter(
+      (button) => button.textContent?.trim() === 'Run'
+    )
+
+    expect(closeButtons).toHaveLength(1)
+    expect(runButtons).toHaveLength(1)
+    expect(document.body.textContent || '').not.toContain('Settings are current for the latest completed run.')
   })
 
   it('shows a monthly component card when monthly seasonality is enabled', async () => {
@@ -1097,7 +1259,7 @@ describe('ForecastingWorkspace', () => {
       [...wrapper.findAll('button')].some((button) => button.text().trim() === 'Run')
     ).toBe(false)
     expect(document.body.textContent || '').toContain('Run')
-    expect(document.body.textContent || '').toContain('Settings are current for the latest completed run.')
+    expect(document.body.textContent || '').not.toContain('Settings are current for the latest completed run.')
 
     await clickBodyButton('Run', { last: true })
     await flushUi()

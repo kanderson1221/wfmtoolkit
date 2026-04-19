@@ -81,12 +81,16 @@ const activeResultTab = defineModel('activeResultTab', {
   required: true
 })
 
+const activeContactsSubview = ref('forecast')
 const inspectorOpen = ref(false)
 const autoOpenedInspectorProjectIds = new Set()
 
 const sourceKind = computed(() => getForecastProjectSourceKind(project.value))
 const resultTabs = computed(() => getForecastProjectResultTabs(project.value))
-const isForecastTab = computed(() => activeResultTab.value === 'daily')
+const isForecastTab = computed(() =>
+  activeResultTab.value === 'daily' && activeContactsSubview.value === 'forecast'
+)
+const canRunFromInspector = computed(() => canRunForecast.value)
 const canRunForecast = computed(() => canForecastProjectRun(project.value))
 const showInspector = computed(() => canForecastProjectShowInspector(project.value))
 const canAdjustForecast = computed(() => canForecastProjectAdjust(project.value))
@@ -143,11 +147,7 @@ const headerStatus = computed(() => {
   return null
 })
 const inspectorFooterMessage = computed(() => {
-  if (!isForecastTab.value) {
-    return ''
-  }
-
-  if (!canRunForecast.value) {
+  if (!canRunFromInspector.value) {
     return ''
   }
 
@@ -159,7 +159,7 @@ const inspectorFooterMessage = computed(() => {
     return 'Outputs are stale. Run the forecast to refresh the chart and rollups.'
   }
 
-  return hasResults.value ? 'Settings are current for the latest completed run.' : ''
+  return ''
 })
 const collapsedRailStatusClass = computed(() => {
   if (props.validationMessages.length) {
@@ -348,8 +348,9 @@ watch(
 
             <div v-if="hasHistory" class="pt-4">
               <ForecastingResultsPanel
+                v-model:project="project"
                 v-model:active-result-tab="activeResultTab"
-                :project="project"
+                v-model:active-contacts-subview="activeContactsSubview"
                 :run-error="props.runError"
               />
             </div>
@@ -394,7 +395,7 @@ watch(
       </div>
 
       <section
-        v-if="canAdjustForecast && hasHistory && activeResultTab === 'daily'"
+        v-if="canAdjustForecast && hasHistory && activeResultTab === 'daily' && activeContactsSubview === 'forecast'"
         class="overflow-visible border border-slate-200 bg-white shadow-sm"
       >
         <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3 xl:flex-row xl:items-start xl:justify-between">
@@ -438,6 +439,7 @@ watch(
       kicker="Prophet Configuration"
       side="right"
       width-class="max-w-[38rem]"
+      :show-header-close="false"
       allow-backdrop-close
       @close="inspectorOpen = false"
     >
@@ -455,9 +457,9 @@ watch(
       <template #footer>
         <div
           class="flex w-full flex-col gap-3 border-t border-slate-200 px-6 py-4"
-          :class="isForecastTab && canRunForecast ? 'xl:flex-row xl:items-center xl:justify-between' : 'items-end'"
+          :class="canRunFromInspector && inspectorFooterMessage ? 'xl:flex-row xl:items-center xl:justify-between' : 'items-end'"
         >
-          <p v-if="isForecastTab && canRunForecast" class="text-sm text-slate-600">
+          <p v-if="canRunFromInspector && inspectorFooterMessage" class="text-sm text-slate-600">
             {{ inspectorFooterMessage }}
           </p>
 
@@ -466,7 +468,7 @@ watch(
               Close
             </AppButton>
             <AppButton
-              v-if="isForecastTab && canRunForecast"
+              v-if="canRunFromInspector"
               size="sm"
               variant="primary"
               :disabled="props.isRunningForecast || props.validationMessages.length > 0"
