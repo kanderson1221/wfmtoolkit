@@ -53,8 +53,19 @@ const sampleCenters = [
         defaultPaidHoursPerDay: 8,
         defaultOccupancyPercent: 90,
         defaultAdherencePercent: 95,
+        serviceLevelPercent: 80,
+        serviceLevelThresholdSeconds: 20,
         holidayCalendarId: 'inherit',
         holidayScheduleMode: 'closed',
+        intraday: {
+          intervalLengthMinutes: 30,
+          intervalRatios: [
+            { startTime: '08:00', ratioPercent: 30 },
+            { startTime: '08:30', ratioPercent: 20 },
+            { startTime: '09:00', ratioPercent: 25 },
+            { startTime: '09:30', ratioPercent: 25 }
+          ]
+        },
         actuals: {
           sourceMode: 'daily_upload',
           dailyRows: [
@@ -278,6 +289,20 @@ describe('localDataStore', () => {
       contacts: 110,
       ahtSeconds: 300
     })
+    expect(loadedCenters[0].groups[0]).toMatchObject({
+      serviceLevelPercent: 80,
+      serviceLevelThresholdSeconds: 20
+    })
+    expect(loadedCenters[0].groups[0].intraday).toMatchObject({
+      intervalLengthMinutes: 30
+    })
+    expect(loadedCenters[0].groups[0].intraday.intervalRatios.slice(0, 4)).toEqual([
+      { startTime: '08:00', ratioPercent: 30 },
+      { startTime: '08:30', ratioPercent: 20 },
+      { startTime: '09:00', ratioPercent: 25 },
+      { startTime: '09:30', ratioPercent: 25 }
+    ])
+    expect(loadedCenters[0].groups[0].intraday.intervalRatios).toHaveLength(18)
     expect(loadedForecasts[0].sourceKind).toBe('imported_daily')
     expect(loadedForecasts[0].sourceData.fileName).toBe('imported-forecast.csv')
     expect(loadedForecasts[0].ahtHistoryRows).toEqual([

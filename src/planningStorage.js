@@ -11,6 +11,7 @@ import {
   normalizeHolidayScheduleMode
 } from './planner/holidayCalendars'
 import { createPlanningGroupActuals, resolvePlanningGroupActuals } from './planner/groupActuals'
+import { createPlanningGroupIntraday, resolvePlanningGroupIntraday } from './planner/groupIntraday'
 import { createPlanDemandSource } from './planner/demandSources'
 import { createNextYearOpening, getCurrentCalendarYear, resolvePlanningYear } from './planner/shared'
 import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/browserStorage'
@@ -21,6 +22,8 @@ export const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
 const buildScopedStorageKey = (baseKey, scope = 'default') => `${baseKey}.${String(scope || 'default')}`
 
 const clonePlain = (value) => JSON.parse(JSON.stringify(value))
+const DEFAULT_GROUP_SERVICE_LEVEL_PERCENT = 80
+const DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS = 20
 
 const toNumber = (value, fallback = 0) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -240,6 +243,11 @@ export const normalizePlanningGroup = (draftGroup, timestamp = new Date().toISOS
   const defaultPaidHoursPerDay = Math.max(toNumber(defaults.defaultPaidHoursPerDay, 8), 0)
   const defaultOccupancyPercent = Math.min(100, Math.max(toNumber(defaults.defaultOccupancyPercent, 90), 1))
   const defaultAdherencePercent = Math.min(100, Math.max(toNumber(defaults.defaultAdherencePercent, 95), 1))
+  const defaultServiceLevelPercent = Math.min(100, Math.max(toNumber(defaults.serviceLevelPercent, DEFAULT_GROUP_SERVICE_LEVEL_PERCENT), 1))
+  const defaultServiceLevelThresholdSeconds = Math.max(
+    Math.round(toNumber(defaults.serviceLevelThresholdSeconds, DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS)),
+    1
+  )
 
   return {
     id: snapshot.id || createEntityId('group'),
@@ -248,9 +256,22 @@ export const normalizePlanningGroup = (draftGroup, timestamp = new Date().toISOS
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, defaultPaidHoursPerDay), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, defaultOccupancyPercent), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, defaultAdherencePercent), 1)),
+    serviceLevelPercent: Math.min(100, Math.max(toNumber(snapshot.serviceLevelPercent, defaultServiceLevelPercent), 1)),
+    serviceLevelThresholdSeconds: Math.max(
+      Math.round(toNumber(snapshot.serviceLevelThresholdSeconds, defaultServiceLevelThresholdSeconds)),
+      1
+    ),
     holidayCalendarId: normalizeGroupHolidayCalendarId(snapshot.holidayCalendarId, GROUP_HOLIDAY_CALENDAR_INHERIT),
     holidayScheduleMode: normalizeHolidayScheduleMode(snapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
     actuals: resolvePlanningGroupActuals(snapshot),
+    intraday: createPlanningGroupIntraday(
+      resolvePlanningGroupIntraday(snapshot, {
+        center: {
+          operatingOpenTime: defaults.operatingOpenTime,
+          operatingCloseTime: defaults.operatingCloseTime
+        }
+      })
+    ),
     createdAt: snapshot.createdAt || timestamp,
     updatedAt: snapshot.updatedAt || timestamp,
     plans: uniquePlansByYear(
@@ -282,6 +303,8 @@ const createGroupFromLegacyPlan = (legacyPlan, timestamp = new Date().toISOStrin
       defaultPaidHoursPerDay: legacyPlan?.presenceMonths?.[0]?.paidHoursPerDay,
       defaultOccupancyPercent: legacyPlan?.randomDefaults?.occupancyPercent,
       defaultAdherencePercent: legacyPlan?.randomDefaults?.adherencePercent,
+      serviceLevelPercent: DEFAULT_GROUP_SERVICE_LEVEL_PERCENT,
+      serviceLevelThresholdSeconds: DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS,
       holidayCalendarId: GROUP_HOLIDAY_CALENDAR_INHERIT,
       holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED
     },
@@ -290,7 +313,9 @@ const createGroupFromLegacyPlan = (legacyPlan, timestamp = new Date().toISOStrin
       operatingWeekdays: legacyPlan?.operatingWeekdays || [1, 2, 3, 4, 5],
       defaultPaidHoursPerDay: legacyPlan?.presenceMonths?.[0]?.paidHoursPerDay || 8,
       defaultOccupancyPercent: legacyPlan?.randomDefaults?.occupancyPercent || 90,
-      defaultAdherencePercent: legacyPlan?.randomDefaults?.adherencePercent || 95
+      defaultAdherencePercent: legacyPlan?.randomDefaults?.adherencePercent || 95,
+      serviceLevelPercent: DEFAULT_GROUP_SERVICE_LEVEL_PERCENT,
+      serviceLevelThresholdSeconds: DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS
     }
   )
 }
@@ -313,9 +338,13 @@ export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toIS
     ? groups.map((group) =>
         normalizePlanningGroup(group, timestamp, {
           operatingWeekdays: snapshot.operatingWeekdays,
+          operatingOpenTime: snapshot.operatingOpenTime,
+          operatingCloseTime: snapshot.operatingCloseTime,
           defaultPaidHoursPerDay: snapshot.defaultPaidHoursPerDay,
           defaultOccupancyPercent: snapshot.defaultOccupancyPercent,
-          defaultAdherencePercent: snapshot.defaultAdherencePercent
+          defaultAdherencePercent: snapshot.defaultAdherencePercent,
+          serviceLevelPercent: DEFAULT_GROUP_SERVICE_LEVEL_PERCENT,
+          serviceLevelThresholdSeconds: DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS
         })
       )
     : Array.isArray(plans)
@@ -334,6 +363,8 @@ export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toIS
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, 90), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, 95), 1)),
+    serviceLevelPercent: DEFAULT_GROUP_SERVICE_LEVEL_PERCENT,
+    serviceLevelThresholdSeconds: DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS,
     createdAt: snapshot.createdAt || timestamp,
     updatedAt: snapshot.updatedAt || timestamp,
     groups: sortPlanningGroups(normalizedGroups)
@@ -395,13 +426,24 @@ export const createPlanningCenterDraft = (overrides = {}) => {
     operatingCloseTime: normalizeOperatingTime(overrides?.operatingCloseTime),
     defaultPaidHoursPerDay: Math.max(toNumber(overrides?.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(overrides?.defaultOccupancyPercent, 90), 1)),
-    defaultAdherencePercent: Math.min(100, Math.max(toNumber(overrides?.defaultAdherencePercent, 95), 1))
+    defaultAdherencePercent: Math.min(100, Math.max(toNumber(overrides?.defaultAdherencePercent, 95), 1)),
+    serviceLevelPercent: Math.min(100, Math.max(toNumber(overrides?.serviceLevelPercent, DEFAULT_GROUP_SERVICE_LEVEL_PERCENT), 1)),
+    serviceLevelThresholdSeconds: Math.max(
+      Math.round(toNumber(overrides?.serviceLevelThresholdSeconds, DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS)),
+      1
+    )
   }
 }
 
 export const createPlanningGroupDraft = (overrides = {}) => {
   const snapshot = clonePlain(overrides || {})
   const { actualsYears: _legacyActualsYears, ...groupSnapshot } = snapshot
+  const intraday = resolvePlanningGroupIntraday(snapshot, {
+    center: {
+      operatingOpenTime: snapshot.operatingOpenTime,
+      operatingCloseTime: snapshot.operatingCloseTime
+    }
+  })
 
   return {
     name: '',
@@ -409,9 +451,12 @@ export const createPlanningGroupDraft = (overrides = {}) => {
     defaultPaidHoursPerDay: 8,
     defaultOccupancyPercent: 90,
     defaultAdherencePercent: 95,
+    serviceLevelPercent: DEFAULT_GROUP_SERVICE_LEVEL_PERCENT,
+    serviceLevelThresholdSeconds: DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS,
     holidayCalendarId: GROUP_HOLIDAY_CALENDAR_INHERIT,
     holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED,
     actuals: resolvePlanningGroupActuals(snapshot),
+    intraday: createPlanningGroupIntraday(intraday),
     ...groupSnapshot
   }
 }

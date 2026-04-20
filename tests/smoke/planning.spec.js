@@ -92,15 +92,16 @@ test('opens staffing-group forecasts from the call-center workspace', async ({ p
   await page.locator('#planning-group-actuals-upload').setInputFiles({
     name: 'consumer-voice-actuals.csv',
     mimeType: 'text/csv',
-    buffer: Buffer.from(buildDailyActualsCsv())
+    buffer: Buffer.from(buildDailyActualsCsv(30))
   })
   await page.getByRole('button', { name: 'Add Daily Actuals' }).last().click()
 
   await page.getByRole('button', { name: 'Forecasts' }).click()
   await expect(page.getByText('No forecasts yet')).toBeVisible()
   await page.getByRole('button', { name: 'New Forecast' }).first().click()
-  await expect(page.getByRole('heading', { name: 'New Forecast' })).toBeVisible()
-  await page.getByLabel('Plan Year').selectOption({ label: '2026' })
+  const forecastCreateDialog = page.getByRole('dialog').filter({ hasText: 'Choose the plan year for a forecast built from this staffing group\'s shared history.' })
+  await expect(forecastCreateDialog).toBeVisible()
+  await forecastCreateDialog.getByLabel('Plan Year').selectOption({ label: '2026' })
   await page.getByRole('button', { name: 'Create Forecast' }).last().click()
 
   await expect(page.getByRole('heading', { level: 2, name: 'Consumer Voice 2026 Budget Forecast' })).toBeVisible()

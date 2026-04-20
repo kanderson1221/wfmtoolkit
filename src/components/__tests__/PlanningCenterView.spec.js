@@ -79,6 +79,12 @@ const PlanningForecastCreateModalStub = {
   `
 }
 
+const PlanningGroupIntradayViewStub = {
+  name: 'PlanningGroupIntradayView',
+  emits: ['save-intraday'],
+  template: '<div>Intraday Setup</div>'
+}
+
 const buildActualsRows = (count = 21, startDay = 1) =>
   Array.from({ length: count }, (_, index) => {
     const date = new Date(2025, 0, startDay + index, 12)
@@ -112,6 +118,8 @@ const buildWrapper = (props = {}) =>
             defaultPaidHoursPerDay: 8,
             defaultOccupancyPercent: 85,
             defaultAdherencePercent: 95,
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
             actuals: {
               sourceMode: 'daily_upload',
               dailyRows: buildActualsRows()
@@ -159,6 +167,7 @@ const buildWrapper = (props = {}) =>
         CallCenterSettingsModal: true,
         PlanningGroupSettingsModal: true,
         PlanningForecastCreateModal: PlanningForecastCreateModalStub,
+        PlanningGroupIntradayView: PlanningGroupIntradayViewStub,
         PlannerSettingsModal: true
       }
     }
@@ -242,9 +251,9 @@ describe('PlanningCenterView', () => {
     const tabButtons = wrapper
       .findAll('button')
       .map((node) => node.text().trim())
-      .filter((label) => ['Data', 'Forecasts', 'Plans'].includes(label))
+      .filter((label) => ['Data', 'Forecasts', 'Intraday', 'Plans'].includes(label))
 
-    expect(tabButtons).toEqual(['Data', 'Forecasts', 'Plans'])
+    expect(tabButtons).toEqual(['Data', 'Forecasts', 'Intraday', 'Plans'])
     expect(wrapper.text()).toContain('Add Data')
     expect(wrapper.text()).not.toContain('New Forecast')
   })
@@ -256,6 +265,16 @@ describe('PlanningCenterView', () => {
 
     expect(wrapper.text()).toContain('New Forecast')
     expect(wrapper.text()).not.toContain('Add Data')
+  })
+
+  it('opens the intraday workspace tab when requested by the route', () => {
+    const wrapper = buildWrapper({
+      selectedGroupTab: 'intraday'
+    })
+
+    expect(wrapper.text()).toContain('Intraday Setup')
+    expect(wrapper.text()).not.toContain('Add Data')
+    expect(wrapper.text()).not.toContain('New Forecast')
   })
 
   it('opens a year-only create-forecast modal and routes new forecasts through shared history', async () => {
@@ -329,6 +348,8 @@ describe('PlanningCenterView', () => {
             defaultPaidHoursPerDay: 8,
             defaultOccupancyPercent: 85,
             defaultAdherencePercent: 95,
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
             plans: [
               {
                 id: 'plan-1',

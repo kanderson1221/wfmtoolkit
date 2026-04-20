@@ -14,7 +14,7 @@ export const defaultRoute = {
 }
 
 const PLANNING_HOME_HASH = '#planning'
-const PLANNING_GROUP_TABS = ['data', 'forecasts', 'plans']
+const PLANNING_GROUP_TABS = ['data', 'forecasts', 'intraday', 'plans']
 
 export const normalizeHashPath = (hash = '') => hash.replace(/^#\/?/, '')
 

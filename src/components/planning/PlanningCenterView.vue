@@ -9,6 +9,7 @@ import {
 
 import PlanningForecastCreateModal from './PlanningForecastCreateModal.vue'
 import PlanningGroupActualsView from './PlanningGroupActualsView.vue'
+import PlanningGroupIntradayView from './PlanningGroupIntradayView.vue'
 import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
 import { navigateToHash } from '../../appRoutes'
@@ -90,6 +91,7 @@ const planHeaderCellRightClass = `${planHeaderCellClass} text-right`
 const STAFFING_GROUP_TABS = [
   { id: 'data', label: 'Data' },
   { id: 'forecasts', label: 'Forecasts' },
+  { id: 'intraday', label: 'Intraday' },
   { id: 'plans', label: 'Plans' }
 ]
 const resolveGroupWorkspaceTab = (value) => {
@@ -134,7 +136,9 @@ const {
 
 const openCreateGroup = () => {
   groupDraft.value = createPlanningGroupDraft({
-    operatingWeekdays: props.center.operatingWeekdays
+    operatingWeekdays: props.center.operatingWeekdays,
+    operatingOpenTime: props.center.operatingOpenTime,
+    operatingCloseTime: props.center.operatingCloseTime
   })
   groupSettingsOpen.value = true
 }
@@ -184,6 +188,17 @@ const saveGroup = () => {
     operatingWeekdays: props.center.operatingWeekdays
   })
   groupSettingsOpen.value = false
+}
+
+const saveGroupIntraday = (intraday) => {
+  if (!selectedGroup.value) {
+    return
+  }
+
+  emit('save-group', {
+    ...selectedGroup.value,
+    intraday
+  })
 }
 const {
   actualsMenuItems,
@@ -691,6 +706,15 @@ watch(
                 </div>
               </div>
 
+              <div v-else-if="activeGroupWorkspaceTab === 'intraday'" class="flex-1 min-h-0 overflow-y-auto">
+                <PlanningGroupIntradayView
+                  :center="props.center"
+                  :group="selectedGroup"
+                  :format-number="formatNumber"
+                  @save-intraday="saveGroupIntraday"
+                />
+              </div>
+
               <div v-else-if="planRows.length" class="flex-1 min-h-0 overflow-y-auto">
                 <div class="border-b border-slate-200 bg-white/80 px-3 py-3">
                   <div :class="planListRowGridClass">
@@ -821,6 +845,8 @@ watch(
       v-model:default-paid-hours-per-day="groupDraft.defaultPaidHoursPerDay"
       v-model:default-occupancy-percent="groupDraft.defaultOccupancyPercent"
       v-model:default-adherence-percent="groupDraft.defaultAdherencePercent"
+      v-model:service-level-percent="groupDraft.serviceLevelPercent"
+      v-model:service-level-threshold-seconds="groupDraft.serviceLevelThresholdSeconds"
       :title="groupDraft.id ? 'Edit Staffing Group' : 'Create Staffing Group'"
       :submit-label="groupDraft.id ? 'Save Staffing Group' : 'Create Staffing Group'"
       @close="closeGroupSettings"
