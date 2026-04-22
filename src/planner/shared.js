@@ -16,6 +16,18 @@ export const FULL_MONTH_LABELS = [
 ]
 
 export const WEEKDAY_FALLBACK = [1, 2, 3, 4, 5]
+export const PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO = 'workload_ratio'
+export const PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG = 'intraday_erlang'
+export const PLAN_REQUIREMENT_METHOD_OPTIONS = [
+  {
+    label: 'Workload Ratio',
+    value: PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+  },
+  {
+    label: 'Intraday Erlang',
+    value: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+  }
+]
 
 export const getCurrentCalendarYear = () => new Date().getFullYear()
 export const getCurrentCalendarMonthIndex = () => new Date().getMonth()
@@ -59,6 +71,24 @@ export const normalizeWeekdays = (weekdays) =>
   Array.isArray(weekdays) && weekdays.length
     ? [...new Set(weekdays.map((value) => toNumber(value, 0)))].sort((left, right) => left - right)
     : [...WEEKDAY_FALLBACK]
+
+export const normalizePlanRequirementMethod = (
+  value,
+  fallback = PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+) => {
+  const normalizedValue = String(value || '').trim().toLowerCase()
+
+  return normalizedValue === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+    ? PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+    : normalizedValue === PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+      ? PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+      : fallback
+}
+
+export const getPlanRequirementMethodLabel = (value) =>
+  normalizePlanRequirementMethod(value) === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+    ? 'Intraday Erlang'
+    : 'Workload Ratio'
 
 export const createPresenceMonth = (overrides = {}) => ({
   paidHoursPerDay: 8,

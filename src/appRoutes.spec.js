@@ -29,7 +29,9 @@ describe('appRoutes', () => {
     expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'reforecast', coverageStartMonthIndex: 3 })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/budget')
     expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { sourceKind: 'manual_monthly', forecastType: 'reforecast', coverageStartMonthIndex: 3 })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget')
     expect(buildPlanningPlanHash('center-1', 'group-1', 'plan-1')).toBe('#planning/center/center-1/group/group-1/plan/plan-1')
-    expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027)).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027')
+    expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027)).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/workload_ratio')
+    expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027, { requirementMethod: 'workload_ratio' })).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/workload_ratio')
+    expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027, { requirementMethod: 'intraday_erlang' })).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang')
   })
 
   it('treats home-like hashes as public landing routes', () => {
@@ -110,6 +112,22 @@ describe('appRoutes', () => {
       groupId: 'group-1',
       year: 2027,
       groupTab: 'intraday'
+    })
+    expect(parseHashRoute('#planning/center/center-1/group/group-1/plan/new/year/2027/method/workload_ratio')).toMatchObject({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      year: 2027,
+      requirementMethod: 'workload_ratio'
+    })
+    expect(parseHashRoute('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang')).toMatchObject({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      year: 2027,
+      requirementMethod: 'intraday_erlang'
     })
   })
 

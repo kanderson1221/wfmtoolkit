@@ -7,7 +7,9 @@ import AppFieldGroup from '../ui/AppFieldGroup.vue'
 import AppNumberField from '../ui/AppNumberField.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
+import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 import PlannerCopyMenu from './PlannerCopyMenu.vue'
 
 const props = defineProps({
@@ -15,9 +17,49 @@ const props = defineProps({
     type: Array,
     required: true
   },
+  demandSource: {
+    type: Object,
+    default: null
+  },
+  currentDemandSourceSummary: {
+    type: Object,
+    default: null
+  },
+  requirementMethod: {
+    type: String,
+    default: ''
+  },
+  serviceLevelPercent: {
+    type: Number,
+    default: 0
+  },
+  serviceLevelThresholdSeconds: {
+    type: Number,
+    default: 0
+  },
+  operatingOpenTime: {
+    type: String,
+    default: ''
+  },
+  operatingCloseTime: {
+    type: String,
+    default: ''
+  },
+  intraday: {
+    type: Object,
+    default: () => ({})
+  },
   summary: {
     type: Object,
     required: true
+  },
+  formatWhole: {
+    type: Function,
+    default: (value) => String(value ?? 0)
+  },
+  formatNumber: {
+    type: Function,
+    default: (value, digits = 1) => Number(value ?? 0).toFixed(digits)
   },
   formatPercent: {
     type: Function,
@@ -54,7 +96,89 @@ const handleOverrideModeChange = (value) => {
   emit('toggle-override-mode', value)
 }
 
-const summaryItems = computed(() => [
+const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+const sectionTitle = computed(() => isIntradayErlang.value ? 'Erlang Inputs' : 'Random/Variability')
+const continueLabel = computed(() => 'Continue to Demand Model')
+const shellMessage = computed(() =>
+  isIntradayErlang.value
+    ? 'Demand Model uses the staffing-group service goal, operating window, and 30-minute interval profile. This step confirms the occupancy cap applied inside Erlang plus the adherence overhead applied afterward.'
+    : ''
+)
+const serviceGoalLabel = computed(() => {
+  if (!isIntradayErlang.value) {
+    return ''
+  }
+
+  const percent = Number(props.serviceLevelPercent)
+  const seconds = Number(props.serviceLevelThresholdSeconds)
+
+  if (!Number.isFinite(percent) || percent <= 0 || !Number.isFinite(seconds) || seconds <= 0) {
+    return 'Needs staffing group setup'
+  }
+
+  return `${props.formatPercent(percent, 0)} in ${props.formatWhole(seconds)} sec`
+})
+const operatingWindowLabel = computed(() => {
+  if (!isIntradayErlang.value) {
+    return ''
+  }
+
+  const open = String(props.operatingOpenTime || '').trim()
+  const close = String(props.operatingCloseTime || '').trim()
+  return open && close ? `${open} to ${close}` : 'Needs call center hours'
+})
+const intervalProfileRows = computed(() =>
+  Array.isArray(props.intraday?.intervalRatios) ? props.intraday.intervalRatios : []
+)
+const intradayForecastSourceLabel = computed(() => {
+  if (!isIntradayErlang.value) {
+    return ''
+  }
+
+  const projectName = String(props.currentDemandSourceSummary?.projectName || '').trim()
+  if (projectName) {
+    return projectName
+  }
+
+  return props.demandSource?.mode === 'forecast' ? 'Applied forecast' : 'Apply a forecast in the next step'
+})
+
+const intradaySummaryItems = computed(() => [
+  {
+    label: 'Service Goal',
+    value: serviceGoalLabel.value,
+    meta: 'Inherited from staffing group settings'
+  },
+  {
+    label: 'Max Occupancy',
+    value: props.formatPercent(props.randomDefaults?.occupancyPercent, 1),
+    meta: 'Plan-level Erlang cap'
+  },
+  {
+    label: 'Adherence',
+    value: props.formatPercent(props.randomDefaults?.adherencePercent, 1),
+    meta: 'Plan-level overhead after Erlang'
+  },
+  {
+    label: 'Operating Window',
+    value: operatingWindowLabel.value,
+    meta: 'Inherited from call center settings'
+  },
+  {
+    label: 'Interval Profile',
+    value: intervalProfileRows.value.length
+      ? `${props.formatWhole(intervalProfileRows.value.length)} intervals @ ${props.formatWhole(props.intraday?.intervalLengthMinutes || 30)} min`
+      : 'Needs intraday profile',
+    meta: 'Inherited from staffing group setup'
+  },
+  {
+    label: 'Forecast Input',
+    value: intradayForecastSourceLabel.value,
+    meta: 'Daily contacts and monthly AHT apply in Demand Model'
+  }
+])
+
+const workloadRatioSummaryItems = computed(() => [
   {
     label: 'Occupancy',
     value: props.formatPercent(
@@ -86,26 +210,109 @@ const summaryItems = computed(() => [
     value: props.formatPercent(props.summary.averageRandomLossPercent, 1)
   }
 ])
+
+const summaryItems = computed(() =>
+  isIntradayErlang.value ? intradaySummaryItems.value : workloadRatioSummaryItems.value
+)
+const summaryColumns = computed(() =>
+  isIntradayErlang.value ? 'md:grid-cols-2 xl:grid-cols-6' : 'md:grid-cols-2 xl:grid-cols-5'
+)
 </script>
 
 <template>
   <section class="monthly-tab-panel">
-    <AppSectionHeader title="Random/Variability" />
+    <AppSectionHeader :title="sectionTitle" />
 
-    <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-5" />
+    <AppStatStrip :items="summaryItems" :columns="summaryColumns" />
 
-    <section class="grid gap-3">
+    <AppStatusMessage v-if="shellMessage" tone="info">
+      {{ shellMessage }}
+    </AppStatusMessage>
+
+    <section v-if="isIntradayErlang" class="grid gap-3">
+      <AppSectionHeader title="Inputs Driving Demand Model" />
+
+      <div class="grid gap-3 xl:grid-cols-[minmax(0,15rem)_minmax(0,15rem)_minmax(0,1fr)] xl:items-start">
+        <AppFieldGroup
+          label="Max Occupancy %"
+          input-id="intraday-erlang-max-occupancy"
+          help-text="This cap is applied inside Erlang when translating interval demand into staffed hours."
+          class="xl:max-w-[15rem]"
+        >
+          <AppNumberField
+            id="intraday-erlang-max-occupancy"
+            v-model.number="randomDefaults.occupancyPercent"
+            min="1"
+            max="100"
+            step="0.1"
+            :min-fraction-digits="1"
+            :max-fraction-digits="1"
+            compact
+            aria-label="Intraday Erlang max occupancy percent"
+          />
+        </AppFieldGroup>
+
+        <AppFieldGroup
+          label="Adherence %"
+          input-id="intraday-erlang-adherence"
+          help-text="This overhead is applied after Erlang when converting net staffed hours into final required staffing."
+          class="xl:max-w-[15rem]"
+        >
+          <AppNumberField
+            id="intraday-erlang-adherence"
+            v-model.number="randomDefaults.adherencePercent"
+            min="1"
+            max="100"
+            step="0.1"
+            :min-fraction-digits="1"
+            :max-fraction-digits="1"
+            compact
+            aria-label="Intraday Erlang adherence percent"
+          />
+        </AppFieldGroup>
+
+        <div class="grid gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-4">
+          <div class="grid gap-1">
+            <strong class="text-sm font-semibold tracking-[-0.02em] text-slate-950">
+              Staffing Group Inputs
+            </strong>
+            <p class="text-sm leading-6 text-slate-600">
+              Service goal, operating window, and interval mix are inherited from staffing-group setup and stay read-only here.
+            </p>
+          </div>
+
+          <dl class="grid gap-3 md:grid-cols-2">
+            <div class="grid gap-1 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5">
+              <dt class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Service Goal</dt>
+              <dd class="text-sm font-semibold text-slate-900">{{ serviceGoalLabel }}</dd>
+            </div>
+            <div class="grid gap-1 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5">
+              <dt class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Operating Window</dt>
+              <dd class="text-sm font-semibold text-slate-900">{{ operatingWindowLabel }}</dd>
+            </div>
+            <div class="grid gap-1 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5">
+              <dt class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Interval Profile</dt>
+              <dd class="text-sm font-semibold text-slate-900">
+                {{ intervalProfileRows.length ? `${intervalProfileRows.length} intervals @ ${props.intraday?.intervalLengthMinutes || 30} min` : 'Needs profile' }}
+              </dd>
+            </div>
+            <div class="grid gap-1 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5">
+              <dt class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Forecast Input</dt>
+              <dd class="text-sm font-semibold text-slate-900">{{ intradayForecastSourceLabel }}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section v-else class="grid gap-3">
       <AppSectionHeader title="Assumptions" />
 
       <div class="grid gap-3 xl:grid-cols-[minmax(0,12rem)_minmax(0,12rem)_minmax(0,1fr)] xl:items-start">
         <AppFieldGroup
           :label="useMonthlyRandomOverrides ? 'Default Occupancy %' : 'Occupancy %'"
           input-id="global-occupancy"
-          :help-text="
-            useMonthlyRandomOverrides
-              ? 'Seeds the monthly override table.'
-              : 'Applies across the full plan year.'
-          "
+          :help-text="useMonthlyRandomOverrides ? 'Seeds the monthly override table.' : 'Applies across the full plan year.'"
           class="xl:max-w-[12rem]"
         >
           <AppNumberField
@@ -124,11 +331,7 @@ const summaryItems = computed(() => [
         <AppFieldGroup
           :label="useMonthlyRandomOverrides ? 'Default Adherence %' : 'Adherence %'"
           input-id="global-adherence"
-          :help-text="
-            useMonthlyRandomOverrides
-              ? 'Seeds the monthly override table.'
-              : 'Applies across the full plan year.'
-          "
+          :help-text="useMonthlyRandomOverrides ? 'Seeds the monthly override table.' : 'Applies across the full plan year.'"
           class="xl:max-w-[12rem]"
         >
           <AppNumberField
@@ -161,7 +364,7 @@ const summaryItems = computed(() => [
       </div>
     </section>
 
-    <section class="grid gap-3">
+    <section v-if="!isIntradayErlang" class="grid gap-3">
       <p v-if="!useMonthlyRandomOverrides" class="random-global-note">
         Global occupancy and adherence assumptions apply to every month in this plan year.
       </p>
@@ -235,7 +438,7 @@ const summaryItems = computed(() => [
 
     <div class="monthly-tab-actions">
       <AppButton variant="secondary" @click="emit('previous')">Back to Agent Availability</AppButton>
-      <AppButton variant="primary" @click="emit('continue')">Continue to Demand Model</AppButton>
+      <AppButton variant="primary" @click="emit('continue')">{{ continueLabel }}</AppButton>
     </div>
   </section>
 </template>

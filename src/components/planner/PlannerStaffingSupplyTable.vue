@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 
 import AppCheckbox from '../ui/AppCheckbox.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
@@ -7,6 +8,10 @@ import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
 
 const props = defineProps({
+  requirementMethod: {
+    type: String,
+    default: ''
+  },
   staffingRecords: {
     type: Array,
     required: true
@@ -94,6 +99,7 @@ const yearEndProjectionMessage = computed(() => {
 
   return `Current plan projects next January to open at ${props.formatNumber(decemberRecord.value.endingFrontlineHeadcount, 1)} frontline headcount${targetLabel}.`
 })
+const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
 </script>
 
 <template>
@@ -137,8 +143,8 @@ const yearEndProjectionMessage = computed(() => {
             <th title="Frontline headcount required by the demand model for this month.">
               <span class="plan-head-label">Avg Req<br />HC</span>
             </th>
-            <th title="Peak-day headcount requirement from the demand model for this month.">
-              <span class="plan-head-label">Peak Req<br />HC</span>
+            <th :title="isIntradayErlang ? 'Peak interval headcount requirement from the intraday Erlang model for this month.' : 'Peak-day headcount requirement from the demand model for this month.'">
+              <span class="plan-head-label">{{ isIntradayErlang ? 'Peak Interval' : 'Peak Req' }}<br />HC</span>
             </th>
             <th title="Total headcount on the roster at the start of the month, before any monthly movement is applied.">
               <span class="plan-head-label">Start Roster<br />HC</span>
@@ -186,7 +192,7 @@ const yearEndProjectionMessage = computed(() => {
               </button>
             </td>
               <td>{{ props.formatNumber(record.requiredHeadcount, 1) }}</td>
-              <td>{{ props.formatNumber(record.peakDayRequiredHeadcount, 1) }}</td>
+              <td>{{ props.formatNumber(isIntradayErlang ? record.peakIntervalRequiredHeadcount : record.peakDayRequiredHeadcount, 1) }}</td>
               <td>
                 <AppTableNumberField
                   v-if="record.monthIndex === 0 && !props.startingPositionInherited"

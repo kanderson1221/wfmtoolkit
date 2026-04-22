@@ -20,7 +20,13 @@ import {
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
 import { buildForecastTrainingSeedFromPlanningGroupActuals } from '../planner/groupActualsForecastSeed'
-import { findLinkedPriorPlan, getCurrentCalendarYear, resolveLinkedOpeningPosition, resolvePlanningYear } from '../plannerModel'
+import {
+  findLinkedPriorPlan,
+  getCurrentCalendarYear,
+  normalizePlanRequirementMethod,
+  resolveLinkedOpeningPosition,
+  resolvePlanningYear
+} from '../plannerModel'
 import { resolveCenterHolidayProfile, resolveCenterHolidayProfiles } from '../planningStorage'
 import { planningRepository } from '../planningRepository'
 import { describeBrowserStorageError } from '../storage/browserStorage'
@@ -153,6 +159,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
     })
 
     const forecastFallbackScopes = buildForecastFallbackScopes(currentCenter.value.id, currentGroup.value.id)
+    const seededRequirementMethod = currentPlan.value?.requirementMethod || currentRoute.value.requirementMethod
 
     return {
       centerId: currentCenter.value.id,
@@ -166,9 +173,14 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       customHolidays: centerHolidayProfile.customHolidays.map((holiday) => ({ ...holiday })),
       holidayScheduleMode: normalizeHolidayScheduleMode(HOLIDAY_SCHEDULE_CLOSED),
       operatingWeekdays: [...currentCenter.value.operatingWeekdays],
+      operatingOpenTime: currentCenter.value.operatingOpenTime,
+      operatingCloseTime: currentCenter.value.operatingCloseTime,
       defaultPaidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay,
       defaultOccupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
       defaultAdherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent,
+      serviceLevelPercent: currentGroup.value.serviceLevelPercent,
+      serviceLevelThresholdSeconds: currentGroup.value.serviceLevelThresholdSeconds,
+      intraday: currentGroup.value.intraday ? { ...currentGroup.value.intraday } : null,
       startingHeadcount: seededStartingPosition.rosterHeadcount,
       startingFrontlineHeadcount: seededStartingPosition.frontlineHeadcount,
       presenceMonths: Array.from({ length: 12 }, () => ({
@@ -178,6 +190,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         occupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
         adherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent
       },
+      requirementMethod: normalizePlanRequirementMethod(seededRequirementMethod),
       forecastStorageScope: buildForecastStorageScope(storageScope.value, currentCenter.value.id, currentGroup.value.id),
       forecastFallbackScopes
     }
@@ -295,8 +308,17 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       return `${scopePrefix}:plan:${currentPlan.value.id}`
     }
 
-    if (currentRoute.value.page === 'editor' && currentGroup.value?.id) {
-      return `${scopePrefix}:${currentGroup.value.id}:plan:new:${currentRoute.value.year || 'default'}`
+    if (currentRoute.value.page === 'editor' && currentRoute.value.planId === 'new') {
+      if (!currentGroup.value?.id) {
+        return ''
+      }
+
+      const requirementMethod = normalizePlanRequirementMethod(currentRoute.value.requirementMethod)
+      return `${scopePrefix}:${currentGroup.value.id}:plan:new:${currentRoute.value.year || 'default'}:${requirementMethod}`
+    }
+
+    if (currentRoute.value.page === 'editor') {
+      return ''
     }
 
     return `${scopePrefix}:plan:new`
@@ -311,7 +333,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       return `planner-${currentPlan.value.id}`
     }
 
-    return `planner-${currentGroup.value?.id || 'no-group'}-new-${currentRoute.value.year || 'default'}`
+    return `planner-${currentGroup.value?.id || 'no-group'}-new-${currentRoute.value.year || 'default'}-${normalizePlanRequirementMethod(currentRoute.value.requirementMethod)}`
   })
 
   const handleSaveCenter = async (centerDraft) => {
@@ -397,7 +419,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       buildPlanningGroupHash(
         targetCenterId,
         targetGroupId,
-        savedPlan?.planningYear || planDraft.planningYear
+        savedPlan?.planningYear || planDraft.planningYear,
+        { tab: 'plans' }
       )
     )
   }

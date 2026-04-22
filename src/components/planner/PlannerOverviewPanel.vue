@@ -8,6 +8,7 @@ import {
   mdiTarget,
   mdiTuneVariant
 } from '@mdi/js'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 
 import AppButton from '../ui/AppButton.vue'
 import AppIcon from '../ui/AppIcon.vue'
@@ -16,6 +17,10 @@ import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 
 const props = defineProps({
+  requirementMethod: {
+    type: String,
+    default: ''
+  },
   planSummary: {
     type: Object,
     required: true
@@ -47,6 +52,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['open-section'])
+const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
 
 const sectionIcons = {
   overview: mdiChartLine,
@@ -71,9 +77,15 @@ const overviewItems = computed(() => [
     meta: props.nextRecommendation ? `Next: ${props.nextRecommendation.title}` : 'No blocking steps remain'
   },
   {
-    label: 'Peak Required Headcount',
-    value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
-    meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
+    label: isIntradayErlang.value ? 'Peak Interval Headcount' : 'Peak Required Headcount',
+    value: isIntradayErlang.value
+      ? (typeof props.planSummary?.peakIntervalMonth?.peakIntervalRequiredHeadcount === 'number'
+          ? props.formatNumber(props.planSummary?.peakIntervalMonth?.peakIntervalRequiredHeadcount, 1)
+          : '—')
+      : props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
+    meta: isIntradayErlang.value
+      ? props.planSummary?.peakIntervalMonth?.fullLabel || 'Highest interval-driven requirement'
+      : props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
   },
   {
     label: 'Average Gap to Requirement',
@@ -94,14 +106,26 @@ const demandItems = computed(() => [
     meta: 'Total yearly workload built from contacts and AHT'
   },
   {
-    label: 'Peak Required Headcount',
-    value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
-    meta: props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
+    label: isIntradayErlang.value ? 'Annual Erlang Hrs' : 'Peak Required Headcount',
+    value: isIntradayErlang.value
+      ? (typeof props.planSummary?.annualErlangStaffedHours === 'number'
+          ? props.formatNumber(props.planSummary?.annualErlangStaffedHours, 1)
+          : '—')
+      : props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1),
+    meta: isIntradayErlang.value
+      ? 'Total monthly interval-staffed hours returned from Erlang'
+      : props.planSummary?.peakMonth?.fullLabel || 'Highest monthly requirement'
   },
   {
-    label: 'Peak Day Required Headcount',
-    value: props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1),
-    meta: props.planSummary?.peakDayMonth?.fullLabel || 'Highest modeled peak-day requirement'
+    label: isIntradayErlang.value ? 'Peak Interval Required HC' : 'Peak Day Required Headcount',
+    value: isIntradayErlang.value
+      ? (typeof props.planSummary?.peakIntervalMonth?.peakIntervalRequiredHeadcount === 'number'
+          ? props.formatNumber(props.planSummary?.peakIntervalMonth?.peakIntervalRequiredHeadcount, 1)
+          : '—')
+      : props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1),
+    meta: isIntradayErlang.value
+      ? props.planSummary?.peakIntervalMonth?.fullLabel || 'Highest interval-driven staffing point'
+      : props.planSummary?.peakDayMonth?.fullLabel || 'Highest modeled peak-day requirement'
   }
 ])
 

@@ -200,6 +200,11 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
           holidayScheduleMode: plan.holidayScheduleMode || '',
           randomDefaults: clonePlain(plan.randomDefaults || {}),
           useMonthlyRandomOverrides: Boolean(plan.useMonthlyRandomOverrides),
+          serviceLevelPercent: plan.serviceLevelPercent ?? null,
+          serviceLevelThresholdSeconds: plan.serviceLevelThresholdSeconds ?? null,
+          operatingOpenTime: plan.operatingOpenTime || '',
+          operatingCloseTime: plan.operatingCloseTime || '',
+          intraday: clonePlain(plan.intraday || {}),
           demandSource: clonePlain(plan.demandSource || {}),
           trainingSettings: clonePlain(plan.trainingSettings || {}),
           nextYearOpening: clonePlain(plan.nextYearOpening || {}),
@@ -341,6 +346,11 @@ const hydratePlanningWorkspace = (scope, rows) => {
         holidayScheduleMode: row.holidayScheduleMode,
         randomDefaults: clonePlain(row.randomDefaults || {}),
         useMonthlyRandomOverrides: Boolean(row.useMonthlyRandomOverrides),
+        serviceLevelPercent: row.serviceLevelPercent,
+        serviceLevelThresholdSeconds: row.serviceLevelThresholdSeconds,
+        operatingOpenTime: row.operatingOpenTime,
+        operatingCloseTime: row.operatingCloseTime,
+        intraday: clonePlain(row.intraday || {}),
         demandSource: clonePlain(row.demandSource || {}),
         trainingSettings: clonePlain(row.trainingSettings || {}),
         nextYearOpening: clonePlain(row.nextYearOpening || {}),
@@ -1284,9 +1294,15 @@ export const persistForecastWorkspaceToDexie = async (projects, scope = DEFAULT_
 }
 
 export const loadPlannerDraftFromDexie = async (draftKey, scope = DEFAULT_SCOPE) => {
+  const normalizedDraftKey = String(draftKey ?? '').trim()
+
+  if (!normalizedDraftKey) {
+    return null
+  }
+
   try {
     await ensureLocalDataReady()
-    const record = await wfmDexie.plannerDrafts.get([normalizeScope(scope), String(draftKey || 'new')])
+    const record = await wfmDexie.plannerDrafts.get([normalizeScope(scope), normalizedDraftKey])
     return record?.value ? clonePlain(record.value) : null
   } catch (error) {
     throw createStorageError('Unable to read the saved planner draft.', error, 'storage_write_failed')
@@ -1294,17 +1310,22 @@ export const loadPlannerDraftFromDexie = async (draftKey, scope = DEFAULT_SCOPE)
 }
 
 export const persistPlannerDraftToDexie = async (draftKey, draftValue, scope = DEFAULT_SCOPE) => {
+  const normalizedDraftKey = String(draftKey ?? '').trim()
   const timestamp = nowIso()
   const nextDraft = {
     ...clonePlain(draftValue),
     autosavedAt: timestamp
   }
 
+  if (!normalizedDraftKey) {
+    return nextDraft
+  }
+
   try {
     await ensureLocalDataReady()
     await wfmDexie.plannerDrafts.put({
       scope: normalizeScope(scope),
-      draftKey: String(draftKey || 'new'),
+      draftKey: normalizedDraftKey,
       value: nextDraft,
       autosavedAt: nextDraft.autosavedAt,
       createdAt: nextDraft.createdAt || timestamp,
@@ -1318,9 +1339,15 @@ export const persistPlannerDraftToDexie = async (draftKey, draftValue, scope = D
 }
 
 export const clearPlannerDraftFromDexie = async (draftKey, scope = DEFAULT_SCOPE) => {
+  const normalizedDraftKey = String(draftKey ?? '').trim()
+
+  if (!normalizedDraftKey) {
+    return
+  }
+
   try {
     await ensureLocalDataReady()
-    await wfmDexie.plannerDrafts.delete([normalizeScope(scope), String(draftKey || 'new')])
+    await wfmDexie.plannerDrafts.delete([normalizeScope(scope), normalizedDraftKey])
     emitLocalDataChanged()
   } catch (error) {
     throw createStorageError('Unable to clear the saved planner draft.', error, 'storage_remove_failed')

@@ -15,6 +15,10 @@ import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
 import { navigateToHash } from '../../appRoutes'
 import { createPlanningGroupDraft } from '../../planningStorage'
 import { currentYear } from '../../composables/monthlyPlanBuilder/shared'
+import {
+  PLAN_REQUIREMENT_METHOD_OPTIONS,
+  PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+} from '../../plannerModel'
 import { usePlanningCenterForecastLibrary } from '../../composables/planning/usePlanningCenterForecastLibrary'
 import { usePlanningGroupDataActions } from '../../composables/planning/usePlanningGroupDataActions'
 import { usePlanningGroupForecastActions } from '../../composables/planning/usePlanningGroupForecastActions'
@@ -67,6 +71,7 @@ const groupSettingsOpen = ref(false)
 const planSettingsOpen = ref(false)
 const groupDraft = ref(createPlanningGroupDraft())
 const newPlanYear = ref(currentYear)
+const newPlanRequirementMethod = ref(PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO)
 const {
   dialogVisible: confirmationDialogOpen,
   dialogTitle: confirmationDialogTitle,
@@ -118,7 +123,8 @@ const {
   selectedGroupId: toRef(props, 'selectedGroupId'),
   selectedYear: toRef(props, 'selectedYear'),
   weekdayOptions: toRef(props, 'weekdayOptions'),
-  newPlanYear
+  newPlanYear,
+  newPlanRequirementMethod
 })
 
 const {
@@ -149,6 +155,7 @@ const openPlanSettings = () => {
   }
 
   newPlanYear.value = resolveNextPlanYear(selectedGroup.value)
+  newPlanRequirementMethod.value = PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
   planSettingsOpen.value = true
 }
 
@@ -856,7 +863,9 @@ watch(
     <PlannerSettingsModal
       v-if="planSettingsOpen && selectedGroup"
       v-model:planning-year="newPlanYear"
+      v-model:requirement-method="newPlanRequirementMethod"
       :year-options="availableYearOptions"
+      :requirement-method-options="PLAN_REQUIREMENT_METHOD_OPTIONS"
       :can-close="!existingPlanForDraftYear"
       :existing-plan-href="existingPlanHref"
       :status-message="existingPlanForDraftYear ? `This staffing group already has a saved plan for ${newPlanYear}.` : ''"

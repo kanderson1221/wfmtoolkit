@@ -1,6 +1,10 @@
 <script setup>
 import { computed, reactive } from 'vue'
-import { FULL_MONTH_LABELS, toNumber } from '../plannerModel'
+import {
+  FULL_MONTH_LABELS,
+  PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+  toNumber
+} from '../plannerModel'
 
 import PlannerActualsPanel from './planner/PlannerActualsPanel.vue'
 import PlannerForecastPanel from './planner/PlannerForecastPanel.vue'
@@ -63,6 +67,9 @@ const builder = reactive(useMonthlyPlanBuilder(props, emit))
 
 const TOTAL_PLAN_MONTHS = FULL_MONTH_LABELS.length
 const reviewedSections = computed(() => new Set(builder.reviewedSections))
+const isIntradayErlang = computed(() => builder.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+const variabilityTitle = computed(() => isIntradayErlang.value ? 'Erlang Inputs' : 'Random/Variability')
+const requirementTitle = computed(() => 'Demand Model')
 
 const formatMonthCoverage = (count) => `${count}/${TOTAL_PLAN_MONTHS} months`
 
@@ -108,6 +115,66 @@ const availabilityProgress = computed(() => {
 })
 
 const variabilityProgress = computed(() => {
+  if (isIntradayErlang.value) {
+    const hasServiceGoal =
+      Number(builder.intradayErlangServiceLevelPercent) > 0 &&
+      Number(builder.intradayErlangServiceLevelThresholdSeconds) > 0
+    const hasOperatingWindow =
+      Boolean(String(builder.intradayErlangOpenTime || '').trim()) &&
+      Boolean(String(builder.intradayErlangCloseTime || '').trim())
+    const intervalRatios = Array.isArray(builder.intradayErlangProfile?.intervalRatios)
+      ? builder.intradayErlangProfile.intervalRatios
+      : []
+    const hasIntradayProfile =
+      Number(builder.intradayErlangProfile?.intervalLengthMinutes || 0) === 30 &&
+      intervalRatios.length > 0
+    const hasMaxOccupancy = toNumber(builder.randomDefaults?.occupancyPercent, 0) > 0
+    const hasAdherence = toNumber(builder.randomDefaults?.adherencePercent, 0) > 0
+    const configuredCount = [hasServiceGoal, hasOperatingWindow, hasIntradayProfile, hasMaxOccupancy, hasAdherence].filter(Boolean).length
+    const defaultsPendingReview = configuredCount === 5 && !reviewedSections.value.has('variability')
+    const isReady = configuredCount === 5 && reviewedSections.value.has('variability')
+
+    return {
+      id: 'variability',
+      title: variabilityTitle.value,
+      description: 'Review the staffing-group inputs, occupancy cap, and adherence assumption that shape the monthly Erlang overhead.',
+      statusLabel: defaultsPendingReview ? 'Using defaults' : `${configuredCount}/5 inputs`,
+      detail: isReady
+        ? 'Service goal, operating window, intraday profile, occupancy cap, and adherence are ready for interval calculations.'
+        : defaultsPendingReview
+          ? 'The staffing-group service goal, operating window, 30-minute interval profile, occupancy cap, and adherence assumption are loaded. Review them before running Erlang.'
+          : !hasServiceGoal
+            ? 'Service level is still missing from the staffing group settings.'
+            : !hasOperatingWindow
+              ? 'Operating hours are still missing from the call center settings.'
+              : !hasIntradayProfile
+                ? 'A 30-minute intraday profile is still missing from the staffing group.'
+                : !hasMaxOccupancy
+                  ? 'Set a valid occupancy cap before running Erlang.'
+                  : 'Set a valid adherence assumption before running Erlang.',
+      blocker: isReady
+        ? ''
+        : defaultsPendingReview
+          ? 'Open Erlang Inputs and confirm the inherited assumptions before calculating interval staffing.'
+          : !hasServiceGoal
+            ? 'Set a staffing group service goal before calculating Erlang.'
+            : !hasOperatingWindow
+              ? 'Set call center operating hours before calculating Erlang.'
+              : !hasIntradayProfile
+                ? 'Configure a 30-minute intraday profile before calculating Erlang.'
+                : !hasMaxOccupancy
+                  ? 'Set a valid max occupancy before calculating Erlang.'
+                  : 'Set a valid adherence assumption before calculating Erlang.',
+      tone: isReady ? 'ready' : configuredCount > 0 ? 'attention' : 'default',
+      isReady,
+      isStarted: reviewedSections.value.has('variability') || configuredCount > 0,
+      nextTitle: variabilityTitle.value,
+      nextDescription: defaultsPendingReview
+        ? 'Confirm the inherited service goal, operating window, intraday profile, occupancy cap, and adherence before reviewing monthly Erlang outputs.'
+        : 'Review the staffing-group assumptions plus the occupancy cap and adherence that shape the interval Erlang result.'
+    }
+  }
+
   if (builder.useMonthlyRandomOverrides) {
     const configuredCount = builder.randomMonths.filter(
       (month) => toNumber(month.occupancyPercent, 0) > 0 && toNumber(month.adherencePercent, 0) > 0
@@ -120,8 +187,10 @@ const variabilityProgress = computed(() => {
 
     return {
       id: 'variability',
-      title: 'Random/Variability',
-      description: 'Apply adherence and occupancy assumptions before the requirement is finalized.',
+      title: variabilityTitle.value,
+      description: isIntradayErlang.value
+        ? 'Set the occupancy cap and adherence overhead that bridge monthly Erlang hours into final staffing outputs.'
+        : 'Apply adherence and occupancy assumptions before the requirement is finalized.',
       statusLabel: formatMonthCoverage(configuredCount),
       detail: isReady
         ? 'Monthly occupancy and adherence overrides are set across the full year.'
@@ -130,8 +199,10 @@ const variabilityProgress = computed(() => {
       tone: isReady ? 'ready' : configuredCount > 0 ? 'attention' : 'default',
       isReady,
       isStarted: configuredCount > 0,
-      nextTitle: 'Random/Variability',
-      nextDescription: 'Set the occupancy and adherence assumptions that convert scheduled time into a usable design factor.'
+      nextTitle: variabilityTitle.value,
+      nextDescription: isIntradayErlang.value
+        ? 'Review the occupancy cap and adherence overhead before finalizing the monthly Erlang outputs.'
+        : 'Set the occupancy and adherence assumptions that convert scheduled time into a usable design factor.'
     }
   }
 
@@ -143,8 +214,10 @@ const variabilityProgress = computed(() => {
 
   return {
     id: 'variability',
-    title: 'Random/Variability',
-    description: 'Apply adherence and occupancy assumptions before the requirement is finalized.',
+    title: variabilityTitle.value,
+    description: isIntradayErlang.value
+      ? 'Set the occupancy cap and adherence overhead that bridge monthly Erlang hours into final staffing outputs.'
+      : 'Apply adherence and occupancy assumptions before the requirement is finalized.',
     statusLabel: defaultsPendingReview ? 'Using defaults' : defaultsConfigured ? 'Defaults confirmed' : 'Needs review',
     detail: isReady
       ? `Shared occupancy and adherence defaults apply across all ${TOTAL_PLAN_MONTHS} months.`
@@ -154,22 +227,92 @@ const variabilityProgress = computed(() => {
     blocker: isReady
       ? ''
       : defaultsPendingReview
-        ? 'Open Random/Variability and confirm the default occupancy and adherence assumptions.'
+        ? `Open ${variabilityTitle.value} and confirm the default assumptions for this plan.`
         : 'Set occupancy and adherence defaults before finalizing requirement.',
     tone: isReady ? 'ready' : defaultsConfigured ? 'attention' : 'default',
     isReady,
     isStarted: reviewedSections.value.has('variability'),
-    nextTitle: 'Random/Variability',
+    nextTitle: variabilityTitle.value,
     nextDescription: defaultsPendingReview
-      ? 'Review the default occupancy and adherence assumptions before locking in the design factor.'
-      : 'Set the occupancy and adherence assumptions that convert scheduled time into a usable design factor.'
+      ? 'Review the default occupancy and adherence assumptions before locking in the next step.'
+      : isIntradayErlang.value
+        ? 'Set the occupancy cap and adherence overhead before reviewing the monthly Erlang outputs.'
+        : 'Set the occupancy and adherence assumptions that convert scheduled time into a usable design factor.'
   }
 })
 
+const intradayForecastMonthSnapshot = computed(() =>
+  Array.isArray(builder.demandSource?.forecastMonthSnapshot)
+    ? builder.demandSource.forecastMonthSnapshot
+    : []
+)
+
+const intradayForecastDailySnapshot = computed(() =>
+  Array.isArray(builder.demandSource?.forecastDailySnapshot)
+    ? builder.demandSource.forecastDailySnapshot
+    : []
+)
+
+const intradayMonthsWithForecastAht = computed(() =>
+  intradayForecastMonthSnapshot.value.filter((month) => toNumber(month?.ahtSeconds, 0) > 0).length
+)
+
+const intradayFirstMissingAhtMonthLabel = computed(() => {
+  const missingMonth = intradayForecastMonthSnapshot.value.find((month) => toNumber(month?.ahtSeconds, 0) <= 0)
+  return missingMonth?.monthLabel || ''
+})
+
 const requirementProgress = computed(() => {
+  if (isIntradayErlang.value) {
+    const erlangStatus = String(builder.erlangStatus?.status || '').trim()
+    const hasDailyForecast = intradayForecastDailySnapshot.value.length > 0
+    const configuredCount = intradayMonthsWithForecastAht.value
+    const isReady = erlangStatus === 'ready'
+    const isLoading = erlangStatus === 'loading'
+    const isStarted = hasDailyForecast || isLoading || isReady
+    const forecastName = builder.demandSourceSummary?.projectName || ''
+    const missingAhtMonthLabel = intradayFirstMissingAhtMonthLabel.value
+
+    return {
+      id: 'requirement',
+      title: requirementTitle.value,
+      description: 'Use the applied daily forecast, flatten it to 30-minute intervals, and roll monthly Erlang staffing outputs back into the plan.',
+      statusLabel: isReady
+        ? 'Calculated'
+        : isLoading
+          ? 'Calculating'
+          : formatMonthCoverage(configuredCount),
+      detail: isReady
+        ? forecastName
+          ? `Daily demand and monthly AHT are locked from ${forecastName}. Interval Erlang outputs are now populating this plan.`
+          : 'Daily forecast demand and monthly AHT assumptions are locked and driving the monthly Erlang outputs.'
+        : isLoading
+          ? 'Flattening the applied daily forecast into 30-minute intervals and calculating monthly Erlang staffing outputs.'
+          : !hasDailyForecast
+            ? 'Apply a saved daily forecast to provide the daily demand stream this plan requires.'
+            : configuredCount < TOTAL_PLAN_MONTHS
+              ? `Monthly AHT assumptions are still missing in ${missingAhtMonthLabel}.`
+              : forecastName
+                ? `Daily forecast demand is applied from ${forecastName}. Run the interval Erlang calculation to populate monthly staffing outputs.`
+                : 'Daily forecast demand is applied. Run the interval Erlang calculation to populate monthly staffing outputs.',
+      blocker: isReady ? '' : String(builder.erlangStatus?.message || '').trim(),
+      tone: isReady ? 'ready' : isStarted || configuredCount > 0 ? 'attention' : 'default',
+      isReady,
+      isStarted,
+      nextTitle: requirementTitle.value,
+      nextDescription: isReady
+        ? 'Review the calculated monthly Erlang outputs before finalizing staffing.'
+        : 'Apply a saved daily forecast with monthly AHT assumptions, then run the interval Erlang calculation for this plan.'
+    }
+  }
+
   const configuredCount = builder.planMonths.filter(
     (month) => toNumber(month.contacts, 0) > 0 && toNumber(month.ahtSeconds, 0) > 0
   ).length
+  const hasAppliedForecastDemand =
+    builder.demandSource.mode === 'forecast' &&
+    Array.isArray(builder.demandSource.forecastMonthSnapshot) &&
+    builder.demandSource.forecastMonthSnapshot.length > 0
   const firstMissingMonthLabel = getFirstMissingMonthLabel(
     builder.planMonths,
     (month) => toNumber(month.contacts, 0) > 0 && toNumber(month.ahtSeconds, 0) > 0
@@ -178,28 +321,38 @@ const requirementProgress = computed(() => {
 
   return {
     id: 'requirement',
-    title: 'Demand Model',
-    description: 'Turn contacts and AHT into the required frontline headcount the staffing plan needs to cover.',
+    title: requirementTitle.value,
+    description: isIntradayErlang.value
+      ? 'Shape the monthly shell that will flatten contacts and AHT into intervals, run Erlang, and roll the result back up.'
+      : 'Use the applied staffing-group forecast to populate read-only demand inputs, then translate that workload into required frontline headcount.',
     statusLabel: formatMonthCoverage(configuredCount),
     detail: isReady
-      ? builder.demandSource.mode === 'forecast' && builder.demandSourceSummary?.projectName
+      ? hasAppliedForecastDemand && builder.demandSourceSummary?.projectName
         ? `Contacts are populated from ${builder.demandSourceSummary.projectName} and AHT is set across the full year.`
         : 'Contacts and AHT are populated for every month.'
       : configuredCount > 0
-        ? builder.demandSource.mode === 'forecast'
+        ? hasAppliedForecastDemand
           ? `Forecast contacts are applied for ${configuredCount} months so far.`
-          : `Demand inputs are modeled for ${configuredCount} months so far.`
-        : 'Demand inputs are still blank across the plan.',
+          : builder.hasLegacyManualDemandSource
+            ? `Legacy monthly demand is still carrying ${configuredCount} months of inputs until it is converted to a saved forecast.`
+            : `Forecast-backed demand is only populated for ${configuredCount} months so far.`
+        : builder.hasLegacyManualDemandSource
+          ? 'This plan still relies on legacy manual demand that should be converted to a saved staffing-group forecast.'
+          : 'No saved forecast has been applied to populate the monthly demand inputs yet.',
     blocker: isReady
       ? ''
-      : builder.demandSource.mode === 'forecast'
-        ? `Apply a forecast or enter contacts and AHT for ${firstMissingMonthLabel} to complete the requirement model.`
-        : `Enter contacts and AHT for ${firstMissingMonthLabel} to complete the requirement model.`,
+      : hasAppliedForecastDemand
+        ? `Refresh or replace the applied forecast so ${firstMissingMonthLabel} has complete demand inputs.`
+        : builder.hasLegacyManualDemandSource
+          ? 'Open Forecasts and convert the legacy manual monthly demand into a saved staffing-group forecast.'
+          : 'Open Forecasts and apply a saved staffing-group forecast before reviewing the demand model.',
     tone: isReady ? 'ready' : configuredCount > 0 ? 'attention' : 'default',
     isReady,
     isStarted: configuredCount > 0,
-    nextTitle: 'Demand Model',
-    nextDescription: 'Enter monthly contacts and AHT so the planner can translate workload into required frontline headcount.'
+    nextTitle: requirementTitle.value,
+    nextDescription: isIntradayErlang.value
+      ? 'Review the monthly intraday-Erlang contract that will feed interval staffing outputs back into this plan.'
+      : 'Apply a saved staffing-group forecast, then review how that demand translates into required frontline headcount.'
   }
 })
 
@@ -257,17 +410,6 @@ const readyCoreSectionCount = computed(() => coreSectionCards.value.filter((sect
 
 const workflowSections = computed(() => [
   {
-    id: 'forecast',
-    label: 'Forecast',
-    items: [
-      {
-        id: 'forecast',
-        title: 'Forecasts',
-        tone: 'default'
-      }
-    ]
-  },
-  {
     id: 'plan',
     label: 'Plan',
     items: [
@@ -276,6 +418,11 @@ const workflowSections = computed(() => [
         title: 'Plan Status',
         statusLabel: planComplete.value ? 'All core sections ready' : `${readyCoreSectionCount.value}/${coreSectionCards.value.length} ready`,
         tone: planComplete.value ? 'ready' : 'default'
+      },
+      {
+        id: 'forecast',
+        title: 'Forecasts',
+        tone: 'default'
       },
       {
         id: 'availability',
@@ -416,6 +563,7 @@ const breadcrumbItems = computed(() => {
             <div class="grid gap-3">
               <PlannerOverviewPanel
                 v-if="builder.activeSection === 'overview'"
+                :requirement-method="builder.requirementMethod"
                 :plan-summary="builder.planSummary"
                 :staffing-summary="builder.staffingSummary"
                 :section-cards="overviewCards"
@@ -457,6 +605,7 @@ const breadcrumbItems = computed(() => {
                 :format-whole="builder.formatWhole"
                 :format-number="builder.formatNumber"
                 :format-percent="builder.formatPercent"
+                :continue-label="isIntradayErlang ? 'Continue to Erlang Inputs' : 'Continue to Random/Variability'"
                 @copy-action="builder.handlePresenceCopyAction"
                 @continue="builder.setActiveForecastStep('variability')"
               />
@@ -466,8 +615,18 @@ const breadcrumbItems = computed(() => {
                 v-model:random-defaults="builder.randomDefaults"
                 v-model:use-monthly-random-overrides="builder.useMonthlyRandomOverrides"
                 v-model:random-months="builder.randomMonths"
+                :requirement-method="builder.requirementMethod"
                 :monthly-records="builder.monthlyRecords"
                 :summary="builder.randomSummary"
+                :demand-source="builder.demandSource"
+                :current-demand-source-summary="builder.demandSourceSummary"
+                :service-level-percent="builder.intradayErlangServiceLevelPercent"
+                :service-level-threshold-seconds="builder.intradayErlangServiceLevelThresholdSeconds"
+                :operating-open-time="builder.intradayErlangOpenTime"
+                :operating-close-time="builder.intradayErlangCloseTime"
+                :intraday="builder.intradayErlangProfile"
+                :format-whole="builder.formatWhole"
+                :format-number="builder.formatNumber"
                 :format-percent="builder.formatPercent"
                 @copy-action="builder.handleRandomCopyAction"
                 @previous="builder.moveForecastStep(-1)"
@@ -479,10 +638,12 @@ const breadcrumbItems = computed(() => {
                 v-else-if="builder.activeSection === 'requirement'"
                 v-model:plan-months="builder.planMonths"
                 v-model:selected-month-index="builder.selectedMonthIndex"
+                :requirement-method="builder.requirementMethod"
                 :monthly-records="builder.monthlyRecords"
                 :plan-summary="builder.planSummary"
                 :demand-source="builder.demandSource"
                 :current-demand-source-summary="builder.demandSourceSummary"
+                :erlang-status="builder.erlangStatus"
                 :format-whole="builder.formatWhole"
                 :format-number="builder.formatNumber"
                 :format-percent="builder.formatPercent"
@@ -494,6 +655,7 @@ const breadcrumbItems = computed(() => {
               <PlannerStaffingPlanTab
                 v-else-if="builder.activeSection === 'staffing'"
                 :planning-year="builder.planningYear"
+                :requirement-method="builder.requirementMethod"
                 v-model:starting-headcount="builder.startingHeadcount"
                 v-model:starting-frontline-headcount="builder.startingFrontlineHeadcount"
                 v-model:training-settings="builder.trainingSettings"

@@ -321,21 +321,22 @@ describe('usePlanningWorkspace', () => {
     expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', getCurrentCalendarYear()))
   })
 
-  it('persists plans and keeps the user in the editor route', async () => {
+  it('persists plans and returns the user to the staffing-group plans tab', async () => {
     const currentRoute = ref({
       app: 'planning',
       page: 'editor',
       centerId: 'center-1',
       groupId: 'group-1',
       planId: 'new',
-      year: 2026
+      year: 2026,
+      requirementMethod: 'workload_ratio'
     })
     const currentUser = ref({ id: 'user-1' })
     const hasWorkspaceAccess = computed(() => true)
     const storageScope = computed(() => currentUser.value.id)
 
     planningRepository.savePlan.mockReturnValue(centers)
-    window.location.hash = buildPlanningNewPlanHash('center-1', 'group-1', 2026)
+    window.location.hash = buildPlanningNewPlanHash('center-1', 'group-1', 2026, { requirementMethod: 'workload_ratio' })
 
     const workspace = usePlanningWorkspace({
       currentRoute,
@@ -349,7 +350,7 @@ describe('usePlanningWorkspace', () => {
 
     expect(planningRepository.savePlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
-    expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', 2026))
+    expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', 2026, { tab: 'plans' }))
   })
 
   it('persists guest workspace changes to the default local scope', async () => {
@@ -451,7 +452,8 @@ describe('usePlanningWorkspace', () => {
       centerId: 'center-1',
       groupId: 'group-1',
       planId: 'new',
-      year: 2027
+      year: 2027,
+      requirementMethod: 'workload_ratio'
     })
     const currentUser = ref({ id: 'user-1' })
     const hasWorkspaceAccess = computed(() => true)
@@ -477,5 +479,68 @@ describe('usePlanningWorkspace', () => {
         }
       ]
     })
+  })
+
+  it('scopes new-plan drafts by requirement method so workload-ratio and Erlang drafts stay separate', async () => {
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'new',
+      year: 2026,
+      requirementMethod: 'workload_ratio'
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const storageScope = computed(() => currentUser.value.id)
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      storageScope
+    })
+
+    await workspace.loadCentersForScope()
+    await nextTick()
+
+    expect(workspace.plannerDraftKey.value).toBe('user-1:group-1:plan:new:2026:workload_ratio')
+    expect(workspace.monthlyPlannerKey.value).toBe('planner-group-1-new-2026-workload_ratio')
+
+    currentRoute.value = {
+      ...currentRoute.value,
+      requirementMethod: 'intraday_erlang'
+    }
+
+    await nextTick()
+
+    expect(workspace.plannerDraftKey.value).toBe('user-1:group-1:plan:new:2026:intraday_erlang')
+    expect(workspace.monthlyPlannerKey.value).toBe('planner-group-1-new-2026-intraday_erlang')
+  })
+
+  it('keeps the new-plan draft key empty until the editor has a resolved group scope', async () => {
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'new',
+      year: 2026,
+      requirementMethod: 'workload_ratio'
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const storageScope = computed(() => currentUser.value.id)
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      storageScope
+    })
+
+    expect(workspace.plannerDraftKey.value).toBe('')
+
+    await workspace.loadCentersForScope()
+    await nextTick()
+
+    expect(workspace.plannerDraftKey.value).toBe('user-1:group-1:plan:new:2026:workload_ratio')
   })
 })

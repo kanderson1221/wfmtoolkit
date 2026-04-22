@@ -16,6 +16,10 @@ const props = defineProps({
     type: Object,
     required: true
   },
+  continueLabel: {
+    type: String,
+    default: 'Continue to Random/Variability'
+  },
   formatWhole: {
     type: Function,
     required: true
@@ -295,7 +299,7 @@ const summaryItems = computed(() => [
     </section>
 
     <div class="monthly-tab-actions">
-      <AppButton variant="primary" @click="emit('continue')">Continue to Random/Variability</AppButton>
+      <AppButton variant="primary" @click="emit('continue')">{{ props.continueLabel }}</AppButton>
     </div>
   </section>
 </template>

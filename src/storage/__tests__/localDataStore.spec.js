@@ -338,6 +338,19 @@ describe('localDataStore', () => {
     expect(loadedDraft?.ui?.activeSection).toBe('forecast')
   })
 
+  it('ignores planner draft reads and writes when the draft key is empty', async () => {
+    const persistedDraft = await persistPlannerDraftToDexie('', {
+      plan: {
+        planningYear: 2026
+      }
+    })
+
+    const loadedDraft = await loadPlannerDraftFromDexie('')
+
+    expect(persistedDraft.autosavedAt).toBeTruthy()
+    expect(loadedDraft).toBeNull()
+  })
+
   it('migrates legacy localStorage data into Dexie once', async () => {
     window.localStorage.setItem(`${CENTERS_STORAGE_KEY}.default`, JSON.stringify(sampleCenters))
     window.localStorage.setItem(`${FORECAST_PROJECTS_STORAGE_KEY}.default:center:center-1:group:group-1:forecasts`, JSON.stringify(sampleForecasts))

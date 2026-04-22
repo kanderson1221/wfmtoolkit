@@ -104,4 +104,37 @@ describe('computeMonthlyRecords peak planning', () => {
     expect(summary.peakDayMonth.monthIndex).toBe(0)
     expect(summary.averagePeakRequiredHeadcount).toBeGreaterThan(summary.averageRequiredHeadcount)
   })
+
+  it('uses open-day-filtered forecast daily demand when a forecast source is applied', () => {
+    const januaryMonth = computeMonthlyRecords({
+      ...basePayload,
+      demandSource: {
+        mode: 'forecast',
+        forecastDailySnapshot: [
+          { serviceDate: '2026-01-01', monthIndex: 0, monthLabel: 'Jan', contacts: 100 },
+          { serviceDate: '2026-01-02', monthIndex: 0, monthLabel: 'Jan', contacts: 200 },
+          { serviceDate: '2026-01-03', monthIndex: 0, monthLabel: 'Jan', contacts: 300 },
+          { serviceDate: '2026-01-05', monthIndex: 0, monthLabel: 'Jan', contacts: 400 }
+        ]
+      },
+      customHolidays: [
+        {
+          id: 'jan-second-closure',
+          label: 'Company Closure',
+          date: '2026-01-02'
+        }
+      ],
+      planMonths: basePayload.planMonths.map((month, monthIndex) => ({
+        ...month,
+        contacts: monthIndex === 0 ? 22000 : month.contacts,
+        peakDayUpliftPercent: monthIndex === 0 ? 15 : month.peakDayUpliftPercent
+      }))
+    })[0]
+
+    expect(januaryMonth.contacts).toBe(500)
+    expect(januaryMonth.averageDailyContacts).toBe(250)
+    expect(januaryMonth.peakDayContacts).toBe(400)
+    expect(januaryMonth.peakDayUpliftPercent).toBe(60)
+    expect(januaryMonth.workloadHours).toBeCloseTo((500 * 300) / 3600, 5)
+  })
 })

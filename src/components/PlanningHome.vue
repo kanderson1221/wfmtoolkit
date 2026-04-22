@@ -244,6 +244,8 @@ const portfolioHeadcountChart = computed(() => {
 
       const monthlyRecords = computeMonthlyRecords({
         planningYear: Number(selectedPlanningYear.value),
+        requirementMethod: plan?.requirementMethod,
+        demandSource: plan?.demandSource,
         operatingWeekdays:
           Array.isArray(plan.operatingWeekdays) && plan.operatingWeekdays.length
             ? plan.operatingWeekdays

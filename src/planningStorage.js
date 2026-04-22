@@ -13,7 +13,12 @@ import {
 import { createPlanningGroupActuals, resolvePlanningGroupActuals } from './planner/groupActuals'
 import { createPlanningGroupIntraday, resolvePlanningGroupIntraday } from './planner/groupIntraday'
 import { createPlanDemandSource } from './planner/demandSources'
-import { createNextYearOpening, getCurrentCalendarYear, resolvePlanningYear } from './planner/shared'
+import {
+  createNextYearOpening,
+  getCurrentCalendarYear,
+  normalizePlanRequirementMethod,
+  resolvePlanningYear
+} from './planner/shared'
 import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/browserStorage'
 
 export const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
@@ -230,6 +235,7 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),
     customHolidays: normalizeCustomHolidays(planSnapshot.customHolidays),
     holidayScheduleMode: normalizeHolidayScheduleMode(planSnapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
+    requirementMethod: normalizePlanRequirementMethod(planSnapshot.requirementMethod),
     demandSource: createPlanDemandSource(planSnapshot.demandSource),
     nextYearOpening: createNextYearOpening(planSnapshot.nextYearOpening),
     createdAt: planSnapshot.createdAt || timestamp,

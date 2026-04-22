@@ -8,6 +8,10 @@ import AppButton from '../ui/AppButton.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 
 const props = defineProps({
+  requirementMethod: {
+    type: String,
+    default: ''
+  },
   planningYear: {
     type: Number,
     required: true
@@ -119,6 +123,7 @@ const yearEndHeadcountTarget = computed({
       v-model:year-end-headcount-target="yearEndHeadcountTarget"
       v-model:staffing-months="staffingMonths"
       v-model:selected-month-index="selectedMonthIndex"
+      :requirement-method="props.requirementMethod"
       :starting-position-inherited="props.startingPositionInherited"
       :starting-position-inherited-from-year="props.startingPositionInheritedFromYear"
       :staffing-records="props.staffingRecords"

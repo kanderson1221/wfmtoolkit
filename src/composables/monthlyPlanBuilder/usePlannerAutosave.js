@@ -11,7 +11,7 @@ export const usePlannerAutosave = ({
   savedPlan,
   buildDraftPayload
 }) => {
-  const activeDraftKey = ref(resolvedDraftKey.value)
+  const activeDraftKey = ref(resolvedDraftKey.value || '')
   const autosaveState = ref(restoredDraft.value ? 'restored' : savedPlan?.updatedAt ? 'saved' : 'idle')
   const lastAutosavedAt = ref(restoredDraft.value?.autosavedAt || savedPlan?.updatedAt || null)
   const autosaveErrorMessage = ref('')
@@ -28,7 +28,7 @@ export const usePlannerAutosave = ({
   }
 
   const persistDraftNow = async () => {
-    if (suspendAutosave.value || plannerBootstrapping?.value) {
+    if (suspendAutosave.value || plannerBootstrapping?.value || !activeDraftKey.value) {
       return
     }
 
@@ -70,6 +70,15 @@ export const usePlannerAutosave = ({
 
   const removeDraft = async () => {
     clearPendingAutosave()
+
+    if (!activeDraftKey.value) {
+      lastAutosavedAt.value = null
+      if (autosaveState.value !== 'error') {
+        autosaveState.value = 'idle'
+      }
+      return
+    }
+
     try {
       await plannerDraftRepository.clearDraft(activeDraftKey.value)
       autosaveErrorMessage.value = ''
@@ -118,29 +127,15 @@ export const usePlannerAutosave = ({
   })
 
   watch(resolvedDraftKey, async (nextDraftKey, previousDraftKey) => {
-    if (!nextDraftKey || nextDraftKey === previousDraftKey) {
+    if (nextDraftKey === previousDraftKey) {
       return
     }
 
-    activeDraftKey.value = nextDraftKey
+    activeDraftKey.value = nextDraftKey || ''
 
-    if (!autosaveReady.value || suspendAutosave.value) {
+    if (!nextDraftKey) {
+      clearPendingAutosave()
       return
-    }
-
-    clearPendingAutosave()
-
-    try {
-      const nextDraft = await plannerDraftRepository.persistDraft(nextDraftKey, buildDraftPayload())
-      lastAutosavedAt.value = nextDraft.autosavedAt
-      autosaveErrorMessage.value = ''
-      autosaveState.value = 'saved'
-    } catch (error) {
-      autosaveState.value = 'error'
-      autosaveErrorMessage.value = `Autosave is unavailable. ${describeBrowserStorageError(
-        error,
-        'This browser could not store the latest draft.'
-      )} Changes will stay in this tab until you save the plan.`
     }
   })
 

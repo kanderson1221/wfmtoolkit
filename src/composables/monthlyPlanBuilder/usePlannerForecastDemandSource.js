@@ -19,6 +19,7 @@ import {
   DEMAND_SOURCE_FORECAST,
   DEMAND_SOURCE_MANUAL,
   applyForecastSnapshotToPlanMonths,
+  buildForecastDailyDemandSnapshot,
   buildForecastDemandSnapshot,
   createPlanDemandSource,
   summarizeForecastDemandSnapshot
@@ -90,16 +91,6 @@ export const usePlannerForecastDemandSource = ({
 
     forecastsLoading.value = false
 
-    const assignableForecasts = availableForecastProjects.value.filter((project) =>
-      isPlanAssignableForecast(project)
-    )
-
-    if (
-      !selectedForecastProjectId.value &&
-      assignableForecasts.length === 1
-    ) {
-      selectedForecastProjectId.value = assignableForecasts[0]?.id || ''
-    }
   }
 
   const forecastProjectsWithResults = computed(() =>
@@ -157,6 +148,12 @@ export const usePlannerForecastDemandSource = ({
       : []
   )
 
+  const selectedForecastDailySnapshot = computed(() =>
+    selectedForecastProject.value
+      ? buildForecastDailyDemandSnapshot(selectedForecastProject.value, planningYear.value)
+      : []
+  )
+
   const selectedForecastPreviewSummary = computed(() => {
     if (selectedForecastProject.value) {
       const snapshotSummary = summarizeForecastDemandSnapshot(selectedForecastSnapshot.value)
@@ -211,9 +208,7 @@ export const usePlannerForecastDemandSource = ({
       return
     }
 
-    planMonths.value = applyForecastSnapshotToPlanMonths(planMonths.value, selectedForecastSnapshot.value, {
-      sourceKind: getForecastProjectSourceKind(selectedForecastProject.value)
-    })
+    planMonths.value = applyForecastSnapshotToPlanMonths(planMonths.value, selectedForecastSnapshot.value)
     demandSource.value = createPlanDemandSource({
       mode: DEMAND_SOURCE_FORECAST,
       forecastProjectId: selectedForecastProject.value.id,
@@ -224,7 +219,8 @@ export const usePlannerForecastDemandSource = ({
       importedAt: new Date().toISOString(),
       importedPlanningYear: planningYear.value,
       coverageStartMonthIndex: selectedForecastProject.value.coverageStartMonthIndex ?? null,
-      forecastMonthSnapshot: selectedForecastSnapshot.value
+      forecastMonthSnapshot: selectedForecastSnapshot.value,
+      forecastDailySnapshot: selectedForecastDailySnapshot.value
     })
   }
 

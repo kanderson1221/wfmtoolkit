@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 
 import PlannerStaffingSupplyTable from '../planner/PlannerStaffingSupplyTable.vue'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 
 describe('PlannerStaffingSupplyTable', () => {
   it('renders average and peak required headcount columns', () => {
@@ -44,6 +45,51 @@ describe('PlannerStaffingSupplyTable', () => {
     expect(wrapper.text()).toContain('Avg Req')
     expect(wrapper.text()).toContain('Peak Req')
     expect(wrapper.text()).toContain('15.8')
+  })
+
+  it('shows peak interval requirement in intraday Erlang mode', () => {
+    const wrapper = mount(PlannerStaffingSupplyTable, {
+      props: {
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        startingHeadcount: 20,
+        startingFrontlineHeadcount: 18,
+        staffingMonths: [
+          {
+            frontlineAttritionHeadcount: 0
+          }
+        ],
+        selectedMonthIndex: 0,
+        staffingRecords: [
+          {
+            monthIndex: 0,
+            label: 'Jan',
+            fullLabel: 'January',
+            requiredHeadcount: 12.4,
+            peakDayRequiredHeadcount: 15.8,
+            peakIntervalRequiredHeadcount: 14.6,
+            startingRosterHeadcount: 20,
+            startingFrontlineHeadcount: 18,
+            hireHeadcount: 0,
+            graduatingHeadcount: 0,
+            inTrainingHeadcount: 0,
+            frontlineAttritionPercent: 0,
+            endingRosterHeadcount: 20,
+            endingFrontlineHeadcount: 18,
+            gapToRequirement: 5.6
+          }
+        ],
+        formatNumber: (value) => Number(value ?? 0).toFixed(1)
+      },
+      global: {
+        stubs: {
+          AppSectionHeader: true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Peak Interval')
+    expect(wrapper.text()).toContain('14.6')
+    expect(wrapper.text()).not.toContain('15.8')
   })
 
   it('locks January starting inputs when the opening position is inherited from the prior year', () => {

@@ -20,6 +20,7 @@ from .batch import (
 from .erlang import build_results_payload
 from .forecasting import ForecastRunRequest, run_daily_volume_forecast
 from .models import StaffingInput
+from .planner import plan_intraday_monthly_rows
 
 
 class ErlangCRequest(BaseModel):
@@ -40,6 +41,23 @@ class ErlangCBatchRequest(BaseModel):
 
 class ErlangCFileProcessorRequest(BaseModel):
     rows: list[dict[str, Any]]
+
+
+class PlannerIntradayErlangRowRequest(BaseModel):
+    monthIndex: int = Field(ge=0, le=11)
+    serviceDate: str
+    intervalStart: str
+    callsOffered: float = Field(ge=0)
+    averageHandleTime: float = Field(gt=0)
+    intervalLengthMinutes: float = Field(gt=0, default=30)
+    serviceLevelGoal: float = Field(gt=0, le=100)
+    serviceLevelThreshold: float = Field(ge=0)
+    maxOccupancy: float = Field(gt=0, le=100, default=85)
+    averageCustomerPatience: float = Field(gt=0, default=60)
+
+
+class PlannerIntradayErlangRequest(BaseModel):
+    rows: list[PlannerIntradayErlangRowRequest]
 
 
 app = FastAPI(title="WFMToolkit API")
@@ -197,6 +215,33 @@ def daily_volume_forecast(payload: ForecastRunRequest) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/api/planner/intraday-erlang/calculate")
+def calculate_planner_intraday_erlang(payload: PlannerIntradayErlangRequest) -> dict[str, Any]:
+    if not payload.rows:
+        raise HTTPException(status_code=422, detail="rows must contain at least one item")
+
+    try:
+        return plan_intraday_monthly_rows(
+            [
+                {
+                    "month_index": row.monthIndex,
+                    "service_date": row.serviceDate,
+                    "interval_start": row.intervalStart,
+                    "calls_offered": row.callsOffered,
+                    "average_handle_time_seconds": row.averageHandleTime,
+                    "interval_duration_seconds": row.intervalLengthMinutes * 60,
+                    "service_level_goal": row.serviceLevelGoal / 100.0,
+                    "service_level_threshold_seconds": row.serviceLevelThreshold,
+                    "max_occupancy": row.maxOccupancy / 100.0,
+                    "mean_patience_seconds": row.averageCustomerPatience,
+                }
+                for row in payload.rows
+            ]
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.get("/api/erlang-c/batch/file-processor/download/{file_id}")

@@ -114,6 +114,165 @@ def plan_daily(interval_plans: list[IntervalPlan]) -> list[DailyStaffingPlan]:
     return daily_rows
 
 
+def plan_intraday_monthly_rows(
+    rows: list[dict[str, float | int | str]],
+) -> dict[str, list[dict[str, float | int | str]]]:
+    interval_forecasts: list[IntervalForecast] = []
+    normalized_rows: list[dict[str, float | int | str]] = []
+
+    for row in rows:
+        month_index = int(row["month_index"])
+        interval_duration_seconds = float(row.get("interval_duration_seconds") or 30 * 60)
+        interval_forecasts.append(
+            IntervalForecast(
+                queue_id=f"month-{month_index}",
+                interval_start=str(row["interval_start"]),
+                calls_offered=float(row["calls_offered"]),
+                avg_handle_time_seconds=float(row["average_handle_time_seconds"]),
+                shrinkage=0.0,
+                mean_patience_seconds=float(row.get("mean_patience_seconds") or 60.0),
+                min_occupancy=0.0,
+                max_occupancy=float(row["max_occupancy"]),
+                service_level_threshold=float(row["service_level_goal"]),
+                service_level_target_seconds=float(row["service_level_threshold_seconds"]),
+                interval_duration_seconds=interval_duration_seconds,
+            )
+        )
+        normalized_rows.append(
+            {
+                "month_index": month_index,
+                "service_date": str(row["service_date"]),
+                "interval_start": str(row["interval_start"]),
+                "interval_duration_seconds": interval_duration_seconds,
+                "calls_offered": float(row["calls_offered"]),
+                "average_handle_time_seconds": float(row["average_handle_time_seconds"]),
+            }
+        )
+
+    interval_plans = plan_intervals(interval_forecasts)
+    daily_plans = plan_daily(interval_plans)
+
+    interval_payload_rows = []
+    monthly_rollups: dict[int, dict[str, float | int | str]] = {}
+
+    for metadata, interval_plan in zip(normalized_rows, interval_plans):
+        month_index = int(metadata["month_index"])
+        service_date = str(metadata["service_date"])
+        interval_hours = interval_plan.required_staff_net * (
+            float(metadata["interval_duration_seconds"]) / 3600.0
+        )
+
+        interval_payload_rows.append(
+            {
+                "monthIndex": month_index,
+                "serviceDate": service_date,
+                "intervalStart": interval_plan.interval_start,
+                "requiredStaffNet": interval_plan.required_staff_net,
+                "requiredStaffGross": interval_plan.required_staff_gross,
+                "serviceLevel": interval_plan.service_level,
+                "occupancy": interval_plan.occupancy,
+                "averageSpeedOfAnswerSeconds": interval_plan.average_speed_of_answer_seconds,
+                "percentAnsweredImmediately": interval_plan.percent_answered_immediately,
+                "abandonPercent": interval_plan.abandon_percent,
+                "intervalLengthMinutes": interval_plan.interval_duration_seconds / 60.0,
+            }
+        )
+
+        monthly_summary = monthly_rollups.setdefault(
+            month_index,
+            {
+                "monthIndex": month_index,
+                "workloadHours": 0.0,
+                "erlangStaffedHours": 0.0,
+                "occupiedHours": 0.0,
+                "serviceLevelWeightedCalls": 0.0,
+                "callsOffered": 0.0,
+                "peakIntervalRequiredHeadcount": 0,
+                "openDayCount": 0,
+                "serviceDateSet": set(),
+            },
+        )
+        monthly_summary["workloadHours"] = float(monthly_summary["workloadHours"]) + (
+            float(metadata["calls_offered"]) * float(metadata["average_handle_time_seconds"]) / 3600.0
+        )
+        monthly_summary["erlangStaffedHours"] = float(
+            monthly_summary["erlangStaffedHours"]
+        ) + interval_hours
+        monthly_summary["occupiedHours"] = float(monthly_summary["occupiedHours"]) + (
+            interval_hours * float(interval_plan.occupancy)
+        )
+        monthly_summary["serviceLevelWeightedCalls"] = float(
+            monthly_summary["serviceLevelWeightedCalls"]
+        ) + (float(metadata["calls_offered"]) * float(interval_plan.service_level))
+        monthly_summary["callsOffered"] = float(monthly_summary["callsOffered"]) + float(
+            metadata["calls_offered"]
+        )
+        monthly_summary["peakIntervalRequiredHeadcount"] = max(
+            int(monthly_summary["peakIntervalRequiredHeadcount"]),
+            interval_plan.required_staff_net,
+        )
+        service_date_set = monthly_summary["serviceDateSet"]
+        service_date_set.add(service_date)
+        monthly_summary["openDayCount"] = len(service_date_set)
+
+    daily_payload_rows = []
+    for daily_plan in daily_plans:
+        month_index = next(
+            (
+                int(metadata["month_index"])
+                for metadata in normalized_rows
+                if metadata["service_date"] == daily_plan.service_date
+            ),
+            datetime.fromisoformat(daily_plan.service_date).month - 1,
+        )
+        daily_payload_rows.append(
+            {
+                "monthIndex": month_index,
+                "serviceDate": daily_plan.service_date,
+                "intervalCount": daily_plan.interval_count,
+                "totalLaborHoursNet": daily_plan.total_labor_hours_net,
+                "totalLaborHoursGross": daily_plan.total_labor_hours_gross,
+                "peakStaffNet": daily_plan.peak_staff_net,
+                "peakStaffGross": daily_plan.peak_staff_gross,
+            }
+        )
+
+    monthly_payload_rows = [
+        {
+            "monthIndex": month_index,
+            "workloadHours": round(float(summary["workloadHours"]), 4),
+            "erlangStaffedHours": round(float(summary["erlangStaffedHours"]), 4),
+            "weightedOccupancyPercent": round(
+                (
+                    float(summary["occupiedHours"]) / float(summary["erlangStaffedHours"]) * 100.0
+                    if float(summary["erlangStaffedHours"]) > 0
+                    else 0.0
+                ),
+                4,
+            ),
+            "weightedServiceLevelPercent": round(
+                (
+                    float(summary["serviceLevelWeightedCalls"]) / float(summary["callsOffered"]) * 100.0
+                    if float(summary["callsOffered"]) > 0
+                    else 0.0
+                ),
+                4,
+            ),
+            "peakIntervalRequiredHeadcount": int(
+                summary["peakIntervalRequiredHeadcount"]
+            ),
+            "openDayCount": int(summary["openDayCount"]),
+        }
+        for month_index, summary in sorted(monthly_rollups.items())
+    ]
+
+    return {
+        "intervalPlans": interval_payload_rows,
+        "dailyPlans": daily_payload_rows,
+        "monthlyPlans": monthly_payload_rows,
+    }
+
+
 def load_forecasts_csv(path: str | Path, interval_duration_seconds: float = 30 * 60) -> list[IntervalForecast]:
     rows: list[IntervalForecast] = []
     with Path(path).open(newline="", encoding="utf-8") as handle:

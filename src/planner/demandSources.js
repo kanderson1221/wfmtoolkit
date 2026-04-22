@@ -2,10 +2,12 @@ import {
   computeForecastPlanningReady,
   FORECAST_SOURCE_MODELED_DAILY,
   FORECAST_SOURCE_MANUAL_MONTHLY,
+  getForecastProjectDailyRows,
   getForecastPlanningYear,
   getForecastProjectMonthlyRollup
 } from '../forecasting/shared'
 import { buildForecastMonthlyHandleTimeAssumptions } from '../forecasting/handleTimeAssumptions'
+import { createPlanOpenDayChecker } from './planOpenDays'
 import { MONTH_LABELS, createPlanMonth, resolvePlanningYear, toNumber } from './shared'
 
 export const DEMAND_SOURCE_MANUAL = 'manual'
@@ -22,6 +24,20 @@ const normalizeNullableAhtSeconds = (value) => {
 
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}
+
+const normalizeDailySnapshotRow = (row = {}) => {
+  const monthIndex = Math.max(
+    0,
+    Math.min(MONTH_LABELS.length - 1, Math.round(toNumber(row.monthIndex, 0)))
+  )
+
+  return {
+    serviceDate: typeof row.serviceDate === 'string' ? row.serviceDate : '',
+    monthIndex,
+    monthLabel: row.monthLabel || MONTH_LABELS[monthIndex],
+    contacts: Math.max(toNumber(row.contacts, 0), 0)
+  }
 }
 
 export const createPlanDemandSource = (overrides = {}) => ({
@@ -48,6 +64,12 @@ export const createPlanDemandSource = (overrides = {}) => ({
         averageDailyVolume: Math.max(toNumber(month.averageDailyVolume, 0), 0),
         peakDailyVolume: Math.max(toNumber(month.peakDailyVolume, 0), 0)
       }))
+    : [],
+  forecastDailySnapshot: Array.isArray(overrides.forecastDailySnapshot)
+    ? overrides.forecastDailySnapshot
+        .map((row) => normalizeDailySnapshotRow(row))
+        .filter((row) => row.serviceDate)
+        .sort((left, right) => left.serviceDate.localeCompare(right.serviceDate))
     : []
 })
 
@@ -107,7 +129,42 @@ export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
     .sort((left, right) => left.monthIndex - right.monthIndex)
 }
 
-const derivePeakDayUpliftPercent = (month = {}) => {
+export const buildForecastDailyDemandSnapshot = (forecastProject, planningYear) => {
+  const resolvedPlanningYear = resolvePlanningYear(planningYear)
+
+  if (
+    !computeForecastPlanningReady(forecastProject) ||
+    getForecastPlanningYear(forecastProject) !== resolvedPlanningYear
+  ) {
+    return []
+  }
+
+  return getForecastProjectDailyRows(forecastProject)
+    .filter((row) => !row?.isHistory)
+    .map((row) => {
+      if (typeof row?.ds !== 'string' || !row.ds.startsWith(`${resolvedPlanningYear}-`)) {
+        return null
+      }
+
+      const parsedDate = parseMonthStart(row.ds)
+      if (!parsedDate || parsedDate.getUTCFullYear() !== resolvedPlanningYear) {
+        return null
+      }
+
+      const monthIndex = parsedDate.getUTCMonth()
+
+      return normalizeDailySnapshotRow({
+        serviceDate: row.ds,
+        monthIndex,
+        monthLabel: MONTH_LABELS[monthIndex],
+        contacts: row.yhat
+      })
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.serviceDate.localeCompare(right.serviceDate))
+}
+
+export const derivePeakDayUpliftPercent = (month = {}) => {
   const averageDailyVolume = Math.max(toNumber(month.averageDailyVolume, 0), 0)
   const peakDailyVolume = Math.max(toNumber(month.peakDailyVolume, 0), 0)
 
@@ -119,11 +176,64 @@ const derivePeakDayUpliftPercent = (month = {}) => {
   return Math.max(Number(upliftPercent.toFixed(1)), 0)
 }
 
-export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot, options = {}) => {
+export const summarizeForecastDailyDemandForOpenDays = ({
+  forecastDailySnapshot,
+  planningYear,
+  operatingWeekdays,
+  holidayCalendarId,
+  disabledHolidayRuleIds,
+  customHolidays
+} = {}) => {
+  const resolvedPlanningYear = resolvePlanningYear(planningYear)
+  const isOpenDay = createPlanOpenDayChecker({
+    planningYear: resolvedPlanningYear,
+    operatingWeekdays,
+    holidayCalendarId,
+    disabledHolidayRuleIds,
+    customHolidays
+  })
+  const monthlySummaryByMonthIndex = new Map()
+
+  ;(Array.isArray(forecastDailySnapshot) ? forecastDailySnapshot : []).forEach((row) => {
+    const serviceDate = typeof row?.serviceDate === 'string' ? row.serviceDate : ''
+
+    if (!serviceDate.startsWith(`${resolvedPlanningYear}-`) || !isOpenDay(serviceDate)) {
+      return
+    }
+
+    const monthIndex = Math.max(
+      0,
+      Math.min(MONTH_LABELS.length - 1, Math.round(toNumber(row?.monthIndex, 0)))
+    )
+    const contacts = Math.max(toNumber(row?.contacts, 0), 0)
+    const existingSummary = monthlySummaryByMonthIndex.get(monthIndex) || {
+      monthIndex,
+      monthLabel: MONTH_LABELS[monthIndex],
+      contacts: 0,
+      openForecastDays: 0,
+      averageDailyVolume: 0,
+      peakDailyVolume: 0
+    }
+
+    existingSummary.contacts += contacts
+    existingSummary.openForecastDays += 1
+    existingSummary.peakDailyVolume = Math.max(existingSummary.peakDailyVolume, contacts)
+    monthlySummaryByMonthIndex.set(monthIndex, existingSummary)
+  })
+
+  monthlySummaryByMonthIndex.forEach((summary) => {
+    summary.averageDailyVolume = summary.openForecastDays > 0
+      ? summary.contacts / summary.openForecastDays
+      : 0
+  })
+
+  return monthlySummaryByMonthIndex
+}
+
+export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot) => {
   const nextPlanMonths = Array.isArray(planMonths)
     ? planMonths.map((month) => createPlanMonth(month))
     : MONTH_LABELS.map(() => createPlanMonth())
-  const sourceKind = String(options?.sourceKind || FORECAST_SOURCE_MODELED_DAILY)
 
   ;(Array.isArray(snapshot) ? snapshot : []).forEach((month) => {
     if (!nextPlanMonths[month.monthIndex]) {
@@ -134,9 +244,7 @@ export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot, options 
       ...nextPlanMonths[month.monthIndex],
       contacts: Math.round(Math.max(toNumber(month.contacts, 0), 0)),
       ahtSeconds: normalizeNullableAhtSeconds(month.ahtSeconds) ?? nextPlanMonths[month.monthIndex].ahtSeconds,
-      peakDayUpliftPercent: sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY
-        ? nextPlanMonths[month.monthIndex].peakDayUpliftPercent
-        : derivePeakDayUpliftPercent(month)
+      peakDayUpliftPercent: derivePeakDayUpliftPercent(month)
     })
   })
 

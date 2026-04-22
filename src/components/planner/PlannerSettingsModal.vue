@@ -23,6 +23,10 @@ const props = defineProps({
     type: Array,
     required: true
   },
+  requirementMethodOptions: {
+    type: Array,
+    default: () => []
+  },
   canClose: {
     type: Boolean,
     default: true
@@ -52,6 +56,11 @@ const planningYear = defineModel('planningYear', {
   required: true
 })
 
+const requirementMethod = defineModel('requirementMethod', {
+  type: String,
+  default: ''
+})
+
 const dialogOpen = computed({
   get: () => true,
   set: (value) => {
@@ -75,6 +84,19 @@ const dialogOpen = computed({
     <div class="grid gap-4">
       <AppFieldGroup label="Planning Year" input-id="plan-year">
         <AppSelect id="plan-year" v-model="planningYear" :options="props.yearOptions" autofocus />
+      </AppFieldGroup>
+
+      <AppFieldGroup
+        v-if="props.requirementMethodOptions.length"
+        label="Requirement Method"
+        input-id="plan-requirement-method"
+        help-text="Choose how this plan will convert monthly demand into required staffing."
+      >
+        <AppSelect
+          id="plan-requirement-method"
+          v-model="requirementMethod"
+          :options="props.requirementMethodOptions"
+        />
       </AppFieldGroup>
 
       <AppStatusMessage v-if="props.statusMessage" :tone="props.statusTone">

@@ -51,6 +51,8 @@ const summarizeAvailability = (plan, center) => {
 
   const monthlyRecords = computeMonthlyRecords({
     planningYear,
+    requirementMethod: plan?.requirementMethod,
+    demandSource: plan?.demandSource,
     operatingWeekdays:
       Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
         ? plan.operatingWeekdays
@@ -87,7 +89,8 @@ export function usePlanningCenterWorkspace({
   selectedGroupId,
   selectedYear,
   weekdayOptions,
-  newPlanYear
+  newPlanYear,
+  newPlanRequirementMethod
 }) {
   const sortedPlansForGroup = (group) =>
     [...getGroupPlans(group)].sort((left, right) => Number(right.planningYear || 0) - Number(left.planningYear || 0))
@@ -229,7 +232,9 @@ export function usePlanningCenterWorkspace({
       return ''
     }
 
-    return buildPlanningNewPlanHash(center.value.id, selectedGroup.value.id, newPlanYear.value)
+    return buildPlanningNewPlanHash(center.value.id, selectedGroup.value.id, newPlanYear.value, {
+      requirementMethod: newPlanRequirementMethod?.value
+    })
   })
 
   const selectedGroupForecastWorkspaceHref = computed(() => {

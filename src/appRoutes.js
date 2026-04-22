@@ -7,6 +7,7 @@ export const defaultRoute = {
   groupTab: null,
   planId: null,
   year: null,
+  requirementMethod: null,
   forecastId: null,
   sourceKind: null,
   forecastType: null,
@@ -118,16 +119,18 @@ export const buildPlanningPlanHash = (centerId, groupId, planId) => {
     : buildPlanningGroupHash(centerId, groupId)
 }
 
-export const buildPlanningNewPlanHash = (centerId, groupId, year = null) => {
+export const buildPlanningNewPlanHash = (centerId, groupId, year = null, options = {}) => {
   if (!centerId || !groupId) {
     return buildPlanningGroupHash(centerId, groupId)
   }
 
   const normalizedYear = Number(year)
+  const normalizedRequirementMethod = String(options.requirementMethod || '').trim().toLowerCase() || 'workload_ratio'
+  const methodSegment = `/method/${encodeURIComponent(normalizedRequirementMethod)}`
 
   return Number.isInteger(normalizedYear) && normalizedYear > 0
-    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new/year/${normalizedYear}`
-    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new`
+    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new/year/${normalizedYear}${methodSegment}`
+    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new${methodSegment}`
 }
 
 export const navigateToHash = (hash) => {
@@ -469,6 +472,12 @@ export const parseHashRoute = (hash) => {
     }
 
     if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'plan' && parts[6] === 'new' && parts[7] === 'year' && parts[8]) {
+      let requirementMethod = null
+
+      if (parts[9] === 'method' && parts[10]) {
+        requirementMethod = decodeURIComponent(parts[10])
+      }
+
       return {
         app: 'planning',
         page: 'editor',
@@ -477,11 +486,18 @@ export const parseHashRoute = (hash) => {
         groupId: parts[4],
         planId: 'new',
         year: Number(parts[8]) || null,
+        requirementMethod,
         forecastId: null
       }
     }
 
     if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'plan' && parts[6] === 'new') {
+      let requirementMethod = null
+
+      if (parts[7] === 'method' && parts[8]) {
+        requirementMethod = decodeURIComponent(parts[8])
+      }
+
       return {
         app: 'planning',
         page: 'editor',
@@ -490,6 +506,7 @@ export const parseHashRoute = (hash) => {
         groupId: parts[4],
         planId: 'new',
         year: null,
+        requirementMethod,
         forecastId: null
       }
     }

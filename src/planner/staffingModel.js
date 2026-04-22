@@ -316,6 +316,7 @@ export const computeStaffingRecords = (
       fullLabel: planned.fullLabel,
       requiredHeadcount: planned.requiredHeadcount,
       peakDayRequiredHeadcount: planned.peakDayRequiredHeadcount,
+      peakIntervalRequiredHeadcount: planned.peakIntervalRequiredHeadcount,
       roundedRequiredHeadcount: planned.roundedHeadcount,
       startingRosterHeadcount: runningHeadcount,
       startingFrontlineHeadcount: openingFrontlineHeadcount,

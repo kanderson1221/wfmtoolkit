@@ -1,11 +1,13 @@
 import {
   FULL_MONTH_LABELS,
   MONTH_LABELS,
+  PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
   average,
   clamp,
   createPlanMonth,
   createPresenceMonth,
   createRandomMonth,
+  normalizePlanRequirementMethod,
   toNumber
 } from './shared'
 import {
@@ -17,6 +19,11 @@ import {
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode
 } from './holidayCalendars'
+import {
+  DEMAND_SOURCE_FORECAST,
+  derivePeakDayUpliftPercent,
+  summarizeForecastDailyDemandForOpenDays
+} from './demandSources'
 
 export const calculateCalendarOpenDays = (
   year,
@@ -130,6 +137,8 @@ const buildMonthlyWarnings = ({
 
 export const computeMonthlyRecords = ({
   planningYear,
+  requirementMethod,
+  demandSource,
   operatingWeekdays,
   holidayCalendarId,
   disabledHolidayRuleIds,
@@ -141,12 +150,31 @@ export const computeMonthlyRecords = ({
   randomMonths,
   planMonths
 }) =>
-  MONTH_LABELS.map((label, monthIndex) => {
+  {
+    const forecastDailyDemandByMonthIndex =
+      demandSource?.mode === DEMAND_SOURCE_FORECAST
+        ? summarizeForecastDailyDemandForOpenDays({
+            forecastDailySnapshot: demandSource?.forecastDailySnapshot,
+            planningYear,
+            operatingWeekdays,
+            holidayCalendarId,
+            disabledHolidayRuleIds,
+            customHolidays
+          })
+        : new Map()
+    const hasForecastDailyDemand =
+      demandSource?.mode === DEMAND_SOURCE_FORECAST &&
+      Array.isArray(demandSource?.forecastDailySnapshot) &&
+      demandSource.forecastDailySnapshot.length > 0
+
+    return MONTH_LABELS.map((label, monthIndex) => {
+    const resolvedRequirementMethod = normalizePlanRequirementMethod(requirementMethod)
     const presenceInput = createPresenceMonth(presenceMonths?.[monthIndex] || {})
     const randomInput = useMonthlyRandomOverrides
       ? createRandomMonth(randomMonths?.[monthIndex] || {})
       : createRandomMonth(randomDefaults || {})
     const planInput = createPlanMonth(planMonths?.[monthIndex] || {})
+    const filteredForecastDemand = forecastDailyDemandByMonthIndex.get(monthIndex) || null
 
     const {
       weekdayOpenDays,
@@ -214,11 +242,21 @@ export const computeMonthlyRecords = ({
     const designFactorShare = designFactorPercent / 100
     const workloadStaffingRatio = designFactorShare > 0 ? 1 / designFactorShare : 0
 
-    const contacts = Math.max(toNumber(planInput.contacts, 0), 0)
+    const contacts = hasForecastDailyDemand
+      ? Math.max(toNumber(filteredForecastDemand?.contacts, 0), 0)
+      : Math.max(toNumber(planInput.contacts, 0), 0)
     const ahtSeconds = Math.max(toNumber(planInput.ahtSeconds, 0), 0)
-    const peakDayUpliftPercent = Math.max(toNumber(planInput.peakDayUpliftPercent, 0), 0)
-    const averageDailyContacts = openDays > 0 ? contacts / openDays : 0
-    const peakDayContacts = averageDailyContacts * (1 + peakDayUpliftPercent / 100)
+    const peakDayUpliftPercent = hasForecastDailyDemand
+      ? derivePeakDayUpliftPercent(filteredForecastDemand || {})
+      : Math.max(toNumber(planInput.peakDayUpliftPercent, 0), 0)
+    const averageDailyContacts = hasForecastDailyDemand
+      ? Math.max(toNumber(filteredForecastDemand?.averageDailyVolume, 0), 0)
+      : openDays > 0
+        ? contacts / openDays
+        : 0
+    const peakDayContacts = hasForecastDailyDemand
+      ? Math.max(toNumber(filteredForecastDemand?.peakDailyVolume, 0), 0)
+      : averageDailyContacts * (1 + peakDayUpliftPercent / 100)
     const workloadHours = (contacts * ahtSeconds) / 3600
     const peakDayWorkloadHours = (peakDayContacts * ahtSeconds) / 3600
     const requiredStaffHours = workloadHours * workloadStaffingRatio
@@ -226,6 +264,8 @@ export const computeMonthlyRecords = ({
     const requiredHeadcount = paidHoursPerMonth > 0 ? requiredStaffHours / paidHoursPerMonth : 0
     const peakDayRequiredHeadcount = paidHoursPerDay > 0 ? peakDayRequiredStaffHours / paidHoursPerDay : 0
     const roundedHeadcount = requiredHeadcount > 0 ? Math.ceil(requiredHeadcount) : 0
+    const avgDailyContacts = openDays > 0 ? contacts / openDays : 0
+    const isIntradayErlang = resolvedRequirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
 
     const warnings = buildMonthlyWarnings({
       operatingWeekdays,
@@ -246,6 +286,8 @@ export const computeMonthlyRecords = ({
       monthIndex,
       label,
       fullLabel: FULL_MONTH_LABELS[monthIndex],
+      requirementMethod: resolvedRequirementMethod,
+      isIntradayErlang,
       weekdayOpenDays,
       holidayCount,
       holidayImpactDays,
@@ -289,17 +331,23 @@ export const computeMonthlyRecords = ({
       ahtSeconds,
       peakDayUpliftPercent,
       averageDailyContacts,
+      avgDailyContacts,
       peakDayContacts,
       workloadHours,
+      erlangStaffedHours: null,
+      weightedOccupancyPercent: null,
+      weightedServiceLevelPercent: null,
       peakDayWorkloadHours,
       requiredStaffHours,
       peakDayRequiredStaffHours,
       requiredHeadcount,
       peakDayRequiredHeadcount,
+      peakIntervalRequiredHeadcount: null,
       roundedHeadcount,
       ...warnings
     }
   })
+  }
 
 export const summarizePresenceRecords = (monthlyRecords) => ({
   totalOpenDays: monthlyRecords.reduce((sum, row) => sum + row.openDays, 0),
@@ -322,15 +370,20 @@ export const summarizeRandomRecords = (monthlyRecords, randomDefaults, useMonthl
 })
 
 export const summarizePlanRecords = (monthlyRecords) => {
+  const resolvedRequirementMethod = normalizePlanRequirementMethod(monthlyRecords[0]?.requirementMethod)
   const peakMonth = monthlyRecords.reduce((peak, row) => (row.requiredHeadcount > peak.requiredHeadcount ? row : peak))
   const peakDayMonth = monthlyRecords.reduce((peak, row) =>
     row.peakDayRequiredHeadcount > peak.peakDayRequiredHeadcount ? row : peak
+  )
+  const peakIntervalMonth = monthlyRecords.reduce((peak, row) =>
+    (row.peakIntervalRequiredHeadcount || 0) > (peak.peakIntervalRequiredHeadcount || 0) ? row : peak
   )
   const busiestMonth = monthlyRecords.reduce((busiest, row) =>
     row.workloadHours > busiest.workloadHours ? row : busiest
   )
   const annualContacts = monthlyRecords.reduce((sum, row) => sum + row.contacts, 0)
   const annualWorkloadHours = monthlyRecords.reduce((sum, row) => sum + row.workloadHours, 0)
+  const annualErlangStaffedHours = monthlyRecords.reduce((sum, row) => sum + (row.erlangStaffedHours || 0), 0)
   const annualRequiredStaffHours = monthlyRecords.reduce((sum, row) => sum + row.requiredStaffHours, 0)
   const averageAhtSeconds =
     annualContacts > 0
@@ -344,17 +397,35 @@ export const summarizePlanRecords = (monthlyRecords) => {
     : 0
 
   return {
+    requirementMethod: resolvedRequirementMethod,
     peakMonth,
     peakDayMonth,
+    peakIntervalMonth,
     busiestMonth,
     annualContacts,
     annualWorkloadHours,
+    annualErlangStaffedHours,
     annualRequiredStaffHours,
     averageAhtSeconds,
     minimumRequiredHeadcount,
+    averageWeightedOccupancyPercent: average(
+      monthlyRecords
+        .map((row) => row.weightedOccupancyPercent)
+        .filter((value) => typeof value === 'number' && Number.isFinite(value))
+    ),
+    averageWeightedServiceLevelPercent: average(
+      monthlyRecords
+        .map((row) => row.weightedServiceLevelPercent)
+        .filter((value) => typeof value === 'number' && Number.isFinite(value))
+    ),
     averageRequiredStaffHours: average(monthlyRecords.map((row) => row.requiredStaffHours)),
     averageRequiredHeadcount: average(monthlyRecords.map((row) => row.requiredHeadcount)),
-    averagePeakRequiredHeadcount: average(monthlyRecords.map((row) => row.peakDayRequiredHeadcount))
+    averagePeakRequiredHeadcount: average(monthlyRecords.map((row) => row.peakDayRequiredHeadcount)),
+    averagePeakIntervalRequiredHeadcount: average(
+      monthlyRecords
+        .map((row) => row.peakIntervalRequiredHeadcount)
+        .filter((value) => typeof value === 'number' && Number.isFinite(value))
+    )
   }
 }
 

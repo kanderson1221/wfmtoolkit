@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 
 import PlannerOverviewPanel from '../planner/PlannerOverviewPanel.vue'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 
 describe('PlannerOverviewPanel', () => {
   it('renders peak-day demand in the forecast summary', () => {
@@ -94,5 +95,46 @@ describe('PlannerOverviewPanel', () => {
 
     const buttons = wrapper.findAll('button')
     expect(buttons.map((button) => button.text())).toEqual(['Open', 'Open'])
+  })
+
+  it('shows intraday Erlang placeholder outputs without reusing peak-day labels', () => {
+    const wrapper = mount(PlannerOverviewPanel, {
+      props: {
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        planSummary: {
+          annualContacts: 120000,
+          annualWorkloadHours: 9600,
+          annualErlangStaffedHours: null,
+          peakMonth: {
+            requiredHeadcount: 12.4,
+            fullLabel: 'January'
+          },
+          peakIntervalMonth: null,
+          averageRequiredHeadcount: 11.8
+        },
+        staffingSummary: {
+          startingFrontlineHeadcount: 18,
+          endingFrontlineHeadcount: 20,
+          totalGraduatingHeadcount: 3,
+          averageGapToRequirement: -1.2
+        },
+        sectionCards: [],
+        nextRecommendation: null,
+        planComplete: false,
+        formatWhole: (value) => String(value ?? 0),
+        formatNumber: (value) => Number(value ?? 0).toFixed(1)
+      },
+      global: {
+        stubs: {
+          AppSectionHeader: true,
+          AppStatusMessage: true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Annual Erlang Hrs')
+    expect(wrapper.text()).toContain('Peak Interval Required HC')
+    expect(wrapper.text()).not.toContain('Peak Day Required Headcount')
+    expect(wrapper.text()).toContain('—')
   })
 })

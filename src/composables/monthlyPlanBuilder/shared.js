@@ -2,6 +2,7 @@ import {
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_SCHEDULE_CLOSED,
   MONTH_LABELS,
+  PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO,
   buildActualsMonths,
   buildPlanMonths,
   buildPlanningYearRange,
@@ -23,6 +24,7 @@ import {
   normalizeDisabledHolidayRuleIds,
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode,
+  normalizePlanRequirementMethod,
   normalizeWeekdays,
   resolveLinkedOpeningPosition,
   toNumber
@@ -97,6 +99,10 @@ export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYe
 
   return {
     planningYear,
+    requirementMethod: normalizePlanRequirementMethod(
+      centerDefaults?.requirementMethod,
+      PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+    ),
     operatingWeekdays,
     holidayCalendarId,
     disabledHolidayRuleIds,
@@ -131,6 +137,7 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
   return {
     seedDefaults,
     planningYear,
+    requirementMethod: normalizePlanRequirementMethod(basePlan.requirementMethod, seedDefaults.requirementMethod),
     operatingWeekdays: normalizeWeekdays(basePlan.operatingWeekdays ?? seedDefaults.operatingWeekdays),
     holidayCalendarId: normalizeHolidayCalendarId(basePlan.holidayCalendarId, seedDefaults.holidayCalendarId),
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(basePlan.disabledHolidayRuleIds ?? seedDefaults.disabledHolidayRuleIds),

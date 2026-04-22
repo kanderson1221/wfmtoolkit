@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 
 import PlannerRandomTab from '../planner/PlannerRandomTab.vue'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 
 const AppButtonStub = {
   name: 'AppButton',
@@ -10,6 +11,10 @@ const AppButtonStub = {
 const AppSectionHeaderStub = {
   props: ['title'],
   template: '<h2>{{ title }}</h2>'
+}
+
+const AppStatusMessageStub = {
+  template: '<div><slot /></div>'
 }
 
 const AppTableNumberFieldStub = {
@@ -65,6 +70,7 @@ describe('PlannerRandomTab', () => {
           AppNumberField: true,
           AppSectionHeader: AppSectionHeaderStub,
           AppStatStrip: true,
+          AppStatusMessage: AppStatusMessageStub,
           AppTableNumberField: AppTableNumberFieldStub,
           PlannerCopyMenu: true
         }
@@ -103,6 +109,7 @@ describe('PlannerRandomTab', () => {
           AppNumberField: true,
           AppSectionHeader: AppSectionHeaderStub,
           AppStatStrip: true,
+          AppStatusMessage: AppStatusMessageStub,
           AppTableNumberField: AppTableNumberFieldStub,
           PlannerCopyMenu: true
         }
@@ -110,5 +117,50 @@ describe('PlannerRandomTab', () => {
     })
 
     expect(wrapper.text()).toContain('Monthly Overrides')
+  })
+
+  it('renames the step to Erlang Inputs and shows inherited intraday assumptions', () => {
+    const wrapper = mount(PlannerRandomTab, {
+      props: buildProps({
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        serviceLevelPercent: 80,
+        serviceLevelThresholdSeconds: 20,
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '20:00',
+        intraday: {
+          intervalLengthMinutes: 30,
+          intervalRatios: [
+            { intervalStart: '08:00', ratioPercent: 50 },
+            { intervalStart: '08:30', ratioPercent: 50 }
+          ]
+        },
+        currentDemandSourceSummary: {
+          projectName: 'FY26 Budget Forecast'
+        }
+      }),
+      global: {
+        stubs: {
+          AppButton: AppButtonStub,
+          AppCheckbox: true,
+          AppFieldGroup: true,
+          AppNumberField: true,
+          AppSectionHeader: AppSectionHeaderStub,
+          AppStatStrip: true,
+          AppStatusMessage: AppStatusMessageStub,
+          AppTableNumberField: AppTableNumberFieldStub,
+          PlannerCopyMenu: true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Erlang Inputs')
+    expect(wrapper.text()).toContain('Demand Model uses the staffing-group service goal, operating window, and 30-minute interval profile.')
+    expect(wrapper.text()).toContain('80.0% in 20 sec')
+    expect(wrapper.text()).toContain('adherence overhead applied afterward')
+    expect(wrapper.text()).toContain('08:00 to 20:00')
+    expect(wrapper.text()).toContain('2 intervals @ 30 min')
+    expect(wrapper.text()).toContain('FY26 Budget Forecast')
+    expect(wrapper.text()).toContain('Continue to Demand Model')
+    expect(wrapper.text()).not.toContain('Monthly Overrides')
   })
 })

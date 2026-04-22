@@ -1,7 +1,9 @@
 import {
   applyForecastSnapshotToPlanMonths,
+  buildForecastDailyDemandSnapshot,
   buildForecastDemandSnapshot,
   createPlanDemandSource,
+  summarizeForecastDailyDemandForOpenDays,
   summarizeForecastDemandSnapshot
 } from '../demandSources'
 
@@ -181,9 +183,17 @@ describe('planner demand sources', () => {
       forecastMonthSnapshot: [
         { monthIndex: 0, monthLabel: 'Jan 2026', monthStart: '2026-01-01', contacts: 14000, averageDailyVolume: 700, peakDailyVolume: 910 },
         { monthIndex: 1, monthLabel: 'Feb 2026', monthStart: '2026-02-01', contacts: 15500, averageDailyVolume: 775, peakDailyVolume: 930 }
+      ],
+      forecastDailySnapshot: [
+        { serviceDate: '2026-02-02', monthIndex: 1, contacts: 320 },
+        { serviceDate: '2026-01-03', monthIndex: 0, contacts: 300 }
       ]
     })
 
+    expect(demandSource.forecastDailySnapshot).toEqual([
+      { serviceDate: '2026-01-03', monthIndex: 0, monthLabel: 'Jan', contacts: 300 },
+      { serviceDate: '2026-02-02', monthIndex: 1, monthLabel: 'Feb', contacts: 320 }
+    ])
     expect(summarizeForecastDemandSnapshot(demandSource.forecastMonthSnapshot)).toMatchObject({
       matchedMonthCount: 2,
       coverageLabel: '2/12 months',
@@ -261,5 +271,79 @@ describe('planner demand sources', () => {
       }
     ])
     expect(snapshot).toHaveLength(12)
+  })
+
+  it('builds a daily forecast snapshot for the selected planning year', () => {
+    const snapshot = buildForecastDailyDemandSnapshot(
+      {
+        planningYear: 2026,
+        forecastType: 'budget',
+        planningContext: {
+          groupId: 'group-1',
+          planningYear: 2026
+        },
+        lastRun: {
+          runAt: '2026-04-08T14:00:00Z',
+          monthlyRollup: Array.from({ length: 12 }, (_, index) => ({
+            monthStart: `2026-${String(index + 1).padStart(2, '0')}-01`,
+            monthLabel: `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]} 2026`,
+            contacts: 10000 + (index * 100),
+            lowerBoundContacts: 9500 + (index * 100),
+            upperBoundContacts: 10500 + (index * 100)
+          })),
+          dailyForecast: [
+            { ds: '2025-12-31', yhat: 900, isHistory: false },
+            { ds: '2026-01-01', yhat: 1000, isHistory: true },
+            { ds: '2026-01-02', yhat: 1100, isHistory: false },
+            { ds: '2026-02-01', yhat: 1200, isHistory: false }
+          ]
+        }
+      },
+      2026
+    )
+
+    expect(snapshot).toEqual([
+      { serviceDate: '2026-01-02', monthIndex: 0, monthLabel: 'Jan', contacts: 1100 },
+      { serviceDate: '2026-02-01', monthIndex: 1, monthLabel: 'Feb', contacts: 1200 }
+    ])
+  })
+
+  it('summarizes daily forecast demand using only open days', () => {
+    const summaryByMonthIndex = summarizeForecastDailyDemandForOpenDays({
+      planningYear: 2026,
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      holidayCalendarId: 'none',
+      customHolidays: [
+        {
+          id: 'jan-second-closure',
+          label: 'Company Closure',
+          date: '2026-01-02'
+        }
+      ],
+      forecastDailySnapshot: [
+        { serviceDate: '2025-12-31', monthIndex: 11, monthLabel: 'Dec', contacts: 900 },
+        { serviceDate: '2026-01-01', monthIndex: 0, monthLabel: 'Jan', contacts: 100 },
+        { serviceDate: '2026-01-02', monthIndex: 0, monthLabel: 'Jan', contacts: 200 },
+        { serviceDate: '2026-01-03', monthIndex: 0, monthLabel: 'Jan', contacts: 300 },
+        { serviceDate: '2026-02-02', monthIndex: 1, monthLabel: 'Feb', contacts: 400 }
+      ]
+    })
+
+    expect(summaryByMonthIndex.get(0)).toMatchObject({
+      monthIndex: 0,
+      monthLabel: 'Jan',
+      contacts: 100,
+      openForecastDays: 1,
+      averageDailyVolume: 100,
+      peakDailyVolume: 100
+    })
+    expect(summaryByMonthIndex.get(1)).toMatchObject({
+      monthIndex: 1,
+      monthLabel: 'Feb',
+      contacts: 400,
+      openForecastDays: 1,
+      averageDailyVolume: 400,
+      peakDailyVolume: 400
+    })
   })
 })

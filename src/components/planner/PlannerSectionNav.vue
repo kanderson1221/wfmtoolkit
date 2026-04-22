@@ -48,6 +48,7 @@ const toneClasses = (tone, isActive) => {
     >
       <span
         v-if="group.label"
+        :data-nav-group-label="group.label.toLowerCase()"
         class="px-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
       >
         {{ group.label }}

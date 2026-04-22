@@ -129,7 +129,7 @@
   }
 
   .assumption-table {
-    @apply w-max min-w-full text-sm text-slate-700;
+    @apply min-w-full text-sm text-slate-700;
   }
 
   .assumption-table thead th {
@@ -193,15 +193,24 @@
   }
 
   .assumption-table-plan {
-    @apply w-full table-fixed;
+    @apply min-w-full table-fixed;
+    width: 100%;
+  }
+
+  .assumption-table-plan .plan-group-row th {
+    @apply border-b border-slate-200 bg-[#eef3f7] px-3.5 py-2 text-left text-[0.64rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
+  }
+
+  .assumption-table-plan .plan-group-row .plan-output-group-head {
+    @apply bg-[#e7eef4] text-[#15395f];
   }
 
   .assumption-table-plan thead th {
-    @apply px-2 py-2 text-[0.68rem];
+    @apply px-3.5 py-3 text-[0.68rem];
   }
 
   .assumption-table-plan tbody td {
-    @apply px-2 py-2 tabular-nums;
+    @apply px-3.5 py-3 tabular-nums;
   }
 
   .assumption-table-plan .month-cell {
@@ -209,36 +218,116 @@
   }
 
   .assumption-table-plan .assumption-month-btn {
-    @apply px-1.5 py-0.5 text-[0.88rem];
+    @apply px-2 py-1 text-[0.9rem];
   }
 
-  .assumption-table-plan input:not([type="checkbox"]) {
-    @apply min-w-0 px-1.5 py-1 text-[0.88rem];
+  .assumption-table-plan .plan-output-head-label {
+    @apply text-[#15395f];
   }
 
-  .plan-col-month {
-    width: 4.5rem;
+  .assumption-table-plan .plan-output-cell {
+    @apply bg-slate-50/70;
   }
 
-  .plan-col-input,
-  .plan-col-value {
-    width: 4.9rem;
+  .assumption-table-plan--standard {
+    min-width: 76rem;
+    table-layout: auto;
   }
 
-  .plan-col-input-contacts {
-    width: 4.25rem;
+  .assumption-table-plan--standard thead th {
+    @apply px-4 py-3.5;
   }
 
-  .plan-col-input-aht {
-    width: 4rem;
+  .assumption-table-plan--standard tbody td {
+    @apply px-4 py-3.5;
   }
 
-  .plan-col-input-peak {
+  .assumption-table-plan--intraday {
+    min-width: 88rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-month,
+  .assumption-table-plan--intraday .plan-col-month {
+    width: 5.25rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-input,
+  .assumption-table-plan--intraday .plan-col-input {
+    width: 5.85rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-input-contacts {
+    width: 6rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-input-aht {
+    width: 6.5rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-input-peak {
+    width: 6.75rem;
+  }
+
+  .assumption-table-plan--intraday .plan-col-input-contacts {
+    width: 5rem;
+  }
+
+  .assumption-table-plan--intraday .plan-col-input-aht {
     width: 4.75rem;
   }
 
-  .plan-col-result {
-    width: 5.4rem;
+  .assumption-table-plan .plan-col-context-days {
+    width: 5.35rem;
+  }
+
+  .assumption-table-plan .plan-col-context-daily {
+    width: 6.2rem;
+  }
+
+  .assumption-table-plan .plan-col-context-scheduled,
+  .assumption-table-plan .plan-col-context-random,
+  .assumption-table-plan .plan-col-context-design {
+    width: 5.35rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-context-scheduled,
+  .assumption-table-plan--standard .plan-col-context-random,
+  .assumption-table-plan--standard .plan-col-context-design {
+    width: 6rem;
+  }
+
+  .assumption-table-plan .plan-col-context-ratio {
+    width: 5.8rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-context-ratio {
+    width: 6.25rem;
+  }
+
+  .assumption-table-plan .plan-col-output-workload,
+  .assumption-table-plan .plan-col-output-erlang,
+  .assumption-table-plan .plan-col-output-required {
+    width: 6.4rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-output-workload,
+  .assumption-table-plan--standard .plan-col-output-required,
+  .assumption-table-plan--standard .plan-col-output-average {
+    width: 6.75rem;
+  }
+
+  .assumption-table-plan .plan-col-output-occupancy,
+  .assumption-table-plan .plan-col-output-service,
+  .assumption-table-plan .plan-col-output-average {
+    width: 6.1rem;
+  }
+
+  .assumption-table-plan .plan-col-output-peak {
+    width: 8.1rem;
+  }
+
+  .assumption-table-plan--standard .plan-col-output-peak {
+    width: 8.5rem;
   }
 
   .assumption-table-staffing {
