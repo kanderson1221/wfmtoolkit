@@ -137,4 +137,28 @@ describe('computeMonthlyRecords peak planning', () => {
     expect(januaryMonth.peakDayUpliftPercent).toBe(60)
     expect(januaryMonth.workloadHours).toBeCloseTo((500 * 300) / 3600, 5)
   })
+
+  it('uses forecast-owned monthly AHT when daily forecast demand is applied', () => {
+    const januaryMonth = computeMonthlyRecords({
+      ...basePayload,
+      demandSource: {
+        mode: 'forecast',
+        forecastDailySnapshot: [
+          { serviceDate: '2026-01-02', monthIndex: 0, monthLabel: 'Jan', contacts: 200 },
+          { serviceDate: '2026-01-05', monthIndex: 0, monthLabel: 'Jan', contacts: 300 }
+        ],
+        forecastMonthSnapshot: [
+          { monthIndex: 0, monthLabel: 'Jan 2026', contacts: 500, ahtSeconds: 420 }
+        ]
+      },
+      planMonths: basePayload.planMonths.map((month, monthIndex) => ({
+        ...month,
+        ahtSeconds: monthIndex === 0 ? 300 : month.ahtSeconds
+      }))
+    })[0]
+
+    expect(januaryMonth.contacts).toBe(500)
+    expect(januaryMonth.ahtSeconds).toBe(420)
+    expect(januaryMonth.workloadHours).toBeCloseTo((500 * 420) / 3600, 5)
+  })
 })

@@ -1,5 +1,5 @@
 import { FULL_MONTH_LABELS, MONTH_LABELS, buildStaffingMonths, createTrainingSettings } from '../shared'
-import { computeStaffingRecords, recommendTrainingClasses } from '../staffingModel'
+import { computeStaffingRecords, deriveTrainingClassMetrics, recommendTrainingClasses } from '../staffingModel'
 
 const buildMonthlyRecords = (requirements = {}) =>
   MONTH_LABELS.map((label, monthIndex) => ({
@@ -12,6 +12,56 @@ const buildMonthlyRecords = (requirements = {}) =>
   }))
 
 describe('staffingModel', () => {
+  it('extends training over weekday holidays while keeping a Monday-Friday calendar', () => {
+    const metrics = deriveTrainingClassMetrics(
+      {
+        hireDate: '2026-12-22',
+        hireCount: 10
+      },
+      createTrainingSettings({
+        trainingDurationWorkdays: 4,
+        postTrainingNestingDays: 1
+      }),
+      {
+        customHolidays: [
+          { id: 'christmas', label: 'Christmas Day', date: '2026-12-25' }
+        ]
+      }
+    )
+
+    expect(metrics.graduationDate.toISOString().slice(0, 10)).toBe('2026-12-28')
+    expect(metrics.frontlineReadyDate.toISOString().slice(0, 10)).toBe('2026-12-29')
+  })
+
+  it('backs recommended class starts up over weekday holidays', () => {
+    const recommendations = recommendTrainingClasses({
+      monthlyRecords: buildMonthlyRecords({
+        1: 10
+      }),
+      planningYear: 2026,
+      startingHeadcount: 0,
+      startingFrontlineHeadcount: 0,
+      staffingMonths: buildStaffingMonths(),
+      trainingClasses: [],
+      trainingSettings: createTrainingSettings({
+        trainingDurationWorkdays: 5,
+        postTrainingNestingDays: 0,
+        graduationYieldPercent: 100,
+        availableTrainers: 1,
+        maxClassSize: 10,
+        startOnFirstBusinessDayOfWeek: false
+      }),
+      trainingCalendar: {
+        customHolidays: [
+          { id: 'january-holiday', label: 'January Holiday', date: '2026-01-28' }
+        ]
+      }
+    })
+
+    expect(recommendations).toHaveLength(1)
+    expect(recommendations[0].hireDate).toBe('2026-01-23')
+  })
+
   it('uses prior-year carry-in classes in January without counting them as next-year hires', () => {
     const staffingRecords = computeStaffingRecords(
       buildMonthlyRecords(),

@@ -158,17 +158,22 @@ def plan_intraday_monthly_rows(
     for metadata, interval_plan in zip(normalized_rows, interval_plans):
         month_index = int(metadata["month_index"])
         service_date = str(metadata["service_date"])
-        interval_hours = interval_plan.required_staff_net * (
-            float(metadata["interval_duration_seconds"]) / 3600.0
-        )
+        interval_duration_hours = float(metadata["interval_duration_seconds"]) / 3600.0
+        calls_offered = float(metadata["calls_offered"])
+        average_handle_time_seconds = float(metadata["average_handle_time_seconds"])
+        workload_hours = calls_offered * average_handle_time_seconds / 3600.0
+        interval_hours = interval_plan.required_staff_net * interval_duration_hours
 
         interval_payload_rows.append(
             {
                 "monthIndex": month_index,
                 "serviceDate": service_date,
                 "intervalStart": interval_plan.interval_start,
+                "callsOffered": calls_offered,
+                "averageHandleTimeSeconds": average_handle_time_seconds,
+                "workloadHours": round(workload_hours, 6),
                 "requiredStaffNet": interval_plan.required_staff_net,
-                "requiredStaffGross": interval_plan.required_staff_gross,
+                "laborHoursNet": round(interval_hours, 6),
                 "serviceLevel": interval_plan.service_level,
                 "occupancy": interval_plan.occupancy,
                 "averageSpeedOfAnswerSeconds": interval_plan.average_speed_of_answer_seconds,
@@ -231,9 +236,7 @@ def plan_intraday_monthly_rows(
                 "serviceDate": daily_plan.service_date,
                 "intervalCount": daily_plan.interval_count,
                 "totalLaborHoursNet": daily_plan.total_labor_hours_net,
-                "totalLaborHoursGross": daily_plan.total_labor_hours_gross,
                 "peakStaffNet": daily_plan.peak_staff_net,
-                "peakStaffGross": daily_plan.peak_staff_gross,
             }
         )
 

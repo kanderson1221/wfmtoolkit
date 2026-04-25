@@ -198,7 +198,8 @@
   }
 
   .assumption-table-plan .plan-group-row th {
-    @apply border-b border-slate-200 bg-[#eef3f7] px-3.5 py-2 text-left text-[0.64rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
+    @apply border-b border-slate-200 bg-[#eef3f7] px-4 py-2.5 text-left text-[0.64rem] font-semibold uppercase tracking-normal text-slate-500;
+    letter-spacing: 0;
   }
 
   .assumption-table-plan .plan-group-row .plan-output-group-head {
@@ -206,11 +207,13 @@
   }
 
   .assumption-table-plan thead th {
-    @apply px-3.5 py-3 text-[0.68rem];
+    @apply px-3.5 py-3.5 text-[0.68rem] tracking-normal;
+    letter-spacing: 0;
+    line-height: 1.05rem;
   }
 
   .assumption-table-plan tbody td {
-    @apply px-3.5 py-3 tabular-nums;
+    @apply px-3.5 py-3.5 tabular-nums;
   }
 
   .assumption-table-plan .month-cell {
@@ -225,12 +228,58 @@
     @apply text-[#15395f];
   }
 
+  .assumption-table-plan .plan-head-label {
+    min-width: max-content;
+  }
+
   .assumption-table-plan .plan-output-cell {
     @apply bg-slate-50/70;
   }
 
+  .assumption-table-plan thead th.plan-adjustable-head {
+    @apply bg-[#f4f8fb] text-[#15395f];
+    box-shadow: inset 0 -1px 0 #c3d2df;
+  }
+
+  .plan-head-cell {
+    @apply inline-flex items-start justify-center gap-1.5 text-center;
+  }
+
+  .plan-head-cell-select {
+    @apply w-full items-center justify-between gap-1.5;
+  }
+
+  .assumption-table-plan thead .plan-head-select {
+    @apply min-w-0 flex-1 rounded-none border-0 bg-transparent py-0 pl-0 pr-3 shadow-none outline-none ring-0 focus:border-transparent focus:bg-transparent focus:ring-0;
+    appearance: none;
+    -webkit-appearance: none;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1rem;
+    text-transform: uppercase;
+    color: #15395f;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2315395f' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right center;
+    background-repeat: no-repeat;
+    background-size: 10px 6px;
+    text-align: center;
+    text-align-last: center;
+  }
+
+  .assumption-table-plan thead .plan-head-select:focus {
+    border: 0;
+    background-color: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+
+  .plan-head-info {
+    @apply mt-0.5;
+  }
+
   .assumption-table-plan--standard {
-    min-width: 76rem;
+    min-width: 84rem;
     table-layout: auto;
   }
 
@@ -243,41 +292,97 @@
   }
 
   .assumption-table-plan--intraday {
-    min-width: 88rem;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .assumption-table-plan--intraday thead th {
+    @apply px-2 py-3 text-[0.66rem];
+    white-space: nowrap;
+  }
+
+  .assumption-table-plan--intraday tbody td {
+    @apply px-2 py-3;
+  }
+
+  .assumption-table-plan--intraday .plan-head-label {
+    min-width: 0;
+  }
+
+  .assumption-table-plan--intraday .assumption-month-btn {
+    @apply px-1.5 text-[0.86rem];
   }
 
   .assumption-table-plan--standard .plan-col-month,
-  .assumption-table-plan--intraday .plan-col-month {
-    width: 5.25rem;
+  .assumption-table-plan .plan-col-month {
+    width: 5.5rem;
   }
 
   .assumption-table-plan--standard .plan-col-input,
-  .assumption-table-plan--intraday .plan-col-input {
-    width: 5.85rem;
+  .assumption-table-plan .plan-col-input {
+    width: 6.4rem;
   }
 
   .assumption-table-plan--standard .plan-col-input-contacts {
-    width: 6rem;
+    width: 6.6rem;
   }
 
   .assumption-table-plan--standard .plan-col-input-aht {
-    width: 6.5rem;
+    width: 6.8rem;
   }
 
   .assumption-table-plan--standard .plan-col-input-peak {
-    width: 6.75rem;
+    width: 7.4rem;
   }
 
-  .assumption-table-plan--intraday .plan-col-input-contacts {
-    width: 5rem;
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-input-contacts {
+    width: 5%;
   }
 
-  .assumption-table-plan--intraday .plan-col-input-aht {
-    width: 4.75rem;
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-input-aht {
+    width: 4.1%;
+  }
+
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-month {
+    width: 4.2%;
+  }
+
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-context-days {
+    width: 4.3%;
+  }
+
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-context-scheduled,
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-context-random,
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-context-design {
+    width: 5.4%;
+  }
+
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-context-ratio {
+    width: 5.8%;
+  }
+
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-output-workload,
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-output-erlang,
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-output-required {
+    width: 6.5%;
+  }
+
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-output-base {
+    width: 5%;
+  }
+
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-output-occupancy,
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-output-service,
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-output-average {
+    width: 5.2%;
+  }
+
+  .assumption-table-plan.assumption-table-plan--intraday .plan-col-output-peak {
+    width: 8.4%;
   }
 
   .assumption-table-plan .plan-col-context-days {
-    width: 5.35rem;
+    width: 6rem;
   }
 
   .assumption-table-plan .plan-col-context-daily {
@@ -287,47 +392,48 @@
   .assumption-table-plan .plan-col-context-scheduled,
   .assumption-table-plan .plan-col-context-random,
   .assumption-table-plan .plan-col-context-design {
-    width: 5.35rem;
+    width: 5.9rem;
   }
 
   .assumption-table-plan--standard .plan-col-context-scheduled,
   .assumption-table-plan--standard .plan-col-context-random,
   .assumption-table-plan--standard .plan-col-context-design {
-    width: 6rem;
+    width: 6.5rem;
   }
 
   .assumption-table-plan .plan-col-context-ratio {
-    width: 5.8rem;
+    width: 6.9rem;
   }
 
   .assumption-table-plan--standard .plan-col-context-ratio {
-    width: 6.25rem;
+    width: 7rem;
   }
 
   .assumption-table-plan .plan-col-output-workload,
   .assumption-table-plan .plan-col-output-erlang,
+  .assumption-table-plan .plan-col-output-base,
   .assumption-table-plan .plan-col-output-required {
-    width: 6.4rem;
+    width: 7.25rem;
   }
 
   .assumption-table-plan--standard .plan-col-output-workload,
   .assumption-table-plan--standard .plan-col-output-required,
   .assumption-table-plan--standard .plan-col-output-average {
-    width: 6.75rem;
+    width: 7.25rem;
   }
 
   .assumption-table-plan .plan-col-output-occupancy,
   .assumption-table-plan .plan-col-output-service,
   .assumption-table-plan .plan-col-output-average {
-    width: 6.1rem;
+    width: 7rem;
   }
 
   .assumption-table-plan .plan-col-output-peak {
-    width: 8.1rem;
+    width: 12rem;
   }
 
   .assumption-table-plan--standard .plan-col-output-peak {
-    width: 8.5rem;
+    width: 9rem;
   }
 
   .assumption-table-staffing {
@@ -792,16 +898,20 @@
     @apply text-sm leading-6 text-slate-600;
   }
 
+  .training-pipeline-header {
+    @apply flex flex-col gap-3 rounded-[20px] border border-slate-200 bg-white px-4 py-3 transition hover:border-[#c3d2df];
+  }
+
+  .training-pipeline-header-open {
+    @apply rounded-b-none border-b-0 pb-3;
+  }
+
   .training-class-toolbar {
-    @apply pb-1;
+    @apply flex flex-wrap items-center gap-3;
   }
 
   .training-pipeline-toggle {
-    @apply flex w-full items-center justify-between rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-[#c3d2df] hover:bg-[#f8fafc];
-  }
-
-  .training-pipeline-toggle-open {
-    @apply rounded-b-none border-b-0;
+    @apply flex w-full min-w-0 items-start justify-between text-left;
   }
 
   .training-pipeline-toggle-icon {
@@ -809,7 +919,7 @@
   }
 
   .training-pipeline-content {
-    @apply grid gap-3 rounded-b-[20px] border border-slate-200 border-t-0 bg-white px-4 py-4;
+    @apply grid gap-3 rounded-b-[20px] border border-slate-200 border-t-0 bg-white px-4 py-3;
   }
 
   .training-pipeline-shell {
@@ -862,6 +972,16 @@
 
   .training-empty-state {
     @apply py-8 text-center text-sm leading-6 text-slate-600;
+  }
+
+  @media (min-width: 1024px) {
+    .training-pipeline-header {
+      @apply flex-row items-start justify-between gap-4;
+    }
+
+    .training-class-toolbar {
+      @apply shrink-0 justify-end;
+    }
   }
 
   .training-action-cell {

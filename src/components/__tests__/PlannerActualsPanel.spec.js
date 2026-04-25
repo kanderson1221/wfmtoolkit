@@ -12,12 +12,6 @@ describe('PlannerActualsPanel', () => {
 
     const wrapper = mount(PlannerActualsPanel, {
       props: {
-        actualsMonths: [
-          {
-            actualContacts: 10200,
-            actualAhtSeconds: 310
-          }
-        ],
         actualsRecords: [
           {
             monthIndex: 0,
@@ -25,7 +19,9 @@ describe('PlannerActualsPanel', () => {
             fullLabel: 'January',
             isLoaded: true,
             plannedContacts: 10000,
+            actualContacts: 10200,
             plannedAhtSeconds: 300,
+            actualAhtSeconds: 310,
             plannedWorkloadHours: 833.3,
             actualWorkloadHours: 878.3,
             actualRequiredHeadcount: 11.2,
@@ -74,9 +70,9 @@ describe('PlannerActualsPanel', () => {
     expect(wrapper.text()).toContain('300')
 
     const metricSelect = wrapper.get('select[aria-label="Planned staffing headcount metric"]')
-    const actualContactsInput = wrapper.get('input[aria-label="Actual contacts"]')
 
-    expect(actualContactsInput.element.value).toBe('10,200')
+    expect(wrapper.find('input[aria-label="Actual contacts"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('10,200')
     expect(wrapper.text()).toContain('12.0')
     expect(wrapper.text()).toContain('0.8')
 

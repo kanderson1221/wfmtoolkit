@@ -118,7 +118,6 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
   const planPresenceMonthRows = []
   const planRandomMonthRows = []
   const planDemandMonthRows = []
-  const planActualMonthRows = []
   const planStaffingMonthRows = []
   const planTrainingClassRows = []
 
@@ -241,15 +240,6 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
             ...clonePlain(month)
           })
         })
-        ;(plan.actualsMonths || []).forEach((month, monthIndex) => {
-          planActualMonthRows.push({
-            scope: normalizedScope,
-            id: buildPlanRowId(plan.id, 'actuals', monthIndex),
-            planId: plan.id,
-            monthIndex,
-            ...clonePlain(month)
-          })
-        })
         ;(plan.staffingMonths || []).forEach((month, monthIndex) => {
           planStaffingMonthRows.push({
             scope: normalizedScope,
@@ -281,7 +271,6 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
     planPresenceMonthRows,
     planRandomMonthRows,
     planDemandMonthRows,
-    planActualMonthRows,
     planStaffingMonthRows,
     planTrainingClassRows
   }
@@ -326,7 +315,6 @@ const hydratePlanningWorkspace = (scope, rows) => {
   const presenceByPlanId = monthRowsByPlanId(rows.planPresenceMonthRows)
   const randomByPlanId = monthRowsByPlanId(rows.planRandomMonthRows)
   const demandByPlanId = monthRowsByPlanId(rows.planDemandMonthRows)
-  const actualsByPlanId = monthRowsByPlanId(rows.planActualMonthRows)
   const staffingByPlanId = monthRowsByPlanId(rows.planStaffingMonthRows)
   const trainingByPlanId = monthRowsByPlanId(rows.planTrainingClassRows)
 
@@ -365,9 +353,6 @@ const hydratePlanningWorkspace = (scope, rows) => {
           .sort((left, right) => left.monthIndex - right.monthIndex)
           .map(({ id: _id, scope: _scope, planId: _planId, monthIndex: _monthIndex, ...month }) => month),
         planMonths: (demandByPlanId.get(row.id) || [])
-          .sort((left, right) => left.monthIndex - right.monthIndex)
-          .map(({ id: _id, scope: _scope, planId: _planId, monthIndex: _monthIndex, ...month }) => month),
-        actualsMonths: (actualsByPlanId.get(row.id) || [])
           .sort((left, right) => left.monthIndex - right.monthIndex)
           .map(({ id: _id, scope: _scope, planId: _planId, monthIndex: _monthIndex, ...month }) => month),
         staffingMonths: (staffingByPlanId.get(row.id) || [])
@@ -768,7 +753,6 @@ const writePlanningWorkspaceRows = async (centers, scope = DEFAULT_SCOPE) => {
     flattened.planPresenceMonthRows.length ? wfmDexie.planPresenceMonths.bulkPut(flattened.planPresenceMonthRows) : Promise.resolve(),
     flattened.planRandomMonthRows.length ? wfmDexie.planRandomMonths.bulkPut(flattened.planRandomMonthRows) : Promise.resolve(),
     flattened.planDemandMonthRows.length ? wfmDexie.planDemandMonths.bulkPut(flattened.planDemandMonthRows) : Promise.resolve(),
-    flattened.planActualMonthRows.length ? wfmDexie.planActualMonths.bulkPut(flattened.planActualMonthRows) : Promise.resolve(),
     flattened.planStaffingMonthRows.length ? wfmDexie.planStaffingMonths.bulkPut(flattened.planStaffingMonthRows) : Promise.resolve(),
     flattened.planTrainingClassRows.length ? wfmDexie.planTrainingClasses.bulkPut(flattened.planTrainingClassRows) : Promise.resolve()
   ])
@@ -1153,7 +1137,6 @@ export const loadPlanningWorkspaceFromDexie = async (scope = DEFAULT_SCOPE) => {
       planPresenceMonthRows,
       planRandomMonthRows,
       planDemandMonthRows,
-      planActualMonthRows,
       planStaffingMonthRows,
       planTrainingClassRows
     ] = await Promise.all([
@@ -1165,7 +1148,6 @@ export const loadPlanningWorkspaceFromDexie = async (scope = DEFAULT_SCOPE) => {
       getScopeRows(wfmDexie.planPresenceMonths, normalizedScope),
       getScopeRows(wfmDexie.planRandomMonths, normalizedScope),
       getScopeRows(wfmDexie.planDemandMonths, normalizedScope),
-      getScopeRows(wfmDexie.planActualMonths, normalizedScope),
       getScopeRows(wfmDexie.planStaffingMonths, normalizedScope),
       getScopeRows(wfmDexie.planTrainingClasses, normalizedScope)
     ])
@@ -1179,7 +1161,6 @@ export const loadPlanningWorkspaceFromDexie = async (scope = DEFAULT_SCOPE) => {
       planPresenceMonthRows,
       planRandomMonthRows,
       planDemandMonthRows,
-      planActualMonthRows,
       planStaffingMonthRows,
       planTrainingClassRows
     })

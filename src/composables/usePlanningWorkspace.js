@@ -19,6 +19,7 @@ import {
   HOLIDAY_SCHEDULE_CLOSED,
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
+import { createPlanningGroupActuals } from '../planner/groupActuals'
 import { buildForecastTrainingSeedFromPlanningGroupActuals } from '../planner/groupActualsForecastSeed'
 import {
   findLinkedPriorPlan,
@@ -181,6 +182,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       serviceLevelPercent: currentGroup.value.serviceLevelPercent,
       serviceLevelThresholdSeconds: currentGroup.value.serviceLevelThresholdSeconds,
       intraday: currentGroup.value.intraday ? { ...currentGroup.value.intraday } : null,
+      actuals: createPlanningGroupActuals(currentGroup.value.actuals),
       startingHeadcount: seededStartingPosition.rosterHeadcount,
       startingFrontlineHeadcount: seededStartingPosition.frontlineHeadcount,
       presenceMonths: Array.from({ length: 12 }, () => ({

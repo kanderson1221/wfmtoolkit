@@ -73,7 +73,17 @@ describe('usePlannerIntradayErlang', () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
-          intervalPlans: [],
+          intervalPlans: [
+            {
+              monthIndex: 0,
+              serviceDate: '2026-01-02',
+              intervalStart: '2026-01-02T08:00:00',
+              intervalLengthMinutes: 30,
+              requiredStaffNet: 13,
+              serviceLevel: 0.83,
+              occupancy: 0.72
+            }
+          ],
           dailyPlans: [],
           monthlyPlans: [
             {
@@ -102,6 +112,13 @@ describe('usePlannerIntradayErlang', () => {
       weightedOccupancyPercent: 82.7,
       weightedServiceLevelPercent: 78.4,
       peakIntervalRequiredHeadcount: 7
+    })
+    expect(result.intervalOutputs.value[0]).toMatchObject({
+      callsOffered: 50,
+      averageHandleTimeSeconds: 300,
+      workloadHours: 4.166667,
+      requiredStaffNet: 13,
+      laborHoursNet: 6.5
     })
   })
 

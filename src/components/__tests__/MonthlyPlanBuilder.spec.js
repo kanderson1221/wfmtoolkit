@@ -9,21 +9,6 @@ import { clearLocalDataStore } from '../../storage/localDataStore'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 
 const plannerStubs = {
-  PlannerOverviewPanel: {
-    props: ['sectionCards', 'nextRecommendation'],
-    template: `
-      <div data-test="overview-panel">
-        <div data-test="next-recommendation">{{ nextRecommendation?.title || '' }}</div>
-        <div
-          v-for="card in sectionCards"
-          :key="card.id"
-          :data-card-id="card.id"
-        >
-          {{ card.statusLabel }}
-        </div>
-      </div>
-    `
-  },
   PlannerForecastPanel: {
     props: ['hasLegacyManualDemandSource', 'currentDemandSourceSummary'],
     template: '<div data-test="planner-forecast-panel">planner-forecast {{ hasLegacyManualDemandSource ? "legacy" : "saved" }}</div>'
@@ -103,9 +88,10 @@ const mountBuilder = async (props = {}) => {
     await flushPromises()
 
     if (
-      wrapper.find('[data-test="overview-panel"]').exists() ||
       wrapper.find('[data-test="presence-tab"]').exists() ||
-      wrapper.find('[data-test="planner-forecast-panel"]').exists()
+      wrapper.find('[data-test="planner-forecast-panel"]').exists() ||
+      wrapper.find('[data-test="random-tab"]').exists() ||
+      wrapper.find('[data-test="plan-tab"]').exists()
     ) {
       break
     }
@@ -149,7 +135,8 @@ describe('MonthlyPlanBuilder', () => {
       prefilledYear: 2026
     })
 
-    expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="planner-forecast-panel"]').exists()).toBe(true)
+    expect(wrapper.vm.builder.activeSection).toBe('forecast')
     expect(wrapper.vm.builder.demandSource.mode).toBe('manual')
     expect(wrapper.vm.builder.demandSourceSummary).toBeNull()
     expect(wrapper.vm.builder.selectedForecastProjectId).toBe('')
@@ -158,7 +145,7 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.get('[data-section-id="requirement"]').text()).toContain('Demand Model')
   })
 
-  it('orders the planner nav with plan status and forecasts first under the plan section', async () => {
+  it('orders the planner nav with forecasts first under the plan section', async () => {
     const wrapper = await mountBuilder({
       draftKey: 'new-plan',
       prefilledYear: 2026
@@ -170,7 +157,7 @@ describe('MonthlyPlanBuilder', () => {
 
     expect(
       wrapper.findAll('[data-section-id]').map((node) => node.attributes('data-section-id'))
-    ).toEqual(['overview', 'forecast', 'availability', 'variability', 'requirement', 'staffing', 'actuals'])
+    ).toEqual(['forecast', 'availability', 'variability', 'requirement', 'staffing', 'actuals'])
   })
 
   it('starts a fresh new intraday Erlang plan even when a scoped draft exists', async () => {
@@ -201,27 +188,11 @@ describe('MonthlyPlanBuilder', () => {
     })
 
     expect(loadDraftSpy).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(true)
-    expect(wrapper.vm.builder.activeSection).toBe('overview')
+    expect(wrapper.find('[data-test="planner-forecast-panel"]').exists()).toBe(true)
+    expect(wrapper.vm.builder.activeSection).toBe('forecast')
     expect(wrapper.vm.builder.demandSource.mode).toBe('manual')
     expect(wrapper.vm.builder.demandSourceSummary).toBeNull()
     expect(wrapper.vm.builder.selectedForecastProjectId).toBe('')
-  })
-
-  it('treats inherited defaults as pending review until the section is opened', async () => {
-    const wrapper = await mountBuilder({
-      draftKey: 'new-plan',
-      prefilledYear: 2026
-    })
-
-    expect(wrapper.find('[data-test="next-recommendation"]').text()).toBe('Agent Availability')
-    expect(wrapper.find('[data-card-id="availability"]').text()).toBe('Using defaults')
-    expect(wrapper.find('[data-card-id="variability"]').text()).toBe('Using defaults')
-
-    await wrapper.find('[data-section-id="availability"]').trigger('click')
-    await wrapper.find('[data-section-id="overview"]').trigger('click')
-
-    expect(wrapper.find('[data-card-id="availability"]').text()).toBe('12/12 months')
   })
 
   it('shows only the import-focused forecast panel inside the plan workflow', async () => {
@@ -234,13 +205,8 @@ describe('MonthlyPlanBuilder', () => {
       }
     })
 
-    expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(true)
-
-    await wrapper.find('[data-section-id="forecast"]').trigger('click')
-
     expect(wrapper.find('[data-test="planner-forecast-panel"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="planner-forecast-panel"]').text()).toContain('legacy')
-    expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(false)
 
     await wrapper.find('[data-section-id="availability"]').trigger('click')
 
@@ -483,7 +449,7 @@ describe('MonthlyPlanBuilder', () => {
     })
 
     expect(loadDraftSpy).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-test="overview-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="planner-forecast-panel"]').exists()).toBe(true)
   })
 
   it('clears the scoped new-plan draft before emitting save for a new intraday Erlang plan', async () => {
@@ -745,9 +711,10 @@ describe('MonthlyPlanBuilder', () => {
       },
       global: {
         stubs: {
-          PlannerOverviewPanel: plannerStubs.PlannerOverviewPanel,
+          PlannerForecastPanel: plannerStubs.PlannerForecastPanel,
           PlannerPresenceTab: plannerStubs.PlannerPresenceTab,
           PlannerRandomTab: plannerStubs.PlannerRandomTab,
+          PlannerMonthlyPlanTab: plannerStubs.PlannerMonthlyPlanTab,
           PlannerStaffingPlanTab: plannerStubs.PlannerStaffingPlanTab,
           PlannerActualsPanel: plannerStubs.PlannerActualsPanel
         }
@@ -766,8 +733,10 @@ describe('MonthlyPlanBuilder', () => {
     wrapper.vm.builder.selectedForecastProjectId = 'forecast-1'
     await flushPromises()
 
-    wrapper.vm.builder.applyForecastToDemand()
+    expect(wrapper.vm.builder.applyForecastToDemand()).toBe(true)
     await flushPromises()
+
+    expect(wrapper.vm.builder.forecastApplyMessage).toContain('Applied 2026 Demand Forecast')
 
     await findButtonByText(wrapper, 'Save Plan').trigger('click')
 
@@ -852,6 +821,82 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.vm.builder.forecastSelectOptions.some((option) => option.value === 'forecast-1')).toBe(true)
     expect(wrapper.vm.builder.selectedForecastProjectId).toBe('')
     expect(wrapper.vm.builder.forecastCanApply).toBe(false)
+  })
+
+  it('reselects the applied forecast when reopening a saved forecast-sourced plan', async () => {
+    const monthlyRollup = Array.from({ length: 12 }, (_, index) => {
+      const monthNumber = index + 1
+      const monthStart = `2026-${String(monthNumber).padStart(2, '0')}-01`
+      const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(new Date(`${monthStart}T00:00:00Z`))
+
+      return {
+        monthStart,
+        monthLabel,
+        contacts: 14000 + (index * 100),
+        averageDailyVolume: 700 + (index * 5),
+        peakDailyVolume: 900 + (index * 5),
+        lowerBoundContacts: 13200 + (index * 100),
+        upperBoundContacts: 14800 + (index * 100)
+      }
+    })
+
+    vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
+      projects: [
+        {
+          id: 'forecast-1',
+          name: '2026 Demand Forecast',
+          planningYear: 2026,
+          forecastType: 'budget',
+          planningContext: {
+            groupId: 'group-1',
+            planningYear: 2026
+          },
+          lastRun: {
+            runAt: '2026-01-10T12:00:00.000Z',
+            monthlyRollup,
+            components: {},
+            diagnostics: {},
+            summary: {
+              forecastDateRange: '2026-01-01 to 2026-12-31'
+            }
+          }
+        }
+      ],
+      error: null
+    })
+
+    const wrapper = await mountBuilder({
+      draftKey: 'saved-forecast-plan',
+      prefilledYear: 2026,
+      storageScope: 'saved-forecast-plan-spec',
+      initialPlan: {
+        id: 'saved-forecast-plan',
+        name: '2026 Plan',
+        planningYear: 2026,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-1',
+          forecastProjectName: '2026 Demand Forecast',
+          importedAt: '2026-02-01T12:00:00.000Z',
+          forecastMonthSnapshot: monthlyRollup.map((row, index) => ({
+            monthIndex: index,
+            monthLabel: row.monthLabel,
+            monthStart: row.monthStart,
+            contacts: row.contacts
+          }))
+        })
+      }
+    })
+
+    await wrapper.find('[data-section-id="forecast"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.builder.forecastSelectOptions.some((option) => option.value === 'forecast-1')).toBe(true)
+    expect(wrapper.vm.builder.selectedForecastProjectId).toBe('forecast-1')
+    expect(wrapper.vm.builder.forecastCanApply).toBe(true)
+
+    expect(wrapper.vm.builder.applyForecastToDemand()).toBe(true)
+    expect(wrapper.vm.builder.forecastApplyMessage).toContain('Reapplied 2026 Demand Forecast')
   })
 
   it('shows a subtle warning when the plan references a deleted forecast source', async () => {

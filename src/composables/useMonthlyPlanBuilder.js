@@ -5,7 +5,7 @@ import {
   MONTH_LABELS,
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_SCHEDULE_CLOSED,
-  buildActualsMonths,
+  buildActualsMonthsFromDailyRows,
   buildPlanMonths,
   buildStaffingMonths,
   buildTrainingClasses,
@@ -16,7 +16,7 @@ import {
   createNextYearOpening,
   buildInheritedTrainingClasses,
   createPlanMonth,
-  createActualsMonth,
+  createPlanningGroupActuals,
   createPresenceMonth,
   createRandomMonth,
   createStaffingMonth,
@@ -45,6 +45,7 @@ import { mergeIntradayErlangMonthlyRecords } from '../planner/intradayErlang'
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
 import { buildExamplePlannerState } from './monthlyPlanBuilder/examplePlan'
 import { usePlannerAutosave } from './monthlyPlanBuilder/usePlannerAutosave'
+import { usePlannerActualsIntradayErlang } from './monthlyPlanBuilder/usePlannerActualsIntradayErlang'
 import { usePlannerForecastDemandSource } from './monthlyPlanBuilder/usePlannerForecastDemandSource'
 import { usePlannerIntradayErlang } from './monthlyPlanBuilder/usePlannerIntradayErlang'
 import {
@@ -143,7 +144,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     })()
     const normalizedInitialSection = (() => {
       if (
-        initialUi.activeSection === 'overview' ||
+        initialUi.activeSection === 'forecast' ||
         initialUi.activeSection === 'availability' ||
         initialUi.activeSection === 'variability' ||
         initialUi.activeSection === 'requirement' ||
@@ -153,12 +154,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
         return initialUi.activeSection
       }
 
-      if (initialUi.activeSection === 'forecast') {
-        return normalizedInitialForecastStep
-      }
-
-      if (initialUi.activeSection === 'budget' || initialUi.activeSection === 'review') {
-        return 'overview'
+      if (initialUi.activeSection === 'overview' || initialUi.activeSection === 'budget' || initialUi.activeSection === 'review') {
+        return 'forecast'
       }
 
       if (initialUi.activeMode === 'staffing') {
@@ -173,7 +170,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
         return 'requirement'
       }
 
-      return 'overview'
+      return 'forecast'
     })()
 
     return {
@@ -204,7 +201,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planMonths.value = bootstrapState.initialState.planMonths.map((month) => createPlanMonth(month))
     demandSource.value = createPlanDemandSource(bootstrapState.initialState.demandSource)
     selectedForecastProjectId.value = bootstrapState.selectedForecastProjectId
-    actualsMonths.value = bootstrapState.initialState.actualsMonths.map((month) => createActualsMonth(month))
     trainingSettings.value = createTrainingSettings(bootstrapState.initialState.trainingSettings)
     nextYearOpening.value = createNextYearOpening(bootstrapState.initialState.nextYearOpening)
     startingHeadcount.value = bootstrapState.initialState.startingHeadcount
@@ -240,7 +236,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const planMonths = ref(initialBootstrapState.initialState.planMonths.map((month) => createPlanMonth(month)))
   const demandSource = ref(createPlanDemandSource(initialBootstrapState.initialState.demandSource))
   const selectedForecastProjectId = ref(initialBootstrapState.selectedForecastProjectId)
-  const actualsMonths = ref(initialBootstrapState.initialState.actualsMonths.map((month) => createActualsMonth(month)))
   const trainingSettings = ref(createTrainingSettings(initialBootstrapState.initialState.trainingSettings))
   const nextYearOpening = ref(createNextYearOpening(initialBootstrapState.initialState.nextYearOpening))
   const startingHeadcount = ref(initialBootstrapState.initialState.startingHeadcount)
@@ -267,7 +262,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     }
 
     markSectionReviewed(sectionId)
-    activeSection.value = sectionId === 'budget' || sectionId === 'review' ? 'overview' : sectionId
+    activeSection.value = sectionId === 'overview' || sectionId === 'budget' || sectionId === 'review'
+      ? 'forecast'
+      : sectionId
   }
 
   const setActiveForecastStep = (stepId) => {
@@ -359,7 +356,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planMonths.value = examplePlan.planMonths
     demandSource.value = createPlanDemandSource(examplePlan.demandSource)
     selectedForecastProjectId.value = examplePlan.demandSource?.forecastProjectId || ''
-    actualsMonths.value = buildActualsMonths()
     startingHeadcount.value = examplePlan.startingHeadcount
     startingFrontlineHeadcount.value = examplePlan.startingFrontlineHeadcount
     trainingSettings.value = examplePlan.trainingSettings
@@ -367,7 +363,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     staffingMonths.value = examplePlan.staffingMonths
     trainingClasses.value = examplePlan.trainingClasses
     reviewedSections.value = [...CORE_SECTION_IDS]
-    activeSection.value = 'overview'
+    activeSection.value = 'forecast'
     activeForecastStep.value = 'availability'
     selectedMonthIndex.value = 0
   }
@@ -388,7 +384,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planMonths.value = buildPlanMonths()
     demandSource.value = createPlanDemandSource()
     selectedForecastProjectId.value = ''
-    actualsMonths.value = buildActualsMonths()
     trainingSettings.value = createTrainingSettings()
     nextYearOpening.value = createNextYearOpening()
     startingHeadcount.value = plannerSeedDefaults.value.startingHeadcount
@@ -396,7 +391,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     staffingMonths.value = buildStaffingMonths()
     trainingClasses.value = buildTrainingClasses()
     reviewedSections.value = []
-    activeSection.value = 'overview'
+    activeSection.value = 'forecast'
     activeForecastStep.value = 'availability'
     selectedMonthIndex.value = currentMonthIndex
   }
@@ -411,6 +406,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     selectedForecastPreviewSummary,
     demandSourceSummary,
     forecastCanApply,
+    forecastApplyMessage,
+    forecastApplyTone,
     hasLegacyManualDemandSource,
     legacyManualSummary,
     applyForecastToDemand,
@@ -491,6 +488,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const {
     erlangStatus: intradayErlangStatus,
     monthlyOutputsByMonthIndex: intradayErlangMonthlyOutputsByMonthIndex,
+    intervalOutputs: intradayErlangIntervalOutputs,
     dailyOutputs: intradayErlangDailyOutputs
   } = usePlannerIntradayErlang({
     requirementMethod,
@@ -518,6 +516,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       : baselineMonthlyRecords.value
   )
 
+  const trainingCalendar = computed(() => ({
+    holidayCalendarId: holidayCalendarId.value,
+    disabledHolidayRuleIds: [...disabledHolidayRuleIds.value],
+    customHolidays: customHolidays.value.map((holiday) => ({ ...holiday }))
+  }))
+
   const staffingRecords = computed(() =>
     computeStaffingRecords(
       monthlyRecords.value,
@@ -526,7 +530,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       startingFrontlineHeadcount.value,
       staffingMonths.value,
       effectiveTrainingClasses.value,
-      trainingSettings.value
+      trainingSettings.value,
+      trainingCalendar.value
     )
   )
 
@@ -571,8 +576,43 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     ...ownedTrainingClasses.value
   ])
 
+  const actualsDailyRows = computed(() =>
+    createPlanningGroupActuals(props.centerDefaults?.actuals).dailyRows
+      .filter((row) => Number(row.serviceDate.slice(0, 4)) === planningYear.value)
+  )
+
+  const actualsDataMonths = computed(() =>
+    buildActualsMonthsFromDailyRows(actualsDailyRows.value, planningYear.value)
+  )
+
+  const {
+    actualsErlangStatus,
+    monthlyOutputsByMonthIndex: actualsIntradayErlangMonthlyOutputsByMonthIndex
+  } = usePlannerActualsIntradayErlang({
+    requirementMethod,
+    planningYear,
+    actualDailyRows: actualsDailyRows,
+    monthlyRecords: baselineMonthlyRecords,
+    operatingWeekdays,
+    holidayCalendarId,
+    disabledHolidayRuleIds,
+    customHolidays,
+    operatingOpenTime: intradayErlangOpenTime,
+    operatingCloseTime: intradayErlangCloseTime,
+    serviceLevelPercent: intradayErlangServiceLevelPercent,
+    serviceLevelThresholdSeconds: intradayErlangServiceLevelThresholdSeconds,
+    intraday: intradayErlangProfile
+  })
+
   const actualsRecords = computed(() =>
-    computeActualsRecords(monthlyRecords.value, staffingRecords.value, actualsMonths.value)
+    computeActualsRecords(
+      monthlyRecords.value,
+      staffingRecords.value,
+      actualsDataMonths.value,
+      requirementMethod.value === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+        ? actualsIntradayErlangMonthlyOutputsByMonthIndex.value
+        : null
+    )
   )
 
   const generateRecommendedTrainingClasses = () => {
@@ -584,6 +624,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       staffingMonths: staffingMonths.value,
       trainingClasses: effectiveTrainingClasses.value,
       trainingSettings: trainingSettings.value,
+      trainingCalendar: trainingCalendar.value,
       targetNextYearStartingFrontlineHeadcount: nextYearOpening.value.frontlineHeadcount,
       ignoredRecommendationSources: [SAME_YEAR_RECOMMENDATION_SOURCE],
       recommendationSource: SAME_YEAR_RECOMMENDATION_SOURCE
@@ -645,7 +686,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       intervalRatios: intradayErlangProfile.value.intervalRatios.map((row) => ({ ...row }))
     },
     demandSource: createPlanDemandSource(demandSource.value),
-    actualsMonths: actualsMonths.value.map((month) => createActualsMonth(month)),
     trainingSettings: createTrainingSettings(trainingSettings.value),
     nextYearOpening: createNextYearOpening({
       frontlineHeadcount: nextYearOpening.value.frontlineHeadcount
@@ -654,7 +694,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     startingFrontlineHeadcount: startingFrontlineHeadcount.value,
     staffingMonths: staffingMonths.value.map((month) => createStaffingMonth(month)),
     trainingClasses: ownedTrainingClasses.value.map((trainingClass) =>
-      persistTrainingClassOutcomes(trainingClass, planningYear.value, trainingSettings.value)
+      persistTrainingClassOutcomes(trainingClass, planningYear.value, trainingSettings.value, trainingCalendar.value)
     ),
     summary: {
       requirementMethod: planSummary.value.requirementMethod,
@@ -827,7 +867,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       planMonths,
       demandSource,
       selectedForecastProjectId,
-      actualsMonths,
       trainingSettings,
       nextYearOpening,
       startingHeadcount,
@@ -894,10 +933,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     selectedForecastPreviewSummary,
     demandSourceSummary,
     forecastCanApply,
+    forecastApplyMessage,
+    forecastApplyTone,
     hasLegacyManualDemandSource,
     legacyManualSummary,
-    actualsMonths,
     trainingSettings,
+    trainingCalendar,
     nextYearOpening,
     startingHeadcount,
     startingFrontlineHeadcount,
@@ -916,6 +957,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     presenceSummary,
     randomSummary,
     planSummary,
+    intradayErlangIntervalOutputs,
     staffingSummary,
     staffingRecords,
     hasNextYearStartingFrontlineTarget,
@@ -926,6 +968,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     intradayErlangOpenTime,
     intradayErlangCloseTime,
     intradayErlangProfile,
+    actualsErlangStatus,
     autosaveStatusMessage,
     validationMessage,
     formatNumber,

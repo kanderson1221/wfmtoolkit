@@ -6,7 +6,7 @@ import AppIcon from '../ui/AppIcon.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
-import AppTableNumberField from '../ui/AppTableNumberField.vue'
+import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import PlannerActualsComparisonChart from './PlannerActualsComparisonChart.vue'
 
 const props = defineProps({
@@ -18,6 +18,13 @@ const props = defineProps({
     type: Object,
     required: true
   },
+  actualsErlangStatus: {
+    type: Object,
+    default: () => ({
+      status: '',
+      message: ''
+    })
+  },
   formatWhole: {
     type: Function,
     required: true
@@ -26,11 +33,6 @@ const props = defineProps({
     type: Function,
     required: true
   }
-})
-
-const actualsMonths = defineModel('actualsMonths', {
-  type: Array,
-  default: null
 })
 
 const staffingMetricOptions = [
@@ -56,17 +58,17 @@ const summaryItems = computed(() => [
   {
     label: 'Months Loaded',
     value: props.formatWhole(props.actualsSummary.loadedMonthsCount),
-    meta: 'Months with actual contacts or AHT entered'
+    meta: 'Months with loaded Data tab actuals'
   },
   {
     label: 'Contacts Variance',
     value: formatSignedNumber(props.actualsSummary.contactsVariance, 0),
-    meta: 'Actual contacts versus the saved plan across loaded months'
+    meta: 'Data tab contacts versus the saved plan across loaded months'
   },
   {
     label: 'Avg AHT Variance',
     value: `${formatSignedNumber(props.actualsSummary.averageAhtVarianceSeconds, 1)} sec`,
-    meta: 'Average handle-time variance across months with actual demand'
+    meta: 'Average handle-time variance across months loaded from Data'
   },
   {
     label: 'Average Required Headcount Variance',
@@ -146,6 +148,22 @@ const staffingGapClass = (value) => ({
 })
 
 const infoIconPath = mdiInformationOutline
+const actualsErlangMessage = computed(() => {
+  const status = String(props.actualsErlangStatus?.status || '').trim()
+  const message = String(props.actualsErlangStatus?.message || '').trim()
+
+  if (message) {
+    return message
+  }
+
+  return status === 'loading'
+    ? 'Calculating actual Intraday Erlang requirements from Data tab daily actuals.'
+    : ''
+})
+
+const actualsErlangTone = computed(() =>
+  props.actualsErlangStatus?.status === 'error' ? 'error' : 'info'
+)
 </script>
 
 <template>
@@ -153,6 +171,10 @@ const infoIconPath = mdiInformationOutline
     <AppSectionHeader title="Actuals & Variance" :icon="mdiChartTimelineVariant" />
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-6" />
+
+    <AppStatusMessage v-if="actualsErlangMessage" :tone="actualsErlangTone">
+      {{ actualsErlangMessage }}
+    </AppStatusMessage>
 
     <section class="grid gap-3">
       <AppSectionHeader title="Planned vs Actual Requirement" />
@@ -163,7 +185,11 @@ const infoIconPath = mdiInformationOutline
     </section>
 
     <section class="grid gap-3">
-      <AppSectionHeader title="Monthly Actuals Worksheet" />
+      <AppSectionHeader title="Monthly Actuals From Data" />
+
+      <AppStatusMessage v-if="props.actualsSummary.loadedMonthsCount === 0" tone="warning">
+        No daily actuals are loaded for this plan year in the staffing group Data tab.
+      </AppStatusMessage>
 
       <div class="assumption-table-shell">
         <table class="assumption-table assumption-table-actuals">
@@ -216,7 +242,7 @@ const infoIconPath = mdiInformationOutline
                   <span class="plan-head-label">Actual<br />Contacts</span>
                   <span
                     class="actuals-head-info"
-                    title="Monthly actual contacts. This is a manual actuals entry field."
+                    title="Monthly actual contacts rolled up from the staffing group Data tab."
                     aria-label="Actual contacts help"
                   >
                     <AppIcon :path="infoIconPath" size="12" />
@@ -240,7 +266,7 @@ const infoIconPath = mdiInformationOutline
                   <span class="plan-head-label">Actual AHT<br />Sec</span>
                   <span
                     class="actuals-head-info"
-                    title="Average actual handle time in seconds. This is a manual actuals entry field."
+                    title="Weighted average actual handle time in seconds rolled up from the staffing group Data tab."
                     aria-label="Actual AHT seconds help"
                   >
                     <AppIcon :path="infoIconPath" size="12" />
@@ -264,7 +290,7 @@ const infoIconPath = mdiInformationOutline
                   <span class="plan-head-label">Actual Wkld<br />Hrs</span>
                   <span
                     class="actuals-head-info"
-                    title="Actual workload hours derived from Actual Contacts and Actual AHT."
+                    title="Actual workload hours derived from Data tab contacts and AHT."
                     aria-label="Actual workload hours help"
                   >
                     <AppIcon :path="infoIconPath" size="12" />
@@ -288,7 +314,7 @@ const infoIconPath = mdiInformationOutline
                   <span class="plan-head-label">Actual Req<br />HC</span>
                   <span
                     class="actuals-head-info"
-                    title="Actual required headcount derived from Actual Contacts and Actual AHT using the saved requirement math."
+                    title="Actual required headcount derived from Data tab actuals using the saved requirement math."
                     aria-label="Actual required headcount help"
                   >
                     <AppIcon :path="infoIconPath" size="12" />
@@ -348,26 +374,9 @@ const infoIconPath = mdiInformationOutline
                 <span class="actuals-month-label" :title="record.fullLabel">{{ record.label }}</span>
               </td>
               <td>{{ displayValue(record.plannedContacts, 0) }}</td>
-              <td>
-                <AppTableNumberField
-                  v-model.number="actualsMonths[record.monthIndex].actualContacts"
-                  :min="0"
-                  :step="100"
-                  :min-fraction-digits="0"
-                  :max-fraction-digits="0"
-                  :use-grouping="true"
-                  aria-label="Actual contacts"
-                />
-              </td>
+              <td>{{ displayValue(record.actualContacts, 0) }}</td>
               <td>{{ displayValue(record.plannedAhtSeconds, 0) }}</td>
-              <td>
-                <AppTableNumberField
-                  v-model.number="actualsMonths[record.monthIndex].actualAhtSeconds"
-                  :min="0"
-                  :step="1"
-                    aria-label="Actual average handle time in seconds"
-                />
-              </td>
+              <td>{{ displayValue(record.actualAhtSeconds, 0) }}</td>
               <td>{{ displayValue(record.plannedWorkloadHours, 1) }}</td>
               <td>
                 <span class="actuals-value-with-sup">

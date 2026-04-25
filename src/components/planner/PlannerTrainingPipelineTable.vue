@@ -18,6 +18,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  trainingCalendar: {
+    type: Object,
+    default: () => ({})
+  },
   formatNumber: {
     type: Function,
     required: true
@@ -93,7 +97,7 @@ const sortedTrainingClasses = computed(() =>
 )
 
 const getTrainingMetrics = (trainingClass) =>
-  deriveTrainingClassMetrics(trainingClass, normalizedTrainingSettings.value)
+  deriveTrainingClassMetrics(trainingClass, normalizedTrainingSettings.value, props.trainingCalendar)
 
 const formatDerivedDate = (date) => (date ? shortDateFormatter.format(date) : '—')
 const formatHireDate = (value) => {
@@ -197,28 +201,28 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
 
 <template>
   <section class="grid gap-0">
-    <button
-      type="button"
-      :class="['training-pipeline-toggle', { 'training-pipeline-toggle-open': pipelineOpen }]"
-      :aria-expanded="pipelineOpen ? 'true' : 'false'"
-      aria-controls="training-pipeline-content"
-      @click="pipelineOpen = !pipelineOpen"
-    >
-      <div class="flex min-w-0 items-center gap-3">
-        <span class="training-pipeline-toggle-icon" aria-hidden="true">
-          <AppIcon :path="pipelineOpen ? mdiChevronDown : mdiChevronRight" class="h-4 w-4" />
-        </span>
-        <div class="grid min-w-0 gap-0.5 text-left">
-          <h3 class="text-base font-semibold tracking-[-0.03em] text-slate-950">Hiring / Training Pipeline</h3>
-          <p class="text-sm text-slate-600">{{ trainingClassSummary }}</p>
+    <div :class="['training-pipeline-header', { 'training-pipeline-header-open': pipelineOpen }]">
+      <button
+        type="button"
+        class="training-pipeline-toggle"
+        :aria-expanded="pipelineOpen ? 'true' : 'false'"
+        aria-controls="training-pipeline-content"
+        @click="pipelineOpen = !pipelineOpen"
+      >
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="training-pipeline-toggle-icon" aria-hidden="true">
+            <AppIcon :path="pipelineOpen ? mdiChevronDown : mdiChevronRight" class="h-4 w-4" />
+          </span>
+          <div class="grid min-w-0 gap-0.5 text-left">
+            <h3 class="text-base font-semibold tracking-[-0.03em] text-slate-950">Hiring / Training Pipeline</h3>
+            <p class="text-sm text-slate-600">{{ trainingClassSummary }}</p>
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
 
-    <div v-if="pipelineOpen" id="training-pipeline-content" class="training-pipeline-content">
-      <div class="training-class-toolbar self-start xl:justify-end">
+      <div v-if="pipelineOpen" class="training-class-toolbar">
         <AppButton variant="secondary" @click="emit('open-settings')">Training Settings</AppButton>
-        <AppButton variant="secondary" @click="addTrainingClass">Add Training Class</AppButton>
+        <AppButton variant="primary" @click="addTrainingClass">Add Training Class</AppButton>
         <AppButton
           variant="secondary"
           :disabled="!canRecommendClasses"
@@ -228,7 +232,9 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
           Recommend Classes
         </AppButton>
       </div>
+    </div>
 
+    <div v-if="pipelineOpen" id="training-pipeline-content" class="training-pipeline-content">
       <div class="assumption-table-shell training-pipeline-shell">
         <table class="assumption-table assumption-table-training">
           <thead>

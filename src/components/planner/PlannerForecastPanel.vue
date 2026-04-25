@@ -47,6 +47,14 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  forecastApplyMessage: {
+    type: String,
+    default: ''
+  },
+  forecastApplyTone: {
+    type: String,
+    default: 'success'
+  },
   formatWhole: {
     type: Function,
     required: true
@@ -76,6 +84,10 @@ const hasAppliedForecast = computed(() =>
 )
 const appliedForecastMatchesSelection = computed(() => demandSource.value?.forecastProjectId === selectedForecastProjectId.value)
 const selectedForecastHasCoverage = computed(() => (props.selectedForecastPreviewSummary?.matchedMonthCount || 0) > 0)
+const shouldShowSelectedForecastPreview = computed(() =>
+  Boolean(props.selectedForecastPreviewSummary) &&
+  (!hasAppliedForecast.value || !appliedForecastMatchesSelection.value)
+)
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -147,6 +159,57 @@ const selectedForecastSummaryLine = computed(() => {
   ].filter(Boolean).join(' • ')
 })
 
+const appliedForecastItems = computed(() => {
+  if (!props.currentDemandSourceSummary || !hasAppliedForecast.value) {
+    return []
+  }
+
+  return [
+    {
+      label: 'Source',
+      value: props.currentDemandSourceSummary.sourceKindLabel || 'Saved Forecast'
+    },
+    {
+      label: 'Type',
+      value: getForecastTypeLabel(props.currentDemandSourceSummary.forecastType)
+    },
+    {
+      label: 'Coverage',
+      value: props.currentDemandSourceSummary.coverageLabel || '0/12 months'
+    },
+    {
+      label: 'Forecast Contacts',
+      value: props.formatWhole(props.currentDemandSourceSummary.totalContacts)
+    },
+    {
+      label: 'Assumed Avg AHT',
+      value: props.currentDemandSourceSummary.averageAhtSeconds != null
+        ? `${formatNumber(props.currentDemandSourceSummary.averageAhtSeconds, 1)} sec`
+        : '—'
+    }
+  ]
+})
+
+const appliedForecastSummaryLine = computed(() => {
+  if (!props.currentDemandSourceSummary || !hasAppliedForecast.value) {
+    return ''
+  }
+
+  return [
+    props.currentDemandSourceSummary.sourceKindLabel || '',
+    getForecastTypeLabel(props.currentDemandSourceSummary.forecastType),
+    props.currentDemandSourceSummary.coverageLabel || '0/12 months',
+    props.currentDemandSourceSummary.coverageWindowLabel || '',
+    `${props.formatWhole(props.currentDemandSourceSummary.totalContacts)} contacts`,
+    props.currentDemandSourceSummary.peakMonthLabel
+      ? `Peak ${props.currentDemandSourceSummary.peakMonthLabel}`
+      : '',
+    props.currentDemandSourceSummary.runAt
+      ? `Ran ${formatDateTime(props.currentDemandSourceSummary.runAt)}`
+      : ''
+  ].filter(Boolean).join(' • ')
+})
+
 const appliedForecastStatusLine = computed(() => {
   if (!props.currentDemandSourceSummary || !hasAppliedForecast.value) {
     return ''
@@ -164,6 +227,12 @@ const deletedForecastNote = computed(() => {
 
   return `${props.currentDemandSourceSummary.projectName || 'The applied forecast'} was deleted. Current monthly contacts and any imported AHT assumptions remain in this plan until you apply a different forecast.`
 })
+
+const selectForecastPrompt = computed(() =>
+  hasAppliedForecast.value
+    ? 'Select another saved forecast to preview and replace the currently applied source.'
+    : 'Select a saved forecast to preview its coverage for this plan year.'
+)
 </script>
 
 <template>
@@ -172,7 +241,7 @@ const deletedForecastNote = computed(() => {
 
     <AppWorkspaceSection
       title="Demand Source"
-      description="Choose a saved staffing-group forecast to populate monthly contacts and starting AHT assumptions. Demand Model will keep forecasted contacts read-only and let planners adjust AHT after import."
+      description="Review the forecast currently applied to this plan, or choose another saved staffing-group forecast to replace monthly contacts and starting AHT assumptions."
     >
       <template v-if="props.hasLegacyManualDemandSource">
         <div class="grid gap-4">
@@ -196,6 +265,70 @@ const deletedForecastNote = computed(() => {
       </template>
 
       <template v-else>
+        <div
+          v-if="props.currentDemandSourceSummary && hasAppliedForecast"
+          class="mb-4 grid gap-3 border border-[#c3d2df] bg-[#f8fbfd] px-4 py-3"
+        >
+          <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div class="grid gap-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[#15395f]">
+                  Currently Applied
+                </p>
+                <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                  Applied
+                </span>
+                <span
+                  v-if="props.currentDemandSourceSummary.sourceMissing"
+                  class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-amber-700"
+                >
+                  Source Deleted
+                </span>
+              </div>
+
+              <h3 class="text-base font-semibold text-slate-950">
+                {{ props.currentDemandSourceSummary.projectName || 'Saved Forecast' }}
+              </h3>
+
+              <p
+                v-if="appliedForecastSummaryLine"
+                class="text-sm leading-6 text-slate-600"
+              >
+                {{ appliedForecastSummaryLine }}
+              </p>
+
+              <p class="text-sm leading-6 text-slate-600">
+                {{ appliedForecastStatusLine }}
+              </p>
+            </div>
+          </div>
+
+          <p
+            v-if="deletedForecastNote"
+            class="text-sm leading-6 text-amber-700"
+          >
+            {{ deletedForecastNote }}
+          </p>
+
+          <div
+            v-if="appliedForecastItems.length"
+            class="grid gap-0 overflow-hidden border-t border-slate-200 md:grid-cols-2 lg:grid-cols-5 lg:divide-x lg:divide-slate-200"
+          >
+            <div
+              v-for="item in appliedForecastItems"
+              :key="item.label"
+              class="grid gap-1 py-3 md:px-4 md:first:pl-0"
+            >
+              <p class="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {{ item.label }}
+              </p>
+              <p class="text-base font-semibold text-slate-950">
+                {{ item.value }}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <AppStatusMessage v-if="props.forecastsLoading">
           Loading saved forecasts for this staffing group.
         </AppStatusMessage>
@@ -217,7 +350,7 @@ const deletedForecastNote = computed(() => {
             <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
               <div class="w-full xl:max-w-[19rem]">
                 <AppFieldGroup
-                  label="Saved Forecast"
+                  label="Replace Forecast"
                   input-id="planner-demand-source-forecast"
                 >
                   <AppSelect
@@ -230,7 +363,7 @@ const deletedForecastNote = computed(() => {
 
               <div class="flex justify-end">
                 <AppButton
-                  variant="secondary"
+                  variant="primary"
                   :disabled="!props.forecastCanApply"
                   @click="emit('apply-forecast')"
                 >
@@ -239,26 +372,26 @@ const deletedForecastNote = computed(() => {
               </div>
             </div>
 
-            <p
-              v-if="deletedForecastNote"
-              class="text-sm leading-6 text-amber-700"
-            >
-              {{ deletedForecastNote }}
-            </p>
-
             <AppStatusMessage v-if="!selectedForecastProjectId">
-              Select a saved forecast to preview its coverage for this plan year.
+              {{ selectForecastPrompt }}
             </AppStatusMessage>
 
             <AppStatusMessage
-              v-else-if="props.selectedForecastPreviewSummary && !selectedForecastHasCoverage"
+              v-else-if="props.forecastApplyMessage"
+              :tone="props.forecastApplyTone"
+            >
+              {{ props.forecastApplyMessage }}
+            </AppStatusMessage>
+
+            <AppStatusMessage
+              v-else-if="shouldShowSelectedForecastPreview && !selectedForecastHasCoverage"
               tone="error"
             >
               The selected forecast does not include monthly rollup rows for this plan year.
             </AppStatusMessage>
 
             <div
-              v-else-if="props.selectedForecastPreviewSummary"
+              v-else-if="shouldShowSelectedForecastPreview"
               class="grid gap-3 border-t border-slate-200 pt-4"
             >
               <div class="grid gap-2">
@@ -266,12 +399,6 @@ const deletedForecastNote = computed(() => {
                   <h3 class="text-base font-semibold tracking-[-0.03em] text-slate-950">
                     {{ props.selectedForecastPreviewSummary.projectName }}
                   </h3>
-                  <span
-                    v-if="props.currentDemandSourceSummary && hasAppliedForecast && appliedForecastMatchesSelection"
-                    class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-emerald-700"
-                  >
-                    Applied
-                  </span>
                 </div>
 
                 <p class="text-sm leading-6 text-slate-600">
@@ -279,14 +406,10 @@ const deletedForecastNote = computed(() => {
                 </p>
 
                 <p
-                  v-if="props.currentDemandSourceSummary && hasAppliedForecast"
+                  v-if="props.currentDemandSourceSummary && hasAppliedForecast && !appliedForecastMatchesSelection"
                   class="text-sm leading-6 text-slate-600"
                 >
-                  {{
-                    appliedForecastMatchesSelection
-                      ? appliedForecastStatusLine
-                      : `${props.currentDemandSourceSummary.projectName} is still applied. Reapply to replace it with the selected forecast.`
-                  }}
+                  {{ props.currentDemandSourceSummary.projectName }} is still applied. Reapply to replace it with the selected forecast.
                 </p>
               </div>
 

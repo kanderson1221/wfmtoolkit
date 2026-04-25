@@ -36,6 +36,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  trainingCalendar: {
+    type: Object,
+    default: () => ({})
+  },
   formatNumber: {
     type: Function,
     required: true
@@ -110,6 +114,7 @@ const yearEndHeadcountTarget = computed({
       v-model:training-classes="trainingClasses"
       :inherited-training-classes="props.inheritedTrainingClasses"
       :planning-year="props.planningYear"
+      :training-calendar="props.trainingCalendar"
       :format-number="props.formatNumber"
       :selected-month-index="selectedMonthIndex"
       @open-settings="trainingSettingsOpen = true"

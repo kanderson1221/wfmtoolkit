@@ -9,7 +9,6 @@ import {
 import PlannerActualsPanel from './planner/PlannerActualsPanel.vue'
 import PlannerForecastPanel from './planner/PlannerForecastPanel.vue'
 import PlannerMonthlyPlanTab from './planner/PlannerMonthlyPlanTab.vue'
-import PlannerOverviewPanel from './planner/PlannerOverviewPanel.vue'
 import PlannerPresenceTab from './planner/PlannerPresenceTab.vue'
 import PlannerRandomTab from './planner/PlannerRandomTab.vue'
 import PlannerSectionNav from './planner/PlannerSectionNav.vue'
@@ -70,6 +69,11 @@ const reviewedSections = computed(() => new Set(builder.reviewedSections))
 const isIntradayErlang = computed(() => builder.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
 const variabilityTitle = computed(() => isIntradayErlang.value ? 'Erlang Inputs' : 'Random/Variability')
 const requirementTitle = computed(() => 'Demand Model')
+const hasAppliedForecastDemand = computed(() =>
+  builder.demandSource.mode === 'forecast' &&
+  Array.isArray(builder.demandSource.forecastMonthSnapshot) &&
+  builder.demandSource.forecastMonthSnapshot.length > 0
+)
 
 const formatMonthCoverage = (count) => `${count}/${TOTAL_PLAN_MONTHS} months`
 
@@ -262,6 +266,133 @@ const intradayFirstMissingAhtMonthLabel = computed(() => {
   return missingMonth?.monthLabel || ''
 })
 
+const forecastProgress = computed(() => {
+  const forecastName = builder.demandSourceSummary?.projectName || 'Saved Forecast'
+  const matchedMonthCount = Number(builder.demandSourceSummary?.matchedMonthCount || 0)
+  const coverageLabel = builder.demandSourceSummary?.coverageLabel || formatMonthCoverage(matchedMonthCount)
+
+  if (builder.hasLegacyManualDemandSource) {
+    return {
+      id: 'forecast',
+      title: 'Forecasts',
+      statusLabel: 'Legacy manual',
+      overviewValue: 'Legacy manual',
+      overviewMeta: 'Convert this plan to a saved staffing-group forecast before continuing.',
+      summary: 'This plan still relies on legacy manual monthly demand.',
+      blocker: 'Open Forecasts and convert the legacy monthly demand into a saved staffing-group forecast.',
+      tone: 'attention',
+      isReady: false,
+      isStarted: true,
+      nextTitle: 'Forecasts',
+      nextDescription: 'Convert the legacy manual monthly demand into a saved staffing-group forecast before reviewing the rest of the plan.'
+    }
+  }
+
+  if (!hasAppliedForecastDemand.value) {
+    return {
+      id: 'forecast',
+      title: 'Forecasts',
+      statusLabel: 'Not applied',
+      overviewValue: 'Not applied',
+      overviewMeta: 'Apply a saved staffing-group forecast to seed this plan.',
+      summary: 'No saved staffing-group forecast is driving this plan yet.',
+      blocker: 'Open Forecasts and apply a saved staffing-group forecast before moving on.',
+      tone: 'default',
+      isReady: false,
+      isStarted: Boolean(builder.selectedForecastProjectId),
+      nextTitle: 'Forecasts',
+      nextDescription: 'Apply a saved staffing-group forecast first so the rest of the planner is working from the right demand basis.'
+    }
+  }
+
+  if (isIntradayErlang.value) {
+    const hasDailyForecast = intradayForecastDailySnapshot.value.length > 0
+    const hasMonthlyAhtCoverage = intradayMonthsWithForecastAht.value === TOTAL_PLAN_MONTHS
+    const missingAhtMonthLabel = intradayFirstMissingAhtMonthLabel.value
+
+    if (!hasDailyForecast) {
+      return {
+        id: 'forecast',
+        title: 'Forecasts',
+        statusLabel: 'Daily rows missing',
+        overviewValue: 'Incomplete',
+        overviewMeta: `${forecastName} is applied, but it does not include the daily demand rows required for Erlang.`,
+        summary: `${forecastName} is applied, but the daily demand rows required for Erlang are missing.`,
+        blocker: 'Apply a saved daily staffing-group forecast before continuing with Intraday Erlang.',
+        tone: 'attention',
+        isReady: false,
+        isStarted: true,
+        nextTitle: 'Forecasts',
+        nextDescription: 'Apply a saved daily staffing-group forecast so Erlang can flatten real forecast days into 30-minute intervals.'
+      }
+    }
+
+    if (!hasMonthlyAhtCoverage) {
+      return {
+        id: 'forecast',
+        title: 'Forecasts',
+        statusLabel: 'AHT incomplete',
+        overviewValue: 'AHT incomplete',
+        overviewMeta: `${forecastName} is applied for ${coverageLabel}, but monthly AHT is still missing in ${missingAhtMonthLabel}.`,
+        summary: `${forecastName} is applied for ${coverageLabel}, but monthly AHT is still missing in ${missingAhtMonthLabel}.`,
+        blocker: `Update the forecast so ${missingAhtMonthLabel} has a monthly AHT assumption before continuing.`,
+        tone: 'attention',
+        isReady: false,
+        isStarted: true,
+        nextTitle: 'Forecasts',
+        nextDescription: 'Finish the monthly AHT assumptions in the saved forecast before reviewing the Erlang setup.'
+      }
+    }
+
+    return {
+      id: 'forecast',
+      title: 'Forecasts',
+      statusLabel: 'Applied',
+      overviewValue: 'Ready',
+      overviewMeta: `${forecastName} is applied with daily demand and monthly AHT across ${coverageLabel}.`,
+      summary: `${forecastName} is applied with daily demand and monthly AHT across ${coverageLabel}.`,
+      blocker: '',
+      tone: 'ready',
+      isReady: true,
+      isStarted: true,
+      nextTitle: 'Agent Availability',
+      nextDescription: 'Review Agent Availability next so the planner can bridge the forecast demand into staffing capacity.'
+    }
+  }
+
+  if (matchedMonthCount < TOTAL_PLAN_MONTHS) {
+    return {
+      id: 'forecast',
+      title: 'Forecasts',
+      statusLabel: 'Coverage incomplete',
+      overviewValue: 'Coverage incomplete',
+      overviewMeta: `${forecastName} is applied for ${coverageLabel}.`,
+      summary: `${forecastName} is applied for ${coverageLabel}.`,
+      blocker: 'Apply a saved forecast with complete monthly coverage before reviewing the demand model.',
+      tone: 'attention',
+      isReady: false,
+      isStarted: true,
+      nextTitle: 'Forecasts',
+      nextDescription: 'Replace or refresh the saved forecast so all 12 plan months are covered before continuing.'
+    }
+  }
+
+  return {
+    id: 'forecast',
+    title: 'Forecasts',
+    statusLabel: 'Applied',
+    overviewValue: 'Ready',
+    overviewMeta: `${forecastName} is applied with forecast contacts and starting AHT across ${coverageLabel}.`,
+    summary: `${forecastName} is applied with forecast contacts and starting AHT across ${coverageLabel}.`,
+    blocker: '',
+    tone: 'ready',
+    isReady: true,
+    isStarted: true,
+    nextTitle: 'Agent Availability',
+    nextDescription: 'Review Agent Availability next so the plan can translate forecast demand into scheduled capacity.'
+  }
+})
+
 const requirementProgress = computed(() => {
   if (isIntradayErlang.value) {
     const erlangStatus = String(builder.erlangStatus?.status || '').trim()
@@ -309,10 +440,6 @@ const requirementProgress = computed(() => {
   const configuredCount = builder.planMonths.filter(
     (month) => toNumber(month.contacts, 0) > 0 && toNumber(month.ahtSeconds, 0) > 0
   ).length
-  const hasAppliedForecastDemand =
-    builder.demandSource.mode === 'forecast' &&
-    Array.isArray(builder.demandSource.forecastMonthSnapshot) &&
-    builder.demandSource.forecastMonthSnapshot.length > 0
   const firstMissingMonthLabel = getFirstMissingMonthLabel(
     builder.planMonths,
     (month) => toNumber(month.contacts, 0) > 0 && toNumber(month.ahtSeconds, 0) > 0
@@ -396,7 +523,8 @@ const staffingProgress = computed(() => {
   }
 })
 
-const coreSectionCards = computed(() => [
+const planWorkflowCards = computed(() => [
+  forecastProgress.value,
   availabilityProgress.value,
   variabilityProgress.value,
   requirementProgress.value,
@@ -405,24 +533,16 @@ const coreSectionCards = computed(() => [
 
 const actualsStarted = computed(() => builder.actualsSummary.loadedMonthsCount > 0)
 
-const planComplete = computed(() => coreSectionCards.value.every((section) => section.isReady))
-const readyCoreSectionCount = computed(() => coreSectionCards.value.filter((section) => section.isReady).length)
-
 const workflowSections = computed(() => [
   {
     id: 'plan',
     label: 'Plan',
     items: [
       {
-        id: 'overview',
-        title: 'Plan Status',
-        statusLabel: planComplete.value ? 'All core sections ready' : `${readyCoreSectionCount.value}/${coreSectionCards.value.length} ready`,
-        tone: planComplete.value ? 'ready' : 'default'
-      },
-      {
         id: 'forecast',
         title: 'Forecasts',
-        tone: 'default'
+        statusLabel: forecastProgress.value.statusLabel,
+        tone: forecastProgress.value.tone
       },
       {
         id: 'availability',
@@ -463,31 +583,6 @@ const workflowSections = computed(() => [
     ]
   }
 ])
-
-const overviewCards = computed(() => coreSectionCards.value)
-
-const nextRecommendation = computed(() => {
-  const nextSection = coreSectionCards.value.find((section) => !section.isReady)
-
-  return nextSection
-    ? {
-        title: nextSection.nextTitle || nextSection.title,
-        description: nextSection.nextDescription || nextSection.blocker || nextSection.detail || nextSection.description,
-        sectionId: nextSection.id
-      }
-    : null
-})
-
-const openWorkflowDestination = ({ sectionId, stepId } = {}) => {
-  if (stepId) {
-    builder.setActiveSection(stepId)
-    return
-  }
-
-  if (sectionId) {
-    builder.setActiveSection(sectionId)
-  }
-}
 
 const handleWorkflowItemSelect = (item) => {
   if (item?.id) {
@@ -561,21 +656,8 @@ const breadcrumbItems = computed(() => {
 
           <section class="min-w-0 p-3">
             <div class="grid gap-3">
-              <PlannerOverviewPanel
-                v-if="builder.activeSection === 'overview'"
-                :requirement-method="builder.requirementMethod"
-                :plan-summary="builder.planSummary"
-                :staffing-summary="builder.staffingSummary"
-                :section-cards="overviewCards"
-                :next-recommendation="nextRecommendation"
-                :plan-complete="planComplete"
-                :format-whole="builder.formatWhole"
-                :format-number="builder.formatNumber"
-                @open-section="openWorkflowDestination"
-              />
-
               <div
-                v-else-if="builder.activeSection === 'forecast'"
+                v-if="builder.activeSection === 'forecast'"
                 class="grid gap-3"
               >
                 <PlannerForecastPanel
@@ -590,6 +672,8 @@ const breadcrumbItems = computed(() => {
                   :has-legacy-manual-demand-source="builder.hasLegacyManualDemandSource"
                   :legacy-manual-summary="builder.legacyManualSummary"
                   :forecast-can-apply="builder.forecastCanApply"
+                  :forecast-apply-message="builder.forecastApplyMessage"
+                  :forecast-apply-tone="builder.forecastApplyTone"
                   :format-whole="builder.formatWhole"
                   :format-number="builder.formatNumber"
                   @apply-forecast="builder.applyForecastToDemand"
@@ -640,6 +724,7 @@ const breadcrumbItems = computed(() => {
                 v-model:selected-month-index="builder.selectedMonthIndex"
                 :requirement-method="builder.requirementMethod"
                 :monthly-records="builder.monthlyRecords"
+                :interval-records="builder.intradayErlangIntervalOutputs"
                 :plan-summary="builder.planSummary"
                 :demand-source="builder.demandSource"
                 :current-demand-source-summary="builder.demandSourceSummary"
@@ -663,6 +748,7 @@ const breadcrumbItems = computed(() => {
                 v-model:staffing-months="builder.staffingMonths"
                 v-model:training-classes="builder.trainingClasses"
                 v-model:selected-month-index="builder.selectedMonthIndex"
+                :training-calendar="builder.trainingCalendar"
                 :starting-position-inherited="builder.startingPositionInherited"
                 :starting-position-inherited-from-year="builder.startingPositionInheritedFromYear"
                 :inherited-training-classes="builder.inheritedTrainingClasses"
@@ -677,9 +763,9 @@ const breadcrumbItems = computed(() => {
 
               <PlannerActualsPanel
                 v-else-if="builder.activeSection === 'actuals'"
-                v-model:actuals-months="builder.actualsMonths"
                 :actuals-records="builder.actualsRecords"
                 :actuals-summary="builder.actualsSummary"
+                :actuals-erlang-status="builder.actualsErlangStatus"
                 :format-whole="builder.formatWhole"
                 :format-number="builder.formatNumber"
               />

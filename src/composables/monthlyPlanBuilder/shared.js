@@ -3,13 +3,11 @@ import {
   HOLIDAY_SCHEDULE_CLOSED,
   MONTH_LABELS,
   PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO,
-  buildActualsMonths,
   buildPlanMonths,
   buildPlanningYearRange,
   buildRandomMonths,
   buildStaffingMonths,
   calculateCalendarOpenDays,
-  createActualsMonth,
   createNextYearOpening,
   createPlanMonth,
   createPresenceMonth,
@@ -125,13 +123,18 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
     ? basePlan.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass))
     : []
   const startingHeadcount = Math.max(toNumber(basePlan.startingHeadcount, seedDefaults.startingHeadcount), 0)
+  const trainingCalendar = {
+    holidayCalendarId: basePlan.holidayCalendarId ?? seedDefaults.holidayCalendarId,
+    disabledHolidayRuleIds: basePlan.disabledHolidayRuleIds ?? seedDefaults.disabledHolidayRuleIds,
+    customHolidays: basePlan.customHolidays ?? seedDefaults.customHolidays
+  }
   const startingFrontlineHeadcount = resolveLinkedOpeningPosition({
     priorPlan: null,
     startingHeadcount,
     startingFrontlineHeadcount:
       basePlan.startingFrontlineHeadcount ??
       seedDefaults.startingFrontlineHeadcount ??
-      deriveStartingFrontlineHeadcount(planningYear, startingHeadcount, trainingClasses, trainingSettings)
+      deriveStartingFrontlineHeadcount(planningYear, startingHeadcount, trainingClasses, trainingSettings, trainingCalendar)
   }).frontlineHeadcount
 
   return {
@@ -153,7 +156,6 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
     randomMonths: hydrateMonths(basePlan.randomMonths, buildRandomMonths, createRandomMonth),
     planMonths: hydrateMonths(basePlan.planMonths, buildPlanMonths, createPlanMonth),
     demandSource: createPlanDemandSource(basePlan.demandSource),
-    actualsMonths: hydrateMonths(basePlan.actualsMonths, buildActualsMonths, createActualsMonth),
     trainingSettings,
     nextYearOpening: createNextYearOpening(basePlan.nextYearOpening || {}),
     startingHeadcount,

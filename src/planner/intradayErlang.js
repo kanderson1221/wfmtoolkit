@@ -2,21 +2,39 @@ import {
   normalizePlanningGroupIntradayRatios,
   resolvePlanningGroupIntraday
 } from './groupIntraday'
+import { createPlanningGroupActuals } from './groupActuals'
 import { createPlanOpenDayChecker } from './planOpenDays'
 import { MONTH_LABELS, toNumber } from './shared'
 
-const DEFAULT_MEAN_PATIENCE_SECONDS = 60
+const normalizeMonthIndex = (value, fallback = 0) =>
+  Math.max(0, Math.min(MONTH_LABELS.length - 1, Math.round(toNumber(value, fallback))))
 
-const buildForecastAhtByMonthIndex = (demandSource = {}) =>
-  new Map(
+const buildForecastAhtByMonthIndex = (demandSource = {}, monthlyRecords = []) => {
+  const ahtByMonthIndex = new Map(
     (Array.isArray(demandSource?.forecastMonthSnapshot) ? demandSource.forecastMonthSnapshot : [])
       .map((month, monthIndex) => ({
-        monthIndex: Math.max(0, Math.min(MONTH_LABELS.length - 1, toNumber(month?.monthIndex, monthIndex))),
+        monthIndex: normalizeMonthIndex(month?.monthIndex, monthIndex),
         ahtSeconds: Math.max(toNumber(month?.ahtSeconds, 0), 0)
       }))
       .filter((row) => row.ahtSeconds > 0)
       .map((row) => [row.monthIndex, row.ahtSeconds])
   )
+
+  ;(Array.isArray(monthlyRecords) ? monthlyRecords : []).forEach((record, fallbackMonthIndex) => {
+    const monthIndex = normalizeMonthIndex(record?.monthIndex, fallbackMonthIndex)
+
+    if (ahtByMonthIndex.has(monthIndex)) {
+      return
+    }
+
+    const ahtSeconds = Math.max(toNumber(record?.ahtSeconds, 0), 0)
+    if (ahtSeconds > 0) {
+      ahtByMonthIndex.set(monthIndex, ahtSeconds)
+    }
+  })
+
+  return ahtByMonthIndex
+}
 
 export const buildPlannerIntradayErlangPayload = ({
   planningYear,
@@ -89,8 +107,15 @@ export const buildPlannerIntradayErlangPayload = ({
     }
   }
 
-  const monthlyAhtByMonthIndex = buildForecastAhtByMonthIndex(demandSource)
-  const firstMissingAhtRow = dailyForecastRows.find((row) => !monthlyAhtByMonthIndex.has(row.monthIndex))
+  const monthlyRecordByMonthIndex = new Map(
+    (Array.isArray(monthlyRecords) ? monthlyRecords : [])
+      .map((row, fallbackMonthIndex) => [normalizeMonthIndex(row?.monthIndex, fallbackMonthIndex), row])
+  )
+  const monthlyAhtByMonthIndex = buildForecastAhtByMonthIndex(demandSource, monthlyRecords)
+  const firstMissingAhtRow = dailyForecastRows.find((row) => {
+    const rowAhtSeconds = Math.max(toNumber(row?.ahtSeconds, 0), 0)
+    return rowAhtSeconds <= 0 && !monthlyAhtByMonthIndex.has(normalizeMonthIndex(row.monthIndex))
+  })
 
   if (firstMissingAhtRow) {
     const monthLabel = MONTH_LABELS[Math.max(0, Math.min(MONTH_LABELS.length - 1, toNumber(firstMissingAhtRow.monthIndex, 0)))]
@@ -101,9 +126,6 @@ export const buildPlannerIntradayErlangPayload = ({
     }
   }
 
-  const monthlyRecordByMonthIndex = new Map(
-    (Array.isArray(monthlyRecords) ? monthlyRecords : []).map((row) => [row.monthIndex, row])
-  )
   const isOpenDay = createPlanOpenDayChecker({
     planningYear,
     operatingWeekdays,
@@ -115,12 +137,14 @@ export const buildPlannerIntradayErlangPayload = ({
   const payloadRows = dailyForecastRows
     .filter((row) => isOpenDay(row.serviceDate))
     .flatMap((row) => {
-      const ahtSeconds = monthlyAhtByMonthIndex.get(row.monthIndex)
-      const monthlyRecord = monthlyRecordByMonthIndex.get(row.monthIndex)
+      const monthIndex = normalizeMonthIndex(row.monthIndex)
+      const rowAhtSeconds = Math.max(toNumber(row.ahtSeconds, 0), 0)
+      const ahtSeconds = rowAhtSeconds > 0 ? rowAhtSeconds : monthlyAhtByMonthIndex.get(monthIndex)
+      const monthlyRecord = monthlyRecordByMonthIndex.get(monthIndex)
       const maxOccupancyPercent = Math.min(100, Math.max(toNumber(monthlyRecord?.occupancyPercent, 85), 1), 100)
 
       return normalizedIntervalRows.map((interval) => ({
-        monthIndex: row.monthIndex,
+        monthIndex,
         serviceDate: row.serviceDate,
         intervalStart: `${row.serviceDate}T${interval.startTime}:00`,
         callsOffered: Number(((Math.max(toNumber(row.contacts, 0), 0) * Math.max(toNumber(interval.ratioPercent, 0), 0)) / 100).toFixed(6)),
@@ -128,8 +152,7 @@ export const buildPlannerIntradayErlangPayload = ({
         intervalLengthMinutes: intervalProfile.intervalLengthMinutes || 30,
         serviceLevelGoal: resolvedServiceLevelPercent,
         serviceLevelThreshold: resolvedServiceLevelThresholdSeconds,
-        maxOccupancy: maxOccupancyPercent,
-        averageCustomerPatience: DEFAULT_MEAN_PATIENCE_SECONDS
+        maxOccupancy: maxOccupancyPercent
       }))
     })
 
@@ -147,6 +170,46 @@ export const buildPlannerIntradayErlangPayload = ({
     message: '',
     intervalLengthMinutes: intervalProfile.intervalLengthMinutes || 30
   }
+}
+
+export const buildPlannerActualsIntradayErlangPayload = ({
+  actualDailyRows,
+  operatingWeekdays,
+  holidayCalendarId,
+  disabledHolidayRuleIds,
+  customHolidays,
+  ...payloadArgs
+} = {}) => {
+  const planningYear = Number(payloadArgs.planningYear)
+  const normalizedActualRows = createPlanningGroupActuals({ dailyRows: actualDailyRows }).dailyRows
+    .filter((row) => Number(row.serviceDate.slice(0, 4)) === planningYear)
+
+  if (!normalizedActualRows.length) {
+    return {
+      rows: [],
+      status: 'actuals_required',
+      message: 'Load daily actuals for this plan year in the staffing group Data tab before calculating actual Intraday Erlang requirements.'
+    }
+  }
+
+  const actualDailySnapshot = normalizedActualRows.map((row) => ({
+    serviceDate: row.serviceDate,
+    monthIndex: normalizeMonthIndex(Number(row.serviceDate.slice(5, 7)) - 1),
+    contacts: row.contacts,
+    ahtSeconds: row.ahtSeconds
+  }))
+
+  return buildPlannerIntradayErlangPayload({
+    ...payloadArgs,
+    demandSource: {
+      forecastDailySnapshot: actualDailySnapshot,
+      forecastMonthSnapshot: []
+    },
+    operatingWeekdays,
+    holidayCalendarId,
+    disabledHolidayRuleIds,
+    customHolidays
+  })
 }
 
 const buildIntradayOverhead = (record = {}) => {

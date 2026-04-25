@@ -1,4 +1,5 @@
 import {
+  buildPlannerActualsIntradayErlangPayload,
   buildPlannerIntradayErlangPayload,
   mergeIntradayErlangMonthlyRecords
 } from '../intradayErlang'
@@ -83,6 +84,52 @@ describe('intraday Erlang planner payloads', () => {
     ])
   })
 
+  it('builds actuals Erlang payload rows from Data tab daily actual contacts and AHT', () => {
+    const payload = buildPlannerActualsIntradayErlangPayload({
+      planningYear: 2026,
+      actualDailyRows: [
+        { serviceDate: '2026-01-01', contacts: 100, ahtSeconds: 300 },
+        { serviceDate: '2026-01-02', contacts: 800, ahtSeconds: 330 },
+        { serviceDate: '2025-01-02', contacts: 900, ahtSeconds: 340 }
+      ],
+      monthlyRecords: [
+        {
+          monthIndex: 0,
+          occupancyPercent: 90
+        }
+      ],
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      customHolidays: [
+        { id: 'new-years-day', label: "New Year's Day", date: '2026-01-01' }
+      ],
+      operatingOpenTime: '08:00',
+      operatingCloseTime: '09:00',
+      serviceLevelPercent: 80,
+      serviceLevelThresholdSeconds: 20,
+      intraday: {
+        intervalLengthMinutes: 30,
+        intervalRatios: [
+          { startTime: '08:00', ratioPercent: 25 },
+          { startTime: '08:30', ratioPercent: 75 }
+        ]
+      }
+    })
+
+    expect(payload.status).toBe('ready')
+    expect(payload.rows).toEqual([
+      expect.objectContaining({
+        serviceDate: '2026-01-02',
+        callsOffered: 200,
+        averageHandleTime: 330
+      }),
+      expect.objectContaining({
+        serviceDate: '2026-01-02',
+        callsOffered: 600,
+        averageHandleTime: 330
+      })
+    ])
+  })
+
   it('normalizes stored interval ratios before flattening daily forecast demand', () => {
     const payload = buildPlannerIntradayErlangPayload({
       planningYear: 2026,
@@ -161,6 +208,49 @@ describe('intraday Erlang planner payloads', () => {
     ).toMatchObject({
       status: 'aht_required'
     })
+  })
+
+  it('uses monthly record AHT as a compatibility fallback for saved applied forecasts', () => {
+    const payload = buildPlannerIntradayErlangPayload({
+      planningYear: 2026,
+      demandSource: {
+        forecastDailySnapshot: [
+          { serviceDate: '2026-01-02', monthIndex: 0, contacts: 100 }
+        ],
+        forecastMonthSnapshot: [
+          { monthIndex: 0, monthLabel: 'Jan 2026', ahtSeconds: null }
+        ]
+      },
+      monthlyRecords: [
+        {
+          monthIndex: 0,
+          ahtSeconds: 315,
+          occupancyPercent: 90
+        }
+      ],
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      operatingOpenTime: '08:00',
+      operatingCloseTime: '09:00',
+      serviceLevelPercent: 80,
+      serviceLevelThresholdSeconds: 20,
+      intraday: {
+        intervalLengthMinutes: 30,
+        intervalRatios: [
+          { startTime: '08:00', ratioPercent: 50 },
+          { startTime: '08:30', ratioPercent: 50 }
+        ]
+      }
+    })
+
+    expect(payload.status).toBe('ready')
+    expect(payload.rows).toEqual([
+      expect.objectContaining({
+        averageHandleTime: 315
+      }),
+      expect.objectContaining({
+        averageHandleTime: 315
+      })
+    ])
   })
 
   it('replaces workload-ratio outputs with neutral Erlang outputs until a month is calculated', () => {

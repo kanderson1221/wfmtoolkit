@@ -79,6 +79,30 @@ const PlanningForecastCreateModalStub = {
   `
 }
 
+const PlannerSettingsModalStub = {
+  name: 'PlannerSettingsModal',
+  props: [
+    'planningYear',
+    'yearOptions',
+    'canClose',
+    'statusMessage',
+    'statusTone'
+  ],
+  emits: ['cancel', 'close', 'update:planningYear', 'update:requirementMethod'],
+  template: `
+    <div>
+      <p>New Plan</p>
+      <p data-test="plan-settings-year">{{ planningYear || 'empty' }}</p>
+      <p data-test="plan-settings-can-close">{{ canClose ? 'open' : 'blocked' }}</p>
+      <ul data-test="plan-settings-year-options">
+        <li v-for="option in yearOptions" :key="option.value">{{ option.label }}</li>
+      </ul>
+      <p v-if="statusMessage" data-test="plan-settings-status">{{ statusMessage }}</p>
+      <button @click="$emit('close')">Create Plan</button>
+    </div>
+  `
+}
+
 const PlanningGroupIntradayViewStub = {
   name: 'PlanningGroupIntradayView',
   emits: ['save-intraday'],
@@ -168,7 +192,7 @@ const buildWrapper = (props = {}) =>
         PlanningGroupSettingsModal: true,
         PlanningForecastCreateModal: PlanningForecastCreateModalStub,
         PlanningGroupIntradayView: PlanningGroupIntradayViewStub,
-        PlannerSettingsModal: true
+        PlannerSettingsModal: PlannerSettingsModalStub
       }
     }
   })
@@ -202,6 +226,48 @@ const createDeferred = () => {
   return { promise, resolve, reject }
 }
 
+const buildForecastMonthlyRollup = (planningYear, monthCount = 12) =>
+  Array.from({ length: monthCount }, (_, index) => {
+    const monthNumber = index + 1
+    const monthStart = `${planningYear}-${String(monthNumber).padStart(2, '0')}-01`
+    const monthLabel = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      year: 'numeric'
+    }).format(new Date(`${monthStart}T00:00:00Z`))
+
+    return {
+      monthStart,
+      monthLabel,
+      contacts: 4000 + (index * 100),
+      averageDailyVolume: 200 + index,
+      peakDailyVolume: 260 + index,
+      lowerBoundContacts: 3800 + (index * 100),
+      upperBoundContacts: 4200 + (index * 100)
+    }
+  })
+
+const buildPlanningReadyForecast = (planningYear, id) =>
+  createForecastProject({
+    id,
+    name: `Voice Support ${planningYear} Budget Forecast`,
+    centerId: 'center-1',
+    planningYear,
+    forecastType: 'budget',
+    planningContext: {
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planningYear,
+      groupName: 'Voice Support'
+    },
+    lastRun: {
+      runAt: `${planningYear - 1}-12-15T12:00:00.000Z`,
+      monthlyRollup: buildForecastMonthlyRollup(planningYear),
+      summary: {
+        projectedTotalContacts: 54000
+      }
+    }
+  })
+
 describe('PlanningCenterView', () => {
   beforeEach(async () => {
     await clearLocalDataStore()
@@ -215,17 +281,78 @@ describe('PlanningCenterView', () => {
     const wrapper = buildWrapper()
     const plansTab = wrapper.findAll('button').find((node) => node.text().trim() === 'Plans')
     await plansTab.trigger('click')
-    const peakHeader = findSpanByText(wrapper, 'Peak Req HC')
-    const averageHeader = findSpanByText(wrapper, 'Avg Req HC')
+    const peakHeader = findSpanByText(wrapper, 'Peak Total Req HC')
+    const averageHeader = findSpanByText(wrapper, 'Avg Total Req HC')
 
     expect(peakHeader).toBeTruthy()
     expect(averageHeader).toBeTruthy()
-    expect(peakHeader.attributes('title')).toBe('Peak Required Headcount')
+    expect(peakHeader.attributes('title')).toBe('Peak Total Required Headcount')
     expect(peakHeader.classes()).toContain('whitespace-nowrap')
     expect(peakHeader.classes()).not.toContain('truncate')
-    expect(averageHeader.attributes('title')).toBe('Average Required Headcount')
+    expect(averageHeader.attributes('title')).toBe('Average Total Required Headcount')
     expect(averageHeader.classes()).toContain('whitespace-nowrap')
     expect(averageHeader.classes()).not.toContain('truncate')
+  })
+
+  it('derives plan summary rows from saved plan inputs when persisted summary demand metrics are stale', async () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 85,
+            defaultAdherencePercent: 95,
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
+            plans: [
+              {
+                id: 'plan-1',
+                planningYear: 2026,
+                planMonths: Array.from({ length: 12 }, () => ({
+                  contacts: 1000,
+                  ahtSeconds: 360,
+                  peakDayUpliftPercent: 0
+                })),
+                presenceMonths: Array.from({ length: 12 }, () => ({
+                  paidHoursPerDay: 8
+                })),
+                randomDefaults: {
+                  occupancyPercent: 100,
+                  adherencePercent: 100
+                },
+                startingHeadcount: 10,
+                startingFrontlineHeadcount: 10,
+                summary: {
+                  annualContacts: 12000,
+                  annualWorkloadHours: 0,
+                  annualRequiredStaffHours: 0,
+                  averageRequiredHeadcount: 0,
+                  peakRequiredHeadcount: 0,
+                  endingFrontlineHeadcount: 0,
+                  averageGapToRequirement: 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    await openTab(wrapper, 'Plans')
+
+    expect(wrapper.text()).toContain('Workload Ratio')
+    expect(wrapper.text()).toContain('12,000')
+    expect(wrapper.text()).toContain('1,200')
+    expect(wrapper.text()).not.toContain('Presence %')
+    expect(wrapper.text()).not.toContain('Utilization %')
   })
 
   it('uses matching compact xl header heights for the group and plan panes', () => {
@@ -297,6 +424,72 @@ describe('PlanningCenterView', () => {
     expect(window.location.hash).toBe(
       buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'budget' })
     )
+  })
+
+  it('limits new plan years to unused staffing-group forecast years that are ready for planning', async () => {
+    vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
+      projects: [
+        buildPlanningReadyForecast(2026, 'forecast-2026'),
+        buildPlanningReadyForecast(2028, 'forecast-2028'),
+        createForecastProject({
+          id: 'forecast-2027-incomplete',
+          name: 'Voice Support 2027 Incomplete Forecast',
+          centerId: 'center-1',
+          planningYear: 2027,
+          forecastType: 'budget',
+          planningContext: {
+            centerId: 'center-1',
+            groupId: 'group-1',
+            planningYear: 2027,
+            groupName: 'Voice Support'
+          },
+          lastRun: {
+            runAt: '2026-12-15T12:00:00.000Z',
+            monthlyRollup: buildForecastMonthlyRollup(2027, 1)
+          }
+        })
+      ],
+      error: null
+    })
+
+    const wrapper = buildWrapper()
+    await flushPromises()
+    await flushPromises()
+    await openTab(wrapper, 'Plans')
+
+    const newPlanButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Plan')
+    await newPlanButton.trigger('click')
+    await flushPromises()
+
+    const yearOptions = wrapper.find('[data-test="plan-settings-year-options"]').text()
+
+    expect(wrapper.text()).toContain('New Plan')
+    expect(wrapper.get('[data-test="plan-settings-year"]').text()).toBe('2028')
+    expect(yearOptions).toContain('2028')
+    expect(yearOptions).not.toContain('2026')
+    expect(yearOptions).not.toContain('2027')
+    expect(wrapper.get('[data-test="plan-settings-can-close"]').text()).toBe('open')
+  })
+
+  it('blocks new plan creation when the staffing group has no planning-ready saved forecasts', async () => {
+    vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
+      projects: [],
+      error: null
+    })
+
+    const wrapper = buildWrapper()
+    await flushPromises()
+    await flushPromises()
+    await openTab(wrapper, 'Plans')
+
+    const newPlanButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Plan')
+    await newPlanButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('New Plan')
+    expect(wrapper.get('[data-test="plan-settings-year-options"]').text()).toBe('')
+    expect(wrapper.get('[data-test="plan-settings-can-close"]').text()).toBe('blocked')
+    expect(wrapper.get('[data-test="plan-settings-status"]').text()).toContain('Create and save a staffing-group forecast for Voice Support before creating a plan.')
   })
 
   it('shows a device-based error message when staffing-group forecasts cannot be read locally', async () => {

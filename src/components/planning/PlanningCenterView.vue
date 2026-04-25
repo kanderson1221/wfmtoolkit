@@ -1,5 +1,5 @@
 <script setup>
-import { ref, toRef, watch } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import {
   mdiChartLineVariant,
   mdiFolderOutline,
@@ -84,7 +84,7 @@ const activeGroupWorkspaceTab = ref('data')
 const actualsViewRef = ref(null)
 
 const planComparisonGridClass =
-  'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(5.5rem,0.68fr)_minmax(6rem,0.76fr)_minmax(5.5rem,0.68fr)_minmax(6rem,0.72fr)_minmax(8.25rem,1fr)_minmax(8.25rem,1fr)] items-center'
+  'grid min-w-0 grid-cols-[minmax(5.25rem,0.62fr)_minmax(7.25rem,0.8fr)_minmax(6rem,0.72fr)_minmax(7rem,0.82fr)_minmax(7rem,0.82fr)_minmax(8.5rem,0.95fr)_minmax(8.5rem,0.95fr)_minmax(8.5rem,0.95fr)_minmax(6.5rem,0.72fr)] items-center'
 const forecastComparisonGridClass =
   'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(9.5rem,1fr)_minmax(7.25rem,0.8fr)_minmax(6rem,0.72fr)_minmax(6rem,0.72fr)_minmax(6.75rem,0.78fr)_minmax(6.75rem,0.8fr)_minmax(8.75rem,1fr)] items-center'
 
@@ -93,6 +93,11 @@ const forecastListRowGridClass = 'grid grid-cols-[auto_minmax(0,1fr)_8.25rem] it
 const planHeaderCellClass =
   'px-3 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap'
 const planHeaderCellRightClass = `${planHeaderCellClass} text-right`
+const formatSignedNumber = (value, digits = 1) => {
+  const numericValue = Number(value)
+  const prefix = Number.isFinite(numericValue) && numericValue > 0 ? '+' : ''
+  return `${prefix}${formatNumber(value, digits)}`
+}
 const STAFFING_GROUP_TABS = [
   { id: 'data', label: 'Data' },
   { id: 'forecasts', label: 'Forecasts' },
@@ -104,17 +109,14 @@ const resolveGroupWorkspaceTab = (value) => {
   return STAFFING_GROUP_TABS.some((item) => item.id === normalizedValue) ? normalizedValue : 'data'
 }
 const {
-  availableYearOptions,
   breadcrumbItems,
   createPlanHref,
   existingPlanForDraftYear,
   existingPlanHref,
   formatNumber,
-  formatPercent,
   formatWhole,
   groupRows,
   planRows,
-  resolveNextPlanYear,
   selectedGroup,
   selectedGroupDefaults,
   selectedYearModel
@@ -140,6 +142,64 @@ const {
   storageRefreshToken: toRef(props, 'storageRefreshToken')
 })
 
+const readyForecastPlanYears = computed(() => (
+  [...new Set(
+    forecastRows.value
+      .filter((forecast) => forecast.readyForPlanning)
+      .map((forecast) => Number(forecast.planningYear))
+      .filter((planningYear) => Number.isFinite(planningYear) && planningYear > 0)
+  )]
+).sort((left, right) => right - left))
+
+const availablePlanYearOptions = computed(() => {
+  const usedYears = new Set(
+    (selectedGroup.value?.plans || [])
+      .map((plan) => Number(plan.planningYear))
+      .filter((planningYear) => Number.isFinite(planningYear) && planningYear > 0)
+  )
+
+  return readyForecastPlanYears.value
+    .filter((planningYear) => !usedYears.has(planningYear))
+    .map((planningYear) => ({
+      label: String(planningYear),
+      value: planningYear
+    }))
+})
+
+const canCreatePlanDraft = computed(() =>
+  !forecastsLoading.value &&
+  availablePlanYearOptions.value.length > 0 &&
+  !existingPlanForDraftYear.value
+)
+
+const planSettingsStatusMessage = computed(() => {
+  if (!selectedGroup.value) {
+    return ''
+  }
+
+  if (forecastsLoading.value) {
+    return `Loading saved forecasts for ${selectedGroup.value.name}.`
+  }
+
+  if (!readyForecastPlanYears.value.length) {
+    return `Create and save a staffing-group forecast for ${selectedGroup.value.name} before creating a plan.`
+  }
+
+  if (!availablePlanYearOptions.value.length) {
+    return `Every forecast-backed year for ${selectedGroup.value.name} already has a saved plan.`
+  }
+
+  if (existingPlanForDraftYear.value) {
+    return `This staffing group already has a saved plan for ${newPlanYear.value}.`
+  }
+
+  return ''
+})
+
+const planSettingsStatusTone = computed(() =>
+  forecastsLoading.value ? 'info' : 'warning'
+)
+
 const openCreateGroup = () => {
   groupDraft.value = createPlanningGroupDraft({
     operatingWeekdays: props.center.operatingWeekdays,
@@ -154,7 +214,7 @@ const openPlanSettings = () => {
     return
   }
 
-  newPlanYear.value = resolveNextPlanYear(selectedGroup.value)
+  newPlanYear.value = Number(availablePlanYearOptions.value[0]?.value) || currentYear
   newPlanRequirementMethod.value = PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
   planSettingsOpen.value = true
 }
@@ -164,7 +224,7 @@ const closePlanSettings = () => {
 }
 
 const createPlan = () => {
-  if (!selectedGroup.value || existingPlanForDraftYear.value) {
+  if (!selectedGroup.value || !canCreatePlanDraft.value) {
     return
   }
 
@@ -345,6 +405,24 @@ watch(
     }
   },
   { immediate: true }
+)
+
+watch(
+  [planSettingsOpen, availablePlanYearOptions],
+  ([isOpen, yearOptions]) => {
+    if (!isOpen) {
+      return
+    }
+
+    const resolvedYearOptions = Array.isArray(yearOptions) ? yearOptions : []
+    const validYears = resolvedYearOptions
+      .map((option) => Number(option?.value))
+      .filter((planningYear) => Number.isFinite(planningYear) && planningYear > 0)
+
+    if (validYears.length && !validYears.includes(Number(newPlanYear.value))) {
+      newPlanYear.value = validYears[0]
+    }
+  }
 )
 
 watch(
@@ -731,23 +809,29 @@ watch(
                       <span :class="planHeaderCellClass">
                         Plan Year
                       </span>
+                      <span :class="planHeaderCellClass">
+                        Method
+                      </span>
                       <span :class="planHeaderCellRightClass">
                         Contacts
                       </span>
                       <span :class="planHeaderCellRightClass">
-                        Staff Hours
+                        Workload Hrs
                       </span>
                       <span :class="planHeaderCellRightClass">
-                        Presence %
+                        Total Req Hrs
                       </span>
-                      <span :class="planHeaderCellRightClass">
-                        Utilization %
+                      <span :class="planHeaderCellRightClass" title="Average Total Required Headcount">
+                        Avg Total Req HC
                       </span>
-                      <span :class="planHeaderCellRightClass" title="Peak Required Headcount">
-                        Peak Req HC
+                      <span :class="planHeaderCellRightClass" title="Peak Total Required Headcount">
+                        Peak Total Req HC
                       </span>
-                      <span :class="planHeaderCellRightClass" title="Average Required Headcount">
-                        Avg Req HC
+                      <span :class="planHeaderCellRightClass" title="Ending Frontline Headcount">
+                        Ending Frontline HC
+                      </span>
+                      <span :class="planHeaderCellRightClass" title="Average Gap to Required Headcount">
+                        Avg Gap
                       </span>
                     </div>
 
@@ -785,23 +869,29 @@ watch(
                           {{ plan.planningYear }}
                         </span>
                       </span>
+                      <span class="truncate px-3 font-medium text-slate-700">
+                        {{ plan.requirementMethodLabel }}
+                      </span>
                       <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
                         {{ formatWhole(plan.annualContacts) }}
                       </span>
                       <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatWhole(plan.neededStaffHours) }}
+                        {{ formatWhole(plan.annualWorkloadHours) }}
                       </span>
                       <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatPercent(plan.averagePresencePercent, 1) }}
+                        {{ formatWhole(plan.totalRequiredStaffHours) }}
                       </span>
                       <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatPercent(plan.averageUtilizationPercent, 1) }}
+                        {{ formatNumber(plan.averageTotalRequiredHeadcount, 1) }}
                       </span>
                       <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatNumber(plan.peakRequiredHeadcount, 1) }}
+                        {{ formatNumber(plan.peakTotalRequiredHeadcount, 1) }}
                       </span>
                       <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatNumber(plan.averageRequiredHeadcount, 1) }}
+                        {{ formatNumber(plan.endingFrontlineHeadcount, 1) }}
+                      </span>
+                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                        {{ formatSignedNumber(plan.averageGapToRequirement, 1) }}
                       </span>
                     </div>
 
@@ -864,14 +954,14 @@ watch(
       v-if="planSettingsOpen && selectedGroup"
       v-model:planning-year="newPlanYear"
       v-model:requirement-method="newPlanRequirementMethod"
-      :year-options="availableYearOptions"
+      :year-options="availablePlanYearOptions"
       :requirement-method-options="PLAN_REQUIREMENT_METHOD_OPTIONS"
-      :can-close="!existingPlanForDraftYear"
+      :can-close="canCreatePlanDraft"
       :existing-plan-href="existingPlanHref"
-      :status-message="existingPlanForDraftYear ? `This staffing group already has a saved plan for ${newPlanYear}.` : ''"
-      status-tone="warning"
+      :status-message="planSettingsStatusMessage"
+      :status-tone="planSettingsStatusTone"
       title="New Plan"
-      description="Choose the planning year for the new plan. Each staffing group can have only one saved plan per year."
+      description="Choose a planning year that already has a completed staffing-group forecast. Each staffing group can have only one saved plan per year."
       submit-label="Create Plan"
       @cancel="closePlanSettings"
       @close="createPlan"

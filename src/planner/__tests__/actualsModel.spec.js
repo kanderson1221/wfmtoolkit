@@ -1,7 +1,34 @@
-import { computeActualsRecords, summarizeActualsRecords } from '../actualsModel'
+import {
+  buildActualsMonthsFromDailyRows,
+  computeActualsRecords,
+  summarizeActualsRecords
+} from '../actualsModel'
 
 describe('actualsModel', () => {
-  it('derives actual requirement, gap, and overhead from entered actuals', () => {
+  it('rolls Data tab daily actuals into monthly contacts and weighted AHT', () => {
+    const months = buildActualsMonthsFromDailyRows(
+      [
+        { serviceDate: '2026-01-02', contacts: 100, ahtSeconds: 300 },
+        { serviceDate: '2026-01-03', contacts: 300, ahtSeconds: 340 },
+        { serviceDate: '2025-01-03', contacts: 1000, ahtSeconds: 500 }
+      ],
+      2026
+    )
+
+    expect(months[0]).toMatchObject({
+      monthIndex: 0,
+      actualContacts: 400,
+      actualAhtSeconds: 330,
+      loadedDaysCount: 2
+    })
+    expect(months[1]).toMatchObject({
+      actualContacts: null,
+      actualAhtSeconds: null,
+      loadedDaysCount: 0
+    })
+  })
+
+  it('derives actual requirement, gap, and overhead from monthly Data tab actuals', () => {
     const records = computeActualsRecords(
       [
         {
@@ -47,6 +74,89 @@ describe('actualsModel', () => {
       actualWorkloadHours: 1100,
       actualRequiredHeadcount: 10.3125,
       requiredHeadcountVariance: 0.3125
+    })
+  })
+
+  it('uses actual Erlang staffed hours for intraday actual requirements when provided', () => {
+    const records = computeActualsRecords(
+      [
+        {
+          monthIndex: 0,
+          label: 'Jan',
+          fullLabel: 'January',
+          contacts: 10000,
+          ahtSeconds: 300,
+          workloadHours: 833.3333333,
+          requiredHeadcount: 10,
+          workloadStaffingRatio: 1.25,
+          paidHoursPerMonth: 160
+        }
+      ],
+      [
+        {
+          startingRosterHeadcount: 20,
+          startingFrontlineHeadcount: 18,
+          endingRosterHeadcount: 19,
+          endingFrontlineHeadcount: 17,
+          gapToRequirement: 8
+        }
+      ],
+      [
+        {
+          actualContacts: 12000,
+          actualAhtSeconds: 330
+        }
+      ],
+      new Map([
+        [
+          0,
+          {
+            erlangStaffedHours: 1400
+          }
+        ]
+      ])
+    )
+
+    expect(records[0]).toMatchObject({
+      actualWorkloadHours: 1100,
+      actualErlangStaffedHours: 1400,
+      actualRequiredStaffHours: 1750,
+      actualRequiredHeadcount: 10.9375,
+      requiredHeadcountVariance: 0.9375
+    })
+  })
+
+  it('leaves intraday actual requirement blank until the actual Erlang rerun returns', () => {
+    const records = computeActualsRecords(
+      [
+        {
+          monthIndex: 0,
+          label: 'Jan',
+          fullLabel: 'January',
+          contacts: 10000,
+          ahtSeconds: 300,
+          workloadHours: 833.3333333,
+          requiredHeadcount: 10,
+          workloadStaffingRatio: 1.5,
+          paidHoursPerMonth: 160
+        }
+      ],
+      [{}],
+      [
+        {
+          actualContacts: 12000,
+          actualAhtSeconds: 330
+        }
+      ],
+      new Map()
+    )
+
+    expect(records[0]).toMatchObject({
+      actualWorkloadHours: 1100,
+      actualErlangStaffedHours: null,
+      actualRequiredStaffHours: null,
+      actualRequiredHeadcount: null,
+      requiredHeadcountVariance: null
     })
   })
 

@@ -99,7 +99,6 @@ const sampleCenters = [
             randomMonths: Array.from({ length: 12 }, () => ({ occupancyPercent: 90, adherencePercent: 95 })),
             useMonthlyRandomOverrides: false,
             planMonths: Array.from({ length: 12 }, () => ({ contacts: 1000, ahtSeconds: 300, peakDayUpliftPercent: 0 })),
-            actualsMonths: Array.from({ length: 12 }, () => ({ actualContacts: null, actualAhtSeconds: null })),
             trainingSettings: {
               trainingDurationWorkdays: 20,
               graduationYieldPercent: 100,

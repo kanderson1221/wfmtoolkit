@@ -7,6 +7,7 @@ import {
   createTrainingSettings,
   toNumber
 } from './shared'
+import { buildHolidayEntriesForYear } from './holidayCalendars'
 
 const parseDate = (value) => {
   if (!value) {
@@ -26,42 +27,81 @@ const monthEnd = (year, monthIndex) => new Date(year, monthIndex + 1, 0, 23, 59,
 const workdayWeekdays = new Set([1, 2, 3, 4, 5])
 const millisecondsPerDay = 1000 * 60 * 60 * 24
 
-const isWorkday = (date) => workdayWeekdays.has(date.getDay())
+const formatDateInput = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
-const moveToWorkdayOnOrAfter = (date) => {
+const createTrainingCalendar = (calendar = {}) => {
+  const holidaySetsByYear = new Map()
+
+  const resolveHolidaySet = (year) => {
+    if (!holidaySetsByYear.has(year)) {
+      holidaySetsByYear.set(
+        year,
+        new Set(
+          buildHolidayEntriesForYear({
+            year,
+            holidayCalendarId: calendar.holidayCalendarId,
+            disabledHolidayRuleIds: calendar.disabledHolidayRuleIds,
+            customHolidays: calendar.customHolidays
+          })
+            .filter((entry) => workdayWeekdays.has(entry.date.getDay()))
+            .map((entry) => formatDateInput(entry.date))
+        )
+      )
+    }
+
+    return holidaySetsByYear.get(year)
+  }
+
+  return {
+    isWorkday: (date) =>
+      workdayWeekdays.has(date.getDay()) && !resolveHolidaySet(date.getFullYear()).has(formatDateInput(date))
+  }
+}
+
+const resolveTrainingCalendar = (calendar) =>
+  calendar?.isWorkday instanceof Function ? calendar : createTrainingCalendar(calendar)
+
+const isWorkday = (date, calendar) => calendar.isWorkday(date)
+
+const moveToWorkdayOnOrAfter = (date, calendar) => {
   const nextDate = new Date(date)
 
-  while (!isWorkday(nextDate)) {
+  while (!isWorkday(nextDate, calendar)) {
     nextDate.setDate(nextDate.getDate() + 1)
   }
 
   return nextDate
 }
 
-const moveToWorkdayOnOrBefore = (date) => {
+const moveToWorkdayOnOrBefore = (date, calendar) => {
   const nextDate = new Date(date)
 
-  while (!isWorkday(nextDate)) {
+  while (!isWorkday(nextDate, calendar)) {
     nextDate.setDate(nextDate.getDate() - 1)
   }
 
   return nextDate
 }
 
-const moveToFirstWorkdayOfWeek = (date) => {
+const moveToFirstWorkdayOfWeek = (date, calendar) => {
   const nextDate = new Date(date)
   const weekdayOffset = (nextDate.getDay() + 6) % 7
   nextDate.setDate(nextDate.getDate() - weekdayOffset)
-  return moveToWorkdayOnOrAfter(nextDate)
+  return moveToWorkdayOnOrAfter(nextDate, calendar)
 }
 
-const moveToFirstWorkdayOfPreviousWeek = (date) => {
-  const nextDate = moveToFirstWorkdayOfWeek(date)
+const moveToFirstWorkdayOfPreviousWeek = (date, calendar) => {
+  const nextDate = moveToFirstWorkdayOfWeek(date, calendar)
   nextDate.setDate(nextDate.getDate() - 7)
-  return moveToWorkdayOnOrAfter(nextDate)
+  return moveToWorkdayOnOrAfter(nextDate, calendar)
 }
 
-const shiftWorkdays = (date, offset) => {
+const shiftWorkdays = (date, offset, calendar) => {
   const nextDate = new Date(date)
 
   if (offset === 0) {
@@ -74,7 +114,7 @@ const shiftWorkdays = (date, offset) => {
   while (remaining > 0) {
     nextDate.setDate(nextDate.getDate() + direction)
 
-    if (isWorkday(nextDate)) {
+    if (isWorkday(nextDate, calendar)) {
       remaining -= 1
     }
   }
@@ -82,21 +122,15 @@ const shiftWorkdays = (date, offset) => {
   return nextDate
 }
 
-const formatDateInput = (date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 const roundHeadcount = (value) => Math.round(toNumber(value, 0) * 10) / 10
 const hasExplicitNumericValue = (value) => value !== '' && value != null && Number.isFinite(Number(value))
 const resolveHeadcount = (value, fallback) =>
   hasExplicitNumericValue(value) ? roundHeadcount(value) : roundHeadcount(fallback)
 
-export const deriveTrainingClassMetrics = (trainingClass, trainingSettings) => {
+export const deriveTrainingClassMetrics = (trainingClass, trainingSettings, trainingCalendarOptions = {}) => {
   const normalizedClass = createTrainingClass(trainingClass)
   const normalizedSettings = createTrainingSettings(trainingSettings)
+  const trainingCalendar = resolveTrainingCalendar(trainingCalendarOptions)
   const hireDate = parseDate(normalizedClass.hireDate)
   const graduatingHeadcount = resolveHeadcount(normalizedClass.graduatingHeadcount, normalizedClass.hireCount)
   const projectedGraduatingHeadcount = resolveHeadcount(
@@ -124,11 +158,13 @@ export const deriveTrainingClassMetrics = (trainingClass, trainingSettings) => {
 
   const derivedGraduationDate = shiftWorkdays(
     hireDate,
-    Math.max(normalizedSettings.trainingDurationWorkdays - 1, 0)
+    Math.max(normalizedSettings.trainingDurationWorkdays - 1, 0),
+    trainingCalendar
   )
   const derivedFrontlineReadyDate = shiftWorkdays(
     derivedGraduationDate,
-    normalizedSettings.postTrainingNestingDays
+    normalizedSettings.postTrainingNestingDays,
+    trainingCalendar
   )
   const graduationDate = parseDate(normalizedClass.graduationDate) || derivedGraduationDate
   const frontlineReadyDate = parseDate(normalizedClass.frontlineReadyDate) || derivedFrontlineReadyDate
@@ -146,11 +182,12 @@ export const deriveTrainingClassMetrics = (trainingClass, trainingSettings) => {
   }
 }
 
-const buildTrainingClassMonthlySummary = (planningYear, trainingClasses, trainingSettings) => {
+const buildTrainingClassMonthlySummary = (planningYear, trainingClasses, trainingSettings, trainingCalendarOptions = {}) => {
   const normalizedSettings = createTrainingSettings(trainingSettings)
+  const trainingCalendar = resolveTrainingCalendar(trainingCalendarOptions)
   const normalizedClasses = (Array.isArray(trainingClasses) ? trainingClasses : []).map((trainingClass, index) => {
     const nextClass = createTrainingClass(trainingClass)
-    const metrics = deriveTrainingClassMetrics(nextClass, normalizedSettings)
+    const metrics = deriveTrainingClassMetrics(nextClass, normalizedSettings, trainingCalendar)
 
     return {
       ...nextClass,
@@ -257,9 +294,20 @@ const buildTrainingClassMonthlySummary = (planningYear, trainingClasses, trainin
   }
 }
 
-export const deriveStartingFrontlineHeadcount = (planningYear, startingHeadcount, trainingClasses, trainingSettings) => {
+export const deriveStartingFrontlineHeadcount = (
+  planningYear,
+  startingHeadcount,
+  trainingClasses,
+  trainingSettings,
+  trainingCalendarOptions = {}
+) => {
   const rosterHeadcount = Math.max(toNumber(startingHeadcount, 0), 0)
-  const trainingSummary = buildTrainingClassMonthlySummary(planningYear, trainingClasses, trainingSettings)
+  const trainingSummary = buildTrainingClassMonthlySummary(
+    planningYear,
+    trainingClasses,
+    trainingSettings,
+    trainingCalendarOptions
+  )
   const startingNonFrontlineHeadcount = trainingSummary.monthlySummary[0]?.startingNonFrontlineHeadcount || 0
 
   return Math.min(Math.max(rosterHeadcount - startingNonFrontlineHeadcount, 0), rosterHeadcount)
@@ -272,9 +320,15 @@ export const computeStaffingRecords = (
   startingFrontlineHeadcount,
   staffingMonths,
   trainingClasses,
-  trainingSettings
+  trainingSettings,
+  trainingCalendarOptions = {}
 ) => {
-  const trainingSummary = buildTrainingClassMonthlySummary(planningYear, trainingClasses, trainingSettings)
+  const trainingSummary = buildTrainingClassMonthlySummary(
+    planningYear,
+    trainingClasses,
+    trainingSettings,
+    trainingCalendarOptions
+  )
   const normalizedStartingHeadcount = Math.max(toNumber(startingHeadcount, 0), 0)
   const normalizedStartingFrontlineHeadcount = Math.max(toNumber(startingFrontlineHeadcount, normalizedStartingHeadcount), 0)
   const openingCarryInNonFrontlineHeadcount = trainingSummary.monthlySummary[0]?.startingNonFrontlineHeadcount || 0
@@ -392,6 +446,7 @@ export const recommendTrainingClasses = ({
   staffingMonths,
   trainingClasses,
   trainingSettings,
+  trainingCalendar: trainingCalendarOptions = {},
   targetNextYearStartingFrontlineHeadcount = null,
   minimumHireDate = null,
   maximumHireDate = null,
@@ -400,6 +455,7 @@ export const recommendTrainingClasses = ({
   recommendationSource = 'recommended'
 }) => {
   const normalizedSettings = createTrainingSettings(trainingSettings)
+  const trainingCalendar = resolveTrainingCalendar(trainingCalendarOptions)
   const yieldShare = normalizedSettings.graduationYieldPercent / 100
 
   if (
@@ -426,12 +482,13 @@ export const recommendTrainingClasses = ({
     startingFrontlineHeadcount,
     staffingMonths,
     manualClasses,
-    normalizedSettings
+    normalizedSettings,
+    trainingCalendar
   )
   const parsedMinimumHireDate = parseDate(minimumHireDate) || monthStart(planningYear, 0)
   const parsedMaximumHireDate = parseDate(maximumHireDate)
-  const planStartDate = moveToWorkdayOnOrAfter(parsedMinimumHireDate)
-  const planEndDate = parsedMaximumHireDate ? moveToWorkdayOnOrBefore(parsedMaximumHireDate) : null
+  const planStartDate = moveToWorkdayOnOrAfter(parsedMinimumHireDate, trainingCalendar)
+  const planEndDate = parsedMaximumHireDate ? moveToWorkdayOnOrBefore(parsedMaximumHireDate, trainingCalendar) : null
   const totalWorkdayLag = Math.max(
     normalizedSettings.trainingDurationWorkdays - 1 + normalizedSettings.postTrainingNestingDays,
     0
@@ -453,12 +510,13 @@ export const recommendTrainingClasses = ({
     }
 
     const targetFrontlineReadyDate = moveToWorkdayOnOrBefore(
-      new Date(monthStart(planningYear, monthIndex).getTime() - millisecondsPerDay)
+      new Date(monthStart(planningYear, monthIndex).getTime() - millisecondsPerDay),
+      trainingCalendar
     )
-    let candidateHireDate = shiftWorkdays(targetFrontlineReadyDate, -totalWorkdayLag)
+    let candidateHireDate = shiftWorkdays(targetFrontlineReadyDate, -totalWorkdayLag, trainingCalendar)
 
     if (normalizedSettings.startOnFirstBusinessDayOfWeek) {
-      candidateHireDate = moveToFirstWorkdayOfWeek(candidateHireDate)
+      candidateHireDate = moveToFirstWorkdayOfWeek(candidateHireDate, trainingCalendar)
     }
 
     if (candidateHireDate < planStartDate || (planEndDate && candidateHireDate > planEndDate)) {
@@ -473,11 +531,13 @@ export const recommendTrainingClasses = ({
 
       const candidateGraduationDate = shiftWorkdays(
         candidateHireDate,
-        Math.max(normalizedSettings.trainingDurationWorkdays - 1, 0)
+        Math.max(normalizedSettings.trainingDurationWorkdays - 1, 0),
+        trainingCalendar
       )
       const candidateFrontlineReadyDate = shiftWorkdays(
         candidateGraduationDate,
-        normalizedSettings.postTrainingNestingDays
+        normalizedSettings.postTrainingNestingDays,
+        trainingCalendar
       )
 
       if (candidateFrontlineReadyDate > targetFrontlineReadyDate) {
@@ -487,7 +547,8 @@ export const recommendTrainingClasses = ({
       const normalizedClasses = buildTrainingClassMonthlySummary(
         planningYear,
         [...manualClasses, ...recommendations],
-        normalizedSettings
+        normalizedSettings,
+        trainingCalendar
       ).classes
 
       const concurrentClassCount = normalizedClasses.filter(
@@ -503,8 +564,8 @@ export const recommendTrainingClasses = ({
 
       if (concurrentClassCount >= normalizedSettings.availableTrainers) {
         const nextCandidateHireDate = normalizedSettings.startOnFirstBusinessDayOfWeek
-          ? moveToFirstWorkdayOfPreviousWeek(candidateHireDate)
-          : shiftWorkdays(candidateHireDate, -1)
+          ? moveToFirstWorkdayOfPreviousWeek(candidateHireDate, trainingCalendar)
+          : shiftWorkdays(candidateHireDate, -1, trainingCalendar)
 
         if (nextCandidateHireDate < planStartDate) {
           break
@@ -531,7 +592,8 @@ export const recommendTrainingClasses = ({
         startingFrontlineHeadcount,
         staffingMonths,
         [...manualClasses, ...recommendations],
-        normalizedSettings
+        normalizedSettings,
+        trainingCalendar
       )
 
       remainingHiresNeeded = Math.max(
@@ -551,15 +613,15 @@ export const recommendTrainingClasses = ({
     : null
 
   if (normalizedTargetNextYearStartingFrontlineHeadcount != null) {
-    const targetFrontlineReadyDate = moveToWorkdayOnOrBefore(monthEnd(planningYear, 11))
+    const targetFrontlineReadyDate = moveToWorkdayOnOrBefore(monthEnd(planningYear, 11), trainingCalendar)
     let remainingNextYearStartingFrontlineGap = Math.max(
       normalizedTargetNextYearStartingFrontlineHeadcount - (staffingProjection[staffingProjection.length - 1]?.endingFrontlineHeadcount || 0),
       0
     )
-    let candidateHireDate = shiftWorkdays(targetFrontlineReadyDate, -totalWorkdayLag)
+    let candidateHireDate = shiftWorkdays(targetFrontlineReadyDate, -totalWorkdayLag, trainingCalendar)
 
     if (normalizedSettings.startOnFirstBusinessDayOfWeek) {
-      candidateHireDate = moveToFirstWorkdayOfWeek(candidateHireDate)
+      candidateHireDate = moveToFirstWorkdayOfWeek(candidateHireDate, trainingCalendar)
     }
 
     let safetyCounter = 0
@@ -573,11 +635,13 @@ export const recommendTrainingClasses = ({
 
       const candidateGraduationDate = shiftWorkdays(
         candidateHireDate,
-        Math.max(normalizedSettings.trainingDurationWorkdays - 1, 0)
+        Math.max(normalizedSettings.trainingDurationWorkdays - 1, 0),
+        trainingCalendar
       )
       const candidateFrontlineReadyDate = shiftWorkdays(
         candidateGraduationDate,
-        normalizedSettings.postTrainingNestingDays
+        normalizedSettings.postTrainingNestingDays,
+        trainingCalendar
       )
 
       if (candidateFrontlineReadyDate > targetFrontlineReadyDate) {
@@ -587,7 +651,8 @@ export const recommendTrainingClasses = ({
       const normalizedClasses = buildTrainingClassMonthlySummary(
         planningYear,
         [...manualClasses, ...recommendations],
-        normalizedSettings
+        normalizedSettings,
+        trainingCalendar
       ).classes
       const concurrentClassCount = normalizedClasses.filter(
         (trainingClass) =>
@@ -602,8 +667,8 @@ export const recommendTrainingClasses = ({
 
       if (concurrentClassCount >= normalizedSettings.availableTrainers) {
         candidateHireDate = normalizedSettings.startOnFirstBusinessDayOfWeek
-          ? moveToFirstWorkdayOfPreviousWeek(candidateHireDate)
-          : shiftWorkdays(candidateHireDate, -1)
+          ? moveToFirstWorkdayOfPreviousWeek(candidateHireDate, trainingCalendar)
+          : shiftWorkdays(candidateHireDate, -1, trainingCalendar)
         continue
       }
 
@@ -627,7 +692,8 @@ export const recommendTrainingClasses = ({
         startingFrontlineHeadcount,
         staffingMonths,
         [...manualClasses, ...recommendations],
-        normalizedSettings
+        normalizedSettings,
+        trainingCalendar
       )
 
       remainingNextYearStartingFrontlineGap = Math.max(
@@ -637,8 +703,8 @@ export const recommendTrainingClasses = ({
 
       if (remainingNextYearStartingFrontlineGap > 0.05) {
         candidateHireDate = normalizedSettings.startOnFirstBusinessDayOfWeek
-          ? moveToFirstWorkdayOfPreviousWeek(candidateHireDate)
-          : shiftWorkdays(candidateHireDate, -1)
+          ? moveToFirstWorkdayOfPreviousWeek(candidateHireDate, trainingCalendar)
+          : shiftWorkdays(candidateHireDate, -1, trainingCalendar)
       }
     }
   }

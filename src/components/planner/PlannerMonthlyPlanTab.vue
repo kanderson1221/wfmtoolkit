@@ -1,8 +1,11 @@
 <script setup>
-import { computed } from 'vue'
+import { mdiDownload } from '@mdi/js'
+import { computed, ref } from 'vue'
 
 import AppButton from '../ui/AppButton.vue'
+import AppInfoTooltip from '../ui/AppInfoTooltip.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
+import AppSelect from '../ui/AppSelect.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import { DEMAND_SOURCE_FORECAST, derivePeakDayUpliftPercent } from '../../planner/demandSources'
@@ -15,6 +18,10 @@ const props = defineProps({
   monthlyRecords: {
     type: Array,
     required: true
+  },
+  intervalRecords: {
+    type: Array,
+    default: () => []
   },
   requirementMethod: {
     type: String,
@@ -59,6 +66,14 @@ const props = defineProps({
 
 const emit = defineEmits(['previous', 'continue'])
 
+const CSV_MIME_TYPE = 'text/csv;charset=utf-8'
+
+const intervalPressureMetricOptions = [
+  { label: 'Peak Day HC', value: 'peak_day_total' },
+  { label: 'P80 Total HC', value: 'p80_interval_total' },
+  { label: 'P90 Total HC', value: 'p90_interval_total' }
+]
+
 const planMonths = defineModel('planMonths', {
   type: Array,
   default: null
@@ -69,6 +84,8 @@ const selectedMonthIndex = defineModel('selectedMonthIndex', {
   required: true
 })
 
+const selectedIntervalPressureMetric = ref('peak_day_total')
+
 const selectedMonth = computed(
   () => props.monthlyRecords[selectedMonthIndex.value] ?? props.monthlyRecords[0] ?? { planWarnings: [], label: 'month' }
 )
@@ -76,6 +93,61 @@ const selectedMonth = computed(
 const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
 const requirementTitle = computed(() => 'Demand Model')
 const previousLabel = computed(() => isIntradayErlang.value ? 'Back to Erlang Inputs' : 'Back to Random/Variability')
+
+const parseFiniteNumber = (value) => {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+const formatCsvNumber = (value, digits = null) => {
+  const number = parseFiniteNumber(value)
+
+  if (number == null) {
+    return ''
+  }
+
+  return digits == null ? String(number) : String(Number(number.toFixed(digits)))
+}
+
+const formatCsvRatioAsPercent = (value, digits = 4) => {
+  const number = parseFiniteNumber(value)
+  return number == null ? '' : formatCsvNumber(number * 100, digits)
+}
+
+const escapeCsvValue = (value) => {
+  if (value == null) {
+    return ''
+  }
+
+  const text = String(value)
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+const buildCsv = (columns, rows) => [
+  columns.map((column) => escapeCsvValue(column.header)).join(','),
+  ...rows.map((row) => columns.map((column) => escapeCsvValue(column.value(row))).join(','))
+].join('\r\n')
+
+const downloadCsv = (fileName, csvText) => {
+  const blob = new Blob([csvText], { type: CSV_MIME_TYPE })
+  const downloadUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = downloadUrl
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(downloadUrl)
+}
+
+const sanitizeFileNamePart = (value) => {
+  const sanitized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return sanitized || 'intraday-erlang'
+}
 
 const setSelectedMonth = (monthIndex) => {
   selectedMonthIndex.value = monthIndex
@@ -119,6 +191,11 @@ const resolveWorkloadRatioAht = (monthIndex) => {
     return forecastAht
   }
 
+  const recordAht = Number(props.monthlyRecords?.[monthIndex]?.ahtSeconds)
+  if (Number.isFinite(recordAht) && recordAht > 0) {
+    return recordAht
+  }
+
   const planAht = Number(planMonths.value?.[monthIndex]?.ahtSeconds)
   return Number.isFinite(planAht) && planAht >= 0 ? planAht : null
 }
@@ -133,6 +210,265 @@ const resolveWorkloadRatioPeakDayUplift = (monthIndex) => {
   return Number.isFinite(planPeakDay) && planPeakDay >= 0 ? planPeakDay : null
 }
 
+const resolveBaseHeadcount = (record = {}) => {
+  const erlangStaffedHours = parseFiniteNumber(record.erlangStaffedHours)
+
+  if (erlangStaffedHours == null) {
+    return null
+  }
+
+  const paidHoursPerMonth = parseFiniteNumber(record.paidHoursPerMonth)
+  if (paidHoursPerMonth != null && paidHoursPerMonth > 0) {
+    return erlangStaffedHours / paidHoursPerMonth
+  }
+
+  const totalHeadcount = parseFiniteNumber(record.requiredHeadcount)
+  const staffingRatio = parseFiniteNumber(record.workloadStaffingRatio)
+  return totalHeadcount != null && staffingRatio != null && staffingRatio > 0
+    ? totalHeadcount / staffingRatio
+    : null
+}
+
+const monthLabelByIndex = computed(() =>
+  new Map(
+    props.monthlyRecords.map((record, fallbackMonthIndex) => [
+      record.monthIndex ?? fallbackMonthIndex,
+      record.label || record.fullLabel || `Month ${fallbackMonthIndex + 1}`
+    ])
+  )
+)
+
+const monthlyRecordByIndex = computed(() =>
+  new Map(
+    props.monthlyRecords.map((record, fallbackMonthIndex) => [
+      record.monthIndex ?? fallbackMonthIndex,
+      record
+    ])
+  )
+)
+
+const resolveIntervalStaffingRatio = (record) => {
+  const monthIndex = parseFiniteNumber(record?.monthIndex)
+  const monthlyRecord = monthIndex == null ? null : monthlyRecordByIndex.value.get(monthIndex)
+  return parseFiniteNumber(monthlyRecord?.workloadStaffingRatio)
+}
+
+const resolveIntervalWfmLaborHoursGross = (record) => {
+  const laborHoursNet = parseFiniteNumber(record.laborHoursNet)
+  const staffingRatio = resolveIntervalStaffingRatio(record)
+
+  return laborHoursNet == null || staffingRatio == null ? null : laborHoursNet * staffingRatio
+}
+
+const resolveIntervalTotalHeadcount = (record) => {
+  const requiredStaffNet = parseFiniteNumber(record?.requiredStaffNet)
+  const staffingRatio = resolveIntervalStaffingRatio(record)
+
+  return requiredStaffNet == null || staffingRatio == null ? null : requiredStaffNet * staffingRatio
+}
+
+const resolveNearestRankPercentile = (values, percentile) => {
+  const sortedValues = values
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => left - right)
+
+  if (!sortedValues.length) {
+    return null
+  }
+
+  const percentileIndex = Math.ceil(percentile * sortedValues.length) - 1
+  return sortedValues[Math.max(0, Math.min(sortedValues.length - 1, percentileIndex))]
+}
+
+const intervalPressureByMonthIndex = computed(() => {
+  const groupedValues = new Map()
+
+  for (const record of Array.isArray(props.intervalRecords) ? props.intervalRecords : []) {
+    const monthIndex = parseFiniteNumber(record?.monthIndex)
+    const intervalTotalHeadcount = resolveIntervalTotalHeadcount(record)
+
+    if (monthIndex == null || intervalTotalHeadcount == null) {
+      continue
+    }
+
+    const normalizedMonthIndex = Math.round(monthIndex)
+    const values = groupedValues.get(normalizedMonthIndex) ?? []
+    values.push(intervalTotalHeadcount)
+    groupedValues.set(normalizedMonthIndex, values)
+  }
+
+  return new Map(
+    Array.from(groupedValues.entries()).map(([monthIndex, values]) => [
+      monthIndex,
+      {
+        p80: resolveNearestRankPercentile(values, 0.8),
+        p90: resolveNearestRankPercentile(values, 0.9)
+      }
+    ])
+  )
+})
+
+const resolveSelectedIntervalPressureHeadcount = (record) => {
+  const monthIndex = parseFiniteNumber(record?.monthIndex)
+  const intervalPressure = monthIndex == null
+    ? null
+    : intervalPressureByMonthIndex.value.get(Math.round(monthIndex))
+
+  if (selectedIntervalPressureMetric.value === 'p80_interval_total') {
+    return intervalPressure?.p80 ?? null
+  }
+
+  if (selectedIntervalPressureMetric.value === 'p90_interval_total') {
+    return intervalPressure?.p90 ?? null
+  }
+
+  return parseFiniteNumber(record?.peakDayRequiredHeadcount)
+}
+
+const exportYear = computed(() => {
+  const importedYear = parseFiniteNumber(props.demandSource?.importedPlanningYear)
+
+  if (importedYear != null) {
+    return Math.round(importedYear)
+  }
+
+  const datedRow = [
+    ...(Array.isArray(props.intervalRecords) ? props.intervalRecords : []),
+    ...(Array.isArray(props.demandSource?.forecastDailySnapshot) ? props.demandSource.forecastDailySnapshot : []),
+    ...(Array.isArray(props.demandSource?.forecastMonthSnapshot) ? props.demandSource.forecastMonthSnapshot : [])
+  ].find((row) => /^(\d{4})-/.test(String(row?.serviceDate || row?.monthStart || '')))
+  const yearText = String(datedRow?.serviceDate || datedRow?.monthStart || '').slice(0, 4)
+  const year = parseFiniteNumber(yearText)
+
+  return year == null ? null : Math.round(year)
+})
+
+const exportFilePrefix = computed(() => {
+  const defaultExportName = isIntradayErlang.value ? 'intraday-erlang' : 'staffing-ratio'
+  const sourceName =
+    props.currentDemandSourceSummary?.projectName ||
+    props.demandSource?.forecastProjectName ||
+    defaultExportName
+  const yearSuffix = exportYear.value == null ? '' : `-${exportYear.value}`
+
+  return `${sanitizeFileNamePart(sourceName)}${yearSuffix}`
+})
+
+const monthlyExportRows = computed(() =>
+  Array.isArray(props.monthlyRecords) ? props.monthlyRecords : []
+)
+
+const intervalExportRows = computed(() =>
+  isIntradayErlang.value
+    ? [...(Array.isArray(props.intervalRecords) ? props.intervalRecords : [])].sort((left, right) => {
+        const leftKey = `${left?.serviceDate || ''} ${left?.intervalStart || ''}`
+        const rightKey = `${right?.serviceDate || ''} ${right?.intervalStart || ''}`
+        return leftKey.localeCompare(rightKey)
+      })
+    : []
+)
+
+const standardMonthlyExportColumns = computed(() => [
+  { header: 'month', value: (record) => record.label || record.fullLabel || '' },
+  {
+    header: 'contacts',
+    value: (record) => formatCsvNumber(planMonths.value?.[record.monthIndex]?.contacts ?? record.contacts, 6)
+  },
+  { header: 'aht_seconds', value: (record) => formatCsvNumber(resolveWorkloadRatioAht(record.monthIndex), 6) },
+  { header: 'peak_day_percent', value: (record) => formatCsvNumber(resolveWorkloadRatioPeakDayUplift(record.monthIndex), 6) },
+  { header: 'business_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'scheduled_percent', value: (record) => formatCsvNumber(record.scheduledPercent, 6) },
+  { header: 'random_percent', value: (record) => formatCsvNumber(record.randomLossPercent, 6) },
+  { header: 'design_percent', value: (record) => formatCsvNumber(record.designFactorPercent, 6) },
+  { header: 'staffing_ratio', value: (record) => formatCsvNumber(record.workloadStaffingRatio, 6) },
+  { header: 'workload_hours', value: (record) => formatCsvNumber(record.workloadHours, 6) },
+  { header: 'required_hours', value: (record) => formatCsvNumber(record.requiredStaffHours, 6) },
+  { header: 'required_headcount', value: (record) => formatCsvNumber(record.requiredHeadcount, 6) },
+  { header: 'peak_day_required_headcount', value: (record) => formatCsvNumber(record.peakDayRequiredHeadcount, 6) }
+])
+
+const selectedIntervalPressureExportHeader = computed(() => {
+  if (selectedIntervalPressureMetric.value === 'p80_interval_total') {
+    return 'p80_interval_total_headcount'
+  }
+
+  if (selectedIntervalPressureMetric.value === 'p90_interval_total') {
+    return 'p90_interval_total_headcount'
+  }
+
+  return 'peak_day_total_headcount'
+})
+
+const intradayErlangMonthlyExportColumns = computed(() => [
+  { header: 'month', value: (record) => record.label || record.fullLabel || '' },
+  {
+    header: 'contacts',
+    value: (record) => formatCsvNumber(planMonths.value?.[record.monthIndex]?.contacts ?? record.contacts, 6)
+  },
+  { header: 'aht_seconds', value: (record) => formatCsvNumber(resolveWorkloadRatioAht(record.monthIndex), 6) },
+  { header: 'business_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'workload_hours', value: (record) => formatCsvNumber(record.workloadHours, 6) },
+  { header: 'erlang_hours', value: (record) => formatCsvNumber(record.erlangStaffedHours, 6) },
+  { header: 'base_headcount', value: (record) => formatCsvNumber(resolveBaseHeadcount(record), 6) },
+  { header: 'occupancy_percent', value: (record) => formatCsvNumber(record.weightedOccupancyPercent, 6) },
+  { header: 'service_level_percent', value: (record) => formatCsvNumber(record.weightedServiceLevelPercent, 6) },
+  { header: 'scheduled_percent', value: (record) => formatCsvNumber(record.scheduledPercent, 6) },
+  { header: 'random_percent', value: (record) => formatCsvNumber(record.randomLossPercent, 6) },
+  { header: 'design_percent', value: (record) => formatCsvNumber(record.designFactorPercent, 6) },
+  { header: 'staffing_ratio', value: (record) => formatCsvNumber(record.workloadStaffingRatio, 6) },
+  { header: 'total_required_hours', value: (record) => formatCsvNumber(record.requiredStaffHours, 6) },
+  { header: 'total_required_headcount', value: (record) => formatCsvNumber(record.requiredHeadcount, 6) },
+  { header: selectedIntervalPressureExportHeader.value, value: (record) => formatCsvNumber(resolveSelectedIntervalPressureHeadcount(record), 6) }
+])
+
+const monthlyExportColumns = computed(() =>
+  isIntradayErlang.value
+    ? intradayErlangMonthlyExportColumns.value
+    : standardMonthlyExportColumns.value
+)
+
+const intervalExportColumns = computed(() => [
+  { header: 'month_index', value: (record) => formatCsvNumber(record.monthIndex, 0) },
+  { header: 'month', value: (record) => monthLabelByIndex.value.get(record.monthIndex) || '' },
+  { header: 'service_date', value: (record) => record.serviceDate || '' },
+  { header: 'interval_start', value: (record) => record.intervalStart || '' },
+  { header: 'interval_length_minutes', value: (record) => formatCsvNumber(record.intervalLengthMinutes, 6) },
+  { header: 'calls_offered', value: (record) => formatCsvNumber(record.callsOffered, 6) },
+  { header: 'average_handle_time_seconds', value: (record) => formatCsvNumber(record.averageHandleTimeSeconds, 6) },
+  { header: 'workload_hours', value: (record) => formatCsvNumber(record.workloadHours, 6) },
+  { header: 'required_staff_net', value: (record) => formatCsvNumber(record.requiredStaffNet, 6) },
+  { header: 'labor_hours_net', value: (record) => formatCsvNumber(record.laborHoursNet, 6) },
+  { header: 'wfm_staffing_ratio', value: (record) => formatCsvNumber(resolveIntervalStaffingRatio(record), 6) },
+  { header: 'wfm_labor_hours_gross', value: (record) => formatCsvNumber(resolveIntervalWfmLaborHoursGross(record), 6) },
+  { header: 'service_level_percent', value: (record) => formatCsvRatioAsPercent(record.serviceLevel, 6) },
+  { header: 'occupancy_percent', value: (record) => formatCsvRatioAsPercent(record.occupancy, 6) },
+  { header: 'average_speed_of_answer_seconds', value: (record) => formatCsvNumber(record.averageSpeedOfAnswerSeconds, 6) },
+  { header: 'answered_immediately_percent', value: (record) => formatCsvRatioAsPercent(record.percentAnsweredImmediately, 6) },
+  { header: 'abandon_percent', value: (record) => formatCsvRatioAsPercent(record.abandonPercent, 6) }
+])
+
+const downloadMonthlyCsv = () => {
+  if (!monthlyExportRows.value.length) {
+    return
+  }
+
+  downloadCsv(
+    `${exportFilePrefix.value}-monthly-demand-model.csv`,
+    buildCsv(monthlyExportColumns.value, monthlyExportRows.value)
+  )
+}
+
+const downloadIntervalCsv = () => {
+  if (!intervalExportRows.value.length) {
+    return
+  }
+
+  downloadCsv(
+    `${exportFilePrefix.value}-interval-demand-model.csv`,
+    buildCsv(intervalExportColumns.value, intervalExportRows.value)
+  )
+}
+
 const summaryItems = computed(() => {
   if (isIntradayErlang.value) {
     return [
@@ -145,24 +481,16 @@ const summaryItems = computed(() => {
         value: props.formatWhole(props.planSummary?.annualWorkloadHours)
       },
       {
-        label: 'Annual Erlang Hrs',
+        label: 'Annual Base Erlang Hrs',
         value: formatOptionalNumber(props.planSummary?.annualErlangStaffedHours, 1)
       },
       {
-        label: 'Avg Weighted Occ',
-        value: formatOptionalPercent(props.planSummary?.averageWeightedOccupancyPercent, 1)
+        label: 'Annual Total Req Hrs',
+        value: formatOptionalNumber(props.planSummary?.annualRequiredStaffHours, 1)
       },
       {
-        label: 'Avg Service Level',
-        value: formatOptionalPercent(props.planSummary?.averageWeightedServiceLevelPercent, 1)
-      },
-      {
-        label: 'Req Headcount',
+        label: 'Avg Total Req HC',
         value: props.formatNumber(props.planSummary?.averageRequiredHeadcount, 1)
-      },
-      {
-        label: 'Peak Interval Req HC',
-        value: formatOptionalNumber(props.planSummary?.peakIntervalMonth?.peakIntervalRequiredHeadcount, 1)
       }
     ]
   }
@@ -194,6 +522,10 @@ const summaryItems = computed(() => {
     }
   ]
 })
+
+const summaryColumns = computed(() =>
+  isIntradayErlang.value ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-2 xl:grid-cols-6'
+)
 
 const contactsSourceMessage = computed(() => {
   if (isIntradayErlang.value) {
@@ -249,7 +581,7 @@ const requirementModeTone = computed(() => {
   <section class="monthly-tab-panel">
     <AppSectionHeader :title="requirementTitle" />
 
-    <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-6" />
+    <AppStatStrip :items="summaryItems" :columns="summaryColumns" />
 
     <AppStatusMessage>
       {{ contactsSourceMessage }}
@@ -260,7 +592,31 @@ const requirementModeTone = computed(() => {
     </AppStatusMessage>
 
     <section class="grid gap-3">
-      <AppSectionHeader title="Monthly Requirement Worksheet" />
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <AppSectionHeader title="Monthly Requirement Worksheet" />
+
+        <div class="flex flex-wrap items-center gap-2">
+          <AppButton
+            variant="secondary"
+            size="sm"
+            :icon="mdiDownload"
+            :disabled="!monthlyExportRows.length"
+            @click="downloadMonthlyCsv"
+          >
+            Download Monthly CSV
+          </AppButton>
+          <AppButton
+            v-if="isIntradayErlang"
+            variant="secondary"
+            size="sm"
+            :icon="mdiDownload"
+            :disabled="!intervalExportRows.length"
+            @click="downloadIntervalCsv"
+          >
+            Download Interval CSV
+          </AppButton>
+        </div>
+      </div>
 
       <div class="assumption-table-shell">
       <table
@@ -276,14 +632,15 @@ const requirementModeTone = computed(() => {
           <col class="plan-col-context plan-col-context-days" />
           <col class="plan-col-output plan-col-output-workload" />
           <col class="plan-col-output plan-col-output-erlang" />
+          <col class="plan-col-output plan-col-output-base" />
           <col class="plan-col-output plan-col-output-occupancy" />
           <col class="plan-col-output plan-col-output-service" />
           <col class="plan-col-context plan-col-context-scheduled" />
           <col class="plan-col-context plan-col-context-random" />
           <col class="plan-col-context plan-col-context-design" />
           <col class="plan-col-context plan-col-context-ratio" />
+          <col class="plan-col-output plan-col-output-required" />
           <col class="plan-col-output plan-col-output-average" />
-          <col class="plan-col-output plan-col-output-peak" />
           <col class="plan-col-output plan-col-output-peak" />
         </colgroup>
         <colgroup v-else>
@@ -305,9 +662,9 @@ const requirementModeTone = computed(() => {
           <tr class="plan-group-row">
             <template v-if="isIntradayErlang">
               <th colspan="4" scope="colgroup">Context</th>
-              <th colspan="4" scope="colgroup" class="plan-output-group-head">Erlang</th>
+              <th colspan="5" scope="colgroup" class="plan-output-group-head">Base Erlang Need</th>
               <th colspan="4" scope="colgroup">Overhead</th>
-              <th colspan="3" scope="colgroup" class="plan-output-group-head">Outputs</th>
+              <th colspan="3" scope="colgroup" class="plan-output-group-head">Total Staffing Need</th>
             </template>
             <template v-else>
               <th colspan="4" scope="colgroup">Inputs</th>
@@ -326,35 +683,41 @@ const requirementModeTone = computed(() => {
               <span class="plan-head-label">Peak Day<br />%</span>
             </th>
             <th title="Business days flowing in from the call-center operating days and holiday closures.">
-              <span class="plan-head-label">Business<br />Days</span>
+              <span class="plan-head-label">Bus. Days</span>
             </th>
             <th v-if="isIntradayErlang" title="Monthly workload hours calculated from contacts and AHT.">
-              <span class="plan-head-label plan-output-head-label">Workload<br />Hrs</span>
+              <span class="plan-head-label plan-output-head-label">Wkld Hrs</span>
             </th>
             <th v-if="isIntradayErlang" title="Monthly staffed hours returned from interval Erlang calculations.">
-              <span class="plan-head-label plan-output-head-label">Erlang<br />Hrs</span>
+              <span class="plan-head-label plan-output-head-label">Erlang Hrs</span>
+            </th>
+            <th
+              v-if="isIntradayErlang"
+              title="Base headcount before overhead or random loss, calculated as monthly Erlang hours divided by monthly paid hours."
+            >
+              <span class="plan-head-label plan-output-head-label">Base HC</span>
             </th>
             <th
               v-if="isIntradayErlang"
               title="Weighted monthly occupancy calculated from the interval Erlang outputs."
             >
-              <span class="plan-head-label plan-output-head-label">Occupancy</span>
+              <span class="plan-head-label plan-output-head-label">Occ. %</span>
             </th>
             <th
               v-if="isIntradayErlang"
               title="Weighted achieved service level calculated from the interval Erlang outputs."
             >
-              <span class="plan-head-label plan-output-head-label">Service<br />Level</span>
+              <span class="plan-head-label plan-output-head-label">SL %</span>
             </th>
-            <th title="Scheduled percentage flowing in from the presence / utilization step.">Scheduled %</th>
+            <th title="Scheduled percentage flowing in from the presence / utilization step.">Sched. %</th>
             <th title="Total scheduled random loss flowing in from the random step.">
-              <span class="plan-head-label">Random<br />%</span>
+              <span class="plan-head-label">Random %</span>
             </th>
             <th title="Design Factor is calculated as Scheduled % - Total Random Loss %.">
-              <span class="plan-head-label">Design<br />%</span>
+              <span class="plan-head-label">Design %</span>
             </th>
             <th title="Workload Staffing Ratio is calculated as 1 / Design Factor.">
-              <span class="plan-head-label">Staffing<br />Ratio</span>
+              <span class="plan-head-label">Staff Ratio</span>
             </th>
             <th v-if="!isIntradayErlang" title="Monthly workload hours calculated from contacts and AHT.">
               <span class="plan-head-label">Workload<br />Hrs</span>
@@ -362,25 +725,44 @@ const requirementModeTone = computed(() => {
             <th v-if="!isIntradayErlang" title="Required staff hours calculated as Workload Hours x Workload Staffing Ratio.">
               <span class="plan-head-label">Required<br />Hrs</span>
             </th>
-            <th :title="isIntradayErlang ? 'Required headcount calculated from monthly required hours and paid hours per month after applying the overhead section.' : 'Required headcount calculated as Required Staff Hours / Monthly FTE Paid Hours from the presence / utilization step.'">
+            <th
+              v-if="isIntradayErlang"
+              title="Total required staff hours after applying overhead and random loss assumptions to monthly Erlang hours."
+            >
+              <span class="plan-head-label plan-output-head-label">Total Hrs</span>
+            </th>
+            <th :title="isIntradayErlang ? 'Total required headcount calculated from total required hours and paid hours per month after applying overhead and random loss assumptions.' : 'Required headcount calculated as Required Staff Hours / Monthly FTE Paid Hours from the presence / utilization step.'">
               <span :class="['plan-head-label', isIntradayErlang && 'plan-output-head-label']">
-                {{ isIntradayErlang ? 'Required' : 'Avg Req' }}<br />{{ isIntradayErlang ? 'Headcount' : 'HC' }}
+                {{ isIntradayErlang ? 'Total HC' : 'Avg Req' }}<template v-if="!isIntradayErlang"><br />HC</template>
               </span>
             </th>
             <th
               v-if="isIntradayErlang"
-              title="Peak day required headcount calculated from the busiest open day after applying the overhead section."
+              class="plan-adjustable-head"
             >
-              <span :class="['plan-head-label', 'plan-output-head-label']">Peak Day<br />Req HC</span>
+              <span class="plan-head-cell plan-head-cell-select">
+                <AppSelect
+                  v-model="selectedIntervalPressureMetric"
+                  :options="intervalPressureMetricOptions"
+                  option-label="label"
+                  option-value="value"
+                  compact
+                  plain
+                  class="plan-head-select"
+                  aria-label="Interval pressure headcount metric"
+                />
+                <AppInfoTooltip
+                  label="interval pressure headcount metric"
+                  content="Choose the Erlang staffing pressure metric for this column. Peak Day uses the busiest open day. P80 and P90 use monthly interval total headcount after applying the staffing ratio."
+                  class="plan-head-info"
+                />
+              </span>
             </th>
             <th
-              :title="isIntradayErlang
-                ? 'Peak interval headcount returned from the monthly interval Erlang run.'
-                : 'Peak-day headcount calculated from average open-day contacts plus Peak Day Uplift %.'"
+              v-if="!isIntradayErlang"
+              title="Peak-day headcount calculated from average open-day contacts plus Peak Day Uplift %."
             >
-              <span :class="['plan-head-label', isIntradayErlang && 'plan-output-head-label']">
-                {{ isIntradayErlang ? 'Peak Interval' : 'Peak Day' }}<br />Req HC
-              </span>
+              <span class="plan-head-label">Peak Day<br />Req HC</span>
             </th>
           </tr>
         </thead>
@@ -405,7 +787,7 @@ const requirementModeTone = computed(() => {
             </td>
             <td>
               <template v-if="isIntradayErlang">
-                {{ formatOptionalNumber(forecastAhtByMonthIndex.get(record.monthIndex), 0) }}
+                {{ formatOptionalNumber(resolveWorkloadRatioAht(record.monthIndex), 0) }}
               </template>
               <template v-else>
                 {{ formatOptionalNumber(resolveWorkloadRatioAht(record.monthIndex), 0) }}
@@ -417,6 +799,7 @@ const requirementModeTone = computed(() => {
             <td>{{ props.formatWhole(record.openDays) }}</td>
             <td v-if="isIntradayErlang" class="plan-output-cell">{{ props.formatNumber(record.workloadHours, 1) }}</td>
             <td v-if="isIntradayErlang" class="plan-output-cell">{{ formatOptionalNumber(record.erlangStaffedHours, 1) }}</td>
+            <td v-if="isIntradayErlang" class="plan-output-cell">{{ formatOptionalNumber(resolveBaseHeadcount(record), 1) }}</td>
             <td v-if="isIntradayErlang" class="plan-output-cell">{{ formatOptionalPercent(record.weightedOccupancyPercent, 1) }}</td>
             <td v-if="isIntradayErlang" class="plan-output-cell">{{ formatOptionalPercent(record.weightedServiceLevelPercent, 1) }}</td>
             <td>{{ props.formatPercent(record.scheduledPercent, 1) }}</td>
@@ -425,14 +808,13 @@ const requirementModeTone = computed(() => {
             <td>{{ props.formatFactor(record.workloadStaffingRatio) }}</td>
             <td v-if="!isIntradayErlang">{{ props.formatNumber(record.workloadHours, 1) }}</td>
             <td v-if="!isIntradayErlang">{{ props.formatNumber(record.requiredStaffHours, 1) }}</td>
+            <td v-if="isIntradayErlang" class="plan-output-cell">{{ props.formatNumber(record.requiredStaffHours, 1) }}</td>
             <td :class="{ 'plan-output-cell': isIntradayErlang }">{{ props.formatNumber(record.requiredHeadcount, 1) }}</td>
-            <td v-if="isIntradayErlang" :class="{ 'plan-output-cell': isIntradayErlang }">
-              {{ props.formatNumber(record.peakDayRequiredHeadcount, 1) }}
+            <td v-if="isIntradayErlang" class="plan-output-cell">
+              {{ formatOptionalNumber(resolveSelectedIntervalPressureHeadcount(record), 1) }}
             </td>
-            <td :class="{ 'plan-output-cell': isIntradayErlang }">
-              {{ isIntradayErlang
-                ? formatOptionalNumber(record.peakIntervalRequiredHeadcount, 1)
-                : props.formatNumber(record.peakDayRequiredHeadcount, 1) }}
+            <td v-if="!isIntradayErlang">
+              {{ props.formatNumber(record.peakDayRequiredHeadcount, 1) }}
             </td>
           </tr>
         </tbody>

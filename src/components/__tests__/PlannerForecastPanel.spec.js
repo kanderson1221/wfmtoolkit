@@ -28,7 +28,7 @@ describe('PlannerForecastPanel', () => {
     const wrapper = mountPanel()
 
     expect(wrapper.text()).toContain('Demand Source')
-    expect(wrapper.text()).toContain('Choose a saved staffing-group forecast')
+    expect(wrapper.text()).toContain('Review the forecast currently applied')
     expect(wrapper.text()).not.toContain('Manual monthly contacts are maintained here.')
   })
 
@@ -75,18 +75,27 @@ describe('PlannerForecastPanel', () => {
         matchedMonthCount: 12
       },
       currentDemandSourceSummary: {
-        projectName: 'Consumer Voice 2026 Forecast'
+        projectName: 'Consumer Voice 2026 Forecast',
+        coverageLabel: '12/12 months',
+        totalContacts: 175000,
+        averageAhtSeconds: 286.4,
+        importedAt: '2026-04-07T12:00:00Z'
       },
-      forecastCanApply: true
+      forecastCanApply: true,
+      forecastApplyMessage: 'Reapplied Consumer Voice 2026 Forecast. Monthly contacts and starting AHT assumptions were refreshed from the saved forecast.'
     })
 
+    expect(wrapper.text()).toContain('Currently Applied')
     expect(wrapper.text()).toContain('12/12 months')
     expect(wrapper.text()).toContain('175000')
     expect(wrapper.text()).toContain('286.4 sec')
     expect(wrapper.text()).toContain('Applied')
     expect(wrapper.text()).toContain('Applied to this plan')
+    expect(wrapper.text()).toContain('Reapplied Consumer Voice 2026 Forecast')
     expect(wrapper.text()).toContain('Reapply Forecast to Contacts & AHT')
     expect(wrapper.text()).not.toContain('Open Staffing Group Forecasts')
+    expect(wrapper.get('button').classes()).toContain('bg-[#15395f]')
+    expect(wrapper.findAll('h3').filter((node) => node.text() === 'Consumer Voice 2026 Forecast')).toHaveLength(1)
   })
 
   it('shows saved-forecast controls only when forecast sourcing is selected', () => {
@@ -101,9 +110,49 @@ describe('PlannerForecastPanel', () => {
       ]
     })
 
-    expect(wrapper.text()).toContain('Saved Forecast')
+    expect(wrapper.text()).toContain('Replace Forecast')
     expect(wrapper.text()).toContain('Select a saved forecast to preview its coverage for this plan year.')
     expect(wrapper.text()).not.toContain('Monthly Contact Volume')
+  })
+
+  it('keeps the applied forecast visible even before a replacement forecast is selected', () => {
+    const wrapper = mountPanel({
+      demandSource: createPlanDemandSource({
+        mode: 'forecast',
+        forecastProjectId: 'forecast-1',
+        forecastProjectName: 'Consumer Voice 2026 Forecast',
+        importedAt: '2026-04-07T12:00:00Z',
+        forecastMonthSnapshot: [
+          {
+            monthIndex: 0,
+            monthLabel: 'Jan',
+            contacts: 14000,
+            ahtSeconds: 286.4
+          }
+        ]
+      }),
+      forecastSelectOptions: [
+        { label: 'Select a saved forecast', value: '' },
+        { label: 'Consumer Voice 2026 Forecast', value: 'forecast-1' }
+      ],
+      currentDemandSourceSummary: {
+        projectName: 'Consumer Voice 2026 Forecast',
+        sourceKindLabel: 'Modeled',
+        forecastType: 'budget',
+        coverageLabel: '12/12 months',
+        totalContacts: 175000,
+        averageAhtSeconds: 286.4,
+        peakMonthLabel: 'January',
+        runAt: '2026-04-06T12:00:00Z'
+      }
+    })
+
+    expect(wrapper.text()).toContain('Currently Applied')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Forecast')
+    expect(wrapper.text()).toContain('12/12 months')
+    expect(wrapper.text()).toContain('175000')
+    expect(wrapper.text()).toContain('286.4 sec')
+    expect(wrapper.text()).toContain('Select another saved forecast to preview and replace the currently applied source.')
   })
 
   it('shows the one-time legacy conversion state for manual plans', () => {

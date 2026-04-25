@@ -25,6 +25,18 @@ import {
   summarizeForecastDailyDemandForOpenDays
 } from './demandSources'
 
+const normalizeMonthIndex = (value, fallback = 0) =>
+  Math.max(0, Math.min(MONTH_LABELS.length - 1, Math.round(toNumber(value, fallback))))
+
+const buildForecastMonthByMonthIndex = (demandSource = {}) =>
+  new Map(
+    (Array.isArray(demandSource?.forecastMonthSnapshot) ? demandSource.forecastMonthSnapshot : [])
+      .map((month, fallbackMonthIndex) => [
+        normalizeMonthIndex(month?.monthIndex, fallbackMonthIndex),
+        month
+      ])
+  )
+
 export const calculateCalendarOpenDays = (
   year,
   monthIndex,
@@ -166,6 +178,10 @@ export const computeMonthlyRecords = ({
       demandSource?.mode === DEMAND_SOURCE_FORECAST &&
       Array.isArray(demandSource?.forecastDailySnapshot) &&
       demandSource.forecastDailySnapshot.length > 0
+    const forecastMonthByMonthIndex =
+      demandSource?.mode === DEMAND_SOURCE_FORECAST
+        ? buildForecastMonthByMonthIndex(demandSource)
+        : new Map()
 
     return MONTH_LABELS.map((label, monthIndex) => {
     const resolvedRequirementMethod = normalizePlanRequirementMethod(requirementMethod)
@@ -175,6 +191,7 @@ export const computeMonthlyRecords = ({
       : createRandomMonth(randomDefaults || {})
     const planInput = createPlanMonth(planMonths?.[monthIndex] || {})
     const filteredForecastDemand = forecastDailyDemandByMonthIndex.get(monthIndex) || null
+    const forecastMonth = forecastMonthByMonthIndex.get(monthIndex) || null
 
     const {
       weekdayOpenDays,
@@ -245,7 +262,12 @@ export const computeMonthlyRecords = ({
     const contacts = hasForecastDailyDemand
       ? Math.max(toNumber(filteredForecastDemand?.contacts, 0), 0)
       : Math.max(toNumber(planInput.contacts, 0), 0)
-    const ahtSeconds = Math.max(toNumber(planInput.ahtSeconds, 0), 0)
+    const forecastAhtSeconds = forecastMonth?.ahtSeconds == null
+      ? null
+      : Math.max(toNumber(forecastMonth.ahtSeconds, 0), 0)
+    const ahtSeconds = forecastAhtSeconds != null
+      ? forecastAhtSeconds
+      : Math.max(toNumber(planInput.ahtSeconds, 0), 0)
     const peakDayUpliftPercent = hasForecastDailyDemand
       ? derivePeakDayUpliftPercent(filteredForecastDemand || {})
       : Math.max(toNumber(planInput.peakDayUpliftPercent, 0), 0)

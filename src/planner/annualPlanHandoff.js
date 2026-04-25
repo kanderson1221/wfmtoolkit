@@ -37,6 +37,14 @@ const stripTrainingClassOutcomes = (trainingClass) => {
 
 const isFiniteHeadcount = (value) => value !== '' && value != null && Number.isFinite(Number(value))
 
+const buildPlanTrainingCalendar = (plan = {}) => ({
+  holidayCalendarId: plan.holidayCalendarId,
+  disabledHolidayRuleIds: Array.isArray(plan.disabledHolidayRuleIds) ? [...plan.disabledHolidayRuleIds] : [],
+  customHolidays: Array.isArray(plan.customHolidays)
+    ? plan.customHolidays.map((holiday) => ({ ...holiday }))
+    : []
+})
+
 export const getPlanYear = (plan, fallback = getCurrentCalendarYear()) =>
   resolvePlanningYear(plan?.planningYear, fallback)
 
@@ -107,10 +115,11 @@ export const buildInheritedTrainingClasses = ({ priorPlan, planningYear }) => {
 
   const planStartDate = new Date(getPlanYear({ planningYear }), 0, 1)
   const normalizedSettings = createTrainingSettings(priorPlan.trainingSettings || {})
+  const trainingCalendar = buildPlanTrainingCalendar(priorPlan)
 
   return (Array.isArray(priorPlan.trainingClasses) ? priorPlan.trainingClasses : []).flatMap((trainingClass, index) => {
     const normalizedTrainingClass = createTrainingClass(trainingClass)
-    const metrics = deriveTrainingClassMetrics(normalizedTrainingClass, normalizedSettings)
+    const metrics = deriveTrainingClassMetrics(normalizedTrainingClass, normalizedSettings, trainingCalendar)
 
     if (!metrics.isValid || metrics.hireDate >= planStartDate || metrics.frontlineReadyDate < planStartDate) {
       return []
@@ -133,9 +142,14 @@ export const buildInheritedTrainingClasses = ({ priorPlan, planningYear }) => {
   })
 }
 
-export const shouldPersistCrossYearTrainingClass = (trainingClass, planningYear, trainingSettings) => {
+export const shouldPersistCrossYearTrainingClass = (
+  trainingClass,
+  planningYear,
+  trainingSettings,
+  trainingCalendar = {}
+) => {
   const normalizedPlanningYear = getPlanYear({ planningYear })
-  const metrics = deriveTrainingClassMetrics(stripTrainingClassOutcomes(trainingClass), trainingSettings)
+  const metrics = deriveTrainingClassMetrics(stripTrainingClassOutcomes(trainingClass), trainingSettings, trainingCalendar)
 
   return (
     metrics.isValid &&
@@ -144,11 +158,11 @@ export const shouldPersistCrossYearTrainingClass = (trainingClass, planningYear,
   )
 }
 
-export const persistTrainingClassOutcomes = (trainingClass, planningYear, trainingSettings) => {
+export const persistTrainingClassOutcomes = (trainingClass, planningYear, trainingSettings, trainingCalendar = {}) => {
   const baseTrainingClass = stripTrainingClassOutcomes(trainingClass)
-  const metrics = deriveTrainingClassMetrics(baseTrainingClass, trainingSettings)
+  const metrics = deriveTrainingClassMetrics(baseTrainingClass, trainingSettings, trainingCalendar)
 
-  if (!shouldPersistCrossYearTrainingClass(baseTrainingClass, planningYear, trainingSettings)) {
+  if (!shouldPersistCrossYearTrainingClass(baseTrainingClass, planningYear, trainingSettings, trainingCalendar)) {
     return baseTrainingClass
   }
 

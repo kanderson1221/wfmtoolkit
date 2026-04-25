@@ -1,13 +1,13 @@
 import { computed, ref, watch } from 'vue'
 
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../planner/shared'
-import { buildPlannerIntradayErlangPayload } from '../../planner/intradayErlang'
+import { buildPlannerActualsIntradayErlangPayload } from '../../planner/intradayErlang'
 
 const extractApiErrorMessage = async (response) => {
   const rawErrorText = await response.text().catch(() => '')
 
   if (!rawErrorText) {
-    return `Intraday Erlang request failed (${response.status}).`
+    return `Actuals Erlang request failed (${response.status}).`
   }
 
   try {
@@ -24,79 +24,13 @@ const extractApiErrorMessage = async (response) => {
     }
   }
 
-  return `Intraday Erlang request failed (${response.status}).`
+  return `Actuals Erlang request failed (${response.status}).`
 }
 
-const parseFiniteNumber = (value) => {
-  if (value == null || (typeof value === 'string' && !value.trim())) {
-    return null
-  }
-
-  const number = Number(value)
-  return Number.isFinite(number) ? number : null
-}
-
-const firstFiniteNumber = (...values) => {
-  for (const value of values) {
-    const number = parseFiniteNumber(value)
-
-    if (number != null) {
-      return number
-    }
-  }
-
-  return null
-}
-
-const roundMetric = (value) => {
-  const number = parseFiniteNumber(value)
-  return number == null ? null : Number(number.toFixed(6))
-}
-
-const enrichIntervalOutputRows = (intervalPlans = [], requestRows = []) =>
-  (Array.isArray(intervalPlans) ? intervalPlans : []).map((intervalPlan, index) => {
-    const requestRow = Array.isArray(requestRows) ? requestRows[index] || {} : {}
-    const intervalLengthMinutes = firstFiniteNumber(
-      intervalPlan?.intervalLengthMinutes,
-      requestRow.intervalLengthMinutes
-    )
-    const callsOffered = firstFiniteNumber(intervalPlan?.callsOffered, requestRow.callsOffered)
-    const averageHandleTimeSeconds = firstFiniteNumber(
-      intervalPlan?.averageHandleTimeSeconds,
-      requestRow.averageHandleTime,
-      requestRow.averageHandleTimeSeconds
-    )
-    const workloadHours = firstFiniteNumber(
-      intervalPlan?.workloadHours,
-      callsOffered == null || averageHandleTimeSeconds == null
-        ? null
-        : callsOffered * averageHandleTimeSeconds / 3600
-    )
-    const requiredStaffNet = firstFiniteNumber(intervalPlan?.requiredStaffNet)
-    const intervalHours = intervalLengthMinutes == null ? null : intervalLengthMinutes / 60
-    const laborHoursNet = firstFiniteNumber(
-      intervalPlan?.laborHoursNet,
-      requiredStaffNet == null || intervalHours == null ? null : requiredStaffNet * intervalHours
-    )
-
-    return {
-      ...intervalPlan,
-      monthIndex: firstFiniteNumber(intervalPlan?.monthIndex, requestRow.monthIndex),
-      serviceDate: intervalPlan?.serviceDate || requestRow.serviceDate || '',
-      intervalStart: intervalPlan?.intervalStart || requestRow.intervalStart || '',
-      intervalLengthMinutes,
-      callsOffered,
-      averageHandleTimeSeconds,
-      workloadHours: roundMetric(workloadHours),
-      requiredStaffNet,
-      laborHoursNet: roundMetric(laborHoursNet)
-    }
-  })
-
-export const usePlannerIntradayErlang = ({
+export const usePlannerActualsIntradayErlang = ({
   requirementMethod,
   planningYear,
-  demandSource,
+  actualDailyRows,
   monthlyRecords,
   operatingWeekdays,
   holidayCalendarId,
@@ -111,8 +45,6 @@ export const usePlannerIntradayErlang = ({
   const status = ref('idle')
   const message = ref('')
   const monthlyOutputsByMonthIndex = ref(new Map())
-  const intervalOutputs = ref([])
-  const dailyOutputs = ref([])
   let requestToken = 0
 
   const payloadState = computed(() => {
@@ -124,9 +56,9 @@ export const usePlannerIntradayErlang = ({
       }
     }
 
-    return buildPlannerIntradayErlangPayload({
+    return buildPlannerActualsIntradayErlangPayload({
       planningYear: planningYear.value,
-      demandSource: demandSource.value,
+      actualDailyRows: actualDailyRows.value,
       monthlyRecords: monthlyRecords.value,
       operatingWeekdays: operatingWeekdays.value,
       holidayCalendarId: holidayCalendarId.value,
@@ -146,10 +78,7 @@ export const usePlannerIntradayErlang = ({
       requestToken += 1
       const currentToken = requestToken
 
-      intervalOutputs.value = []
-      dailyOutputs.value = []
-
-      if (nextPayloadState.status === 'inactive') {
+      if (nextPayloadState.status === 'inactive' || nextPayloadState.status === 'actuals_required') {
         status.value = 'idle'
         message.value = ''
         monthlyOutputsByMonthIndex.value = new Map()
@@ -164,7 +93,7 @@ export const usePlannerIntradayErlang = ({
       }
 
       status.value = 'loading'
-      message.value = 'Calculating interval Erlang outputs from the applied daily forecast.'
+      message.value = 'Calculating actual Intraday Erlang requirements.'
 
       try {
         const response = await fetch('/api/planner/intraday-erlang/calculate', {
@@ -190,8 +119,6 @@ export const usePlannerIntradayErlang = ({
         monthlyOutputsByMonthIndex.value = new Map(
           (Array.isArray(payload?.monthlyPlans) ? payload.monthlyPlans : []).map((row) => [row.monthIndex, row])
         )
-        intervalOutputs.value = enrichIntervalOutputRows(payload?.intervalPlans, nextPayloadState.rows)
-        dailyOutputs.value = Array.isArray(payload?.dailyPlans) ? payload.dailyPlans : []
         status.value = 'ready'
         message.value = ''
       } catch (error) {
@@ -208,21 +135,19 @@ export const usePlannerIntradayErlang = ({
         }
 
         status.value = 'error'
-        message.value = error instanceof Error ? error.message : 'Unable to calculate interval Erlang outputs.'
+        message.value = error instanceof Error ? error.message : 'Unable to calculate actual Intraday Erlang requirements.'
       }
     },
     { deep: true, immediate: true }
   )
 
-  const erlangStatus = computed(() => ({
+  const actualsErlangStatus = computed(() => ({
     status: status.value,
     message: message.value
   }))
 
   return {
-    erlangStatus,
-    monthlyOutputsByMonthIndex,
-    intervalOutputs,
-    dailyOutputs
+    actualsErlangStatus,
+    monthlyOutputsByMonthIndex
   }
 }

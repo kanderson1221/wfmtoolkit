@@ -33,8 +33,12 @@ export const usePlannerForecastDemandSource = ({
   selectedForecastProjectId
 }) => {
   const availableForecastProjects = ref([])
+  const forecastsLoaded = ref(false)
   const forecastsLoading = ref(false)
   const forecastsError = ref('')
+  const forecastApplyMessage = ref('')
+  const forecastApplyTone = ref('success')
+  const normalizeForecastId = (value) => String(value || '').trim()
 
   const forecastStorageScope = computed(() =>
     props.centerDefaults?.forecastStorageScope ||
@@ -61,6 +65,7 @@ export const usePlannerForecastDemandSource = ({
   )
 
   const loadForecastProjects = async () => {
+    forecastsLoaded.value = false
     forecastsLoading.value = true
     forecastsError.value = ''
     const centerId = String(props.centerDefaults?.centerId || '').trim()
@@ -90,6 +95,7 @@ export const usePlannerForecastDemandSource = ({
     }
 
     forecastsLoading.value = false
+    forecastsLoaded.value = true
 
   }
 
@@ -114,13 +120,31 @@ export const usePlannerForecastDemandSource = ({
   )
 
   watch(
-    forecastProjectsWithResults,
-    (projects) => {
-      if (!selectedForecastProjectId.value) {
+    [
+      forecastProjectsWithResults,
+      () => demandSource.value.mode,
+      () => demandSource.value.forecastProjectId,
+      () => demandSource.value.forecastMonthSnapshot?.length || 0,
+      forecastsLoaded
+    ],
+    ([projects, mode, appliedForecastId, appliedSnapshotLength, loaded]) => {
+      const availableProjectIds = new Set(projects.map((project) => normalizeForecastId(project?.id)))
+      const normalizedSelectedForecastId = normalizeForecastId(selectedForecastProjectId.value)
+
+      if (normalizedSelectedForecastId && availableProjectIds.has(normalizedSelectedForecastId)) {
         return
       }
 
-      if (!projects.some((project) => project.id === selectedForecastProjectId.value)) {
+      const normalizedAppliedForecastId = mode === DEMAND_SOURCE_FORECAST && appliedSnapshotLength > 0
+        ? normalizeForecastId(appliedForecastId)
+        : ''
+
+      if (normalizedAppliedForecastId && availableProjectIds.has(normalizedAppliedForecastId)) {
+        selectedForecastProjectId.value = normalizedAppliedForecastId
+        return
+      }
+
+      if (loaded && normalizedSelectedForecastId) {
         selectedForecastProjectId.value = ''
       }
     },
@@ -205,9 +229,12 @@ export const usePlannerForecastDemandSource = ({
 
   const applyForecastToDemand = () => {
     if (!selectedForecastProject.value || !selectedForecastSnapshot.value.length) {
-      return
+      forecastApplyTone.value = 'error'
+      forecastApplyMessage.value = 'Select a completed saved forecast before applying it to this plan.'
+      return false
     }
 
+    const wasSameForecast = normalizeForecastId(demandSource.value.forecastProjectId) === normalizeForecastId(selectedForecastProject.value.id)
     planMonths.value = applyForecastSnapshotToPlanMonths(planMonths.value, selectedForecastSnapshot.value)
     demandSource.value = createPlanDemandSource({
       mode: DEMAND_SOURCE_FORECAST,
@@ -222,6 +249,9 @@ export const usePlannerForecastDemandSource = ({
       forecastMonthSnapshot: selectedForecastSnapshot.value,
       forecastDailySnapshot: selectedForecastDailySnapshot.value
     })
+    forecastApplyTone.value = 'success'
+    forecastApplyMessage.value = `${wasSameForecast ? 'Reapplied' : 'Applied'} ${selectedForecastProject.value.name}. Monthly contacts and starting AHT assumptions were refreshed from the saved forecast.`
+    return true
   }
 
   const hasLegacyManualDemandSource = computed(() =>
@@ -330,6 +360,10 @@ export const usePlannerForecastDemandSource = ({
     }
   )
 
+  watch(selectedForecastProjectId, () => {
+    forecastApplyMessage.value = ''
+  })
+
   onMounted(() => {
     void loadForecastProjects()
   })
@@ -348,25 +382,6 @@ export const usePlannerForecastDemandSource = ({
     }
   )
 
-  watch(
-    [forecastProjectsWithResults, selectedForecastProjectId],
-    ([projects, selectedForecastId]) => {
-      const normalizedSelectedForecastId = String(selectedForecastId || '').trim()
-
-      if (!normalizedSelectedForecastId) {
-        return
-      }
-
-      const stillAvailable = projects.some(
-        (project) => String(project?.id || '').trim() === normalizedSelectedForecastId
-      )
-
-      if (!stillAvailable) {
-        selectedForecastProjectId.value = ''
-      }
-    }
-  )
-
   return {
     availableForecastProjects,
     savedForecastProjectCount,
@@ -377,6 +392,8 @@ export const usePlannerForecastDemandSource = ({
     selectedForecastPreviewSummary,
     demandSourceSummary,
     forecastCanApply,
+    forecastApplyMessage,
+    forecastApplyTone,
     applyForecastToDemand,
     convertLegacyManualDemandSource,
     hasLegacyManualDemandSource,

@@ -352,7 +352,7 @@ defineExpose({
 
     <AppEmptyState
       v-else
-      class="p-5"
+      class="m-5"
       title="No data loaded"
       description="Use Add Data to upload a daily CSV and build the shared history this staffing group uses for forecasting and staffing."
     />

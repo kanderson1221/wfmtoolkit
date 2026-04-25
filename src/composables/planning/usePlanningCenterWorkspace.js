@@ -11,14 +11,16 @@ import {
 import { resolvePlanHolidaySnapshot } from '../../planningStorage'
 import {
   getAnnualContacts,
-  getAnnualRequiredStaffHours,
-  getAverageRequiredHeadcount,
   getCenterGroups,
   getGroupPlans,
-  getPeakRequiredHeadcount,
   summarizeGroup
 } from '../../planningSummary'
-import { computeMonthlyRecords } from '../../planner/demandModel'
+import { computeMonthlyRecords, summarizePlanRecords } from '../../planner/demandModel'
+import { computeStaffingRecords, summarizeStaffingRecords } from '../../planner/staffingModel'
+import {
+  getPlanRequirementMethodLabel,
+  normalizePlanRequirementMethod
+} from '../../planner/shared'
 import { currentYear, yearOptions } from '../monthlyPlanBuilder/shared'
 
 const formatWhole = (value) =>
@@ -34,24 +36,39 @@ const formatNumber = (value, digits = 1) =>
 
 const formatPercent = (value, digits = 1) => `${formatNumber(value, digits)}%`
 
-const summarizeAvailability = (plan, center) => {
-  const summary = plan?.summary || {}
+const toFiniteNumberOrNull = (value) => {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+const chooseDemandMetric = (summaryValue, fallbackValue) => {
+  const summaryNumber = toFiniteNumberOrNull(summaryValue)
+  const fallbackNumber = toFiniteNumberOrNull(fallbackValue)
+
+  if (summaryNumber != null && summaryNumber > 0) {
+    return summaryNumber
+  }
+
+  if (fallbackNumber != null && fallbackNumber > 0) {
+    return fallbackNumber
+  }
+
+  return summaryNumber ?? fallbackNumber ?? 0
+}
+
+const chooseSummaryMetric = (summaryValue, fallbackValue) => {
+  const summaryNumber = toFiniteNumberOrNull(summaryValue)
+  const fallbackNumber = toFiniteNumberOrNull(fallbackValue)
+  return summaryNumber ?? fallbackNumber ?? 0
+}
+
+const buildComputedMonthlyRecords = (plan, center) => {
   const planningYear = Number(plan?.planningYear) || currentYear
   const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
 
-  if (
-    typeof summary.averagePresencePercent === 'number' &&
-    typeof summary.averageUtilizationPercent === 'number'
-  ) {
-    return {
-      averagePresencePercent: summary.averagePresencePercent,
-      averageUtilizationPercent: summary.averageUtilizationPercent
-    }
-  }
-
-  const monthlyRecords = computeMonthlyRecords({
+  return computeMonthlyRecords({
     planningYear,
-    requirementMethod: plan?.requirementMethod,
+    requirementMethod: plan?.requirementMethod || plan?.summary?.requirementMethod,
     demandSource: plan?.demandSource,
     operatingWeekdays:
       Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
@@ -62,25 +79,70 @@ const summarizeAvailability = (plan, center) => {
     holidayCalendarId: holidaySnapshot.holidayCalendarId,
     disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
     customHolidays: holidaySnapshot.customHolidays,
+    holidayScheduleMode: plan?.holidayScheduleMode,
     presenceMonths: Array.isArray(plan?.presenceMonths) ? plan.presenceMonths : [],
     randomDefaults: plan?.randomDefaults || {},
     useMonthlyRandomOverrides: Boolean(plan?.useMonthlyRandomOverrides),
     randomMonths: Array.isArray(plan?.randomMonths) ? plan.randomMonths : [],
     planMonths: Array.isArray(plan?.planMonths) ? plan.planMonths : []
   })
+}
 
-  if (!monthlyRecords.length) {
-    return {
-      averagePresencePercent: 0,
-      averageUtilizationPercent: 0
-    }
-  }
+const buildPlanRowMetrics = (plan, center) => {
+  const summary = plan?.summary || {}
+  const monthlyRecords = buildComputedMonthlyRecords(plan, center)
+  const computedPlanSummary = monthlyRecords.length ? summarizePlanRecords(monthlyRecords) : {}
+  const planningYear = Number(plan?.planningYear) || currentYear
+  const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
+  const staffingRecords = monthlyRecords.length
+    ? computeStaffingRecords(
+        monthlyRecords,
+        planningYear,
+        plan?.startingHeadcount,
+        plan?.startingFrontlineHeadcount,
+        Array.isArray(plan?.staffingMonths) ? plan.staffingMonths : [],
+        Array.isArray(plan?.trainingClasses) ? plan.trainingClasses : [],
+        plan?.trainingSettings || {},
+        {
+          holidayCalendarId: holidaySnapshot.holidayCalendarId,
+          disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
+          customHolidays: holidaySnapshot.customHolidays
+        }
+      )
+    : []
+  const computedStaffingSummary = staffingRecords.length ? summarizeStaffingRecords(staffingRecords) : {}
+  const requirementMethod = normalizePlanRequirementMethod(summary.requirementMethod || plan?.requirementMethod)
+  const peakDayRequiredHeadcount = chooseDemandMetric(
+    summary.peakDayRequiredHeadcount,
+    computedPlanSummary.peakDayMonth?.peakDayRequiredHeadcount
+  )
+  const peakRequiredHeadcount = chooseDemandMetric(
+    summary.peakRequiredHeadcount,
+    computedPlanSummary.peakMonth?.requiredHeadcount
+  )
 
   return {
-    averagePresencePercent:
-      monthlyRecords.reduce((sum, record) => sum + (Number(record.presencePercent) || 0), 0) / monthlyRecords.length,
-    averageUtilizationPercent:
-      monthlyRecords.reduce((sum, record) => sum + (Number(record.utilizationPercent) || 0), 0) / monthlyRecords.length
+    requirementMethod,
+    requirementMethodLabel: getPlanRequirementMethodLabel(requirementMethod),
+    annualContacts: chooseDemandMetric(summary.annualContacts, computedPlanSummary.annualContacts),
+    annualWorkloadHours: chooseDemandMetric(summary.annualWorkloadHours, computedPlanSummary.annualWorkloadHours),
+    totalRequiredStaffHours: chooseDemandMetric(
+      summary.annualRequiredStaffHours,
+      computedPlanSummary.annualRequiredStaffHours
+    ),
+    averageTotalRequiredHeadcount: chooseDemandMetric(
+      summary.averageRequiredHeadcount,
+      computedPlanSummary.averageRequiredHeadcount
+    ),
+    peakTotalRequiredHeadcount: peakDayRequiredHeadcount || peakRequiredHeadcount,
+    endingFrontlineHeadcount: chooseSummaryMetric(
+      summary.endingFrontlineHeadcount,
+      computedStaffingSummary.endingFrontlineHeadcount
+    ),
+    averageGapToRequirement: chooseSummaryMetric(
+      summary.averageGapToRequirement,
+      computedStaffingSummary.averageGapToRequirement
+    )
   }
 }
 
@@ -174,16 +236,18 @@ export function usePlanningCenterWorkspace({
 
   const planRows = computed(() =>
     (selectedGroup.value?.plans || []).map((plan) => {
-      const availability = summarizeAvailability(plan, center.value)
+      const rowMetrics = buildPlanRowMetrics(plan, center.value)
 
       return {
         ...plan,
-        annualContacts: getAnnualContacts(plan),
-        neededStaffHours: getAnnualRequiredStaffHours(plan),
-        averageRequiredHeadcount: getAverageRequiredHeadcount(plan),
-        averagePresencePercent: availability.averagePresencePercent,
-        averageUtilizationPercent: availability.averageUtilizationPercent,
-        peakRequiredHeadcount: getPeakRequiredHeadcount(plan),
+        annualContacts: rowMetrics.annualContacts || getAnnualContacts(plan),
+        requirementMethodLabel: rowMetrics.requirementMethodLabel,
+        annualWorkloadHours: rowMetrics.annualWorkloadHours,
+        totalRequiredStaffHours: rowMetrics.totalRequiredStaffHours,
+        averageTotalRequiredHeadcount: rowMetrics.averageTotalRequiredHeadcount,
+        peakTotalRequiredHeadcount: rowMetrics.peakTotalRequiredHeadcount,
+        endingFrontlineHeadcount: rowMetrics.endingFrontlineHeadcount,
+        averageGapToRequirement: rowMetrics.averageGapToRequirement,
         openHref: buildPlanningPlanHash(center.value.id, selectedGroup.value.id, plan.id),
         isSelectedYear: Number(plan.planningYear) === Number(selectedYearModel.value)
       }

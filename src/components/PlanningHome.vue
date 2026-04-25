@@ -268,7 +268,12 @@ const portfolioHeadcountChart = computed(() => {
         Number(plan.startingFrontlineHeadcount) || 0,
         Array.isArray(plan.staffingMonths) ? plan.staffingMonths : [],
         Array.isArray(plan.trainingClasses) ? plan.trainingClasses : [],
-        plan.trainingSettings || {}
+        plan.trainingSettings || {},
+        {
+          holidayCalendarId: holidaySnapshot.holidayCalendarId,
+          disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
+          customHolidays: holidaySnapshot.customHolidays
+        }
       )
 
       monthlyRecords.forEach((record, monthIndex) => {

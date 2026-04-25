@@ -43,7 +43,8 @@ describe('PlannerTrainingPipelineTable', () => {
       global: {
         stubs: {
           AppButton: {
-            template: '<button><slot /></button>'
+            props: ['variant'],
+            template: '<button :data-variant="variant"><slot /></button>'
           },
           AppIcon: true,
           AppMenu: {
@@ -64,6 +65,7 @@ describe('PlannerTrainingPipelineTable', () => {
     await wrapper.find('button.training-pipeline-toggle').trigger('click')
 
     expect(wrapper.text()).toContain('Recommend Classes')
+    expect(wrapper.find('button[data-variant="primary"]').text()).toContain('Add Training Class')
     expect(wrapper.text()).toContain('Inherited from 2026 plan')
     expect(wrapper.text()).toContain('Read only')
     expect(wrapper.findAll('tbody input').length).toBe(2)
