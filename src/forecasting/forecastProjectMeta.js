@@ -47,6 +47,44 @@ export const forecastProjectBelongsToPlanningContext = (project, centerId, group
   return !projectGroupId || projectGroupId === normalizedGroupId
 }
 
+const startsWithName = (value, prefix) =>
+  Boolean(
+    value &&
+      prefix &&
+      value.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase())
+  )
+
+const buildForecastSubjectName = ({
+  groupName,
+  centerName,
+  planningYear,
+  planName
+} = {}) => {
+  const normalizedPlanName = String(planName || '').trim()
+
+  if (normalizedPlanName) {
+    if (startsWithName(normalizedPlanName, groupName) || startsWithName(normalizedPlanName, centerName)) {
+      return normalizedPlanName
+    }
+
+    return groupName ? `${groupName} ${normalizedPlanName}` : normalizedPlanName
+  }
+
+  if (groupName && planningYear > 0) {
+    return `${groupName} ${planningYear}`
+  }
+
+  if (groupName) {
+    return groupName
+  }
+
+  if (centerName && planningYear > 0) {
+    return `${centerName} ${planningYear}`
+  }
+
+  return centerName
+}
+
 export function buildForecastBaseName(seed = {}) {
   const snapshot = seed && typeof seed === 'object' ? seed : {}
   const planningContext = snapshot.planningContext || {}
@@ -58,63 +96,38 @@ export function buildForecastBaseName(seed = {}) {
       planningContext.centerName ||
       ''
   ).trim()
+  const planName = String(snapshot.planName || planningContext.planName || '').trim()
   const forecastType = resolveForecastType(snapshot.forecastType, snapshot)
   const sourceKind = resolveForecastSourceKind(snapshot.sourceKind)
+  const subjectName = buildForecastSubjectName({
+    groupName,
+    centerName,
+    planningYear,
+    planName
+  })
 
   if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
-    if (groupName && planningYear > 0) {
-      return `${groupName} ${planningYear} Imported Daily Forecast`
-    }
-
-    if (groupName) {
-      return `${groupName} Imported Daily Forecast`
-    }
-
-    if (centerName && planningYear > 0) {
-      return `${centerName} ${planningYear} Imported Daily Forecast`
-    }
-
-    if (centerName) {
-      return `${centerName} Imported Daily Forecast`
+    if (subjectName) {
+      return `${subjectName} Imported Daily Forecast`
     }
   }
 
   if (sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
-    if (groupName && planningYear > 0) {
-      return `${groupName} ${planningYear} Monthly Forecast`
-    }
-
-    if (groupName) {
-      return `${groupName} Monthly Forecast`
-    }
-
-    if (centerName && planningYear > 0) {
-      return `${centerName} ${planningYear} Monthly Forecast`
-    }
-
-    if (centerName) {
-      return `${centerName} Monthly Forecast`
+    if (subjectName) {
+      return `${subjectName} Monthly Forecast`
     }
   }
 
-  if (groupName && planningYear > 0) {
+  if (subjectName) {
+    if (planName) {
+      return `${subjectName} Forecast`
+    }
+
     if (forecastType === FORECAST_TYPE_BUDGET) {
-      return `${groupName} ${planningYear} Budget Forecast`
+      return `${subjectName} Budget Forecast`
     }
 
-    return `${groupName} ${planningYear} Forecast`
-  }
-
-  if (groupName) {
-    return `${groupName} Forecast`
-  }
-
-  if (centerName && planningYear > 0) {
-    return `${centerName} ${planningYear} Forecast`
-  }
-
-  if (centerName) {
-    return `${centerName} Forecast`
+    return `${subjectName} Forecast`
   }
 
   return 'Untitled Forecast'

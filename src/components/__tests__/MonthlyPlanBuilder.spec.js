@@ -7,6 +7,7 @@ import { plannerDraftRepository } from '../../plannerDraftRepository'
 import { BrowserStorageError } from '../../storage/browserStorage'
 import { clearLocalDataStore } from '../../storage/localDataStore'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
+import { PLAN_TYPE_BUDGET, PLAN_TYPE_UPDATE } from '../../planningStorage'
 
 const plannerStubs = {
   PlannerForecastPanel: {
@@ -223,6 +224,65 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.find('[data-test="staffing-tab"]').exists()).toBe(false)
   })
 
+  it('opens saved Budget plans read-only and blocks saving', async () => {
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'budget-2026',
+        name: '2026 Budget',
+        planType: PLAN_TYPE_BUDGET,
+        planningYear: 2026,
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }
+    })
+
+    expect(wrapper.text()).toContain('Budget plan is locked. Create an updated plan to change future assumptions.')
+    expect(findButtonByText(wrapper, 'Save Plan')).toBeUndefined()
+    expect(wrapper.findAll('a').some((link) => link.text().trim() === 'Create Updated Plan')).toBe(true)
+    expect(wrapper.find('fieldset').attributes('disabled')).toBeDefined()
+
+    await wrapper.vm.builder.savePlan()
+
+    expect(wrapper.emitted('save')).toBeFalsy()
+  })
+
+  it('saves update drafts as current update versions with budget metadata', async () => {
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: null,
+        name: '2026 Apr Update',
+        planType: PLAN_TYPE_UPDATE,
+        isCurrent: true,
+        planningYear: 2026,
+        sourcePlanId: 'budget-2026',
+        budgetPlanId: 'budget-2026',
+        actualsThroughMonth: '2026-03-01',
+        actualizedAt: '2026-04-01T12:00:00.000Z'
+      },
+      groupPlans: [
+        {
+          id: 'budget-2026',
+          name: '2026 Budget',
+          planType: PLAN_TYPE_BUDGET,
+          planningYear: 2026
+        }
+      ]
+    })
+
+    await findButtonByText(wrapper, 'Save Plan').trigger('click')
+
+    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+      id: null,
+      name: '2026 Apr Update',
+      planType: PLAN_TYPE_UPDATE,
+      isCurrent: true,
+      planningYear: 2026,
+      sourcePlanId: 'budget-2026',
+      budgetPlanId: 'budget-2026',
+      actualsThroughMonth: '2026-03-01',
+      actualizedAt: '2026-04-01T12:00:00.000Z'
+    })
+  })
+
   it('starts new plans in the intraday Erlang shell when that requirement method is seeded', async () => {
     const wrapper = await mountBuilder({
       draftKey: 'new-erlang-plan',
@@ -320,6 +380,9 @@ describe('MonthlyPlanBuilder', () => {
         id: 'plan-1',
         createdAt: '2026-01-01T00:00:00.000Z',
         name: '2026 Plan',
+        planType: PLAN_TYPE_UPDATE,
+        budgetPlanId: 'budget-2026',
+        sourcePlanId: 'budget-2026',
         planningYear: 2026,
         operatingWeekdays: [1],
         holidayCalendarId: 'none',
@@ -357,7 +420,8 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.emitted('save')).toBeTruthy()
     expect(wrapper.emitted('save')[0][0]).toMatchObject({
       id: null,
-      name: '2026 Plan',
+      name: '2026 Budget',
+      planType: PLAN_TYPE_BUDGET,
       planningYear: 2026,
       operatingWeekdays: [1, 2, 3, 4, 5],
       holidayCalendarId: 'us_federal',
@@ -391,7 +455,7 @@ describe('MonthlyPlanBuilder', () => {
 
     expect(alertSpy).not.toHaveBeenCalled()
     expect(wrapper.emitted('save')).toBeFalsy()
-    expect(wrapper.text()).toContain('A 2026 plan already exists for Consumer Voice.')
+    expect(wrapper.text()).toContain('A 2026 Budget already exists for Consumer Voice.')
   })
 
   it('waits for a real autosave event before persisting into a new draft scope', async () => {
@@ -700,6 +764,9 @@ describe('MonthlyPlanBuilder', () => {
         initialPlan: {
           id: 'planner-forecast-demand',
           name: '2026 Plan',
+          planType: PLAN_TYPE_UPDATE,
+          budgetPlanId: 'budget-2026',
+          sourcePlanId: 'budget-2026',
           planningYear: 2026,
           demandSource: createPlanDemandSource(),
           planMonths: Array.from({ length: 12 }, () => ({
@@ -872,6 +939,9 @@ describe('MonthlyPlanBuilder', () => {
       initialPlan: {
         id: 'saved-forecast-plan',
         name: '2026 Plan',
+        planType: PLAN_TYPE_UPDATE,
+        budgetPlanId: 'budget-2026',
+        sourcePlanId: 'budget-2026',
         planningYear: 2026,
         demandSource: createPlanDemandSource({
           mode: 'forecast',

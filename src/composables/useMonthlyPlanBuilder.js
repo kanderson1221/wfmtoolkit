@@ -40,6 +40,7 @@ import {
 import {
   createPlanDemandSource
 } from '../planner/demandSources'
+import { PLAN_TYPE_BUDGET, PLAN_TYPE_UPDATE } from '../planningStorage'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../planner/shared'
 import { mergeIntradayErlangMonthlyRecords } from '../planner/intradayErlang'
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
@@ -218,6 +219,16 @@ export const useMonthlyPlanBuilder = (props, emit) => {
         ? syncPlanScheduleWithSeed(savedPlan)
         : props.centerDefaults || {}
   )
+  const planType = computed(() =>
+    sourcePlanReference.value?.planType === PLAN_TYPE_UPDATE ? PLAN_TYPE_UPDATE : PLAN_TYPE_BUDGET
+  )
+  const planVersionLabel = computed(() =>
+    planType.value === PLAN_TYPE_UPDATE ? 'Update' : 'Budget'
+  )
+  const isReadOnlyBudget = computed(() =>
+    Boolean(sourcePlanReference.value?.id && planType.value === PLAN_TYPE_BUDGET)
+  )
+  const readOnlyBudgetMessage = 'Budget plan is locked. Create an updated plan to change future assumptions.'
 
   const planningYear = ref(initialBootstrapState.initialState.planningYear)
   const requirementMethod = ref(initialBootstrapState.initialState.requirementMethod)
@@ -244,6 +255,14 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const trainingClasses = ref(initialBootstrapState.initialState.trainingClasses.map((trainingClass) => createTrainingClass(trainingClass)))
   const reviewedSections = ref([...new Set(initialBootstrapState.reviewedSections)])
   const validationMessage = ref('')
+  const ensurePlannerEditable = () => {
+    if (!isReadOnlyBudget.value) {
+      return true
+    }
+
+    validationMessage.value = readOnlyBudgetMessage
+    return false
+  }
 
   const markSectionReviewed = (sectionId) => {
     if (!CORE_SECTION_IDS.has(sectionId) || reviewedSections.value.includes(sectionId)) {
@@ -339,6 +358,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const loadExamplePlan = () => {
+    if (!ensurePlannerEditable()) {
+      return
+    }
+
     validationMessage.value = ''
     const examplePlan = buildExamplePlannerState(currentYear + 1)
 
@@ -369,6 +392,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const resetPlanner = () => {
+    if (!ensurePlannerEditable()) {
+      return
+    }
+
     validationMessage.value = ''
     planningYear.value = plannerSeedDefaults.value.planningYear
     requirementMethod.value = plannerSeedDefaults.value.requirementMethod
@@ -410,7 +437,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     forecastApplyTone,
     hasLegacyManualDemandSource,
     legacyManualSummary,
-    applyForecastToDemand,
+    applyForecastToDemand: applyForecastToDemandBase,
     convertLegacyManualDemandSource: convertLegacyManualDemandSourceBase,
     reloadForecastProjects: loadForecastProjects
   } = usePlannerForecastDemandSource({
@@ -420,6 +447,14 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planMonths,
     selectedForecastProjectId
   })
+
+  const applyForecastToDemand = () => {
+    if (!ensurePlannerEditable()) {
+      return false
+    }
+
+    return applyForecastToDemandBase()
+  }
 
   const baselineMonthlyRecords = computed(() =>
     computeMonthlyRecords({
@@ -616,6 +651,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   )
 
   const generateRecommendedTrainingClasses = () => {
+    if (!ensurePlannerEditable()) {
+      return
+    }
+
     const recommendations = recommendTrainingClasses({
       monthlyRecords: monthlyRecords.value,
       planningYear: planningYear.value,
@@ -638,18 +677,27 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     ]
   }
 
-  const displayPlanLabel = computed(() => `${planningYear.value} Plan`)
+  const displayPlanLabel = computed(() =>
+    String(sourcePlanReference.value?.name || '').trim() || `${planningYear.value} ${planVersionLabel.value}`
+  )
   const duplicateYearPlan = computed(() => {
+    if (planType.value === PLAN_TYPE_UPDATE) {
+      return null
+    }
+
     const targetYear = toNumber(planningYear.value, currentYear)
     const currentPlanId = sourcePlanReference.value?.id || null
 
     return (props.groupPlans || []).find(
-      (plan) => plan?.id !== currentPlanId && toNumber(plan?.planningYear, currentYear) === targetYear
+      (plan) =>
+        plan?.id !== currentPlanId &&
+        plan?.planType !== PLAN_TYPE_UPDATE &&
+        toNumber(plan?.planningYear, currentYear) === targetYear
     ) || null
   })
   const duplicateYearMessage = computed(() =>
     duplicateYearPlan.value
-      ? `A ${planningYear.value} plan already exists for ${props.centerDefaults?.groupName || 'this staffing group'}. Open the existing plan or choose another year.`
+      ? `A ${planningYear.value} Budget already exists for ${props.centerDefaults?.groupName || 'this staffing group'}. Open the existing Budget or choose another year.`
       : ''
   )
   const presenceSummary = computed(() => summarizePresenceRecords(monthlyRecords.value))
@@ -664,7 +712,17 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const buildPlanPayload = () => ({
     id: sourcePlanReference.value?.id || null,
     createdAt: sourcePlanReference.value?.createdAt || null,
-    name: `${planningYear.value} Plan`,
+    name: String(sourcePlanReference.value?.name || '').trim() || `${planningYear.value} ${planVersionLabel.value}`,
+    planType: planType.value,
+    isCurrent: planType.value === PLAN_TYPE_UPDATE
+      ? true
+      : Boolean(sourcePlanReference.value?.isCurrent ?? true),
+    budgetPlanId: planType.value === PLAN_TYPE_BUDGET
+      ? (sourcePlanReference.value?.budgetPlanId || sourcePlanReference.value?.id || null)
+      : (sourcePlanReference.value?.budgetPlanId || sourcePlanReference.value?.sourcePlanId || null),
+    sourcePlanId: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.sourcePlanId || '') : '',
+    actualsThroughMonth: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualsThroughMonth || '') : '',
+    actualizedAt: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualizedAt || '') : '',
     planningYear: planningYear.value,
     requirementMethod: requirementMethod.value,
     operatingWeekdays: [...operatingWeekdays.value],
@@ -751,6 +809,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     plannerBootstrapping.value = true
 
     try {
+      if (isReadOnlyBudget.value) {
+        restoredDraft.value = null
+        validationMessage.value = ''
+        return
+      }
+
       if (!savedPlan?.id) {
         restoredDraft.value = null
         validationMessage.value = ''
@@ -777,7 +841,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const {
     autosaveState,
-    autosaveReady,
     suspendAutosave,
     autosaveStatusMessage,
     queueAutosave,
@@ -790,6 +853,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     savedPlan,
     buildDraftPayload
   })
+
+  watch(isReadOnlyBudget, (readOnly) => {
+    if (readOnly) {
+      suspendAutosave.value = true
+    }
+  }, { immediate: true })
 
   onMounted(() => {
     void hydratePlannerDraft()
@@ -822,6 +891,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const savePlan = async () => {
+    if (!ensurePlannerEditable()) {
+      return
+    }
+
     if (!validatePlanDetails()) {
       return
     }
@@ -832,6 +905,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const convertLegacyManualDemandSource = async () => {
+    if (!ensurePlannerEditable()) {
+      return
+    }
+
     const didConvert = await convertLegacyManualDemandSourceBase()
 
     if (!didConvert) {
@@ -844,7 +921,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   }
 
   const cancelEditor = () => {
-    void flushAutosave()
+    if (!isReadOnlyBudget.value) {
+      void flushAutosave()
+    }
     emit('cancel')
   }
 
@@ -876,6 +955,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     ],
     () => {
       if (plannerBootstrapping.value) {
+        return
+      }
+
+      if (isReadOnlyBudget.value) {
         return
       }
 
@@ -953,6 +1036,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     autosaveState,
     plannerBootstrapping,
     monthlyRecords,
+    planType,
+    planVersionLabel,
+    isReadOnlyBudget,
+    readOnlyBudgetMessage,
     displayPlanLabel,
     presenceSummary,
     randomSummary,
@@ -968,6 +1055,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     intradayErlangOpenTime,
     intradayErlangCloseTime,
     intradayErlangProfile,
+    erlangStatus: intradayErlangStatus,
     actualsErlangStatus,
     autosaveStatusMessage,
     validationMessage,

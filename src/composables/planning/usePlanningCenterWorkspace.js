@@ -8,7 +8,7 @@ import {
   buildPlanningPlanHash,
   navigateToHash
 } from '../../appRoutes'
-import { resolvePlanHolidaySnapshot } from '../../planningStorage'
+import { PLAN_TYPE_BUDGET, PLAN_TYPE_UPDATE, resolvePlanHolidaySnapshot } from '../../planningStorage'
 import {
   getAnnualContacts,
   getCenterGroups,
@@ -17,6 +17,7 @@ import {
 } from '../../planningSummary'
 import { computeMonthlyRecords, summarizePlanRecords } from '../../planner/demandModel'
 import { computeStaffingRecords, summarizeStaffingRecords } from '../../planner/staffingModel'
+import { buildActualsThroughMonthOptions, buildPlanUpdateName } from '../../planner/planUpdates'
 import {
   getPlanRequirementMethodLabel,
   normalizePlanRequirementMethod
@@ -60,6 +61,29 @@ const chooseSummaryMetric = (summaryValue, fallbackValue) => {
   const summaryNumber = toFiniteNumberOrNull(summaryValue)
   const fallbackNumber = toFiniteNumberOrNull(fallbackValue)
   return summaryNumber ?? fallbackNumber ?? 0
+}
+
+const formatMonthStartLabel = (value) => {
+  const normalizedValue = String(value || '').trim()
+  const match = normalizedValue.match(/^(\d{4})-(\d{2})-01$/)
+  if (!match) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date(Number(match[1]), Number(match[2]) - 1, 1))
+}
+
+const formatVariance = (value, digits = 1) => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return '—'
+  }
+
+  const prefix = numericValue > 0 ? '+' : ''
+  return `${prefix}${formatNumber(numericValue, digits)}`
 }
 
 const buildComputedMonthlyRecords = (plan, center) => {
@@ -155,13 +179,37 @@ export function usePlanningCenterWorkspace({
   newPlanRequirementMethod
 }) {
   const sortedPlansForGroup = (group) =>
-    [...getGroupPlans(group)].sort((left, right) => Number(right.planningYear || 0) - Number(left.planningYear || 0))
+    [...getGroupPlans(group)].sort((left, right) => {
+      const yearDelta = Number(right.planningYear || 0) - Number(left.planningYear || 0)
+      if (yearDelta !== 0) {
+        return yearDelta
+      }
+
+      if (left.planType === PLAN_TYPE_BUDGET && right.planType !== PLAN_TYPE_BUDGET) {
+        return -1
+      }
+
+      if (right.planType === PLAN_TYPE_BUDGET && left.planType !== PLAN_TYPE_BUDGET) {
+        return 1
+      }
+
+      if (left.isCurrent && !right.isCurrent) {
+        return -1
+      }
+
+      if (right.isCurrent && !left.isCurrent) {
+        return 1
+      }
+
+      return new Date(right.updatedAt || right.createdAt || 0).getTime() -
+        new Date(left.updatedAt || left.createdAt || 0).getTime()
+    })
 
   const groupRows = computed(() =>
     getCenterGroups(center.value).map((group) => {
       const summary = summarizeGroup(group)
       const plans = sortedPlansForGroup(group)
-      const latestPlan = plans[0] || null
+      const latestPlan = plans.find((plan) => plan.isCurrent) || plans[0] || null
       const latestPlanYear = latestPlan?.planningYear || null
 
       return {
@@ -187,7 +235,11 @@ export function usePlanningCenterWorkspace({
   })
 
   const resolveNextPlanYear = (group = selectedGroup.value) => {
-    const usedYears = new Set((group?.plans || []).map((plan) => Number(plan.planningYear)))
+    const usedYears = new Set(
+      (group?.plans || [])
+        .filter((plan) => plan.planType === PLAN_TYPE_BUDGET)
+        .map((plan) => Number(plan.planningYear))
+    )
     let candidateYear = currentYear
 
     while (usedYears.has(candidateYear)) {
@@ -198,7 +250,11 @@ export function usePlanningCenterWorkspace({
   }
 
   const availableYearOptions = computed(() => {
-    const usedYears = new Set((selectedGroup.value?.plans || []).map((plan) => Number(plan.planningYear)))
+    const usedYears = new Set(
+      (selectedGroup.value?.plans || [])
+        .filter((plan) => plan.planType === PLAN_TYPE_BUDGET)
+        .map((plan) => Number(plan.planningYear))
+    )
     const yearSet = new Set(yearOptions.filter((year) => !usedYears.has(Number(year))))
     const nextAvailableYear = resolveNextPlanYear(selectedGroup.value)
 
@@ -234,12 +290,24 @@ export function usePlanningCenterWorkspace({
     }
   })
 
-  const planRows = computed(() =>
-    (selectedGroup.value?.plans || []).map((plan) => {
+  const buildPlanRow = (plan, budgetRow = null) => {
       const rowMetrics = buildPlanRowMetrics(plan, center.value)
+      const planType = plan.planType === PLAN_TYPE_UPDATE ? PLAN_TYPE_UPDATE : PLAN_TYPE_BUDGET
+      const actualsThroughLabel = formatMonthStartLabel(plan.actualsThroughMonth)
+      const contactsVarianceToBudget = budgetRow ? rowMetrics.annualContacts - budgetRow.annualContacts : null
+      const totalRequiredHoursVarianceToBudget = budgetRow ? rowMetrics.totalRequiredStaffHours - budgetRow.totalRequiredStaffHours : null
+      const averageRequiredHeadcountVarianceToBudget = budgetRow ? rowMetrics.averageTotalRequiredHeadcount - budgetRow.averageTotalRequiredHeadcount : null
+      const averageGapVarianceToBudget = budgetRow ? rowMetrics.averageGapToRequirement - budgetRow.averageGapToRequirement : null
 
       return {
         ...plan,
+        planType,
+        planTypeLabel: planType === PLAN_TYPE_UPDATE ? 'Update' : 'Budget',
+        isBudget: planType === PLAN_TYPE_BUDGET,
+        isUpdate: planType === PLAN_TYPE_UPDATE,
+        isCurrent: Boolean(plan.isCurrent),
+        actualsThroughLabel,
+        actualsThroughBadge: actualsThroughLabel ? `Actuals through ${actualsThroughLabel}` : '',
         annualContacts: rowMetrics.annualContacts || getAnnualContacts(plan),
         requirementMethodLabel: rowMetrics.requirementMethodLabel,
         annualWorkloadHours: rowMetrics.annualWorkloadHours,
@@ -248,11 +316,70 @@ export function usePlanningCenterWorkspace({
         peakTotalRequiredHeadcount: rowMetrics.peakTotalRequiredHeadcount,
         endingFrontlineHeadcount: rowMetrics.endingFrontlineHeadcount,
         averageGapToRequirement: rowMetrics.averageGapToRequirement,
+        contactsVarianceToBudget,
+        totalRequiredHoursVarianceToBudget,
+        averageRequiredHeadcountVarianceToBudget,
+        averageGapVarianceToBudget,
+        contactsVarianceLabel: budgetRow && planType === PLAN_TYPE_UPDATE ? formatVariance(contactsVarianceToBudget, 0) : '—',
+        totalRequiredHoursVarianceLabel: budgetRow && planType === PLAN_TYPE_UPDATE ? formatVariance(totalRequiredHoursVarianceToBudget, 0) : '—',
+        averageRequiredHeadcountVarianceLabel: budgetRow && planType === PLAN_TYPE_UPDATE ? formatVariance(averageRequiredHeadcountVarianceToBudget, 1) : '—',
+        averageGapVarianceLabel: budgetRow && planType === PLAN_TYPE_UPDATE ? formatVariance(averageGapVarianceToBudget, 1) : '—',
         openHref: buildPlanningPlanHash(center.value.id, selectedGroup.value.id, plan.id),
         isSelectedYear: Number(plan.planningYear) === Number(selectedYearModel.value)
       }
+  }
+
+  const planYearSections = computed(() => {
+    const plansByYear = new Map()
+
+    ;(selectedGroup.value?.plans || []).forEach((plan) => {
+      const planningYear = Number(plan.planningYear)
+      if (!Number.isFinite(planningYear) || planningYear <= 0) {
+        return
+      }
+
+      const existingPlans = plansByYear.get(planningYear) || []
+      plansByYear.set(planningYear, [...existingPlans, plan])
     })
-  )
+
+    return [...plansByYear.entries()]
+      .sort(([leftYear], [rightYear]) => rightYear - leftYear)
+      .map(([planningYear, plans]) => {
+        const budgetPlan = plans.find((plan) => plan.planType === PLAN_TYPE_BUDGET) || plans[0]
+        const budgetRow = buildPlanRow(budgetPlan)
+        const rows = plans
+          .filter((plan) => plan.id !== budgetPlan.id)
+          .map((plan) => buildPlanRow(plan, budgetRow))
+          .sort((left, right) => {
+            if (left.isCurrent && !right.isCurrent) {
+              return -1
+            }
+
+            if (right.isCurrent && !left.isCurrent) {
+              return 1
+            }
+
+            return new Date(right.updatedAt || right.createdAt || 0).getTime() -
+              new Date(left.updatedAt || left.createdAt || 0).getTime()
+          })
+
+        const actualsThroughOptions = buildActualsThroughMonthOptions(selectedGroup.value?.actuals, planningYear)
+        const defaultActualsThroughMonth = actualsThroughOptions[actualsThroughOptions.length - 1]?.value || ''
+
+        return {
+          planningYear,
+          budgetPlanId: budgetRow.id,
+          currentPlan: [budgetRow, ...rows].find((plan) => plan.isCurrent) || budgetRow,
+          budgetPlan: budgetRow,
+          rows: [budgetRow, ...rows],
+          actualsThroughOptions,
+          defaultActualsThroughMonth,
+          defaultUpdateName: buildPlanUpdateName(planningYear, defaultActualsThroughMonth)
+        }
+      })
+  })
+
+  const planRows = computed(() => planYearSections.value.flatMap((section) => section.rows))
 
   const operatingDayLabel = computed(() =>
     weekdayOptions.value
@@ -314,7 +441,9 @@ export function usePlanningCenterWorkspace({
       return null
     }
 
-    return selectedGroup.value.plans.find((plan) => Number(plan.planningYear) === Number(newPlanYear.value)) || null
+    return selectedGroup.value.plans.find(
+      (plan) => Number(plan.planningYear) === Number(newPlanYear.value) && plan.planType === PLAN_TYPE_BUDGET
+    ) || null
   })
 
   const existingPlanHref = computed(() => {
@@ -335,6 +464,7 @@ export function usePlanningCenterWorkspace({
     formatPercent,
     formatWhole,
     groupRows,
+    planYearSections,
     planRows,
     resolveNextPlanYear,
     selectedGroup,

@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 
 import { buildForecastStorageScope, forecastingRepository } from '../../forecastingRepository'
 import { DEMAND_SOURCE_FORECAST } from '../../planner/demandSources'
+import { PLAN_TYPE_UPDATE } from '../../planningStorage'
 import {
   computeForecastPlanningReady,
   FORECAST_SOURCE_IMPORTED_DAILY,
@@ -25,6 +26,18 @@ const formatWhole = (value) =>
     maximumFractionDigits: 0
   }).format(value || 0)
 
+const buildPlanUsageLabel = (plan = {}) => {
+  const explicitName = String(plan?.name || '').trim()
+  if (explicitName) {
+    return explicitName
+  }
+
+  const planningYear = Number(plan?.planningYear) || 0
+  const typeLabel = plan?.planType === PLAN_TYPE_UPDATE ? 'Update' : 'Budget'
+
+  return planningYear ? `${planningYear} ${typeLabel}` : typeLabel
+}
+
 const buildForecastUsageSummary = (plans = [], forecastId = '') => {
   const matchingPlans = (Array.isArray(plans) ? plans : []).filter((plan) =>
     plan?.demandSource?.mode === DEMAND_SOURCE_FORECAST &&
@@ -39,22 +52,19 @@ const buildForecastUsageSummary = (plans = [], forecastId = '') => {
   }
 
   if (matchingPlans.length === 1) {
-    const planningYear = Number(matchingPlans[0]?.planningYear) || 0
+    const planLabel = buildPlanUsageLabel(matchingPlans[0])
     return {
-      usedByLabel: planningYear ? `${planningYear} Plan` : '1 Plan',
-      usedByTitle: planningYear ? `Imported into the ${planningYear} plan` : 'Imported into 1 saved plan'
+      usedByLabel: planLabel,
+      usedByTitle: `Imported into ${planLabel}`
     }
   }
 
-  const planYears = matchingPlans
-    .map((plan) => Number(plan?.planningYear) || 0)
-    .filter((year) => year > 0)
-    .sort((left, right) => left - right)
+  const planLabels = matchingPlans.map(buildPlanUsageLabel).sort((left, right) => left.localeCompare(right))
 
   return {
     usedByLabel: `${matchingPlans.length} Plans`,
-    usedByTitle: planYears.length
-      ? `Imported into ${planYears.join(', ')}`
+    usedByTitle: planLabels.length
+      ? `Imported into ${planLabels.join(', ')}`
       : `Imported into ${matchingPlans.length} saved plans`
   }
 }
@@ -227,15 +237,12 @@ export function usePlanningCenterForecastLibrary({
         forecast.lastRun?.summary?.projectedTotalContacts ??
           monthlyRollup.reduce((sum, row) => sum + Number(row?.contacts || 0), 0)
       ) || 0
-      const importedDailyRowCount = Array.isArray(forecast.lastRun?.dailyForecast) ? forecast.lastRun.dailyForecast.length : 0
       const historyRangeLabel = sourceKind === FORECAST_SOURCE_MODELED_DAILY
         ? historyRows.length
           ? `${formatDate(historyRows[0].ds)} to ${formatDate(historyRows[historyRows.length - 1].ds)}`
           : 'No history loaded'
         : ''
-      const displayName = forecastType
-        ? 'Budget Forecast'
-        : forecast.name
+      const displayName = forecast.name || getForecastTypeLabel(forecastType)
       const usageSummary = buildForecastUsageSummary(selectedGroup.value?.plans, forecastId)
 
       return {

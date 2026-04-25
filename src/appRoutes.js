@@ -8,6 +8,9 @@ export const defaultRoute = {
   planId: null,
   year: null,
   requirementMethod: null,
+  updateSourcePlanId: null,
+  actualsThroughMonth: null,
+  updatePlanName: null,
   forecastId: null,
   sourceKind: null,
   forecastType: null,
@@ -127,10 +130,16 @@ export const buildPlanningNewPlanHash = (centerId, groupId, year = null, options
   const normalizedYear = Number(year)
   const normalizedRequirementMethod = String(options.requirementMethod || '').trim().toLowerCase() || 'workload_ratio'
   const methodSegment = `/method/${encodeURIComponent(normalizedRequirementMethod)}`
+  const updateSourcePlanId = String(options.updateSourcePlanId || '').trim()
+  const actualsThroughMonth = String(options.actualsThroughMonth || '').trim()
+  const updatePlanName = String(options.updatePlanName || '').trim()
+  const updateSegment = updateSourcePlanId
+    ? `/update/${encodeURIComponent(updateSourcePlanId)}${actualsThroughMonth ? `/actuals-through/${encodeURIComponent(actualsThroughMonth)}` : ''}${updatePlanName ? `/name/${encodeURIComponent(updatePlanName)}` : ''}`
+    : ''
 
   return Number.isInteger(normalizedYear) && normalizedYear > 0
-    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new/year/${normalizedYear}${methodSegment}`
-    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new${methodSegment}`
+    ? `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new/year/${normalizedYear}${methodSegment}${updateSegment}`
+    : `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/plan/new${methodSegment}${updateSegment}`
 }
 
 export const navigateToHash = (hash) => {
@@ -473,9 +482,27 @@ export const parseHashRoute = (hash) => {
 
     if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'plan' && parts[6] === 'new' && parts[7] === 'year' && parts[8]) {
       let requirementMethod = null
+      let updateSourcePlanId = null
+      let actualsThroughMonth = null
+      let updatePlanName = null
 
       if (parts[9] === 'method' && parts[10]) {
         requirementMethod = decodeURIComponent(parts[10])
+      }
+
+      let cursor = requirementMethod ? 11 : 9
+      if (parts[cursor] === 'update' && parts[cursor + 1]) {
+        updateSourcePlanId = decodeURIComponent(parts[cursor + 1])
+        cursor += 2
+      }
+
+      if (parts[cursor] === 'actuals-through' && parts[cursor + 1]) {
+        actualsThroughMonth = decodeURIComponent(parts[cursor + 1])
+        cursor += 2
+      }
+
+      if (parts[cursor] === 'name' && parts[cursor + 1]) {
+        updatePlanName = decodeURIComponent(parts[cursor + 1])
       }
 
       return {
@@ -487,15 +514,36 @@ export const parseHashRoute = (hash) => {
         planId: 'new',
         year: Number(parts[8]) || null,
         requirementMethod,
+        updateSourcePlanId,
+        actualsThroughMonth,
+        updatePlanName,
         forecastId: null
       }
     }
 
     if (parts[1] === 'center' && parts[2] && parts[3] === 'group' && parts[4] && parts[5] === 'plan' && parts[6] === 'new') {
       let requirementMethod = null
+      let updateSourcePlanId = null
+      let actualsThroughMonth = null
+      let updatePlanName = null
 
       if (parts[7] === 'method' && parts[8]) {
         requirementMethod = decodeURIComponent(parts[8])
+      }
+
+      let cursor = requirementMethod ? 9 : 7
+      if (parts[cursor] === 'update' && parts[cursor + 1]) {
+        updateSourcePlanId = decodeURIComponent(parts[cursor + 1])
+        cursor += 2
+      }
+
+      if (parts[cursor] === 'actuals-through' && parts[cursor + 1]) {
+        actualsThroughMonth = decodeURIComponent(parts[cursor + 1])
+        cursor += 2
+      }
+
+      if (parts[cursor] === 'name' && parts[cursor + 1]) {
+        updatePlanName = decodeURIComponent(parts[cursor + 1])
       }
 
       return {
@@ -507,6 +555,9 @@ export const parseHashRoute = (hash) => {
         planId: 'new',
         year: null,
         requirementMethod,
+        updateSourcePlanId,
+        actualsThroughMonth,
+        updatePlanName,
         forecastId: null
       }
     }

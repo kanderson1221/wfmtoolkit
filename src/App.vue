@@ -48,6 +48,7 @@ const {
   handleDeleteGroup,
   handleSavePlan,
   handleDeletePlan,
+  handleSetCurrentPlan,
   openPlanningHome
 } = usePlanningWorkspace({
   currentRoute,
@@ -169,6 +170,7 @@ onBeforeUnmount(() => {
         @save-group="handleSaveGroup"
         @delete-group="handleDeleteGroup"
         @delete-plan="handleDeletePlan"
+        @set-current-plan="handleSetCurrentPlan"
       />
 
       <PlanningGroupForecastsView
@@ -186,7 +188,7 @@ onBeforeUnmount(() => {
       <MonthlyPlanBuilder
         v-else-if="currentRoute.app === 'planning' && currentRoute.page === 'editor' && currentCenter && currentGroup && (currentRoute.planId === 'new' || currentPlan)"
         :key="monthlyPlannerKey"
-        :initial-plan="currentPlan"
+        :initial-plan="currentPlan || plannerSeed?.updateDraftPlan || null"
         :center-defaults="plannerSeed"
         :forecast-seed="forecastSeed"
         :group-plans="currentGroup?.plans || []"

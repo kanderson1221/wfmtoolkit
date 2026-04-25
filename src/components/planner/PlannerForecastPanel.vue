@@ -8,7 +8,7 @@ import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
-import { formatNumber, getForecastTypeLabel } from '../../forecasting/shared'
+import { formatNumber as formatForecastNumber, getForecastTypeLabel } from '../../forecasting/shared'
 
 const props = defineProps({
   forecastSelectOptions: {
@@ -133,7 +133,7 @@ const selectedForecastItems = computed(() => {
     {
       label: 'Assumed Avg AHT',
       value: props.selectedForecastPreviewSummary.averageAhtSeconds != null
-        ? `${formatNumber(props.selectedForecastPreviewSummary.averageAhtSeconds, 1)} sec`
+        ? `${formatForecastNumber(props.selectedForecastPreviewSummary.averageAhtSeconds, 1)} sec`
         : '—'
     }
   ]
@@ -184,7 +184,7 @@ const appliedForecastItems = computed(() => {
     {
       label: 'Assumed Avg AHT',
       value: props.currentDemandSourceSummary.averageAhtSeconds != null
-        ? `${formatNumber(props.currentDemandSourceSummary.averageAhtSeconds, 1)} sec`
+        ? `${formatForecastNumber(props.currentDemandSourceSummary.averageAhtSeconds, 1)} sec`
         : '—'
     }
   ]

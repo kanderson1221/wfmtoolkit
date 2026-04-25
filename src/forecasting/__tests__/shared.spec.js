@@ -11,6 +11,27 @@ describe('forecasting shared helpers', () => {
     expect(project.modelConfig.holdoutDays).toBe(60)
   })
 
+  it('uses plan version names when creating default staffing-group forecast names', () => {
+    const project = createForecastProject({
+      groupName: 'Consumer Voice',
+      planningYear: 2026,
+      planName: '2026 Apr Update',
+      forecastType: 'budget',
+      planningContext: {
+        groupId: 'group-1',
+        planningYear: 2026,
+        groupName: 'Consumer Voice',
+        planId: 'update-1',
+        planName: '2026 Apr Update',
+        planType: 'update',
+        actualsThroughMonth: '2026-03-01'
+      }
+    })
+
+    expect(project.name).toBe('Consumer Voice 2026 Apr Update Forecast')
+    expect(project.planningContext.planName).toBe('2026 Apr Update')
+  })
+
   it('applies range adjustment rules to future daily rows and recomputes monthly rollups', () => {
     const project = createForecastProject({
       planningYear: 2026,

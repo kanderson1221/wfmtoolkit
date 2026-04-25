@@ -8,6 +8,7 @@ import {
   removePlanningCenter,
   removePlanningGroup,
   removePlanningPlan,
+  setCurrentPlanningPlan,
   upsertPlanningCenter,
   upsertPlanningGroup,
   upsertPlanningPlan
@@ -34,7 +35,8 @@ export const createPlanningRepository = () => ({
   saveGroup: upsertPlanningGroup,
   deleteGroup: removePlanningGroup,
   savePlan: upsertPlanningPlan,
-  deletePlan: removePlanningPlan
+  deletePlan: removePlanningPlan,
+  setCurrentPlan: setCurrentPlanningPlan
 })
 
 export const planningRepository = createPlanningRepository()

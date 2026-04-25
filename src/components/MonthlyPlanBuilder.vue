@@ -454,11 +454,11 @@ const requirementProgress = computed(() => {
       : 'Use the applied staffing-group forecast to populate read-only demand inputs, then translate that workload into required frontline headcount.',
     statusLabel: formatMonthCoverage(configuredCount),
     detail: isReady
-      ? hasAppliedForecastDemand && builder.demandSourceSummary?.projectName
+      ? hasAppliedForecastDemand.value && builder.demandSourceSummary?.projectName
         ? `Contacts are populated from ${builder.demandSourceSummary.projectName} and AHT is set across the full year.`
         : 'Contacts and AHT are populated for every month.'
       : configuredCount > 0
-        ? hasAppliedForecastDemand
+        ? hasAppliedForecastDemand.value
           ? `Forecast contacts are applied for ${configuredCount} months so far.`
           : builder.hasLegacyManualDemandSource
             ? `Legacy monthly demand is still carrying ${configuredCount} months of inputs until it is converted to a saved forecast.`
@@ -468,7 +468,7 @@ const requirementProgress = computed(() => {
           : 'No saved forecast has been applied to populate the monthly demand inputs yet.',
     blocker: isReady
       ? ''
-      : hasAppliedForecastDemand
+      : hasAppliedForecastDemand.value
         ? `Refresh or replace the applied forecast so ${firstMissingMonthLabel} has complete demand inputs.`
         : builder.hasLegacyManualDemandSource
           ? 'Open Forecasts and convert the legacy manual monthly demand into a saved staffing-group forecast.'
@@ -522,14 +522,6 @@ const staffingProgress = computed(() => {
     nextDescription: 'Set starting roster and frontline headcount, then add attrition or training assumptions as needed.'
   }
 })
-
-const planWorkflowCards = computed(() => [
-  forecastProgress.value,
-  availabilityProgress.value,
-  variabilityProgress.value,
-  requirementProgress.value,
-  staffingProgress.value
-])
 
 const actualsStarted = computed(() => builder.actualsSummary.loadedMonthsCount > 0)
 
@@ -606,6 +598,14 @@ const breadcrumbItems = computed(() => {
     { label: builder.displayPlanLabel }
   ]
 })
+const plansHref = computed(() =>
+  buildPlanningGroupHash(
+    props.centerDefaults?.centerId,
+    props.centerDefaults?.groupId,
+    builder.planningYear,
+    { tab: 'plans' }
+  )
+)
 </script>
 
 <template>
@@ -624,12 +624,24 @@ const breadcrumbItems = computed(() => {
             :autosave-status-message="builder.autosaveStatusMessage"
             :autosave-state="builder.autosaveState"
           />
-          <AppButton size="md" variant="primary" @click="builder.savePlan">Save Plan</AppButton>
+          <AppButton
+            v-if="builder.isReadOnlyBudget"
+            size="md"
+            variant="primary"
+            :href="plansHref"
+          >
+            Create Updated Plan
+          </AppButton>
+          <AppButton v-else size="md" variant="primary" @click="builder.savePlan">Save Plan</AppButton>
         </div>
       </div>
 
       <AppStatusMessage v-if="builder.plannerBootstrapping" class="mb-3">
         Restoring the latest planner draft from this browser.
+      </AppStatusMessage>
+
+      <AppStatusMessage v-else-if="builder.isReadOnlyBudget" tone="info" class="mb-3">
+        {{ builder.readOnlyBudgetMessage }}
       </AppStatusMessage>
 
       <AppStatusMessage v-else-if="builder.validationMessage" tone="error" class="mb-3">
@@ -655,121 +667,123 @@ const breadcrumbItems = computed(() => {
           </section>
 
           <section class="min-w-0 p-3">
-            <div class="grid gap-3">
-              <div
-                v-if="builder.activeSection === 'forecast'"
-                class="grid gap-3"
-              >
-                <PlannerForecastPanel
-                  v-model:demand-source="builder.demandSource"
-                  v-model:selected-forecast-project-id="builder.selectedForecastProjectId"
-                  :saved-forecast-project-count="builder.savedForecastProjectCount"
-                  :forecast-select-options="builder.forecastSelectOptions"
-                  :forecasts-loading="builder.forecastsLoading"
-                  :forecasts-error="builder.forecastsError"
-                  :selected-forecast-preview-summary="builder.selectedForecastPreviewSummary"
-                  :current-demand-source-summary="builder.demandSourceSummary"
-                  :has-legacy-manual-demand-source="builder.hasLegacyManualDemandSource"
-                  :legacy-manual-summary="builder.legacyManualSummary"
-                  :forecast-can-apply="builder.forecastCanApply"
-                  :forecast-apply-message="builder.forecastApplyMessage"
-                  :forecast-apply-tone="builder.forecastApplyTone"
+            <fieldset :disabled="builder.isReadOnlyBudget" class="contents">
+              <div class="grid gap-3">
+                <div
+                  v-if="builder.activeSection === 'forecast'"
+                  class="grid gap-3"
+                >
+                  <PlannerForecastPanel
+                    v-model:demand-source="builder.demandSource"
+                    v-model:selected-forecast-project-id="builder.selectedForecastProjectId"
+                    :saved-forecast-project-count="builder.savedForecastProjectCount"
+                    :forecast-select-options="builder.forecastSelectOptions"
+                    :forecasts-loading="builder.forecastsLoading"
+                    :forecasts-error="builder.forecastsError"
+                    :selected-forecast-preview-summary="builder.selectedForecastPreviewSummary"
+                    :current-demand-source-summary="builder.demandSourceSummary"
+                    :has-legacy-manual-demand-source="builder.hasLegacyManualDemandSource"
+                    :legacy-manual-summary="builder.legacyManualSummary"
+                    :forecast-can-apply="builder.forecastCanApply"
+                    :forecast-apply-message="builder.forecastApplyMessage"
+                    :forecast-apply-tone="builder.forecastApplyTone"
+                    :format-whole="builder.formatWhole"
+                    :format-number="builder.formatNumber"
+                    @apply-forecast="builder.applyForecastToDemand"
+                    @convert-legacy-manual-demand-source="builder.convertLegacyManualDemandSource"
+                  />
+                </div>
+
+                <PlannerPresenceTab
+                  v-else-if="builder.activeSection === 'availability'"
+                  v-model:presence-months="builder.presenceMonths"
+                  :monthly-records="builder.monthlyRecords"
+                  :summary="builder.presenceSummary"
                   :format-whole="builder.formatWhole"
                   :format-number="builder.formatNumber"
-                  @apply-forecast="builder.applyForecastToDemand"
-                  @convert-legacy-manual-demand-source="builder.convertLegacyManualDemandSource"
+                  :format-percent="builder.formatPercent"
+                  :continue-label="isIntradayErlang ? 'Continue to Erlang Inputs' : 'Continue to Random/Variability'"
+                  @copy-action="builder.handlePresenceCopyAction"
+                  @continue="builder.setActiveForecastStep('variability')"
+                />
+
+                <PlannerRandomTab
+                  v-else-if="builder.activeSection === 'variability'"
+                  v-model:random-defaults="builder.randomDefaults"
+                  v-model:use-monthly-random-overrides="builder.useMonthlyRandomOverrides"
+                  v-model:random-months="builder.randomMonths"
+                  :requirement-method="builder.requirementMethod"
+                  :monthly-records="builder.monthlyRecords"
+                  :summary="builder.randomSummary"
+                  :demand-source="builder.demandSource"
+                  :current-demand-source-summary="builder.demandSourceSummary"
+                  :service-level-percent="builder.intradayErlangServiceLevelPercent"
+                  :service-level-threshold-seconds="builder.intradayErlangServiceLevelThresholdSeconds"
+                  :operating-open-time="builder.intradayErlangOpenTime"
+                  :operating-close-time="builder.intradayErlangCloseTime"
+                  :intraday="builder.intradayErlangProfile"
+                  :format-whole="builder.formatWhole"
+                  :format-number="builder.formatNumber"
+                  :format-percent="builder.formatPercent"
+                  @copy-action="builder.handleRandomCopyAction"
+                  @previous="builder.moveForecastStep(-1)"
+                  @continue="builder.setActiveForecastStep('requirement')"
+                  @toggle-override-mode="builder.setRandomOverrideMode"
+                />
+
+                <PlannerMonthlyPlanTab
+                  v-else-if="builder.activeSection === 'requirement'"
+                  v-model:plan-months="builder.planMonths"
+                  v-model:selected-month-index="builder.selectedMonthIndex"
+                  :requirement-method="builder.requirementMethod"
+                  :monthly-records="builder.monthlyRecords"
+                  :interval-records="builder.intradayErlangIntervalOutputs"
+                  :plan-summary="builder.planSummary"
+                  :demand-source="builder.demandSource"
+                  :current-demand-source-summary="builder.demandSourceSummary"
+                  :erlang-status="builder.erlangStatus"
+                  :format-whole="builder.formatWhole"
+                  :format-number="builder.formatNumber"
+                  :format-percent="builder.formatPercent"
+                  :format-factor="builder.formatFactor"
+                  @previous="builder.moveForecastStep(-1)"
+                  @continue="builder.setActiveSection('staffing')"
+                />
+
+                <PlannerStaffingPlanTab
+                  v-else-if="builder.activeSection === 'staffing'"
+                  :planning-year="builder.planningYear"
+                  :requirement-method="builder.requirementMethod"
+                  v-model:starting-headcount="builder.startingHeadcount"
+                  v-model:starting-frontline-headcount="builder.startingFrontlineHeadcount"
+                  v-model:training-settings="builder.trainingSettings"
+                  v-model:next-year-opening="builder.nextYearOpening"
+                  v-model:staffing-months="builder.staffingMonths"
+                  v-model:training-classes="builder.trainingClasses"
+                  v-model:selected-month-index="builder.selectedMonthIndex"
+                  :training-calendar="builder.trainingCalendar"
+                  :starting-position-inherited="builder.startingPositionInherited"
+                  :starting-position-inherited-from-year="builder.startingPositionInheritedFromYear"
+                  :inherited-training-classes="builder.inheritedTrainingClasses"
+                  :staffing-records="builder.staffingRecords"
+                  :format-number="builder.formatNumber"
+                  :year-end-target-defaults="{
+                    frontlineHeadcount: builder.staffingSummary.endingFrontlineHeadcount,
+                  }"
+                  @recommend-classes="builder.generateRecommendedTrainingClasses"
+                  @save="builder.savePlan"
+                />
+
+                <PlannerActualsPanel
+                  v-else-if="builder.activeSection === 'actuals'"
+                  :actuals-records="builder.actualsRecords"
+                  :actuals-summary="builder.actualsSummary"
+                  :actuals-erlang-status="builder.actualsErlangStatus"
+                  :format-whole="builder.formatWhole"
+                  :format-number="builder.formatNumber"
                 />
               </div>
-
-              <PlannerPresenceTab
-                v-else-if="builder.activeSection === 'availability'"
-                v-model:presence-months="builder.presenceMonths"
-                :monthly-records="builder.monthlyRecords"
-                :summary="builder.presenceSummary"
-                :format-whole="builder.formatWhole"
-                :format-number="builder.formatNumber"
-                :format-percent="builder.formatPercent"
-                :continue-label="isIntradayErlang ? 'Continue to Erlang Inputs' : 'Continue to Random/Variability'"
-                @copy-action="builder.handlePresenceCopyAction"
-                @continue="builder.setActiveForecastStep('variability')"
-              />
-
-              <PlannerRandomTab
-                v-else-if="builder.activeSection === 'variability'"
-                v-model:random-defaults="builder.randomDefaults"
-                v-model:use-monthly-random-overrides="builder.useMonthlyRandomOverrides"
-                v-model:random-months="builder.randomMonths"
-                :requirement-method="builder.requirementMethod"
-                :monthly-records="builder.monthlyRecords"
-                :summary="builder.randomSummary"
-                :demand-source="builder.demandSource"
-                :current-demand-source-summary="builder.demandSourceSummary"
-                :service-level-percent="builder.intradayErlangServiceLevelPercent"
-                :service-level-threshold-seconds="builder.intradayErlangServiceLevelThresholdSeconds"
-                :operating-open-time="builder.intradayErlangOpenTime"
-                :operating-close-time="builder.intradayErlangCloseTime"
-                :intraday="builder.intradayErlangProfile"
-                :format-whole="builder.formatWhole"
-                :format-number="builder.formatNumber"
-                :format-percent="builder.formatPercent"
-                @copy-action="builder.handleRandomCopyAction"
-                @previous="builder.moveForecastStep(-1)"
-                @continue="builder.setActiveForecastStep('requirement')"
-                @toggle-override-mode="builder.setRandomOverrideMode"
-              />
-
-              <PlannerMonthlyPlanTab
-                v-else-if="builder.activeSection === 'requirement'"
-                v-model:plan-months="builder.planMonths"
-                v-model:selected-month-index="builder.selectedMonthIndex"
-                :requirement-method="builder.requirementMethod"
-                :monthly-records="builder.monthlyRecords"
-                :interval-records="builder.intradayErlangIntervalOutputs"
-                :plan-summary="builder.planSummary"
-                :demand-source="builder.demandSource"
-                :current-demand-source-summary="builder.demandSourceSummary"
-                :erlang-status="builder.erlangStatus"
-                :format-whole="builder.formatWhole"
-                :format-number="builder.formatNumber"
-                :format-percent="builder.formatPercent"
-                :format-factor="builder.formatFactor"
-                @previous="builder.moveForecastStep(-1)"
-                @continue="builder.setActiveSection('staffing')"
-              />
-
-              <PlannerStaffingPlanTab
-                v-else-if="builder.activeSection === 'staffing'"
-                :planning-year="builder.planningYear"
-                :requirement-method="builder.requirementMethod"
-                v-model:starting-headcount="builder.startingHeadcount"
-                v-model:starting-frontline-headcount="builder.startingFrontlineHeadcount"
-                v-model:training-settings="builder.trainingSettings"
-                v-model:next-year-opening="builder.nextYearOpening"
-                v-model:staffing-months="builder.staffingMonths"
-                v-model:training-classes="builder.trainingClasses"
-                v-model:selected-month-index="builder.selectedMonthIndex"
-                :training-calendar="builder.trainingCalendar"
-                :starting-position-inherited="builder.startingPositionInherited"
-                :starting-position-inherited-from-year="builder.startingPositionInheritedFromYear"
-                :inherited-training-classes="builder.inheritedTrainingClasses"
-                :staffing-records="builder.staffingRecords"
-                :format-number="builder.formatNumber"
-                :year-end-target-defaults="{
-                  frontlineHeadcount: builder.staffingSummary.endingFrontlineHeadcount,
-                }"
-                @recommend-classes="builder.generateRecommendedTrainingClasses"
-                @save="builder.savePlan"
-              />
-
-              <PlannerActualsPanel
-                v-else-if="builder.activeSection === 'actuals'"
-                :actuals-records="builder.actualsRecords"
-                :actuals-summary="builder.actualsSummary"
-                :actuals-erlang-status="builder.actualsErlangStatus"
-                :format-whole="builder.formatWhole"
-                :format-number="builder.formatNumber"
-              />
-            </div>
+            </fieldset>
           </section>
         </div>
       </AppPanel>

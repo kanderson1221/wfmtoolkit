@@ -79,6 +79,29 @@ const PlanningForecastCreateModalStub = {
   `
 }
 
+const PlanningPlanUpdateModalStub = {
+  name: 'PlanningPlanUpdateModal',
+  props: [
+    'visible',
+    'sourcePlan',
+    'budgetPlan',
+    'actualsThroughOptions',
+    'actualsThroughMonth',
+    'updateName'
+  ],
+  emits: ['cancel', 'create', 'update:visible', 'update:actualsThroughMonth', 'update:updateName'],
+  template: `
+    <div v-if="visible" data-test="plan-update-modal">
+      <p>Update Source: {{ sourcePlan?.name }}</p>
+      <p>Budget Baseline: {{ budgetPlan?.name }}</p>
+      <p>Actuals Options: {{ actualsThroughOptions.length }}</p>
+      <p>Actuals Through: {{ actualsThroughMonth }}</p>
+      <p>Update Name: {{ updateName }}</p>
+      <button @click="$emit('create')">Confirm Updated Plan</button>
+    </div>
+  `
+}
+
 const PlannerSettingsModalStub = {
   name: 'PlannerSettingsModal',
   props: [
@@ -191,6 +214,7 @@ const buildWrapper = (props = {}) =>
         CallCenterSettingsModal: true,
         PlanningGroupSettingsModal: true,
         PlanningForecastCreateModal: PlanningForecastCreateModalStub,
+        PlanningPlanUpdateModal: PlanningPlanUpdateModalStub,
         PlanningGroupIntradayView: PlanningGroupIntradayViewStub,
         PlannerSettingsModal: PlannerSettingsModalStub
       }
@@ -277,19 +301,17 @@ describe('PlanningCenterView', () => {
     vi.restoreAllMocks()
   })
 
-  it('keeps annual-plan headers on a single line with dense headcount labels', async () => {
+  it('keeps versioned plan headers on a single line with compact labels', async () => {
     const wrapper = buildWrapper()
     const plansTab = wrapper.findAll('button').find((node) => node.text().trim() === 'Plans')
     await plansTab.trigger('click')
-    const peakHeader = findSpanByText(wrapper, 'Peak Total Req HC')
-    const averageHeader = findSpanByText(wrapper, 'Avg Total Req HC')
+    const hoursHeader = findSpanByText(wrapper, 'Total Req Hrs')
+    const averageHeader = findSpanByText(wrapper, 'Avg Req HC')
 
-    expect(peakHeader).toBeTruthy()
+    expect(hoursHeader).toBeTruthy()
     expect(averageHeader).toBeTruthy()
-    expect(peakHeader.attributes('title')).toBe('Peak Total Required Headcount')
-    expect(peakHeader.classes()).toContain('whitespace-nowrap')
-    expect(peakHeader.classes()).not.toContain('truncate')
-    expect(averageHeader.attributes('title')).toBe('Average Total Required Headcount')
+    expect(hoursHeader.classes()).toContain('whitespace-nowrap')
+    expect(hoursHeader.classes()).not.toContain('truncate')
     expect(averageHeader.classes()).toContain('whitespace-nowrap')
     expect(averageHeader.classes()).not.toContain('truncate')
   })
@@ -353,6 +375,119 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('1,200')
     expect(wrapper.text()).not.toContain('Presence %')
     expect(wrapper.text()).not.toContain('Utilization %')
+  })
+
+  it('groups Budget and Update plans by year with current badges, budget variances, and update actions', async () => {
+    window.location.hash = '#planning'
+
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 85,
+            defaultAdherencePercent: 95,
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: [
+                { serviceDate: '2026-01-02', contacts: 900, ahtSeconds: 300 }
+              ]
+            },
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planningYear: 2026,
+                planType: 'budget',
+                isCurrent: false,
+                summary: {
+                  annualContacts: 180000,
+                  annualRequiredStaffHours: 31200,
+                  averageRequiredHeadcount: 18.4,
+                  averageGapToRequirement: -1.2
+                },
+                updatedAt: '2026-01-01T00:00:00.000Z'
+              },
+              {
+                id: 'update-current',
+                name: '2026 Apr Update',
+                planningYear: 2026,
+                planType: 'update',
+                isCurrent: true,
+                budgetPlanId: 'budget-2026',
+                sourcePlanId: 'budget-2026',
+                actualsThroughMonth: '2026-03-01',
+                summary: {
+                  annualContacts: 190000,
+                  annualRequiredStaffHours: 33000,
+                  averageRequiredHeadcount: 19.2,
+                  averageGapToRequirement: -2.4
+                },
+                updatedAt: '2026-04-01T00:00:00.000Z'
+              },
+              {
+                id: 'update-old',
+                name: '2026 Feb Update',
+                planningYear: 2026,
+                planType: 'update',
+                isCurrent: false,
+                budgetPlanId: 'budget-2026',
+                sourcePlanId: 'budget-2026',
+                actualsThroughMonth: '2026-01-01',
+                summary: {
+                  annualContacts: 184000,
+                  annualRequiredStaffHours: 31800,
+                  averageRequiredHeadcount: 18.7,
+                  averageGapToRequirement: -1.5
+                },
+                updatedAt: '2026-02-01T00:00:00.000Z'
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    await openTab(wrapper, 'Plans')
+
+    expect(wrapper.text()).toContain('Current: 2026 Apr Update')
+    expect(wrapper.text()).toContain('Budget')
+    expect(wrapper.text()).toContain('Update')
+    expect(wrapper.text()).toContain('Current')
+    expect(wrapper.text()).toContain('Actuals through Mar 2026')
+    expect(wrapper.text()).toContain('Contacts +10,000')
+    expect(wrapper.text()).toContain('HC +0.8')
+    expect(wrapper.text()).toContain('Hrs +1,800')
+    expect(wrapper.text()).toContain('Gap -1.2')
+
+    const setCurrentButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Current')
+    await setCurrentButton.trigger('click')
+
+    expect(wrapper.emitted('set-current-plan')?.[0]?.[0]).toEqual({
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'update-old',
+      planningYear: 2026
+    })
+
+    const createUpdateButton = wrapper
+      .findAll('button')
+      .find((node) => node.text().trim() === 'Create Updated Plan')
+    await createUpdateButton.trigger('click')
+
+    expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Update Source: 2026 Apr Update')
+    expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Budget Baseline: 2026 Budget')
+    expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Actuals Options: 1')
   })
 
   it('uses matching compact xl header heights for the group and plan panes', () => {
@@ -546,6 +681,9 @@ describe('PlanningCenterView', () => {
             plans: [
               {
                 id: 'plan-1',
+                name: '2026 Budget',
+                planType: 'budget',
+                isCurrent: true,
                 planningYear: 2026,
                 demandSource: {
                   mode: 'forecast',
@@ -571,7 +709,7 @@ describe('PlanningCenterView', () => {
     await openTab(wrapper, 'Forecasts')
 
     expect(wrapper.text()).toContain('Used By')
-    expect(wrapper.text()).toContain('2026 Plan')
+    expect(wrapper.text()).toContain('2026 Budget')
     expect(wrapper.text()).not.toContain('Not used')
     expect(forecastingRepository.loadWorkspaceResult).toHaveBeenCalledWith(forecastScope)
   })
@@ -605,7 +743,7 @@ describe('PlanningCenterView', () => {
     await flushPromises()
     await openTab(wrapper, 'Forecasts')
 
-    const forecastRow = wrapper.find('[aria-label="Select Budget Forecast for Voice Support"]')
+    const forecastRow = wrapper.find('[aria-label="Select Voice Support 2026 Budget Forecast for Voice Support"]')
     expect(forecastRow.exists()).toBe(true)
 
     await forecastRow.trigger('click')
@@ -693,7 +831,7 @@ describe('PlanningCenterView', () => {
     await flushPromises()
     await openTab(wrapper, 'Forecasts')
 
-    expect(wrapper.text()).toContain('Budget Forecast')
+    expect(wrapper.text()).toContain('Voice Support 2026 Forecast')
 
     const deleteButtons = wrapper.findAll('button').filter((node) => node.text().trim() === 'Delete')
     await deleteButtons[deleteButtons.length - 1].trigger('click')

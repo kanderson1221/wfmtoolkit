@@ -165,7 +165,7 @@ export const readJsonFromLocalStorageResult = (storageKey, fallback = null) => {
 }
 
 export const writeJsonToLocalStorage = (storageKey, value) => {
-  let serializedValue = ''
+  let serializedValue
 
   try {
     serializedValue = JSON.stringify(value)

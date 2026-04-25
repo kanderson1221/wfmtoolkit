@@ -28,9 +28,37 @@ import {
   resolveLinkedOpeningPosition,
   resolvePlanningYear
 } from '../plannerModel'
-import { resolveCenterHolidayProfile, resolveCenterHolidayProfiles } from '../planningStorage'
+import { createUpdatedPlanDraft } from '../planner/planUpdates'
+import { PLAN_TYPE_BUDGET, PLAN_TYPE_UPDATE, resolveCenterHolidayProfile, resolveCenterHolidayProfiles } from '../planningStorage'
 import { planningRepository } from '../planningRepository'
 import { describeBrowserStorageError } from '../storage/browserStorage'
+
+const buildForecastPlanVersionLabel = (plan, fallbackPlanningYear = null) => {
+  const explicitName = String(plan?.name || '').trim()
+  if (explicitName) {
+    return explicitName
+  }
+
+  const planningYear = Number(plan?.planningYear || fallbackPlanningYear) || 0
+  const typeLabel = plan?.planType === PLAN_TYPE_UPDATE ? 'Update' : 'Budget'
+
+  return planningYear > 0 ? `${planningYear} ${typeLabel}` : typeLabel
+}
+
+const findForecastPlanVersionForYear = (plans = [], planningYear = null) => {
+  const resolvedPlanningYear = Number(planningYear) || 0
+  const yearPlans = (Array.isArray(plans) ? plans : []).filter((plan) =>
+    Number(plan?.planningYear) === resolvedPlanningYear
+  )
+
+  if (!yearPlans.length) {
+    return null
+  }
+
+  return yearPlans.find((plan) => plan?.isCurrent) ||
+    yearPlans.find((plan) => plan?.planType === PLAN_TYPE_BUDGET) ||
+    yearPlans[0]
+}
 
 export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }) => {
   const planningCenters = ref([])
@@ -161,6 +189,28 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
 
     const forecastFallbackScopes = buildForecastFallbackScopes(currentCenter.value.id, currentGroup.value.id)
     const seededRequirementMethod = currentPlan.value?.requirementMethod || currentRoute.value.requirementMethod
+    const updateSourcePlan = currentRoute.value.planId === 'new' && currentRoute.value.updateSourcePlanId
+      ? (currentGroup.value.plans || []).find((plan) => plan.id === currentRoute.value.updateSourcePlanId)
+      : null
+    const updateBudgetPlan = updateSourcePlan
+      ? (currentGroup.value.plans || []).find(
+          (plan) =>
+            plan.id === updateSourcePlan.budgetPlanId ||
+            (
+              Number(plan.planningYear) === Number(updateSourcePlan.planningYear) &&
+              plan.planType === PLAN_TYPE_BUDGET
+            )
+        )
+      : null
+    const updateDraftPlan = updateSourcePlan
+      ? createUpdatedPlanDraft({
+          sourcePlan: updateSourcePlan,
+          budgetPlan: updateBudgetPlan,
+          actuals: currentGroup.value.actuals,
+          actualsThroughMonth: currentRoute.value.actualsThroughMonth,
+          name: currentRoute.value.updatePlanName
+        })
+      : null
 
     return {
       centerId: currentCenter.value.id,
@@ -193,6 +243,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         adherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent
       },
       requirementMethod: normalizePlanRequirementMethod(seededRequirementMethod),
+      updateDraftPlan,
       forecastStorageScope: buildForecastStorageScope(storageScope.value, currentCenter.value.id, currentGroup.value.id),
       forecastFallbackScopes
     }
@@ -241,6 +292,14 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       currentRoute.value.page === 'group-forecasts'
         ? (currentRoute.value.sourceKind || FORECAST_SOURCE_MODELED_DAILY)
         : FORECAST_SOURCE_MODELED_DAILY
+    const forecastPlanVersion = currentRoute.value.page === 'editor'
+      ? currentPlan.value
+      : currentRoute.value.page === 'group-forecasts'
+        ? findForecastPlanVersionForYear(currentGroup.value?.plans, resolvedPlanningYear)
+        : null
+    const forecastPlanVersionName = forecastPlanVersion
+      ? buildForecastPlanVersionLabel(forecastPlanVersion, resolvedPlanningYear)
+      : ''
     const sharedHistorySeed =
       currentRoute.value.page === 'group-forecasts' &&
       seededSourceKind === FORECAST_SOURCE_MODELED_DAILY
@@ -256,6 +315,9 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       groupId: currentGroup.value.id,
       groupName,
       planningYear: resolvedPlanningYear,
+      planName: forecastPlanVersionName,
+      planType: forecastPlanVersion?.planType || '',
+      actualsThroughMonth: forecastPlanVersion?.actualsThroughMonth || '',
       sourceKind: seededSourceKind,
       forecastType: seededForecastType,
       coverageStartMonthIndex: seededCoverageStartMonthIndex,
@@ -265,7 +327,10 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       planningContext: {
         centerId: currentCenter.value.id,
         groupId: currentGroup.value.id,
-        planId: currentRoute.value.page === 'editor' ? currentPlan.value?.id || null : null,
+        planId: forecastPlanVersion?.id || null,
+        planName: forecastPlanVersionName,
+        planType: forecastPlanVersion?.planType || '',
+        actualsThroughMonth: forecastPlanVersion?.actualsThroughMonth || '',
         planningYear: resolvedPlanningYear,
         groupName
       },
@@ -316,7 +381,10 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       }
 
       const requirementMethod = normalizePlanRequirementMethod(currentRoute.value.requirementMethod)
-      return `${scopePrefix}:${currentGroup.value.id}:plan:new:${currentRoute.value.year || 'default'}:${requirementMethod}`
+      const updateKey = currentRoute.value.updateSourcePlanId
+        ? `:update:${currentRoute.value.updateSourcePlanId}:${currentRoute.value.actualsThroughMonth || 'none'}`
+        : ''
+      return `${scopePrefix}:${currentGroup.value.id}:plan:new:${currentRoute.value.year || 'default'}:${requirementMethod}${updateKey}`
     }
 
     if (currentRoute.value.page === 'editor') {
@@ -335,7 +403,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       return `planner-${currentPlan.value.id}`
     }
 
-    return `planner-${currentGroup.value?.id || 'no-group'}-new-${currentRoute.value.year || 'default'}-${normalizePlanRequirementMethod(currentRoute.value.requirementMethod)}`
+    return `planner-${currentGroup.value?.id || 'no-group'}-new-${currentRoute.value.year || 'default'}-${normalizePlanRequirementMethod(currentRoute.value.requirementMethod)}-${currentRoute.value.updateSourcePlanId || 'budget'}-${currentRoute.value.actualsThroughMonth || 'none'}`
   })
 
   const handleSaveCenter = async (centerDraft) => {
@@ -415,7 +483,16 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
     const savedGroup = savedCenter?.groups.find((group) => group.id === targetGroupId)
     const savedPlan = planDraft.id
       ? savedGroup?.plans.find((plan) => plan.id === planDraft.id)
-      : savedGroup?.plans.find((plan) => Number(plan.planningYear) === Number(planDraft.planningYear))
+      : planDraft.planType === PLAN_TYPE_UPDATE
+        ? savedGroup?.plans.find((plan) =>
+            Number(plan.planningYear) === Number(planDraft.planningYear) &&
+            plan.planType === PLAN_TYPE_UPDATE &&
+            plan.isCurrent
+          )
+        : savedGroup?.plans.find((plan) =>
+            Number(plan.planningYear) === Number(planDraft.planningYear) &&
+            plan.planType === PLAN_TYPE_BUDGET
+          )
 
     navigateToHash(
       buildPlanningGroupHash(
@@ -432,11 +509,19 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       return
     }
     if (planningYear) {
-      navigateToHash(buildPlanningGroupHash(centerId, groupId, planningYear))
+      navigateToHash(buildPlanningGroupHash(centerId, groupId, planningYear, { tab: 'plans' }))
       return
     }
 
-    navigateToHash(buildPlanningGroupHash(centerId, groupId))
+    navigateToHash(buildPlanningGroupHash(centerId, groupId, null, { tab: 'plans' }))
+  }
+
+  const handleSetCurrentPlan = async ({ centerId, groupId, planId, planningYear }) => {
+    if (!await persistAndSetCenters(planningRepository.setCurrentPlan(planningCenters.value, centerId, groupId, planId))) {
+      return
+    }
+
+    navigateToHash(buildPlanningGroupHash(centerId, groupId, planningYear, { tab: 'plans' }))
   }
 
   const openPlanningHome = () => {
@@ -577,6 +662,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
     handleDeleteGroup,
     handleSavePlan,
     handleDeletePlan,
+    handleSetCurrentPlan,
     openPlanningHome
   }
 }

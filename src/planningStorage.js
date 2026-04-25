@@ -23,6 +23,8 @@ import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/bro
 
 export const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
 export const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
+export const PLAN_TYPE_BUDGET = 'budget'
+export const PLAN_TYPE_UPDATE = 'update'
 
 const buildScopedStorageKey = (baseKey, scope = 'default') => `${baseKey}.${String(scope || 'default')}`
 
@@ -185,21 +187,101 @@ const sortPlans = (plans) =>
   })
 
 const getPlanYear = (plan) => resolvePlanningYear(plan?.planningYear)
-const buildPlanName = (planningYear) => `${getPlanYear({ planningYear })} Plan`
-
-const uniquePlansByYear = (plans) => {
-  const sortedPlans = sortPlans(plans)
-  const chosenByYear = new Map()
-
-  for (const plan of sortedPlans) {
-    const year = getPlanYear(plan)
-
-    if (!chosenByYear.has(year)) {
-      chosenByYear.set(year, plan)
-    }
+const normalizePlanType = (value) => String(value || '').trim().toLowerCase() === PLAN_TYPE_UPDATE
+  ? PLAN_TYPE_UPDATE
+  : PLAN_TYPE_BUDGET
+const normalizeMonthStart = (value) => {
+  const normalizedValue = String(value || '').trim()
+  return /^\d{4}-\d{2}-01$/.test(normalizedValue) ? normalizedValue : ''
+}
+const buildPlanName = (planningYear, planType = PLAN_TYPE_BUDGET) =>
+  planType === PLAN_TYPE_UPDATE
+    ? `${getPlanYear({ planningYear })} Update`
+    : `${getPlanYear({ planningYear })} Budget`
+const getPlanVersionRank = (plan) => {
+  if (plan.planType === PLAN_TYPE_BUDGET) {
+    return 0
   }
 
-  return sortPlans([...chosenByYear.values()])
+  if (plan.isCurrent) {
+    return 1
+  }
+
+  return 2
+}
+
+const normalizePlanVersionSet = (plans, timestamp = new Date().toISOString()) => {
+  const normalizedPlans = (Array.isArray(plans) ? plans : []).map((plan) => normalizePlanningPlan(plan, timestamp))
+  const plansByYear = new Map()
+
+  normalizedPlans.forEach((plan) => {
+    const year = getPlanYear(plan)
+    const existingPlans = plansByYear.get(year) || []
+    plansByYear.set(year, [...existingPlans, plan])
+  })
+
+  const nextPlans = []
+
+  plansByYear.forEach((yearPlans) => {
+    const sortedByAge = [...yearPlans].sort((left, right) =>
+      new Date(left.createdAt || left.updatedAt || 0).getTime() -
+      new Date(right.createdAt || right.updatedAt || 0).getTime()
+    )
+    const budgetPlan = sortedByAge.find((plan) => plan.planType === PLAN_TYPE_BUDGET) || sortedByAge[0]
+    const budgetPlanId = budgetPlan?.id || ''
+    const normalizedYearPlans = yearPlans.map((plan) => {
+      if (plan.id === budgetPlanId) {
+        return {
+          ...plan,
+          planType: PLAN_TYPE_BUDGET,
+          budgetPlanId
+        }
+      }
+
+      return {
+        ...plan,
+        planType: PLAN_TYPE_UPDATE,
+        budgetPlanId: plan.budgetPlanId || budgetPlanId,
+        sourcePlanId: plan.sourcePlanId || budgetPlanId
+      }
+    })
+    const explicitlyCurrent = normalizedYearPlans
+      .filter((plan) => plan.isCurrent)
+      .sort((left, right) =>
+        new Date(right.updatedAt || right.createdAt || 0).getTime() -
+        new Date(left.updatedAt || left.createdAt || 0).getTime()
+      )[0]
+    const newestUpdate = normalizedYearPlans
+      .filter((plan) => plan.planType === PLAN_TYPE_UPDATE)
+      .sort((left, right) =>
+        new Date(right.updatedAt || right.createdAt || 0).getTime() -
+        new Date(left.updatedAt || left.createdAt || 0).getTime()
+      )[0]
+    const currentPlanId = explicitlyCurrent?.id || newestUpdate?.id || budgetPlanId
+
+    nextPlans.push(
+      ...normalizedYearPlans.map((plan) => ({
+        ...plan,
+        isCurrent: plan.id === currentPlanId
+      }))
+    )
+  })
+
+  return sortPlans(nextPlans).sort((left, right) => {
+    const yearDelta = getPlanYear(right) - getPlanYear(left)
+    if (yearDelta !== 0) {
+      return yearDelta
+    }
+
+    const rankDelta = getPlanVersionRank(left) - getPlanVersionRank(right)
+    if (rankDelta !== 0) {
+      return rankDelta
+    }
+
+    const leftStamp = new Date(left.updatedAt || left.createdAt || 0).getTime()
+    const rightStamp = new Date(right.updatedAt || right.createdAt || 0).getTime()
+    return rightStamp - leftStamp
+  })
 }
 
 export const sortPlanningGroups = (groups) =>
@@ -225,11 +307,22 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
   const snapshot = clonePlain(draftPlan)
   const { budgets: _discardBudgets, ...planSnapshot } = snapshot
   const resolvedYear = resolvePlanningYear(planSnapshot.planningYear)
+  const planType = normalizePlanType(planSnapshot.planType)
+  const id = planSnapshot.id || createEntityId('plan')
+  const name = String(planSnapshot.name || '').trim() || buildPlanName(resolvedYear, planType)
 
   return {
     ...planSnapshot,
-    id: planSnapshot.id || createEntityId('plan'),
-    name: buildPlanName(resolvedYear),
+    id,
+    name,
+    planType,
+    isCurrent: Boolean(planSnapshot.isCurrent),
+    budgetPlanId: planType === PLAN_TYPE_BUDGET
+      ? (planSnapshot.budgetPlanId || id)
+      : String(planSnapshot.budgetPlanId || '').trim(),
+    sourcePlanId: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.sourcePlanId || '').trim() : '',
+    actualsThroughMonth: planType === PLAN_TYPE_UPDATE ? normalizeMonthStart(planSnapshot.actualsThroughMonth) : '',
+    actualizedAt: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.actualizedAt || '').trim() : '',
     planningYear: resolvedYear,
     holidayCalendarId: normalizeHolidayCalendarId(planSnapshot.holidayCalendarId, HOLIDAY_CALENDAR_NONE),
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),
@@ -280,10 +373,11 @@ export const normalizePlanningGroup = (draftGroup, timestamp = new Date().toISOS
     ),
     createdAt: snapshot.createdAt || timestamp,
     updatedAt: snapshot.updatedAt || timestamp,
-    plans: uniquePlansByYear(
+    plans: normalizePlanVersionSet(
       Array.isArray(snapshot.plans)
-        ? snapshot.plans.map((plan) => normalizePlanningPlan(plan, timestamp))
-        : []
+        ? snapshot.plans
+        : [],
+      timestamp
     )
   }
 }
@@ -655,36 +749,50 @@ export const upsertPlanningPlan = (centers, centerId, groupId, draftPlan) => {
             const planningYear = getPlanYear({
               planningYear: draftPlan.planningYear ?? existingPlan?.planningYear
             })
-            const yearMatchedPlan = group.plans.find(
-              (plan) => plan.id !== draftPlan.id && getPlanYear(plan) === planningYear
+            const planType = normalizePlanType(draftPlan.planType || existingPlan?.planType)
+            const existingBudgetPlan = group.plans.find(
+              (plan) => plan.id !== existingPlan?.id &&
+                getPlanYear(plan) === planningYear &&
+                normalizePlanType(plan.planType) === PLAN_TYPE_BUDGET
             )
 
-            if (yearMatchedPlan && yearMatchedPlan.id !== existingPlan?.id) {
+            if (!existingPlan && planType === PLAN_TYPE_BUDGET && existingBudgetPlan) {
               return group
             }
 
             const nextPlan = normalizePlanningPlan(
               {
-                ...yearMatchedPlan,
                 ...existingPlan,
                 ...draftPlan,
                 planningYear,
-                id: yearMatchedPlan?.id || existingPlan?.id || draftPlan.id,
-                createdAt: yearMatchedPlan?.createdAt || existingPlan?.createdAt || draftPlan.createdAt,
+                id: existingPlan?.id || draftPlan.id,
+                planType,
+                isCurrent: planType === PLAN_TYPE_UPDATE ? true : Boolean(existingPlan?.isCurrent || draftPlan.isCurrent || !existingBudgetPlan),
+                budgetPlanId: planType === PLAN_TYPE_BUDGET
+                  ? (existingPlan?.budgetPlanId || draftPlan.budgetPlanId || existingPlan?.id || draftPlan.id)
+                  : (draftPlan.budgetPlanId || existingPlan?.budgetPlanId || existingBudgetPlan?.id || draftPlan.sourcePlanId),
+                createdAt: existingPlan?.createdAt || draftPlan.createdAt,
                 updatedAt: timestamp
               },
               timestamp
             )
             const nextPlans = [
-              ...group.plans.filter(
-                (plan) => plan.id !== existingPlan?.id && plan.id !== yearMatchedPlan?.id && getPlanYear(plan) !== planningYear
-              ),
+              ...group.plans.filter((plan) => plan.id !== existingPlan?.id),
               nextPlan
             ]
 
             return {
               ...group,
-              plans: uniquePlansByYear(nextPlans),
+              plans: normalizePlanVersionSet(
+                nextPlan.isCurrent
+                  ? nextPlans.map((plan) =>
+                      getPlanYear(plan) === planningYear
+                        ? { ...plan, isCurrent: plan.id === nextPlan.id }
+                        : plan
+                    )
+                  : nextPlans,
+                timestamp
+              ),
               updatedAt: timestamp
             }
           })
@@ -711,10 +819,69 @@ export const removePlanningPlan = (centers, centerId, groupId, planId) => {
             if (group.id !== groupId) {
               return group
             }
+            const planToRemove = group.plans.find((plan) => plan.id === planId)
+            if (!planToRemove) {
+              return group
+            }
+
+            const sameYearUpdates = group.plans.filter(
+              (plan) =>
+                plan.id !== planId &&
+                getPlanYear(plan) === getPlanYear(planToRemove) &&
+                normalizePlanType(plan.planType) === PLAN_TYPE_UPDATE
+            )
+
+            if (normalizePlanType(planToRemove?.planType) === PLAN_TYPE_BUDGET && sameYearUpdates.length) {
+              return group
+            }
 
             return {
               ...group,
-              plans: sortPlans(group.plans.filter((plan) => plan.id !== planId)),
+              plans: normalizePlanVersionSet(group.plans.filter((plan) => plan.id !== planId), timestamp),
+              updatedAt: timestamp
+            }
+          })
+        ),
+        updatedAt: timestamp
+      }
+    })
+  )
+}
+
+export const setCurrentPlanningPlan = (centers, centerId, groupId, planId) => {
+  const timestamp = new Date().toISOString()
+
+  return sortPlanningCenters(
+    centers.map((center) => {
+      if (center.id !== centerId) {
+        return center
+      }
+
+      return {
+        ...center,
+        groups: sortPlanningGroups(
+          center.groups.map((group) => {
+            if (group.id !== groupId) {
+              return group
+            }
+
+            const targetPlan = group.plans.find((plan) => plan.id === planId)
+            if (!targetPlan) {
+              return group
+            }
+
+            const targetYear = getPlanYear(targetPlan)
+
+            return {
+              ...group,
+              plans: normalizePlanVersionSet(
+                group.plans.map((plan) =>
+                  getPlanYear(plan) === targetYear
+                    ? { ...plan, isCurrent: plan.id === planId }
+                    : plan
+                ),
+                timestamp
+              ),
               updatedAt: timestamp
             }
           })

@@ -27,7 +27,8 @@ vi.mock('../../planningRepository', () => ({
     deletePlan: vi.fn(),
     saveCenter: vi.fn(),
     saveGroup: vi.fn(),
-    savePlan: vi.fn()
+    savePlan: vi.fn(),
+    setCurrentPlan: vi.fn()
   }
 }))
 
@@ -261,6 +262,68 @@ describe('usePlanningWorkspace', () => {
     })
   })
 
+  it('ties group forecast seeds to the current plan version for the selected year', async () => {
+    planningRepository.loadWorkspace.mockResolvedValue([
+      {
+        ...centers[0],
+        groups: [
+          {
+            ...centers[0].groups[0],
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planType: 'budget',
+                isCurrent: false,
+                planningYear: 2026
+              },
+              {
+                id: 'update-2026-apr',
+                name: '2026 Apr Update',
+                planType: 'update',
+                isCurrent: true,
+                planningYear: 2026,
+                actualsThroughMonth: '2026-03-01',
+                budgetPlanId: 'budget-2026'
+              }
+            ]
+          }
+        ]
+      }
+    ])
+
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'group-forecasts',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      year: 2026
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const storageScope = computed(() => currentUser.value.id)
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      storageScope
+    })
+
+    await workspace.loadCentersForScope()
+    await nextTick()
+
+    expect(workspace.forecastSeed.value).toMatchObject({
+      planName: '2026 Apr Update',
+      planType: 'update',
+      actualsThroughMonth: '2026-03-01',
+      planningContext: {
+        planId: 'update-2026-apr',
+        planName: '2026 Apr Update',
+        planType: 'update',
+        actualsThroughMonth: '2026-03-01'
+      }
+    })
+  })
+
   it('persists center saves through the planning storage layer', async () => {
     const currentRoute = ref({
       app: 'planning',
@@ -351,6 +414,104 @@ describe('usePlanningWorkspace', () => {
     expect(planningRepository.savePlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
     expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', 2026, { tab: 'plans' }))
+  })
+
+  it('seeds a new update draft from the selected source plan and actuals cutoff', async () => {
+    const versionedCenters = [
+      {
+        ...centers[0],
+        groups: [
+          {
+            ...centers[0].groups[0],
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: [
+                { serviceDate: '2026-01-02', contacts: 100, ahtSeconds: 300 },
+                { serviceDate: '2026-01-03', contacts: 200, ahtSeconds: 360 }
+              ]
+            },
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planType: 'budget',
+                planningYear: 2026,
+                isCurrent: true,
+                planMonths: Array.from({ length: 12 }, (_, monthIndex) => ({
+                  contacts: 1000 + (monthIndex * 100),
+                  ahtSeconds: 300 + monthIndex
+                })),
+                demandSource: {
+                  mode: 'forecast',
+                  forecastProjectId: 'forecast-1',
+                  forecastMonthSnapshot: Array.from({ length: 12 }, (_, monthIndex) => ({
+                    monthIndex,
+                    monthLabel: String(monthIndex + 1),
+                    monthStart: `2026-${String(monthIndex + 1).padStart(2, '0')}-01`,
+                    contacts: 1000 + (monthIndex * 100),
+                    ahtSeconds: 300 + monthIndex
+                  })),
+                  forecastDailySnapshot: [
+                    { serviceDate: '2026-01-02', monthIndex: 0, contacts: 100 },
+                    { serviceDate: '2026-02-02', monthIndex: 1, contacts: 120 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'new',
+      year: 2026,
+      requirementMethod: 'intraday_erlang',
+      updateSourcePlanId: 'budget-2026',
+      actualsThroughMonth: '2026-01-01',
+      updatePlanName: '2026 Feb Update'
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const hasWorkspaceAccess = computed(() => true)
+    const storageScope = computed(() => currentUser.value.id)
+
+    planningRepository.loadWorkspace.mockResolvedValue(versionedCenters)
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      hasWorkspaceAccess,
+      storageScope
+    })
+
+    await workspace.loadCentersForScope()
+    await nextTick()
+
+    expect(workspace.plannerSeed.value.updateDraftPlan).toMatchObject({
+      id: null,
+      name: '2026 Feb Update',
+      planType: 'update',
+      isCurrent: true,
+      sourcePlanId: 'budget-2026',
+      budgetPlanId: 'budget-2026',
+      actualsThroughMonth: '2026-01-01'
+    })
+    expect(workspace.plannerSeed.value.updateDraftPlan.planMonths[0]).toMatchObject({
+      contacts: 300,
+      ahtSeconds: 340
+    })
+    expect(workspace.plannerSeed.value.updateDraftPlan.planMonths[1]).toMatchObject({
+      contacts: 1100,
+      ahtSeconds: 301
+    })
+    expect(workspace.plannerSeed.value.updateDraftPlan.demandSource.forecastDailySnapshot.map((row) => row.serviceDate)).toEqual([
+      '2026-01-02',
+      '2026-01-03',
+      '2026-02-02'
+    ])
   })
 
   it('persists guest workspace changes to the default local scope', async () => {
@@ -504,7 +665,7 @@ describe('usePlanningWorkspace', () => {
     await nextTick()
 
     expect(workspace.plannerDraftKey.value).toBe('user-1:group-1:plan:new:2026:workload_ratio')
-    expect(workspace.monthlyPlannerKey.value).toBe('planner-group-1-new-2026-workload_ratio')
+    expect(workspace.monthlyPlannerKey.value).toBe('planner-group-1-new-2026-workload_ratio-budget-none')
 
     currentRoute.value = {
       ...currentRoute.value,
@@ -514,7 +675,7 @@ describe('usePlanningWorkspace', () => {
     await nextTick()
 
     expect(workspace.plannerDraftKey.value).toBe('user-1:group-1:plan:new:2026:intraday_erlang')
-    expect(workspace.monthlyPlannerKey.value).toBe('planner-group-1-new-2026-intraday_erlang')
+    expect(workspace.monthlyPlannerKey.value).toBe('planner-group-1-new-2026-intraday_erlang-budget-none')
   })
 
   it('keeps the new-plan draft key empty until the editor has a resolved group scope', async () => {

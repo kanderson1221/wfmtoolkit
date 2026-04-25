@@ -32,6 +32,12 @@ describe('appRoutes', () => {
     expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027)).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/workload_ratio')
     expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027, { requirementMethod: 'workload_ratio' })).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/workload_ratio')
     expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027, { requirementMethod: 'intraday_erlang' })).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang')
+    expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027, {
+      requirementMethod: 'intraday_erlang',
+      updateSourcePlanId: 'plan-source',
+      actualsThroughMonth: '2027-03-01',
+      updatePlanName: '2027 Apr Update'
+    })).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang/update/plan-source/actuals-through/2027-03-01/name/2027%20Apr%20Update')
   })
 
   it('treats home-like hashes as public landing routes', () => {
@@ -128,6 +134,18 @@ describe('appRoutes', () => {
       groupId: 'group-1',
       year: 2027,
       requirementMethod: 'intraday_erlang'
+    })
+    expect(parseHashRoute('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang/update/plan-source/actuals-through/2027-03-01/name/2027%20Apr%20Update')).toMatchObject({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'new',
+      year: 2027,
+      requirementMethod: 'intraday_erlang',
+      updateSourcePlanId: 'plan-source',
+      actualsThroughMonth: '2027-03-01',
+      updatePlanName: '2027 Apr Update'
     })
   })
 

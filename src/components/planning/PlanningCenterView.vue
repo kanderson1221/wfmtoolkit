@@ -11,8 +11,9 @@ import PlanningForecastCreateModal from './PlanningForecastCreateModal.vue'
 import PlanningGroupActualsView from './PlanningGroupActualsView.vue'
 import PlanningGroupIntradayView from './PlanningGroupIntradayView.vue'
 import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
+import PlanningPlanUpdateModal from './PlanningPlanUpdateModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
-import { navigateToHash } from '../../appRoutes'
+import { buildPlanningNewPlanHash, navigateToHash } from '../../appRoutes'
 import { createPlanningGroupDraft } from '../../planningStorage'
 import { currentYear } from '../../composables/monthlyPlanBuilder/shared'
 import {
@@ -65,13 +66,19 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['save-group', 'delete-group', 'delete-plan'])
+const emit = defineEmits(['save-group', 'delete-group', 'delete-plan', 'set-current-plan'])
 
 const groupSettingsOpen = ref(false)
 const planSettingsOpen = ref(false)
+const planUpdateOpen = ref(false)
 const groupDraft = ref(createPlanningGroupDraft())
 const newPlanYear = ref(currentYear)
 const newPlanRequirementMethod = ref(PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO)
+const updateSourcePlan = ref(null)
+const updateBudgetPlan = ref(null)
+const updateActualsThroughOptions = ref([])
+const updateActualsThroughMonth = ref('')
+const updatePlanName = ref('')
 const {
   dialogVisible: confirmationDialogOpen,
   dialogTitle: confirmationDialogTitle,
@@ -84,7 +91,7 @@ const activeGroupWorkspaceTab = ref('data')
 const actualsViewRef = ref(null)
 
 const planComparisonGridClass =
-  'grid min-w-0 grid-cols-[minmax(5.25rem,0.62fr)_minmax(7.25rem,0.8fr)_minmax(6rem,0.72fr)_minmax(7rem,0.82fr)_minmax(7rem,0.82fr)_minmax(8.5rem,0.95fr)_minmax(8.5rem,0.95fr)_minmax(8.5rem,0.95fr)_minmax(6.5rem,0.72fr)] items-center'
+  'grid min-w-0 grid-cols-[minmax(12rem,1.25fr)_minmax(7rem,0.72fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7rem,0.72fr)] items-center'
 const forecastComparisonGridClass =
   'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(9.5rem,1fr)_minmax(7.25rem,0.8fr)_minmax(6rem,0.72fr)_minmax(6rem,0.72fr)_minmax(6.75rem,0.78fr)_minmax(6.75rem,0.8fr)_minmax(8.75rem,1fr)] items-center'
 
@@ -116,7 +123,7 @@ const {
   formatNumber,
   formatWhole,
   groupRows,
-  planRows,
+  planYearSections,
   selectedGroup,
   selectedGroupDefaults,
   selectedYearModel
@@ -154,6 +161,7 @@ const readyForecastPlanYears = computed(() => (
 const availablePlanYearOptions = computed(() => {
   const usedYears = new Set(
     (selectedGroup.value?.plans || [])
+      .filter((plan) => plan.planType !== 'update')
       .map((plan) => Number(plan.planningYear))
       .filter((planningYear) => Number.isFinite(planningYear) && planningYear > 0)
   )
@@ -190,7 +198,7 @@ const planSettingsStatusMessage = computed(() => {
   }
 
   if (existingPlanForDraftYear.value) {
-    return `This staffing group already has a saved plan for ${newPlanYear.value}.`
+    return `This staffing group already has a Budget plan for ${newPlanYear.value}.`
   }
 
   return ''
@@ -230,6 +238,44 @@ const createPlan = () => {
 
   planSettingsOpen.value = false
   navigateToHash(createPlanHref.value)
+}
+
+const openPlanUpdate = (plan, section = null) => {
+  if (!selectedGroup.value || !plan) {
+    return
+  }
+
+  const matchedSection = section || planYearSections.value.find((item) =>
+    item.rows.some((row) => row.id === plan.id)
+  )
+
+  updateSourcePlan.value = plan
+  updateBudgetPlan.value = matchedSection?.budgetPlan || null
+  updateActualsThroughOptions.value = matchedSection?.actualsThroughOptions || []
+  updateActualsThroughMonth.value = matchedSection?.defaultActualsThroughMonth || ''
+  updatePlanName.value = matchedSection?.defaultUpdateName || `${plan.planningYear} Update`
+  planUpdateOpen.value = true
+}
+
+const closePlanUpdate = () => {
+  planUpdateOpen.value = false
+}
+
+const createPlanUpdate = () => {
+  if (!selectedGroup.value || !updateSourcePlan.value || !updateActualsThroughMonth.value || !updatePlanName.value.trim()) {
+    return
+  }
+
+  const sourcePlan = updateSourcePlan.value
+  planUpdateOpen.value = false
+  navigateToHash(
+    buildPlanningNewPlanHash(props.center.id, selectedGroup.value.id, sourcePlan.planningYear, {
+      requirementMethod: sourcePlan.requirementMethod,
+      updateSourcePlanId: sourcePlan.id,
+      actualsThroughMonth: updateActualsThroughMonth.value,
+      updatePlanName: updatePlanName.value.trim()
+    })
+  )
 }
 
 const selectPlanYear = (planningYear) => {
@@ -307,6 +353,22 @@ const confirmDeletePlan = (plan) => {
 
   const groupId = selectedGroup.value.id
   const groupName = selectedGroup.value.name
+  const hasUpdates = (selectedGroup.value.plans || []).some(
+    (candidate) =>
+      candidate.id !== plan.id &&
+      Number(candidate.planningYear) === Number(plan.planningYear) &&
+      candidate.planType === 'update'
+  )
+
+  if (plan.planType === 'budget' && hasUpdates) {
+    requestConfirmation({
+      title: 'Budget Has Updates',
+      description: `Delete the updated ${plan.planningYear} plans before deleting the Budget baseline for "${groupName}".`,
+      confirmLabel: 'OK',
+      onConfirm: () => {}
+    })
+    return
+  }
 
   requestConfirmation({
     title: 'Delete Plan?',
@@ -334,10 +396,21 @@ const groupMenuItems = [
   }
 ]
 
-const planMenuItems = [
+const buildPlanMenuItems = (plan) => [
+  {
+    id: 'create-update',
+    label: 'Create Updated Plan'
+  },
+  ...(plan.planType === 'update' && !plan.isCurrent
+    ? [{
+        id: 'set-current',
+        label: 'Set Current'
+      }]
+    : []),
   {
     id: 'delete-plan',
-    label: 'Delete'
+    label: 'Delete',
+    tone: 'danger'
   }
 ]
 
@@ -353,6 +426,21 @@ const handleGroupMenuSelect = (group, item) => {
 }
 
 const handlePlanMenuSelect = (plan, item) => {
+  if (item.id === 'create-update') {
+    openPlanUpdate(plan)
+    return
+  }
+
+  if (item.id === 'set-current') {
+    emit('set-current-plan', {
+      centerId: props.center.id,
+      groupId: selectedGroup.value.id,
+      planId: plan.id,
+      planningYear: Number(plan.planningYear)
+    })
+    return
+  }
+
   if (item.id === 'delete-plan') {
     confirmDeletePlan(plan)
   }
@@ -650,7 +738,7 @@ watch(
                             Plan Year
                           </span>
                           <span :class="planHeaderCellClass">
-                            Type
+                            Forecast
                           </span>
                           <span :class="planHeaderCellClass">
                             Source
@@ -800,120 +888,132 @@ watch(
                 />
               </div>
 
-              <div v-else-if="planRows.length" class="flex-1 min-h-0 overflow-y-auto">
-                <div class="border-b border-slate-200 bg-white/80 px-3 py-3">
-                  <div :class="planListRowGridClass">
-                    <span class="h-9 w-1" aria-hidden="true" />
-
-                    <div :class="[planComparisonGridClass, 'px-2']">
-                      <span :class="planHeaderCellClass">
-                        Plan Year
-                      </span>
-                      <span :class="planHeaderCellClass">
-                        Method
-                      </span>
-                      <span :class="planHeaderCellRightClass">
-                        Contacts
-                      </span>
-                      <span :class="planHeaderCellRightClass">
-                        Workload Hrs
-                      </span>
-                      <span :class="planHeaderCellRightClass">
-                        Total Req Hrs
-                      </span>
-                      <span :class="planHeaderCellRightClass" title="Average Total Required Headcount">
-                        Avg Total Req HC
-                      </span>
-                      <span :class="planHeaderCellRightClass" title="Peak Total Required Headcount">
-                        Peak Total Req HC
-                      </span>
-                      <span :class="planHeaderCellRightClass" title="Ending Frontline Headcount">
-                        Ending Frontline HC
-                      </span>
-                      <span :class="planHeaderCellRightClass" title="Average Gap to Required Headcount">
-                        Avg Gap
-                      </span>
-                    </div>
-
-                    <div class="pr-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                      Actions
-                    </div>
-                  </div>
-                </div>
-
-                <div class="divide-y divide-slate-200">
-                  <div
-                    v-for="plan in planRows"
-                    :key="plan.id"
-                    :class="[planListRowGridClass, 'h-16 cursor-pointer px-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c3d2df]', plan.isSelectedYear ? 'bg-[#e7eef4]' : 'bg-white hover:bg-slate-50/70']"
-                    tabindex="0"
-                    role="button"
-                    :aria-label="`Select ${plan.planningYear} plan for ${selectedGroup.name}`"
-                    @click="selectPlanYear(plan.planningYear)"
-                    @dblclick="navigateToHash(plan.openHref)"
-                    @keydown.enter.prevent="navigateToHash(plan.openHref)"
-                    @keydown.space.prevent="selectPlanYear(plan.planningYear)"
+              <div v-else-if="planYearSections.length" class="flex-1 min-h-0 overflow-y-auto">
+                <div class="grid gap-4 p-4">
+                  <section
+                    v-for="section in planYearSections"
+                    :key="section.planningYear"
+                    class="grid gap-0 border border-slate-200 bg-white"
                   >
-                    <span
-                      class="h-9 w-1 rounded-full transition"
-                      :class="plan.isSelectedYear ? 'bg-[#15395f]' : 'bg-transparent'"
-                      aria-hidden="true"
-                    />
-
-                    <div :class="[planComparisonGridClass, 'rounded-[16px] px-2 py-1.5 text-sm']">
-                      <span class="px-3">
-                        <span
-                          class="inline-flex min-w-[4.25rem] items-center justify-center rounded-[16px] px-2.5 py-1 font-semibold"
-                          :class="plan.isSelectedYear ? 'bg-white text-[#15395f]' : 'bg-slate-100 text-slate-700'"
-                        >
-                          {{ plan.planningYear }}
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="text-base font-semibold text-slate-950">
+                          {{ section.planningYear }}
+                        </h3>
+                        <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                          Current: {{ section.currentPlan.name || section.currentPlan.planTypeLabel }}
                         </span>
-                      </span>
-                      <span class="truncate px-3 font-medium text-slate-700">
-                        {{ plan.requirementMethodLabel }}
-                      </span>
-                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatWhole(plan.annualContacts) }}
-                      </span>
-                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatWhole(plan.annualWorkloadHours) }}
-                      </span>
-                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatWhole(plan.totalRequiredStaffHours) }}
-                      </span>
-                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatNumber(plan.averageTotalRequiredHeadcount, 1) }}
-                      </span>
-                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatNumber(plan.peakTotalRequiredHeadcount, 1) }}
-                      </span>
-                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatNumber(plan.endingFrontlineHeadcount, 1) }}
-                      </span>
-                      <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                        {{ formatSignedNumber(plan.averageGapToRequirement, 1) }}
-                      </span>
-                    </div>
+                      </div>
 
-                    <div class="flex items-center justify-end gap-1.5 whitespace-nowrap" @click.stop @keydown.stop>
                       <AppButton
                         size="sm"
-                        variant="quiet"
-                        :href="plan.openHref"
-                        :aria-label="`Open ${plan.planningYear} plan for ${selectedGroup.name}`"
+                        variant="secondary"
+                        :disabled="!section.actualsThroughOptions.length"
+                        @click="openPlanUpdate(section.currentPlan, section)"
                       >
-                        Open
+                        Create Updated Plan
                       </AppButton>
-                      <AppMenu
-                        :items="planMenuItems"
-                        :trigger-icon="mdiDotsVertical"
-                        :trigger-label="`Open actions for ${plan.planningYear} plan`"
-                        compact
-                        trigger-variant="icon-quiet"
-                        @select="handlePlanMenuSelect(plan, $event)"
-                      />
                     </div>
-                  </div>
+
+                    <div class="border-b border-slate-200 px-3 py-2">
+                      <div :class="planListRowGridClass">
+                        <span class="h-8 w-1" aria-hidden="true" />
+                        <div :class="[planComparisonGridClass, 'px-2']">
+                          <span :class="planHeaderCellClass">Plan</span>
+                          <span :class="planHeaderCellRightClass">Contacts</span>
+                          <span :class="planHeaderCellRightClass">Total Req Hrs</span>
+                          <span :class="planHeaderCellRightClass">Avg Req HC</span>
+                          <span :class="planHeaderCellRightClass">Avg Gap</span>
+                          <span :class="planHeaderCellRightClass">Vs Budget</span>
+                          <span :class="planHeaderCellRightClass">Saved</span>
+                        </div>
+                        <div class="pr-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                          Actions
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="divide-y divide-slate-200">
+                      <div
+                        v-for="plan in section.rows"
+                        :key="plan.id"
+                        :class="[planListRowGridClass, 'min-h-20 cursor-pointer px-3 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c3d2df]', plan.isSelectedYear ? 'bg-[#e7eef4]' : 'bg-white hover:bg-slate-50/70']"
+                        tabindex="0"
+                        role="button"
+                        :aria-label="`Select ${plan.name || plan.planningYear} plan for ${selectedGroup.name}`"
+                        @click="selectPlanYear(plan.planningYear)"
+                        @dblclick="navigateToHash(plan.openHref)"
+                        @keydown.enter.prevent="navigateToHash(plan.openHref)"
+                        @keydown.space.prevent="selectPlanYear(plan.planningYear)"
+                      >
+                        <span
+                          class="h-10 w-1 rounded-full transition"
+                          :class="plan.isCurrent ? 'bg-[#15395f]' : 'bg-transparent'"
+                          aria-hidden="true"
+                        />
+
+                        <div :class="[planComparisonGridClass, 'rounded-[16px] px-2 py-1.5 text-sm']">
+                          <div class="grid min-w-0 gap-1 px-3">
+                            <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                              <strong class="truncate text-slate-950">{{ plan.name || `${plan.planningYear} Plan` }}</strong>
+                              <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-600">
+                                {{ plan.planTypeLabel }}
+                              </span>
+                              <span
+                                v-if="plan.isCurrent"
+                                class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-emerald-700"
+                              >
+                                Current
+                              </span>
+                            </div>
+                            <span class="truncate text-[0.78rem] text-slate-500">
+                              {{ plan.actualsThroughBadge || plan.requirementMethodLabel }}
+                            </span>
+                          </div>
+                          <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                            {{ formatWhole(plan.annualContacts) }}
+                          </span>
+                          <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                            {{ formatWhole(plan.totalRequiredStaffHours) }}
+                          </span>
+                          <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                            {{ formatNumber(plan.averageTotalRequiredHeadcount, 1) }}
+                          </span>
+                          <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                            {{ formatSignedNumber(plan.averageGapToRequirement, 1) }}
+                          </span>
+                          <span class="grid gap-0.5 px-3 text-right text-[0.78rem] font-medium tabular-nums text-slate-600">
+                            <span>Contacts {{ plan.contactsVarianceLabel }}</span>
+                            <span>HC {{ plan.averageRequiredHeadcountVarianceLabel }}</span>
+                            <span>Hrs {{ plan.totalRequiredHoursVarianceLabel }}</span>
+                            <span>Gap {{ plan.averageGapVarianceLabel }}</span>
+                          </span>
+                          <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
+                            {{ plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : '—' }}
+                          </span>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-1.5 whitespace-nowrap" @click.stop @keydown.stop>
+                          <AppButton
+                            size="sm"
+                            variant="quiet"
+                            :href="plan.openHref"
+                            :aria-label="`Open ${plan.name || plan.planningYear} plan for ${selectedGroup.name}`"
+                          >
+                            Open
+                          </AppButton>
+                          <AppMenu
+                            :items="buildPlanMenuItems(plan)"
+                            :trigger-icon="mdiDotsVertical"
+                            :trigger-label="`Open actions for ${plan.name || plan.planningYear} plan`"
+                            compact
+                            trigger-variant="icon-quiet"
+                            @select="handlePlanMenuSelect(plan, $event)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </div>
 
@@ -961,7 +1061,7 @@ watch(
       :status-message="planSettingsStatusMessage"
       :status-tone="planSettingsStatusTone"
       title="New Plan"
-      description="Choose a planning year that already has a completed staffing-group forecast. Each staffing group can have only one saved plan per year."
+      description="Choose a planning year that already has a completed staffing-group forecast. Each staffing group can have one Budget plan per year."
       submit-label="Create Plan"
       @cancel="closePlanSettings"
       @close="createPlan"
@@ -974,6 +1074,18 @@ watch(
       :can-create="canCreateForecast"
       @cancel="closeForecastCreate"
       @create="createForecast"
+    />
+
+    <PlanningPlanUpdateModal
+      v-if="planUpdateOpen && updateSourcePlan"
+      v-model:visible="planUpdateOpen"
+      v-model:actuals-through-month="updateActualsThroughMonth"
+      v-model:update-name="updatePlanName"
+      :source-plan="updateSourcePlan"
+      :budget-plan="updateBudgetPlan"
+      :actuals-through-options="updateActualsThroughOptions"
+      @cancel="closePlanUpdate"
+      @create="createPlanUpdate"
     />
 
     <AppConfirmDialog

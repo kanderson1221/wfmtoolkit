@@ -2,8 +2,12 @@ import { getCurrentCalendarYear } from '../planner/shared'
 import {
   createPlanningCenterDraft,
   loadPlanningCenters,
+  PLAN_TYPE_BUDGET,
+  PLAN_TYPE_UPDATE,
+  removePlanningPlan,
   resolveCenterHolidayProfile,
   resolvePlanHolidaySnapshot,
+  setCurrentPlanningPlan,
   upsertPlanningPlan
 } from '../planningStorage'
 
@@ -146,9 +150,220 @@ describe('planningStorage', () => {
     expect(nextPlans).toHaveLength(1)
     expect(nextPlans[0]).toMatchObject({
       id: 'plan-1',
-      name: '2026 Plan',
+      name: '2026 Updated Plan',
       planningYear: 2026
     })
+  })
+
+  it('normalizes legacy saved plans as current Budget baselines', () => {
+    ensurePlanningStorageApi().setItem(
+      'wfmtoolkit.callCenters.v1.default',
+      JSON.stringify([
+        {
+          id: 'center-1',
+          name: 'North America Operations',
+          operatingWeekdays: [1, 2, 3, 4, 5],
+          defaultPaidHoursPerDay: 8,
+          defaultOccupancyPercent: 90,
+          defaultAdherencePercent: 95,
+          groups: [
+            {
+              id: 'group-1',
+              name: 'Consumer Voice',
+              plans: [
+                {
+                  id: 'plan-1',
+                  name: '2026 Operating Plan',
+                  planningYear: 2026
+                }
+              ]
+            }
+          ]
+        }
+      ])
+    )
+
+    const centers = loadPlanningCenters('default')
+    const plan = centers[0].groups[0].plans[0]
+
+    expect(plan).toMatchObject({
+      id: 'plan-1',
+      name: '2026 Operating Plan',
+      planningYear: 2026,
+      planType: PLAN_TYPE_BUDGET,
+      isCurrent: true,
+      budgetPlanId: 'plan-1',
+      sourcePlanId: '',
+      actualsThroughMonth: ''
+    })
+  })
+
+  it('allows multiple same-year updates and keeps only the newest saved update current', () => {
+    const centers = [
+      {
+        id: 'center-1',
+        name: 'North America Operations',
+        timezone: 'America/New_York',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        defaultPaidHoursPerDay: 8,
+        defaultOccupancyPercent: 90,
+        defaultAdherencePercent: 95,
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Consumer Voice',
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planType: PLAN_TYPE_BUDGET,
+                planningYear: 2026,
+                isCurrent: true,
+                createdAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+
+    const withFirstUpdate = upsertPlanningPlan(centers, 'center-1', 'group-1', {
+      name: '2026 Apr Update',
+      planType: PLAN_TYPE_UPDATE,
+      planningYear: 2026,
+      sourcePlanId: 'budget-2026',
+      budgetPlanId: 'budget-2026',
+      actualsThroughMonth: '2026-03-01'
+    })
+    const withSecondUpdate = upsertPlanningPlan(withFirstUpdate, 'center-1', 'group-1', {
+      name: '2026 Jun Update',
+      planType: PLAN_TYPE_UPDATE,
+      planningYear: 2026,
+      sourcePlanId: 'budget-2026',
+      budgetPlanId: 'budget-2026',
+      actualsThroughMonth: '2026-05-01'
+    })
+
+    const nextPlans = withSecondUpdate[0].groups[0].plans
+    const updatePlans = nextPlans.filter((plan) => plan.planType === PLAN_TYPE_UPDATE)
+
+    expect(nextPlans).toHaveLength(3)
+    expect(updatePlans).toHaveLength(2)
+    expect(nextPlans.filter((plan) => plan.isCurrent)).toHaveLength(1)
+    expect(nextPlans.find((plan) => plan.isCurrent)).toMatchObject({
+      name: '2026 Jun Update',
+      planType: PLAN_TYPE_UPDATE,
+      budgetPlanId: 'budget-2026',
+      actualsThroughMonth: '2026-05-01'
+    })
+  })
+
+  it('blocks Budget deletion while updates exist and falls back to Budget when the current update is deleted', () => {
+    const centers = [
+      {
+        id: 'center-1',
+        name: 'North America Operations',
+        timezone: 'America/New_York',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        defaultPaidHoursPerDay: 8,
+        defaultOccupancyPercent: 90,
+        defaultAdherencePercent: 95,
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Consumer Voice',
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planType: PLAN_TYPE_BUDGET,
+                planningYear: 2026,
+                isCurrent: false,
+                createdAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z'
+              },
+              {
+                id: 'update-1',
+                name: '2026 Apr Update',
+                planType: PLAN_TYPE_UPDATE,
+                planningYear: 2026,
+                budgetPlanId: 'budget-2026',
+                sourcePlanId: 'budget-2026',
+                isCurrent: true,
+                actualsThroughMonth: '2026-03-01',
+                createdAt: '2026-04-01T00:00:00.000Z',
+                updatedAt: '2026-04-01T00:00:00.000Z'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+
+    const afterBlockedBudgetDelete = removePlanningPlan(centers, 'center-1', 'group-1', 'budget-2026')
+    expect(afterBlockedBudgetDelete[0].groups[0].plans).toHaveLength(2)
+
+    const afterUpdateDelete = removePlanningPlan(afterBlockedBudgetDelete, 'center-1', 'group-1', 'update-1')
+    expect(afterUpdateDelete[0].groups[0].plans).toHaveLength(1)
+    expect(afterUpdateDelete[0].groups[0].plans[0]).toMatchObject({
+      id: 'budget-2026',
+      planType: PLAN_TYPE_BUDGET,
+      isCurrent: true
+    })
+  })
+
+  it('can set a non-current update as the current plan for its year', () => {
+    const centers = [
+      {
+        id: 'center-1',
+        name: 'North America Operations',
+        timezone: 'America/New_York',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        defaultPaidHoursPerDay: 8,
+        defaultOccupancyPercent: 90,
+        defaultAdherencePercent: 95,
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Consumer Voice',
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planType: PLAN_TYPE_BUDGET,
+                planningYear: 2026,
+                isCurrent: false
+              },
+              {
+                id: 'update-1',
+                name: '2026 Apr Update',
+                planType: PLAN_TYPE_UPDATE,
+                planningYear: 2026,
+                budgetPlanId: 'budget-2026',
+                sourcePlanId: 'budget-2026',
+                isCurrent: true
+              },
+              {
+                id: 'update-2',
+                name: '2026 Jun Update',
+                planType: PLAN_TYPE_UPDATE,
+                planningYear: 2026,
+                budgetPlanId: 'budget-2026',
+                sourcePlanId: 'update-1',
+                isCurrent: false
+              }
+            ]
+          }
+        ]
+      }
+    ]
+
+    const nextCenters = setCurrentPlanningPlan(centers, 'center-1', 'group-1', 'update-2')
+    const nextPlans = nextCenters[0].groups[0].plans
+
+    expect(nextPlans.filter((plan) => plan.isCurrent)).toHaveLength(1)
+    expect(nextPlans.find((plan) => plan.isCurrent)?.id).toBe('update-2')
   })
 
   it('migrates legacy federal template centers to manual holiday rows', () => {
