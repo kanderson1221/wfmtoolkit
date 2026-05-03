@@ -1,4 +1,5 @@
 import {
+  computeForecastPlanningReady,
   FORECAST_SOURCE_MODELED_DAILY,
   getForecastProjectDailyRows,
   getForecastProjectMonthlyRollup
@@ -9,6 +10,7 @@ import { MONTH_LABELS, createPlanMonth, resolvePlanningYear, toNumber } from './
 
 export const DEMAND_SOURCE_MANUAL = 'manual'
 export const DEMAND_SOURCE_FORECAST = 'forecast'
+const PLAN_TYPE_UPDATE = 'update'
 
 const normalizeNullableAhtSeconds = (value) => {
   if (value == null) {
@@ -85,21 +87,100 @@ const parseMonthStart = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
+const normalizeMonthStartValue = (value) => {
+  const parsed = parseMonthStart(value)
+  if (!parsed) {
+    return ''
+  }
+
+  return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, '0')}-01`
+}
+
+export const buildPlanRequiredMonthStarts = (planningYear, options = {}) => {
+  const resolvedPlanningYear = resolvePlanningYear(planningYear)
+  const actualsThroughMonth = normalizeMonthStartValue(options.actualsThroughMonth)
+  let startMonthIndex = 0
+
+  if (options.planType === PLAN_TYPE_UPDATE && actualsThroughMonth.startsWith(`${resolvedPlanningYear}-`)) {
+    startMonthIndex = Math.min(Number(actualsThroughMonth.slice(5, 7)), MONTH_LABELS.length)
+  }
+
+  return Array.from(
+    { length: Math.max(MONTH_LABELS.length - startMonthIndex, 0) },
+    (_, index) => {
+      const monthIndex = startMonthIndex + index
+      return `${resolvedPlanningYear}-${String(monthIndex + 1).padStart(2, '0')}-01`
+    }
+  )
+}
+
+const formatMissingCoverageLabel = (monthStarts = []) => {
+  if (!monthStarts.length) {
+    return ''
+  }
+
+  const formatMonth = (monthStart) => {
+    const parsed = parseMonthStart(monthStart)
+    if (!parsed) {
+      return monthStart
+    }
+
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC'
+    }).format(parsed)
+  }
+
+  if (monthStarts.length === 1) {
+    return formatMonth(monthStarts[0])
+  }
+
+  return `${formatMonth(monthStarts[0])}-${formatMonth(monthStarts[monthStarts.length - 1])}`
+}
+
+export const summarizeForecastCoverageForPlan = (forecastProject, planningYear, options = {}) => {
+  const requiredMonthStarts = buildPlanRequiredMonthStarts(planningYear, options)
+  const availableMonthStarts = new Set(
+    getForecastProjectMonthlyRollup(forecastProject)
+      .map((row) => normalizeMonthStartValue(row?.monthStart))
+      .filter(Boolean)
+  )
+  const matchedMonthStarts = requiredMonthStarts.filter((monthStart) => availableMonthStarts.has(monthStart))
+  const missingMonthStarts = requiredMonthStarts.filter((monthStart) => !availableMonthStarts.has(monthStart))
+
+  return {
+    requiredMonthStarts,
+    matchedMonthStarts,
+    missingMonthStarts,
+    requiredMonthCount: requiredMonthStarts.length,
+    matchedMonthCount: matchedMonthStarts.length,
+    hasRequiredCoverage: requiredMonthStarts.length > 0 && missingMonthStarts.length === 0,
+    coverageLabel: `Covers ${matchedMonthStarts.length}/${requiredMonthStarts.length} required months`,
+    missingCoverageLabel: missingMonthStarts.length
+      ? `Missing ${formatMissingCoverageLabel(missingMonthStarts)}`
+      : ''
+  }
+}
+
+export const buildForecastDemandSnapshot = (forecastProject, planningYear, options = {}) => {
   const resolvedPlanningYear = resolvePlanningYear(planningYear)
   const monthlyRollup = getForecastProjectMonthlyRollup(forecastProject)
+  const coverageSummary = summarizeForecastCoverageForPlan(forecastProject, resolvedPlanningYear, options)
   const ahtAssumptionsByMonthStart = new Map(
     buildForecastMonthlyHandleTimeAssumptions(forecastProject).map((row) => [row.monthStart, row])
   )
 
-  if (!monthlyRollup.length) {
+  if (!computeForecastPlanningReady(forecastProject) || !coverageSummary.hasRequiredCoverage) {
     return []
   }
+
+  const requiredMonthStarts = new Set(coverageSummary.requiredMonthStarts)
 
   return monthlyRollup
     .map((row) => {
       const parsedMonthStart = parseMonthStart(row.monthStart)
-      if (!parsedMonthStart || parsedMonthStart.getUTCFullYear() !== resolvedPlanningYear) {
+      if (!parsedMonthStart || !requiredMonthStarts.has(normalizeMonthStartValue(row.monthStart))) {
         return null
       }
 
@@ -123,13 +204,19 @@ export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
     .sort((left, right) => left.monthIndex - right.monthIndex)
 }
 
-export const buildForecastDailyDemandSnapshot = (forecastProject, planningYear) => {
+export const buildForecastDailyDemandSnapshot = (forecastProject, planningYear, options = {}) => {
   const resolvedPlanningYear = resolvePlanningYear(planningYear)
+  const coverageSummary = summarizeForecastCoverageForPlan(forecastProject, resolvedPlanningYear, options)
+
+  if (!computeForecastPlanningReady(forecastProject) || !coverageSummary.hasRequiredCoverage) {
+    return []
+  }
+
+  const requiredMonthPrefixes = new Set(coverageSummary.requiredMonthStarts.map((monthStart) => monthStart.slice(0, 7)))
 
   return getForecastProjectDailyRows(forecastProject)
-    .filter((row) => !row?.isHistory)
     .map((row) => {
-      if (typeof row?.ds !== 'string' || !row.ds.startsWith(`${resolvedPlanningYear}-`)) {
+      if (typeof row?.ds !== 'string' || !requiredMonthPrefixes.has(row.ds.slice(0, 7))) {
         return null
       }
 
@@ -139,12 +226,19 @@ export const buildForecastDailyDemandSnapshot = (forecastProject, planningYear) 
       }
 
       const monthIndex = parsedDate.getUTCMonth()
+      const actualValue = row.actualValue == null || row.actualValue === ''
+        ? null
+        : Number(row.actualValue)
+      const forecastValue = toNumber(row.yhat, 0)
+      const contacts = row.isHistory && Number.isFinite(actualValue)
+        ? actualValue
+        : forecastValue
 
       return normalizeDailySnapshotRow({
         serviceDate: row.ds,
         monthIndex,
         monthLabel: MONTH_LABELS[monthIndex],
-        contacts: row.yhat
+        contacts
       })
     })
     .filter(Boolean)
@@ -238,7 +332,7 @@ export const applyForecastSnapshotToPlanMonths = (planMonths, snapshot) => {
   return nextPlanMonths
 }
 
-export const summarizeForecastDemandSnapshot = (snapshot) => {
+export const summarizeForecastDemandSnapshot = (snapshot, expectedMonthCount = MONTH_LABELS.length) => {
   const normalizedSnapshot = Array.isArray(snapshot) ? snapshot : []
   const totalContacts = normalizedSnapshot.reduce((sum, month) => sum + Math.max(toNumber(month.contacts, 0), 0), 0)
   const weightedAhtTotal = normalizedSnapshot.reduce((sum, month) => (
@@ -259,14 +353,6 @@ export const summarizeForecastDemandSnapshot = (snapshot) => {
     ),
     null
   )
-  const sortedMonths = [...normalizedSnapshot]
-    .filter((month) => month.monthStart)
-    .sort((left, right) => String(left.monthStart).localeCompare(String(right.monthStart)))
-  const firstMonth = sortedMonths[0]
-  const lastMonth = sortedMonths.at(-1)
-  const coverageLabel = firstMonth && lastMonth
-    ? `${firstMonth.monthLabel || MONTH_LABELS[firstMonth.monthIndex]}-${lastMonth.monthLabel || MONTH_LABELS[lastMonth.monthIndex]}`
-    : `${normalizedSnapshot.length}/${MONTH_LABELS.length} months`
 
   return {
     matchedMonthCount: normalizedSnapshot.length,
@@ -274,6 +360,6 @@ export const summarizeForecastDemandSnapshot = (snapshot) => {
     averageAhtSeconds: weightedAhtContacts > 0 ? weightedAhtTotal / weightedAhtContacts : null,
     peakMonthLabel: peakMonth?.monthLabel || '',
     peakMonthContacts: peakMonth ? Math.max(toNumber(peakMonth.contacts, 0), 0) : 0,
-    coverageLabel
+    coverageLabel: `Covers ${normalizedSnapshot.length}/${expectedMonthCount} required months`
   }
 }

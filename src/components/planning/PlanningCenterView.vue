@@ -2,9 +2,12 @@
 import { computed, ref, toRef, watch } from 'vue'
 import {
   mdiChartLineVariant,
+  mdiChevronDown,
+  mdiChevronRight,
   mdiFolderOutline,
   mdiDotsVertical,
-  mdiPlus
+  mdiPlus,
+  mdiViewDashboardOutline
 } from '@mdi/js'
 
 import PlanningForecastCreateModal from './PlanningForecastCreateModal.vue'
@@ -13,7 +16,7 @@ import PlanningGroupIntradayView from './PlanningGroupIntradayView.vue'
 import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
 import PlanningPlanUpdateModal from './PlanningPlanUpdateModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
-import { buildPlanningNewPlanHash, navigateToHash } from '../../appRoutes'
+import { buildPlanningCenterHash, buildPlanningNewPlanHash, navigateToHash } from '../../appRoutes'
 import { createPlanningGroupDraft } from '../../planningStorage'
 import { currentYear } from '../../composables/monthlyPlanBuilder/shared'
 import {
@@ -32,6 +35,7 @@ import AppEmptyState from '../ui/AppEmptyState.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import AppMenu from '../ui/AppMenu.vue'
 import AppPanel from '../ui/AppPanel.vue'
+import AppSelect from '../ui/AppSelect.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
@@ -72,6 +76,7 @@ const groupSettingsOpen = ref(false)
 const planSettingsOpen = ref(false)
 const planUpdateOpen = ref(false)
 const groupDraft = ref(createPlanningGroupDraft())
+const callCenterPlanningYear = ref(Number(props.selectedYear) || currentYear)
 const newPlanYear = ref(currentYear)
 const newPlanRequirementMethod = ref(PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO)
 const updateSourcePlan = ref(null)
@@ -89,22 +94,96 @@ const {
 } = useConfirmDialog()
 const activeGroupWorkspaceTab = ref('data')
 const actualsViewRef = ref(null)
+const expandedActualMonthIds = ref(new Set())
 
 const planComparisonGridClass =
   'grid min-w-0 grid-cols-[minmax(12rem,1.25fr)_minmax(7rem,0.72fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7rem,0.72fr)] items-center'
 const forecastComparisonGridClass =
-  'grid min-w-0 grid-cols-[minmax(6rem,0.82fr)_minmax(9.5rem,1fr)_minmax(7.25rem,0.8fr)_minmax(6rem,0.72fr)_minmax(6rem,0.72fr)_minmax(6.75rem,0.78fr)_minmax(6.75rem,0.8fr)_minmax(8.75rem,1fr)] items-center'
+  'grid min-w-0 grid-cols-[minmax(9rem,0.95fr)_minmax(9.5rem,1fr)_minmax(7.25rem,0.8fr)_minmax(6rem,0.72fr)_minmax(6rem,0.72fr)_minmax(6.75rem,0.78fr)_minmax(6.75rem,0.8fr)_minmax(8.75rem,1fr)] items-center'
 
 const planListRowGridClass = 'grid grid-cols-[auto_minmax(0,1fr)_8.25rem] items-center gap-2'
 const forecastListRowGridClass = 'grid grid-cols-[auto_minmax(0,1fr)_8.25rem] items-center gap-2'
 const planHeaderCellClass =
   'px-3 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap'
 const planHeaderCellRightClass = `${planHeaderCellClass} text-right`
+const callCenterActualsHeaderCellClass =
+  'px-2 py-2 text-left align-bottom text-[0.64rem] font-semibold uppercase leading-tight text-slate-400'
+const callCenterActualsHeaderCellRightClass = `${callCenterActualsHeaderCellClass} text-right`
+const callCenterActualsCellClass = 'px-2 py-2.5 text-right font-medium tabular-nums text-slate-700'
+const callCenterActualsDetailCellClass = 'px-2 py-2 text-right font-medium tabular-nums text-slate-600'
+const callCenterActualsFooterCellClass = 'px-2 py-2.5 text-right font-semibold tabular-nums text-slate-900'
+const callCenterActualsParentCellClass = (monthStart) => [
+  callCenterActualsCellClass,
+  isActualMonthExpanded(monthStart) ? 'font-semibold text-slate-900' : ''
+]
 const formatSignedNumber = (value, digits = 1) => {
   const numericValue = Number(value)
   const prefix = Number.isFinite(numericValue) && numericValue > 0 ? '+' : ''
   return `${prefix}${formatNumber(value, digits)}`
 }
+const formatOptionalWhole = (value) => {
+  if (value == null || value === '') {
+    return '—'
+  }
+
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? formatWhole(numericValue) : '—'
+}
+const formatOptionalNumber = (value, digits = 1) => {
+  if (value == null || value === '') {
+    return '—'
+  }
+
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? formatNumber(numericValue, digits) : '—'
+}
+const actualRequirementVarianceClass = (value) => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 'text-slate-500'
+  }
+
+  return numericValue > 0.05
+    ? 'text-rose-700'
+    : numericValue < -0.05
+      ? 'text-emerald-700'
+      : 'text-slate-700'
+}
+const staffingGapClass = (value) => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 'text-slate-500'
+  }
+
+  return numericValue > 0.05
+    ? 'text-emerald-700'
+    : numericValue < -0.05
+      ? 'text-rose-700'
+      : 'text-slate-700'
+}
+const workloadDeltaPercent = (actual, planned) => {
+  if (actual == null || actual === '' || planned == null || planned === '') {
+    return null
+  }
+
+  const actualValue = Number(actual)
+  const plannedValue = Number(planned)
+  if (!Number.isFinite(actualValue) || !Number.isFinite(plannedValue) || plannedValue <= 0) {
+    return null
+  }
+
+  return ((actualValue - plannedValue) / plannedValue) * 100
+}
+const workloadDeltaLabel = (actual, planned) => {
+  const delta = workloadDeltaPercent(actual, planned)
+  if (delta == null) {
+    return ''
+  }
+
+  const prefix = delta > 0 ? '+' : ''
+  return `${prefix}${formatNumber(delta, 1)}%`
+}
+const workloadDeltaClass = (actual, planned) => actualRequirementVarianceClass(workloadDeltaPercent(actual, planned))
 const STAFFING_GROUP_TABS = [
   { id: 'data', label: 'Data' },
   { id: 'forecasts', label: 'Forecasts' },
@@ -117,6 +196,10 @@ const resolveGroupWorkspaceTab = (value) => {
 }
 const {
   breadcrumbItems,
+  callCenterAnnualMonthlyRows,
+  callCenterAnnualTotalRow,
+  callCenterSummaryRows,
+  callCenterPlanningYearOptions,
   createPlanHref,
   existingPlanForDraftYear,
   existingPlanHref,
@@ -131,10 +214,46 @@ const {
   center: toRef(props, 'center'),
   selectedGroupId: toRef(props, 'selectedGroupId'),
   selectedYear: toRef(props, 'selectedYear'),
+  summaryPlanningYear: callCenterPlanningYear,
   weekdayOptions: toRef(props, 'weekdayOptions'),
   newPlanYear,
   newPlanRequirementMethod
 })
+
+const centerSummaryHref = computed(() => buildPlanningCenterHash(props.center.id))
+
+const callCenterActualMonthIds = computed(() =>
+  callCenterAnnualMonthlyRows.value.map((row) => row.monthStart)
+)
+
+const allActualMonthsExpanded = computed(() =>
+  callCenterActualMonthIds.value.length > 0 &&
+  callCenterActualMonthIds.value.every((monthStart) => expandedActualMonthIds.value.has(monthStart))
+)
+
+const isActualMonthExpanded = (monthStart) => expandedActualMonthIds.value.has(monthStart)
+
+const setExpandedActualMonths = (monthStarts) => {
+  expandedActualMonthIds.value = new Set(monthStarts)
+}
+
+const toggleActualMonth = (monthStart) => {
+  const nextExpanded = new Set(expandedActualMonthIds.value)
+  if (nextExpanded.has(monthStart)) {
+    nextExpanded.delete(monthStart)
+  } else {
+    nextExpanded.add(monthStart)
+  }
+  expandedActualMonthIds.value = nextExpanded
+}
+
+const expandAllActualMonths = () => {
+  setExpandedActualMonths(callCenterActualMonthIds.value)
+}
+
+const collapseAllActualMonths = () => {
+  setExpandedActualMonths([])
+}
 
 const {
   deleteForecast,
@@ -397,10 +516,12 @@ const groupMenuItems = [
 ]
 
 const buildPlanMenuItems = (plan) => [
-  {
-    id: 'create-update',
-    label: 'Create Updated Plan'
-  },
+  ...(!plan.isDraftBudget
+    ? [{
+        id: 'create-update',
+        label: 'Create Updated Plan'
+      }]
+    : []),
   ...(plan.planType === 'update' && !plan.isCurrent
     ? [{
         id: 'set-current',
@@ -427,6 +548,10 @@ const handleGroupMenuSelect = (group, item) => {
 
 const handlePlanMenuSelect = (plan, item) => {
   if (item.id === 'create-update') {
+    if (plan.isDraftBudget) {
+      return
+    }
+
     openPlanUpdate(plan)
     return
   }
@@ -452,8 +577,14 @@ const {
   closeForecastCreate,
   createForecast,
   forecastCreateOpen,
+  forecastCoverageMessage,
+  forecastMonthOptions,
   forecastYearOptions,
   handleForecastMenuSelect,
+  newForecastCoverageEndMonth,
+  newForecastCoverageStartMonth,
+  newForecastPeriodMode,
+  newForecastSourceKind,
   newForecastYear,
   openForecast,
   openForecastCreate,
@@ -472,6 +603,37 @@ const {
     showForecastHistoryRequirement()
   }
 })
+
+watch(
+  callCenterPlanningYearOptions,
+  (yearOptions) => {
+    const validYears = yearOptions.map((option) => Number(option.value))
+    const routeYear = Number(props.selectedYear)
+    const preferredYear = validYears.includes(routeYear)
+      ? routeYear
+      : validYears.includes(currentYear)
+        ? currentYear
+        : validYears[0]
+
+    if (preferredYear && !validYears.includes(Number(callCenterPlanningYear.value))) {
+      callCenterPlanningYear.value = preferredYear
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  callCenterAnnualMonthlyRows,
+  (rows) => {
+    const validMonthIds = new Set(rows.map((row) => row.monthStart))
+    const stillValidExpandedIds = [...expandedActualMonthIds.value].filter((monthStart) =>
+      validMonthIds.has(monthStart)
+    )
+
+    setExpandedActualMonths(stillValidExpandedIds)
+  },
+  { immediate: true }
+)
 
 watch(
   [selectedGroup, () => props.selectedGroupTab],
@@ -536,23 +698,42 @@ watch(
       </div>
 
       <AppPanel :padded="false">
-        <div class="grid h-[calc(100vh-12.5rem)] min-h-[36rem] xl:grid-cols-[320px_minmax(0,1fr)] xl:items-stretch">
+        <div class="grid h-[calc(100vh-12.5rem)] min-h-[36rem] xl:grid-cols-[256px_minmax(0,1fr)] 2xl:grid-cols-[272px_minmax(0,1fr)] xl:items-stretch">
           <div class="flex min-h-0 flex-col border-b border-slate-200 xl:border-b-0 xl:border-r">
             <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-4 py-3 xl:h-[6rem]">
               <div class="flex h-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:items-start">
                 <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">
                   Staffing Groups
                 </h2>
+              </div>
+            </div>
 
-                <AppButton
-                  size="sm"
-                  :icon="mdiPlus"
-                  variant="primary"
-                  class="self-start sm:self-auto"
-                  @click="openCreateGroup"
-                >
-                  New Group
-                </AppButton>
+            <div class="border-b border-slate-200 bg-slate-50/80 p-2">
+              <div
+                class="grid h-14 cursor-pointer grid-cols-[auto_1fr] items-center gap-3 rounded-[18px] px-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c3d2df]"
+                :class="!selectedGroup ? 'bg-[#e7eef4]' : 'bg-white hover:bg-slate-50/70'"
+                tabindex="0"
+                role="link"
+                aria-label="Open call center summary"
+                @click="navigateToHash(centerSummaryHref)"
+                @keydown.enter.prevent="navigateToHash(centerSummaryHref)"
+                @keydown.space.prevent="navigateToHash(centerSummaryHref)"
+              >
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#15395f] shadow-sm">
+                  <AppIcon :path="mdiViewDashboardOutline" class="h-4 w-4" />
+                </span>
+
+                <span class="grid min-w-0">
+                  <strong
+                    class="truncate text-sm font-semibold"
+                    :class="!selectedGroup ? 'text-[#15395f]' : 'text-slate-950'"
+                  >
+                    Call Center Plan
+                  </strong>
+                  <span class="truncate text-[0.78rem] text-slate-500">
+                    All staffing groups
+                  </span>
+                </span>
               </div>
             </div>
 
@@ -616,7 +797,254 @@ watch(
           </div>
 
           <div class="flex min-h-0 flex-col bg-slate-50/30">
-            <div v-if="selectedGroup" class="flex min-h-0 flex-col">
+            <div v-if="!selectedGroup" class="flex min-h-0 flex-col">
+              <div class="border-b border-slate-200 px-4 py-3 xl:h-[6rem]">
+                <div class="flex h-full flex-col justify-between gap-1.5">
+                  <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="grid gap-0.5">
+                      <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">
+                        Call Center Plan
+                      </h2>
+                      <p class="text-sm text-slate-500">
+                        Expected vs actuals across staffing groups. Expand a month to see each group using the same columns.
+                      </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-end gap-2">
+                      <div class="grid min-w-[6.75rem] gap-1">
+                        <label
+                          for="call-center-plan-year"
+                          class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                        >
+                          Year
+                        </label>
+                        <AppSelect
+                          id="call-center-plan-year"
+                          v-model="callCenterPlanningYear"
+                          :options="callCenterPlanningYearOptions"
+                          class="w-[6.75rem]"
+                          aria-label="Call center planning year"
+                        />
+                      </div>
+
+                      <AppButton
+                        size="sm"
+                        :icon="mdiPlus"
+                        variant="primary"
+                        @click="openCreateGroup"
+                      >
+                        New Group
+                      </AppButton>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex-1 min-h-0 overflow-y-auto p-4">
+                <div v-if="callCenterSummaryRows.length" class="grid gap-4">
+                  <section class="grid gap-3">
+                    <div class="flex justify-end px-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <AppButton
+                          size="xs"
+                          variant="quiet"
+                          :disabled="allActualMonthsExpanded"
+                          @click="expandAllActualMonths"
+                        >
+                          Expand All
+                        </AppButton>
+                        <AppButton
+                          size="xs"
+                          variant="quiet"
+                          :disabled="!expandedActualMonthIds.size"
+                          @click="collapseAllActualMonths"
+                        >
+                          Collapse All
+                        </AppButton>
+                      </div>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-[14px] border border-slate-200 bg-white shadow-sm">
+                        <table class="w-full min-w-[64rem] table-fixed border-collapse text-[0.82rem] xl:min-w-0">
+                          <colgroup>
+                            <col class="w-[6.75%]" />
+                            <col class="w-[8.5%]" />
+                            <col class="w-[8.5%]" />
+                            <col class="w-[7%]" />
+                            <col class="w-[7%]" />
+                            <col class="w-[8.3%]" />
+                            <col class="w-[8.3%]" />
+                            <col class="w-[8.3%]" />
+                            <col class="w-[8.3%]" />
+                            <col class="w-[7.9%]" />
+                            <col class="w-[9.8%]" />
+                            <col class="w-[11.35%]" />
+                          </colgroup>
+                          <thead class="border-b border-slate-200 bg-slate-50/80">
+                          <tr class="bg-[#eef4f8]">
+                            <th rowspan="2" scope="col" :class="callCenterActualsHeaderCellClass">
+                              Month
+                            </th>
+                            <th colspan="9" scope="colgroup" class="px-2 py-2 text-center text-[0.64rem] font-semibold uppercase text-[#15395f]">
+                              Workload
+                            </th>
+                            <th colspan="2" scope="colgroup" class="border-l border-slate-200 px-2 py-2 text-center text-[0.64rem] font-semibold uppercase text-[#15395f]">
+                              Staffing
+                            </th>
+                          </tr>
+                          <tr>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Plan Contacts</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Actual Contacts</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Plan AHT</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Actual AHT</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Plan Wkld</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Actual Wkld</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Plan Req HC</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Actual Req HC</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Req HC Var</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Start FL HC</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Gap vs Actual Req HC</th>
+                          </tr>
+                          </thead>
+
+                          <tbody class="divide-y divide-slate-200 bg-white">
+                          <template
+                            v-for="row in callCenterAnnualMonthlyRows"
+                            :key="row.monthStart"
+                          >
+                            <tr
+                              class="transition"
+                              :class="isActualMonthExpanded(row.monthStart) ? 'bg-[#eef4f8]' : 'bg-white hover:bg-slate-50/70'"
+                            >
+                              <th
+                                scope="row"
+                                class="border-l-4 px-2 py-2.5 text-left"
+                                :class="isActualMonthExpanded(row.monthStart) ? 'border-[#15395f]' : 'border-transparent'"
+                              >
+                                <button
+                                  type="button"
+                                  class="inline-flex max-w-full items-center gap-1 rounded-xl px-1 py-1 text-left font-semibold text-slate-950 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c3d2df]"
+                                  :aria-expanded="isActualMonthExpanded(row.monthStart)"
+                                  :aria-label="`${isActualMonthExpanded(row.monthStart) ? 'Collapse' : 'Expand'} ${row.monthLabel} staffing groups`"
+                                  @click="toggleActualMonth(row.monthStart)"
+                                >
+                                  <AppIcon
+                                    :path="isActualMonthExpanded(row.monthStart) ? mdiChevronDown : mdiChevronRight"
+                                    class="h-3.5 w-3.5 text-slate-500"
+                                  />
+                                  <span>{{ row.label }}</span>
+                                </button>
+                              </th>
+                              <td :class="callCenterActualsParentCellClass(row.monthStart)">{{ formatWhole(row.plannedContacts) }}</td>
+                              <td :class="callCenterActualsParentCellClass(row.monthStart)">{{ formatOptionalWhole(row.actualContacts) }}</td>
+                              <td :class="callCenterActualsParentCellClass(row.monthStart)">{{ formatOptionalNumber(row.plannedAhtSeconds, 0) }}</td>
+                              <td :class="callCenterActualsParentCellClass(row.monthStart)">{{ formatOptionalNumber(row.actualAhtSeconds, 0) }}</td>
+                              <td :class="callCenterActualsParentCellClass(row.monthStart)">{{ formatOptionalNumber(row.plannedWorkloadHours, 1) }}</td>
+                              <td :class="callCenterActualsParentCellClass(row.monthStart)">
+                                <span class="inline-flex items-baseline gap-1">
+                                  <span>{{ formatOptionalNumber(row.actualWorkloadHours, 1) }}</span>
+                                  <sup
+                                    v-if="workloadDeltaLabel(row.actualWorkloadHours, row.plannedWorkloadHours)"
+                                    class="text-[0.64rem] font-semibold"
+                                    :class="workloadDeltaClass(row.actualWorkloadHours, row.plannedWorkloadHours)"
+                                  >
+                                    {{ workloadDeltaLabel(row.actualWorkloadHours, row.plannedWorkloadHours) }}
+                                  </sup>
+                                </span>
+                              </td>
+                              <td :class="callCenterActualsParentCellClass(row.monthStart)">{{ formatOptionalNumber(row.plannedRequiredHeadcount, 1) }}</td>
+                              <td :class="callCenterActualsParentCellClass(row.monthStart)">{{ formatOptionalNumber(row.actualRequiredHeadcount, 1) }}</td>
+                              <td class="px-2 py-2.5 text-right font-semibold tabular-nums" :class="actualRequirementVarianceClass(row.requiredHeadcountVariance)">
+                                {{ formatOptionalNumber(row.requiredHeadcountVariance, 1) }}
+                              </td>
+                              <td
+                                class="border-l border-slate-200"
+                                :class="callCenterActualsParentCellClass(row.monthStart)"
+                              >
+                                {{ formatOptionalNumber(row.plannedStartingFrontlineHeadcount, 1) }}
+                              </td>
+                              <td class="px-2 py-2.5 text-right font-semibold tabular-nums" :class="staffingGapClass(row.gapVsActualRequiredHeadcount)">
+                                {{ formatOptionalNumber(row.gapVsActualRequiredHeadcount, 1) }}
+                              </td>
+                            </tr>
+
+                            <tr
+                              v-for="detailRow in isActualMonthExpanded(row.monthStart) ? row.staffingGroupRows : []"
+                              :key="`${row.monthStart}-${detailRow.groupId}`"
+                              class="bg-[#f8fbfd] text-[0.78rem] transition hover:bg-[#f3f8fb]"
+                            >
+                              <th scope="row" class="px-2 py-2 text-left">
+                                <div class="ml-7 grid gap-0.5 border-l-2 border-[#c3d2df] pl-3">
+                                  <span class="truncate font-semibold text-[#15395f]" :title="detailRow.groupName">{{ detailRow.groupName }}</span>
+                                  <span v-if="!detailRow.hasPlan" class="text-[0.72rem] text-amber-700">No plan for {{ callCenterPlanningYear }}</span>
+                                </div>
+                              </th>
+                              <td :class="callCenterActualsDetailCellClass">{{ formatOptionalWhole(detailRow.plannedContacts) }}</td>
+                              <td :class="callCenterActualsDetailCellClass">{{ formatOptionalWhole(detailRow.actualContacts) }}</td>
+                              <td :class="callCenterActualsDetailCellClass">{{ formatOptionalNumber(detailRow.plannedAhtSeconds, 0) }}</td>
+                              <td :class="callCenterActualsDetailCellClass">{{ formatOptionalNumber(detailRow.actualAhtSeconds, 0) }}</td>
+                              <td :class="callCenterActualsDetailCellClass">{{ formatOptionalNumber(detailRow.plannedWorkloadHours, 1) }}</td>
+                              <td :class="callCenterActualsDetailCellClass">
+                                <span class="inline-flex items-baseline gap-1">
+                                  <span>{{ formatOptionalNumber(detailRow.actualWorkloadHours, 1) }}</span>
+                                  <sup
+                                    v-if="workloadDeltaLabel(detailRow.actualWorkloadHours, detailRow.plannedWorkloadHours)"
+                                    class="text-[0.64rem] font-semibold"
+                                    :class="workloadDeltaClass(detailRow.actualWorkloadHours, detailRow.plannedWorkloadHours)"
+                                  >
+                                    {{ workloadDeltaLabel(detailRow.actualWorkloadHours, detailRow.plannedWorkloadHours) }}
+                                  </sup>
+                                </span>
+                              </td>
+                              <td :class="callCenterActualsDetailCellClass">{{ formatOptionalNumber(detailRow.plannedRequiredHeadcount, 1) }}</td>
+                              <td :class="callCenterActualsDetailCellClass">{{ formatOptionalNumber(detailRow.actualRequiredHeadcount, 1) }}</td>
+                              <td class="px-2 py-2 text-right font-semibold tabular-nums" :class="actualRequirementVarianceClass(detailRow.requiredHeadcountVariance)">
+                                {{ formatOptionalNumber(detailRow.requiredHeadcountVariance, 1) }}
+                              </td>
+                              <td class="border-l border-slate-200 px-2 py-2 text-right font-medium tabular-nums text-slate-600">{{ formatOptionalNumber(detailRow.plannedStartingFrontlineHeadcount, 1) }}</td>
+                              <td class="px-2 py-2 text-right font-semibold tabular-nums" :class="staffingGapClass(detailRow.gapVsActualRequiredHeadcount)">
+                                {{ formatOptionalNumber(detailRow.gapVsActualRequiredHeadcount, 1) }}
+                              </td>
+                            </tr>
+                          </template>
+                          </tbody>
+
+                          <tfoot class="border-t-2 border-slate-300 bg-slate-50">
+                          <tr>
+                            <th scope="row" class="px-2 py-2.5 text-left font-semibold text-slate-950">
+                              {{ callCenterAnnualTotalRow.monthLabel }}
+                            </th>
+                            <td :class="callCenterActualsFooterCellClass">{{ formatWhole(callCenterAnnualTotalRow.plannedContacts) }}</td>
+                            <td :class="callCenterActualsFooterCellClass">{{ formatOptionalWhole(callCenterAnnualTotalRow.actualContacts) }}</td>
+                            <td :class="callCenterActualsFooterCellClass">{{ formatOptionalNumber(callCenterAnnualTotalRow.plannedAhtSeconds, 0) }}</td>
+                            <td :class="callCenterActualsFooterCellClass">{{ formatOptionalNumber(callCenterAnnualTotalRow.actualAhtSeconds, 0) }}</td>
+                            <td :class="callCenterActualsFooterCellClass">{{ formatOptionalNumber(callCenterAnnualTotalRow.plannedWorkloadHours, 1) }}</td>
+                            <td :class="callCenterActualsFooterCellClass">{{ formatOptionalNumber(callCenterAnnualTotalRow.actualWorkloadHours, 1) }}</td>
+                            <td :class="callCenterActualsFooterCellClass">{{ formatOptionalNumber(callCenterAnnualTotalRow.plannedRequiredHeadcount, 1) }}</td>
+                            <td :class="callCenterActualsFooterCellClass">{{ formatOptionalNumber(callCenterAnnualTotalRow.actualRequiredHeadcount, 1) }}</td>
+                            <td class="px-2 py-2.5 text-right font-semibold tabular-nums" :class="actualRequirementVarianceClass(callCenterAnnualTotalRow.requiredHeadcountVariance)">
+                              {{ formatOptionalNumber(callCenterAnnualTotalRow.requiredHeadcountVariance, 1) }}
+                            </td>
+                            <td class="border-l border-slate-200 px-2 py-2.5 text-right font-semibold tabular-nums text-slate-900">{{ formatOptionalNumber(callCenterAnnualTotalRow.plannedStartingFrontlineHeadcount, 1) }}</td>
+                            <td class="px-2 py-2.5 text-right font-semibold tabular-nums" :class="staffingGapClass(callCenterAnnualTotalRow.gapVsActualRequiredHeadcount)">
+                              {{ formatOptionalNumber(callCenterAnnualTotalRow.gapVsActualRequiredHeadcount, 1) }}
+                            </td>
+                          </tr>
+                          </tfoot>
+                        </table>
+                    </div>
+                  </section>
+                </div>
+
+                <AppEmptyState
+                  v-else
+                  title="Create the first staffing group"
+                  description="Start a staffing group for each team or queue you plan separately inside this call center."
+                />
+              </div>
+            </div>
+
+            <div v-else class="flex min-h-0 flex-col">
               <div class="border-b border-slate-200 px-4 py-3 xl:h-[6rem]">
                 <div class="flex h-full flex-col justify-between gap-1.5">
                   <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
@@ -710,22 +1138,20 @@ watch(
                   </AppStatusMessage>
 
                   <AppStatusMessage v-if="!forecastsLoading && !forecastsError && !canLaunchModeledForecast" tone="warning">
-                    Add at least {{ formatWhole(minimumForecastHistoryDays) }} daily history rows in Data before building a forecast for {{ selectedGroup.name }}.
+                    Add at least {{ formatWhole(minimumForecastHistoryDays) }} daily history rows in Data before building a modeled forecast for {{ selectedGroup.name }}. Imported daily and monthly forecasts can still be created here.
                   </AppStatusMessage>
 
                   <AppEmptyState
                     v-if="!forecastRows.length"
                     title="No forecasts yet"
-                    :description="canLaunchModeledForecast
-                      ? `Create the first saved forecast for ${selectedGroup.name}. Forecasts stay owned by this staffing group and plans can import the monthly rollup later.`
-                      : `Load shared history in Data before creating the first forecast for ${selectedGroup.name}.`"
+                    :description="`Create the first saved forecast for ${selectedGroup.name}. Build from Data history, import daily contacts and AHT, or enter monthly contacts.`"
                   />
                 </div>
 
                 <div v-else class="grid gap-0">
                     <div v-if="!canLaunchModeledForecast" class="px-5 pt-5">
                       <AppStatusMessage tone="warning">
-                        Add at least {{ formatWhole(minimumForecastHistoryDays) }} daily history rows in Data before building a forecast for {{ selectedGroup.name }}.
+                        Add at least {{ formatWhole(minimumForecastHistoryDays) }} daily history rows in Data before building a modeled forecast for {{ selectedGroup.name }}. Imported daily and monthly forecasts can still be created here.
                       </AppStatusMessage>
                     </div>
 
@@ -735,7 +1161,7 @@ watch(
 
                         <div :class="[forecastComparisonGridClass, 'px-2']">
                           <span :class="planHeaderCellClass">
-                            Plan Year
+                            Period
                           </span>
                           <span :class="planHeaderCellClass">
                             Forecast
@@ -792,7 +1218,7 @@ watch(
                         <div :class="[forecastComparisonGridClass, 'rounded-[16px] px-2 py-1.5 text-sm']">
                           <span class="px-3">
                             <span class="inline-flex min-w-[4.25rem] items-center justify-center rounded-[16px] bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
-                              {{ forecast.planningYearLabel || '—' }}
+                              {{ forecast.coverageWindowLabel || forecast.planningYearLabel || '—' }}
                             </span>
                           </span>
                           <div class="grid gap-0.5 px-3">
@@ -906,6 +1332,7 @@ watch(
                       </div>
 
                       <AppButton
+                        v-if="!section.currentPlan.isDraftBudget"
                         size="sm"
                         variant="secondary"
                         :disabled="!section.actualsThroughOptions.length"
@@ -1024,13 +1451,6 @@ watch(
                 />
               </div>
             </div>
-
-            <div v-else class="flex-1 min-h-0 overflow-y-auto p-5">
-              <AppEmptyState
-                title="Select a staffing group"
-                description="Choose a staffing group from the left to review its defaults, data, forecasts, and yearly plans."
-              />
-            </div>
           </div>
         </div>
       </AppPanel>
@@ -1070,8 +1490,15 @@ watch(
     <PlanningForecastCreateModal
       v-if="forecastCreateOpen && selectedGroup"
       v-model:planning-year="newForecastYear"
+      v-model:source-kind="newForecastSourceKind"
+      v-model:period-mode="newForecastPeriodMode"
+      v-model:coverage-start-month="newForecastCoverageStartMonth"
+      v-model:coverage-end-month="newForecastCoverageEndMonth"
       :year-options="forecastYearOptions"
+      :month-options="forecastMonthOptions"
       :can-create="canCreateForecast"
+      :coverage-message="forecastCoverageMessage"
+      :modeled-forecast-unavailable-message="`Add at least ${formatWhole(minimumForecastHistoryDays)} daily history rows in Data before building a modeled forecast for ${selectedGroup.name}.`"
       @cancel="closeForecastCreate"
       @create="createForecast"
     />

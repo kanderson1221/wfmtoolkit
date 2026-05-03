@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 
-import { createPlanningGroupActuals } from '../../planner/groupActuals'
+import { createPlanningGroupActuals, resolvePlanningGroupActuals } from '../../planner/groupActuals'
 import {
   buildForecastTrainingSeedFromPlanningGroupActuals,
   MINIMUM_FORECAST_HISTORY_DAYS
@@ -37,11 +37,11 @@ export function usePlanningGroupDataActions({
   }
 
   const hasActualsData = computed(() =>
-    createPlanningGroupActuals(selectedGroup.value?.actuals).dailyRows.length > 0
+    resolvePlanningGroupActuals(selectedGroup.value).dailyRows.length > 0
   )
 
   const selectedGroupForecastTrainingSeed = computed(() =>
-    buildForecastTrainingSeedFromPlanningGroupActuals(selectedGroup.value?.actuals, {
+    buildForecastTrainingSeedFromPlanningGroupActuals(resolvePlanningGroupActuals(selectedGroup.value), {
       group: selectedGroup.value,
       center: center.value
     })

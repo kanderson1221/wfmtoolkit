@@ -1,5 +1,6 @@
 import {
   createForecastProject,
+  getForecastSourceKindLabel,
   getForecastProjectDailyRows,
   getForecastProjectMonthlyRollup,
   resolveForecastCoverageWindow
@@ -12,7 +13,7 @@ describe('forecasting shared helpers', () => {
     expect(project.modelConfig.holdoutDays).toBe(60)
   })
 
-  it('uses neutral demand forecast names for staffing-group forecast defaults', () => {
+  it('uses plan version names when creating default staffing-group forecast names', () => {
     const project = createForecastProject({
       groupName: 'Consumer Voice',
       planningYear: 2026,
@@ -29,38 +30,29 @@ describe('forecasting shared helpers', () => {
       }
     })
 
-    expect(project.name).toBe('Consumer Voice 2026 Demand Forecast')
+    expect(project.name).toBe('Consumer Voice 2026 Apr Update Forecast')
     expect(project.planningContext.planName).toBe('2026 Apr Update')
   })
 
-  it('uses reforecast names and honors rolling coverage windows', () => {
-    const project = createForecastProject({
-      groupName: 'Consumer Voice',
+  it('formats forecast coverage labels with endpoint years', () => {
+    expect(resolveForecastCoverageWindow({
+      planningYear: 2027,
+      forecastType: 'budget',
+      coverageStartDate: '2027-01-01',
+      coverageEndDate: '2027-12-31'
+    }).coverageMonthLabel).toBe('Jan 2027-Dec 2027')
+    expect(resolveForecastCoverageWindow({
       planningYear: 2026,
       forecastType: 'budget',
-      coverageStartMonthIndex: 4,
-      planningContext: {
-        groupId: 'group-1',
-        planningYear: 2026,
-        groupName: 'Consumer Voice'
-      }
-    })
-    const coverage = resolveForecastCoverageWindow({
-      planningYear: 2026,
-      forecastType: 'budget',
-      coverageStartDate: '2026-05-01',
-      coverageEndDate: '2027-04-30'
-    })
+      coverageStartDate: '2026-10-01',
+      coverageEndDate: '2028-03-31'
+    }).coverageMonthLabel).toBe('Oct 2026-Mar 2028')
+  })
 
-    expect(project.name).toBe('Consumer Voice 2026 May Reforecast')
-    expect(project.coverageStartDate).toBe('2026-05-01')
-    expect(project.coverageEndDate).toBe('2026-12-31')
-    expect(coverage).toMatchObject({
-      coverageStartMonthIndex: 4,
-      coverageStartDate: '2026-05-01',
-      coverageEndDate: '2027-04-30',
-      expectedMonthCount: 12
-    })
+  it('uses source labels that describe forecast origin', () => {
+    expect(getForecastSourceKindLabel('modeled_daily')).toBe('Modeled')
+    expect(getForecastSourceKindLabel('manual_monthly')).toBe('Manual')
+    expect(getForecastSourceKindLabel('imported_daily')).toBe('Imported')
   })
 
   it('applies range adjustment rules to future daily rows and recomputes monthly rollups', () => {

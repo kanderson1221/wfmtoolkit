@@ -29,11 +29,13 @@ const visible = defineModel('visible', {
 
 const draftProject = ref(createForecastProject())
 const importedDailyRows = ref([])
+const ahtMonthOverrides = ref([])
 
 const resetDraftProject = () => {
   draftProject.value = createForecastProject({
     ...props.project,
-    forecastType: FORECAST_TYPE_BUDGET
+    forecastType: FORECAST_TYPE_BUDGET,
+    coverageStartMonthIndex: 0
   })
   draftProject.value.sourceData = {
     fileName: props.project?.sourceData?.fileName || '',
@@ -46,6 +48,9 @@ const resetDraftProject = () => {
   }
   importedDailyRows.value = Array.isArray(props.project?.lastRun?.dailyForecast)
     ? props.project.lastRun.dailyForecast.map((row) => ({ ...row }))
+    : []
+  ahtMonthOverrides.value = Array.isArray(props.project?.modelConfig?.ahtMonthOverrides)
+    ? props.project.modelConfig.ahtMonthOverrides.map((row) => ({ ...row }))
     : []
 }
 
@@ -72,7 +77,9 @@ const sourceIssues = computed(() => (
 ))
 
 const canApply = computed(() =>
-  importedDailyRows.value.length > 0 && sourceIssues.value.length === 0
+  importedDailyRows.value.length > 0 &&
+  ahtMonthOverrides.value.length > 0 &&
+  sourceIssues.value.length === 0
 )
 
 const definitionRows = computed(() => [
@@ -86,11 +93,19 @@ const definitionRows = computed(() => [
   },
   {
     id: 'forecast',
-    label: 'Forecast Value',
+    label: 'Contacts',
     required: 'Y',
     example: '1420',
     definition: 'Forecasted contact volume for the date.',
     mappingKey: 'forecastColumn'
+  },
+  {
+    id: 'aht',
+    label: 'Avg AHT Sec',
+    required: 'Y',
+    example: '318',
+    definition: 'Average handle time in seconds for the date.',
+    mappingKey: 'ahtColumn'
   }
 ])
 
@@ -113,7 +128,7 @@ const handleFileSelect = async (event) => {
     {
       planningYear: draftProject.value.planningYear,
       forecastType: FORECAST_TYPE_BUDGET,
-      coverageStartMonthIndex: draftProject.value.coverageStartMonthIndex,
+      coverageStartMonthIndex: draftProject.value.coverageStartMonthIndex ?? 0,
       coverageStartDate: draftProject.value.coverageStartDate,
       coverageEndDate: draftProject.value.coverageEndDate
     }
@@ -127,6 +142,7 @@ const handleFileSelect = async (event) => {
     issues: nextState.issues
   }
   importedDailyRows.value = nextState.importedDailyRows
+  ahtMonthOverrides.value = nextState.ahtMonthOverrides
 }
 
 watch(
@@ -146,13 +162,14 @@ watch(
       currentMapping: draftProject.value.sourceData.mapping || {},
       planningYear: draftProject.value.planningYear,
       forecastType: FORECAST_TYPE_BUDGET,
-      coverageStartMonthIndex: draftProject.value.coverageStartMonthIndex,
+      coverageStartMonthIndex: draftProject.value.coverageStartMonthIndex ?? 0,
       coverageStartDate: draftProject.value.coverageStartDate,
       coverageEndDate: draftProject.value.coverageEndDate
     })
 
     draftProject.value.sourceData.issues = nextState.issues
     importedDailyRows.value = nextState.importedDailyRows
+    ahtMonthOverrides.value = nextState.ahtMonthOverrides
   },
   { deep: true }
 )
@@ -166,7 +183,8 @@ const handleApply = () => {
       mapping: draftProject.value.sourceData?.mapping || {},
       issues: draftProject.value.sourceData?.issues || []
     },
-    importedDailyRows: importedDailyRows.value
+    importedDailyRows: importedDailyRows.value,
+    ahtMonthOverrides: ahtMonthOverrides.value
   })
   visible.value = false
 }
@@ -177,7 +195,7 @@ const handleApply = () => {
     v-model:visible="visible"
     kicker="Imported Daily Forecast"
     title="Load Daily Forecast"
-    description="Upload a daily forecast file for this staffing group. Imported daily forecasts are saved as read-only demand sources."
+    description="Upload daily contacts and average handle time for this staffing group. Imported daily forecasts are saved as read-only demand sources."
     allow-backdrop-close
     max-width="max-w-5xl"
     @close="emit('close')"
@@ -198,8 +216,21 @@ const handleApply = () => {
       />
 
       <AppTableShell>
-        <div class="border-b border-slate-200 px-5 py-4">
-          <p class="text-sm font-semibold text-slate-950">File Definition</p>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div class="grid gap-0.5">
+            <p class="text-sm font-semibold text-slate-950">File Definition</p>
+            <p class="text-sm text-slate-600">
+              Map the service date, daily contacts, and average handle time columns. Other file columns are ignored.
+            </p>
+          </div>
+          <AppButton
+            size="sm"
+            variant="primary"
+            href="/planning_group_daily_forecast_template.csv"
+            download
+          >
+            Download Sample Template
+          </AppButton>
         </div>
 
         <div class="overflow-x-auto">

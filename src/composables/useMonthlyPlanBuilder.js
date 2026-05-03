@@ -40,7 +40,13 @@ import {
 import {
   createPlanDemandSource
 } from '../planner/demandSources'
-import { PLAN_TYPE_BUDGET, PLAN_TYPE_UPDATE } from '../planningStorage'
+import {
+  PLAN_STATUS_DRAFT,
+  PLAN_STATUS_FINALIZED,
+  PLAN_TYPE_BUDGET,
+  PLAN_TYPE_UPDATE,
+  normalizePlanStatus
+} from '../planningStorage'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../planner/shared'
 import { mergeIntradayErlangMonthlyRecords } from '../planner/intradayErlang'
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
@@ -225,10 +231,21 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const planVersionLabel = computed(() =>
     planType.value === PLAN_TYPE_UPDATE ? 'Update' : 'Budget'
   )
-  const isReadOnlyBudget = computed(() =>
-    Boolean(sourcePlanReference.value?.id && planType.value === PLAN_TYPE_BUDGET)
+  const sourcePlanStatus = computed(() => normalizePlanStatus(sourcePlanReference.value?.status, planType.value))
+  const isFinalizedBudget = computed(() =>
+    Boolean(
+      sourcePlanReference.value?.id &&
+      planType.value === PLAN_TYPE_BUDGET &&
+      sourcePlanStatus.value === PLAN_STATUS_FINALIZED
+    )
   )
-  const readOnlyBudgetMessage = 'Budget plan is locked. Create an updated plan to change future assumptions.'
+  const isDraftBudget = computed(() =>
+    planType.value === PLAN_TYPE_BUDGET && !isFinalizedBudget.value
+  )
+  const isReadOnlyBudget = computed(() =>
+    isFinalizedBudget.value
+  )
+  const readOnlyBudgetMessage = 'Finalized budget plan is locked. Create an updated plan to change future assumptions.'
 
   const planningYear = ref(initialBootstrapState.initialState.planningYear)
   const requirementMethod = ref(initialBootstrapState.initialState.requirementMethod)
@@ -445,7 +462,10 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     planningYear,
     demandSource,
     planMonths,
-    selectedForecastProjectId
+    selectedForecastProjectId,
+    planType,
+    requirementMethod,
+    actualsThroughMonth: computed(() => sourcePlanReference.value?.actualsThroughMonth || '')
   })
 
   const applyForecastToDemand = () => {
@@ -709,83 +729,100 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const actualsSummary = computed(() => summarizeActualsRecords(actualsRecords.value))
   const hasNextYearStartingFrontlineTarget = computed(() => nextYearOpening.value.frontlineHeadcount != null)
 
-  const buildPlanPayload = () => ({
-    id: sourcePlanReference.value?.id || null,
-    createdAt: sourcePlanReference.value?.createdAt || null,
-    name: String(sourcePlanReference.value?.name || '').trim() || `${planningYear.value} ${planVersionLabel.value}`,
-    planType: planType.value,
-    isCurrent: planType.value === PLAN_TYPE_UPDATE
-      ? true
-      : Boolean(sourcePlanReference.value?.isCurrent ?? true),
-    budgetPlanId: planType.value === PLAN_TYPE_BUDGET
-      ? (sourcePlanReference.value?.budgetPlanId || sourcePlanReference.value?.id || null)
-      : (sourcePlanReference.value?.budgetPlanId || sourcePlanReference.value?.sourcePlanId || null),
-    sourcePlanId: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.sourcePlanId || '') : '',
-    actualsThroughMonth: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualsThroughMonth || '') : '',
-    actualizedAt: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualizedAt || '') : '',
-    planningYear: planningYear.value,
-    requirementMethod: requirementMethod.value,
-    operatingWeekdays: [...operatingWeekdays.value],
-    holidayCalendarId: holidayCalendarId.value,
-    disabledHolidayRuleIds: [...disabledHolidayRuleIds.value],
-    customHolidays: customHolidays.value.map((holiday) => ({ ...holiday })),
-    holidayScheduleMode: holidayScheduleMode.value,
-    presenceMonths: presenceMonths.value.map((month) => createPresenceMonth(month)),
-    randomDefaults: createRandomMonth(randomDefaults.value),
-    useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
-    randomMonths: randomMonths.value.map((month) => createRandomMonth(month)),
-    planMonths: planMonths.value.map((month) => createPlanMonth(month)),
-    serviceLevelPercent: intradayErlangServiceLevelPercent.value,
-    serviceLevelThresholdSeconds: intradayErlangServiceLevelThresholdSeconds.value,
-    operatingOpenTime: intradayErlangOpenTime.value,
-    operatingCloseTime: intradayErlangCloseTime.value,
-    intraday: {
-      intervalLengthMinutes: intradayErlangProfile.value.intervalLengthMinutes,
-      intervalRatios: intradayErlangProfile.value.intervalRatios.map((row) => ({ ...row }))
-    },
-    demandSource: createPlanDemandSource(demandSource.value),
-    trainingSettings: createTrainingSettings(trainingSettings.value),
-    nextYearOpening: createNextYearOpening({
-      frontlineHeadcount: nextYearOpening.value.frontlineHeadcount
-    }),
-    startingHeadcount: startingHeadcount.value,
-    startingFrontlineHeadcount: startingFrontlineHeadcount.value,
-    staffingMonths: staffingMonths.value.map((month) => createStaffingMonth(month)),
-    trainingClasses: ownedTrainingClasses.value.map((trainingClass) =>
-      persistTrainingClassOutcomes(trainingClass, planningYear.value, trainingSettings.value, trainingCalendar.value)
-    ),
-    summary: {
-      requirementMethod: planSummary.value.requirementMethod,
-      annualContacts: planSummary.value.annualContacts,
-      annualWorkloadHours: planSummary.value.annualWorkloadHours,
-      annualErlangStaffedHours: planSummary.value.annualErlangStaffedHours,
-      annualRequiredStaffHours: planSummary.value.annualRequiredStaffHours,
-      averageAhtSeconds: planSummary.value.averageAhtSeconds,
-      minimumRequiredHeadcount: planSummary.value.minimumRequiredHeadcount,
-      averageCoveragePercent: planSummary.value.averageCoveragePercent,
-      averageWeightedOccupancyPercent: planSummary.value.averageWeightedOccupancyPercent,
-      averageWeightedServiceLevelPercent: planSummary.value.averageWeightedServiceLevelPercent,
-      averageRequiredStaffHours: planSummary.value.averageRequiredStaffHours,
-      averageRequiredHeadcount: planSummary.value.averageRequiredHeadcount,
-      peakRequiredHeadcount: planSummary.value.peakMonth.requiredHeadcount,
-      peakMonthLabel: planSummary.value.peakMonth.fullLabel,
-      averagePeakRequiredHeadcount: planSummary.value.averagePeakRequiredHeadcount,
-      peakDayRequiredHeadcount: planSummary.value.peakDayMonth.peakDayRequiredHeadcount,
-      peakDayMonthLabel: planSummary.value.peakDayMonth.fullLabel,
-      peakIntervalRequiredHeadcount: planSummary.value.peakIntervalMonth?.peakIntervalRequiredHeadcount ?? null,
-      peakIntervalMonthLabel: planSummary.value.peakIntervalMonth?.fullLabel || '',
-      averagePeakIntervalRequiredHeadcount: planSummary.value.averagePeakIntervalRequiredHeadcount,
-      startingRosterHeadcount: staffingSummary.value.startingRosterHeadcount,
-      startingFrontlineHeadcount: staffingSummary.value.startingFrontlineHeadcount,
-      endingRosterHeadcount: staffingSummary.value.endingRosterHeadcount,
-      endingFrontlineHeadcount: staffingSummary.value.endingFrontlineHeadcount,
-      totalHireHeadcount: staffingSummary.value.totalHireHeadcount,
-      totalGraduatingHeadcount: staffingSummary.value.totalGraduatingHeadcount,
-      totalFrontlineAttritionHeadcount: staffingSummary.value.totalFrontlineAttritionHeadcount,
-      averageGapToRequirement: staffingSummary.value.averageGapToRequirement,
-      peakInTrainingHeadcount: staffingSummary.value.peakInTrainingHeadcount
+  const resolvePayloadStatus = (requestedStatus = '') => {
+    if (planType.value === PLAN_TYPE_UPDATE) {
+      return PLAN_STATUS_FINALIZED
     }
-  })
+
+    return requestedStatus === PLAN_STATUS_FINALIZED ? PLAN_STATUS_FINALIZED : PLAN_STATUS_DRAFT
+  }
+
+  const buildPlanPayload = ({ status = '', savedAt = '' } = {}) => {
+    const resolvedStatus = resolvePayloadStatus(status)
+    const finalizedAt = resolvedStatus === PLAN_STATUS_FINALIZED
+      ? (sourcePlanReference.value?.finalizedAt || savedAt || new Date().toISOString())
+      : ''
+
+    return {
+      id: sourcePlanReference.value?.id || null,
+      createdAt: sourcePlanReference.value?.createdAt || null,
+      name: String(sourcePlanReference.value?.name || '').trim() || `${planningYear.value} ${planVersionLabel.value}`,
+      planType: planType.value,
+      status: resolvedStatus,
+      finalizedAt,
+      isCurrent: planType.value === PLAN_TYPE_UPDATE
+        ? true
+        : Boolean(sourcePlanReference.value?.isCurrent ?? true),
+      budgetPlanId: planType.value === PLAN_TYPE_BUDGET
+        ? (sourcePlanReference.value?.budgetPlanId || sourcePlanReference.value?.id || null)
+        : (sourcePlanReference.value?.budgetPlanId || sourcePlanReference.value?.sourcePlanId || null),
+      sourcePlanId: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.sourcePlanId || '') : '',
+      actualsThroughMonth: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualsThroughMonth || '') : '',
+      actualizedAt: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualizedAt || '') : '',
+      planningYear: planningYear.value,
+      requirementMethod: requirementMethod.value,
+      operatingWeekdays: [...operatingWeekdays.value],
+      holidayCalendarId: holidayCalendarId.value,
+      disabledHolidayRuleIds: [...disabledHolidayRuleIds.value],
+      customHolidays: customHolidays.value.map((holiday) => ({ ...holiday })),
+      holidayScheduleMode: holidayScheduleMode.value,
+      presenceMonths: presenceMonths.value.map((month) => createPresenceMonth(month)),
+      randomDefaults: createRandomMonth(randomDefaults.value),
+      useMonthlyRandomOverrides: useMonthlyRandomOverrides.value,
+      randomMonths: randomMonths.value.map((month) => createRandomMonth(month)),
+      planMonths: planMonths.value.map((month) => createPlanMonth(month)),
+      serviceLevelPercent: intradayErlangServiceLevelPercent.value,
+      serviceLevelThresholdSeconds: intradayErlangServiceLevelThresholdSeconds.value,
+      operatingOpenTime: intradayErlangOpenTime.value,
+      operatingCloseTime: intradayErlangCloseTime.value,
+      intraday: {
+        intervalLengthMinutes: intradayErlangProfile.value.intervalLengthMinutes,
+        intervalRatios: intradayErlangProfile.value.intervalRatios.map((row) => ({ ...row }))
+      },
+      demandSource: createPlanDemandSource(demandSource.value),
+      trainingSettings: createTrainingSettings(trainingSettings.value),
+      nextYearOpening: createNextYearOpening({
+        frontlineHeadcount: nextYearOpening.value.frontlineHeadcount
+      }),
+      startingHeadcount: startingHeadcount.value,
+      startingFrontlineHeadcount: startingFrontlineHeadcount.value,
+      staffingMonths: staffingMonths.value.map((month) => createStaffingMonth(month)),
+      trainingClasses: ownedTrainingClasses.value.map((trainingClass) =>
+        persistTrainingClassOutcomes(trainingClass, planningYear.value, trainingSettings.value, trainingCalendar.value)
+      ),
+      summary: {
+        requirementMethod: planSummary.value.requirementMethod,
+        annualContacts: planSummary.value.annualContacts,
+        annualWorkloadHours: planSummary.value.annualWorkloadHours,
+        annualErlangStaffedHours: planSummary.value.annualErlangStaffedHours,
+        annualRequiredStaffHours: planSummary.value.annualRequiredStaffHours,
+        averageAhtSeconds: planSummary.value.averageAhtSeconds,
+        minimumRequiredHeadcount: planSummary.value.minimumRequiredHeadcount,
+        averageCoveragePercent: planSummary.value.averageCoveragePercent,
+        averageWeightedOccupancyPercent: planSummary.value.averageWeightedOccupancyPercent,
+        averageWeightedServiceLevelPercent: planSummary.value.averageWeightedServiceLevelPercent,
+        averageRequiredStaffHours: planSummary.value.averageRequiredStaffHours,
+        averageRequiredHeadcount: planSummary.value.averageRequiredHeadcount,
+        peakRequiredHeadcount: planSummary.value.peakMonth.requiredHeadcount,
+        peakMonthLabel: planSummary.value.peakMonth.fullLabel,
+        averagePeakRequiredHeadcount: planSummary.value.averagePeakRequiredHeadcount,
+        peakDayRequiredHeadcount: planSummary.value.peakDayMonth.peakDayRequiredHeadcount,
+        peakDayMonthLabel: planSummary.value.peakDayMonth.fullLabel,
+        peakIntervalRequiredHeadcount: planSummary.value.peakIntervalMonth?.peakIntervalRequiredHeadcount ?? null,
+        peakIntervalMonthLabel: planSummary.value.peakIntervalMonth?.fullLabel || '',
+        averagePeakIntervalRequiredHeadcount: planSummary.value.averagePeakIntervalRequiredHeadcount,
+        startingRosterHeadcount: staffingSummary.value.startingRosterHeadcount,
+        startingFrontlineHeadcount: staffingSummary.value.startingFrontlineHeadcount,
+        endingRosterHeadcount: staffingSummary.value.endingRosterHeadcount,
+        endingFrontlineHeadcount: staffingSummary.value.endingFrontlineHeadcount,
+        totalHireHeadcount: staffingSummary.value.totalHireHeadcount,
+        totalGraduatingHeadcount: staffingSummary.value.totalGraduatingHeadcount,
+        totalFrontlineAttritionHeadcount: staffingSummary.value.totalFrontlineAttritionHeadcount,
+        averageGapToRequirement: staffingSummary.value.averageGapToRequirement,
+        peakInTrainingHeadcount: staffingSummary.value.peakInTrainingHeadcount
+      }
+    }
+  }
 
   const buildDraftPayload = () => ({
     plan: buildPlanPayload(),
@@ -890,7 +927,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     return true
   }
 
-  const savePlan = async () => {
+  const savePlanWithStatus = async (nextStatus) => {
     if (!ensurePlannerEditable()) {
       return
     }
@@ -901,7 +938,15 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     const savedAt = new Date().toISOString()
     await completeManualSave(savedAt)
-    emit('save', buildPlanPayload())
+    emit('save', buildPlanPayload({ status: nextStatus, savedAt }))
+  }
+
+  const savePlan = async () => {
+    await savePlanWithStatus(PLAN_STATUS_DRAFT)
+  }
+
+  const finalizePlan = async () => {
+    await savePlanWithStatus(PLAN_STATUS_FINALIZED)
   }
 
   const convertLegacyManualDemandSource = async () => {
@@ -917,7 +962,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     const savedAt = new Date().toISOString()
     await completeManualSave(savedAt)
-    emit('save', buildPlanPayload())
+    emit('save', buildPlanPayload({ status: PLAN_STATUS_DRAFT, savedAt }))
   }
 
   const cancelEditor = () => {
@@ -1038,6 +1083,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     monthlyRecords,
     planType,
     planVersionLabel,
+    isDraftBudget,
+    isFinalizedBudget,
     isReadOnlyBudget,
     readOnlyBudgetMessage,
     displayPlanLabel,
@@ -1076,6 +1123,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     resetPlanner,
     generateRecommendedTrainingClasses,
     savePlan,
+    finalizePlan,
     cancelEditor
   }
 }

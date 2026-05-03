@@ -40,6 +40,14 @@ const props = defineProps({
     type: Object,
     default: () => ({})
   },
+  readOnly: {
+    type: Boolean,
+    default: false
+  },
+  saveLabel: {
+    type: String,
+    default: 'Save Plan'
+  },
   formatNumber: {
     type: Function,
     required: true
@@ -117,6 +125,7 @@ const yearEndHeadcountTarget = computed({
       :training-calendar="props.trainingCalendar"
       :format-number="props.formatNumber"
       :selected-month-index="selectedMonthIndex"
+      :read-only="props.readOnly"
       @open-settings="trainingSettingsOpen = true"
       @recommend-classes="emit('recommend-classes')"
     />
@@ -133,10 +142,11 @@ const yearEndHeadcountTarget = computed({
       :starting-position-inherited-from-year="props.startingPositionInheritedFromYear"
       :staffing-records="props.staffingRecords"
       :format-number="props.formatNumber"
+      :read-only="props.readOnly"
     />
 
-    <div class="monthly-tab-actions">
-      <AppButton variant="primary" @click="emit('save')">Save Plan</AppButton>
+    <div v-if="!props.readOnly" class="monthly-tab-actions">
+      <AppButton variant="primary" @click="emit('save')">{{ props.saveLabel }}</AppButton>
     </div>
 
     <PlannerTrainingSettingsModal

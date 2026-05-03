@@ -144,12 +144,6 @@ const handleImportFileChange = async (event) => {
   }
 }
 
-const cancelImport = () => {
-  pendingImportEnvelope.value = null
-  pendingImportSummary.value = null
-  importConfirmOpen.value = false
-}
-
 const confirmImport = async () => {
   if (!pendingImportEnvelope.value) {
     importConfirmOpen.value = false

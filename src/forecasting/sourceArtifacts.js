@@ -1,5 +1,6 @@
 import {
   buildMonthlyRollupFromDailyForecastRows,
+  buildForecastCoverageMonthStarts,
   createEmptyForecastResults,
   FORECAST_SOURCE_IMPORTED_DAILY,
   FORECAST_SOURCE_MANUAL_MONTHLY,
@@ -17,10 +18,13 @@ const formatMonthLabel = (value) => {
     return String(value || '')
   }
 
+  const [year, month, day] = parsed.split('-').map((part) => Number(part))
+
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
-    year: 'numeric'
-  }).format(new Date(parsed))
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(new Date(Date.UTC(year, month - 1, day)))
 }
 
 const getMonthDayCount = (monthStart) => {
@@ -84,7 +88,7 @@ const buildImportedCoverageIssue = (coverageWindow = {}) => {
     return 'This imported forecast must match the selected staffing-group forecast window.'
   }
 
-  return `This imported ${coverageWindow.planningYear} ${forecastTypeLabel} must contain one complete daily forecast from ${coverageWindow.coverageStartDate} through ${coverageWindow.coverageEndDate}.`
+  return `This imported ${forecastTypeLabel} must contain one complete daily forecast from ${coverageWindow.coverageStartDate} through ${coverageWindow.coverageEndDate}.`
 }
 
 const buildSummary = ({
@@ -122,6 +126,16 @@ const buildSummary = ({
     coverageStartDate,
     coverageEndDate
   })
+  const expectedMonthStarts = buildForecastCoverageMonthStarts(
+    coverageWindow.coverageStartDate,
+    coverageWindow.coverageEndDate
+  )
+  const monthlyRollupMonthStarts = monthlyRollup.map((row) => String(row?.monthStart || ''))
+  const planningReady = Boolean(
+    expectedMonthStarts.length &&
+      monthlyRollupMonthStarts.length === expectedMonthStarts.length &&
+      expectedMonthStarts.every((monthStart, index) => monthlyRollupMonthStarts[index] === monthStart)
+  )
 
   return {
     originalObservations: dailyForecast.length,
@@ -136,7 +150,7 @@ const buildSummary = ({
     coverageStartMonthIndex: coverageWindow.coverageStartMonthIndex,
     coverageStartDate: coverageWindow.coverageStartDate,
     coverageEndDate: coverageWindow.coverageEndDate,
-    planningReady: Boolean(monthlyRollup.length && monthlyRollup.length === coverageWindow.expectedMonthCount)
+    planningReady
   }
 }
 
@@ -145,16 +159,37 @@ const sanitizeImportedDailyColumnMapping = (headers = [], mapping = {}, guessed 
 
   return {
     dateColumn: availableHeaders.has(mapping.dateColumn) ? mapping.dateColumn : guessed.dateColumn || '',
-    forecastColumn: availableHeaders.has(mapping.forecastColumn) ? mapping.forecastColumn : guessed.forecastColumn || ''
+    forecastColumn: availableHeaders.has(mapping.forecastColumn) ? mapping.forecastColumn : guessed.forecastColumn || '',
+    ahtColumn: availableHeaders.has(mapping.ahtColumn) ? mapping.ahtColumn : guessed.ahtColumn || ''
   }
 }
 
 const guessImportedDailyColumnMapping = (headers = []) => {
   const baseGuess = guessColumnMapping(headers)
+  const normalizedHeaders = headers.map((header) => ({
+    original: header,
+    normalized: String(header || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+  }))
+  const ahtCandidates = [
+    'aht',
+    'aht_seconds',
+    'avg_aht',
+    'avg_aht_seconds',
+    'average_aht',
+    'average_aht_seconds',
+    'average_handle_time',
+    'average_handle_time_seconds',
+    'handle_time_seconds'
+  ]
 
   return {
     dateColumn: baseGuess.dateColumn || '',
-    forecastColumn: baseGuess.volumeColumn || ''
+    forecastColumn: baseGuess.volumeColumn || '',
+    ahtColumn: normalizedHeaders.find((header) => ahtCandidates.includes(header.normalized))?.original || ''
   }
 }
 
@@ -163,13 +198,18 @@ const normalizeImportedDailyRows = ({ rows = [], mapping = {} } = {}) => {
   const importedRows = []
   const dateColumn = mapping.dateColumn || ''
   const forecastColumn = mapping.forecastColumn || ''
+  const ahtColumn = mapping.ahtColumn || ''
 
   if (!dateColumn) {
     issues.push('Choose the date column before loading an imported forecast.')
   }
 
   if (!forecastColumn) {
-    issues.push('Choose the forecast value column before loading an imported forecast.')
+    issues.push('Choose the contacts column before loading an imported forecast.')
+  }
+
+  if (!ahtColumn) {
+    issues.push('Choose the average handle time column before loading an imported forecast.')
   }
 
   if (issues.length) {
@@ -179,6 +219,7 @@ const normalizeImportedDailyRows = ({ rows = [], mapping = {} } = {}) => {
   ;(Array.isArray(rows) ? rows : []).forEach((row) => {
     const ds = parseDateValue(row?.[dateColumn])
     const forecastValue = parseNumberValue(row?.[forecastColumn])
+    const ahtSeconds = parseNumberValue(row?.[ahtColumn])
 
     if (!ds) {
       issues.push(`Row ${row.rowIndex}: enter a valid date in "${dateColumn}".`)
@@ -186,7 +227,12 @@ const normalizeImportedDailyRows = ({ rows = [], mapping = {} } = {}) => {
     }
 
     if (forecastValue == null || forecastValue < 0) {
-      issues.push(`Row ${row.rowIndex}: enter a numeric forecast value in "${forecastColumn}".`)
+      issues.push(`Row ${row.rowIndex}: enter a numeric contacts value in "${forecastColumn}".`)
+      return
+    }
+
+    if (ahtSeconds == null || ahtSeconds < 0) {
+      issues.push(`Row ${row.rowIndex}: enter numeric average handle time seconds in "${ahtColumn}".`)
       return
     }
 
@@ -195,6 +241,7 @@ const normalizeImportedDailyRows = ({ rows = [], mapping = {} } = {}) => {
       yhat: forecastValue,
       yhatLower: forecastValue,
       yhatUpper: forecastValue,
+      ahtSeconds,
       actualValue: null,
       isHistory: false
     })
@@ -204,6 +251,51 @@ const normalizeImportedDailyRows = ({ rows = [], mapping = {} } = {}) => {
     rows: importedRows.sort((left, right) => left.ds.localeCompare(right.ds)),
     issues
   }
+}
+
+export const buildMonthlyAhtOverridesFromImportedDailyRows = (rows = []) => {
+  const monthBuckets = new Map()
+
+  ;(Array.isArray(rows) ? rows : []).forEach((row) => {
+    const ds = parseDateValue(row?.ds)
+    const monthStart = ds ? `${ds.slice(0, 7)}-01` : ''
+    const ahtSeconds = Number(row?.ahtSeconds)
+
+    if (!monthStart || !Number.isFinite(ahtSeconds) || ahtSeconds < 0) {
+      return
+    }
+
+    const contacts = Math.max(Number(row?.yhat || 0), 0)
+    const bucket = monthBuckets.get(monthStart) || {
+      monthStart,
+      weightedAhtTotal: 0,
+      weightedContacts: 0,
+      simpleAhtTotal: 0,
+      simpleCount: 0
+    }
+
+    bucket.simpleAhtTotal += ahtSeconds
+    bucket.simpleCount += 1
+
+    if (contacts > 0) {
+      bucket.weightedAhtTotal += contacts * ahtSeconds
+      bucket.weightedContacts += contacts
+    }
+
+    monthBuckets.set(monthStart, bucket)
+  })
+
+  return [...monthBuckets.values()]
+    .sort((left, right) => left.monthStart.localeCompare(right.monthStart))
+    .map((bucket) => ({
+      monthStart: bucket.monthStart,
+      ahtSeconds: bucket.weightedContacts > 0
+        ? bucket.weightedAhtTotal / bucket.weightedContacts
+        : bucket.simpleCount > 0
+          ? bucket.simpleAhtTotal / bucket.simpleCount
+          : null
+    }))
+    .filter((row) => Number.isFinite(row.ahtSeconds) && row.ahtSeconds >= 0)
 }
 
 const validateImportedDailyCoverage = ({
@@ -264,7 +356,8 @@ export const buildImportedDailySourceState = ({
     rows,
     mapping: columnMapping,
     issues: [...parserIssues, ...normalized.issues, ...coverageIssues],
-    importedDailyRows: normalized.rows
+    importedDailyRows: normalized.rows,
+    ahtMonthOverrides: buildMonthlyAhtOverridesFromImportedDailyRows(normalized.rows)
   }
 }
 
@@ -364,14 +457,8 @@ export const createManualMonthlyEntryRows = ({
     (Array.isArray(seedRows) ? seedRows : []).map((row) => [String(row?.monthStart || ''), row])
   )
 
-  const startMonth = coverageWindow.coverageStartDate
-    ? new Date(`${coverageWindow.coverageStartDate}T00:00:00Z`)
-    : null
-
-  return Array.from({ length: coverageWindow.expectedMonthCount }, (_, index) => {
-    const date = startMonth ? new Date(Date.UTC(startMonth.getUTCFullYear(), startMonth.getUTCMonth() + index, 1)) : null
-    const monthStart = date ? date.toISOString().slice(0, 10) : `${planningYear}-${String(index + 1).padStart(2, '0')}-01`
-    const monthIndex = date ? date.getUTCMonth() : index
+  return buildForecastCoverageMonthStarts(coverageWindow.coverageStartDate, coverageWindow.coverageEndDate).map((monthStart) => {
+    const monthIndex = Number(monthStart.slice(5, 7)) - 1
     const seededRow = seedByMonthStart.get(monthStart)
 
     return {

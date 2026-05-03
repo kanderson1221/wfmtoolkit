@@ -26,6 +26,7 @@ describe('PlannerStaffingPlanTab', () => {
         startingFrontlineHeadcount: 38,
         staffingMonths: Array.from({ length: 12 }, () => ({ frontlineAttritionHeadcount: 0 })),
         trainingClasses: [],
+        saveLabel: 'Save Draft',
         inheritedTrainingClasses: [
           {
             id: 'carry-in-1',
@@ -59,12 +60,12 @@ describe('PlannerStaffingPlanTab', () => {
       global: {
         stubs: {
           PlannerTrainingPipelineTable: {
-            props: ['inheritedTrainingClasses'],
-            template: '<div data-test="pipeline">{{ inheritedTrainingClasses.length }}</div>'
+            props: ['inheritedTrainingClasses', 'readOnly'],
+            template: '<div data-test="pipeline">{{ inheritedTrainingClasses.length }}|{{ readOnly ? "read-only" : "editable" }}</div>'
           },
           PlannerStaffingSupplyTable: {
-            props: ['yearEndTargetEnabled', 'yearEndHeadcountTarget', 'startingPositionInherited', 'startingPositionInheritedFromYear'],
-            template: '<div data-test="supply-target">{{ yearEndTargetEnabled ? yearEndHeadcountTarget : "disabled" }}|{{ startingPositionInherited ? startingPositionInheritedFromYear : "editable" }}</div>'
+            props: ['yearEndTargetEnabled', 'yearEndHeadcountTarget', 'startingPositionInherited', 'startingPositionInheritedFromYear', 'readOnly'],
+            template: '<div data-test="supply-target">{{ yearEndTargetEnabled ? yearEndHeadcountTarget : "disabled" }}|{{ startingPositionInherited ? startingPositionInheritedFromYear : "editable" }}|{{ readOnly ? "read-only" : "editable" }}</div>'
           },
           PlannerTrainingSettingsModal: true,
           AppSectionHeader: true
@@ -72,7 +73,60 @@ describe('PlannerStaffingPlanTab', () => {
       }
     })
 
-    expect(wrapper.find('[data-test="supply-target"]').text()).toBe('disabled|editable')
-    expect(wrapper.find('[data-test="pipeline"]').text()).toBe('1')
+    expect(wrapper.find('[data-test="supply-target"]').text()).toBe('disabled|editable|editable')
+    expect(wrapper.find('[data-test="pipeline"]').text()).toBe('1|editable')
+    expect(wrapper.text()).toContain('Save Draft')
+  })
+
+  it('passes read-only state into staffing child tables and hides the save action', () => {
+    const wrapper = mount(PlannerStaffingPlanTab, {
+      props: {
+        readOnly: true,
+        planningYear: 2026,
+        yearEndTargetDefaults: {
+          frontlineHeadcount: 38
+        },
+        trainingSettings: {
+          trainingDurationWorkdays: 10,
+          graduationYieldPercent: 90,
+          availableTrainers: 1,
+          maxClassSize: 10,
+          postTrainingNestingDays: 5,
+          startOnFirstBusinessDayOfWeek: true
+        },
+        nextYearOpening: {
+          rosterHeadcount: null,
+          frontlineHeadcount: null
+        },
+        startingHeadcount: 44,
+        startingFrontlineHeadcount: 38,
+        staffingMonths: Array.from({ length: 12 }, () => ({ frontlineAttritionHeadcount: 0 })),
+        trainingClasses: [],
+        selectedMonthIndex: 0,
+        staffingRecords: [],
+        formatNumber: (value) => Number(value ?? 0).toFixed(1)
+      },
+      global: {
+        stubs: {
+          PlannerTrainingPipelineTable: {
+            props: ['readOnly'],
+            template: '<div data-test="pipeline">{{ readOnly ? "read-only" : "editable" }}</div>'
+          },
+          PlannerStaffingSupplyTable: {
+            props: ['readOnly'],
+            template: '<div data-test="supply-target">{{ readOnly ? "read-only" : "editable" }}</div>'
+          },
+          PlannerTrainingSettingsModal: true,
+          AppButton: {
+            template: '<button><slot /></button>'
+          },
+          AppSectionHeader: true
+        }
+      }
+    })
+
+    expect(wrapper.find('[data-test="pipeline"]').text()).toBe('read-only')
+    expect(wrapper.find('[data-test="supply-target"]').text()).toBe('read-only')
+    expect(wrapper.text()).not.toContain('Save Plan')
   })
 })

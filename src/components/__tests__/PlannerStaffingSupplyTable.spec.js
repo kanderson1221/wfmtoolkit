@@ -179,4 +179,50 @@ describe('PlannerStaffingSupplyTable', () => {
     expect(wrapper.text()).toContain('against a target of 22.0')
     expect(wrapper.text()).toContain('Projected: 18.0')
   })
+
+  it('keeps read-only staffing supply navigable while rendering editable fields as values', () => {
+    const wrapper = mount(PlannerStaffingSupplyTable, {
+      props: {
+        readOnly: true,
+        startingHeadcount: 20,
+        startingFrontlineHeadcount: 18,
+        yearEndTargetEnabled: true,
+        yearEndHeadcountTarget: 22,
+        staffingMonths: [
+          ...Array.from({ length: 11 }, () => ({ frontlineAttritionHeadcount: 0 })),
+          { frontlineAttritionHeadcount: 3 }
+        ],
+        selectedMonthIndex: 11,
+        staffingRecords: Array.from({ length: 12 }, (_, monthIndex) => ({
+          monthIndex,
+          label: monthIndex === 11 ? 'Dec' : 'Jan',
+          fullLabel: monthIndex === 11 ? 'December' : 'January',
+          requiredHeadcount: 12.4,
+          peakDayRequiredHeadcount: 15.8,
+          startingRosterHeadcount: 20,
+          startingFrontlineHeadcount: 18,
+          hireHeadcount: 0,
+          graduatingHeadcount: 0,
+          inTrainingHeadcount: 0,
+          frontlineAttritionHeadcount: monthIndex === 11 ? 3 : 0,
+          frontlineAttritionPercent: 0,
+          endingRosterHeadcount: 20,
+          endingFrontlineHeadcount: 18,
+          gapToRequirement: 5.6
+        })),
+        formatNumber: (value) => Number(value ?? 0).toFixed(1)
+      },
+      global: {
+        stubs: {
+          AppSectionHeader: true
+        }
+      }
+    })
+
+    expect(wrapper.find('input[aria-label="Starting roster headcount for the first month"]').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="Starting frontline headcount for the first month"]').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="Frontline attrition headcount"]').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="December ending frontline headcount target"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('3.0')
+  })
 })

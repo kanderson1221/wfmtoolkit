@@ -52,6 +52,8 @@ export {
   isPlanAlignedForecast,
   getForecastTypeLabel,
   resolveForecastType,
+  buildForecastCoverageMonthStarts,
+  buildMonthEndDate,
   resolveForecastCoverageWindow,
   computeForecastPlanningReady
 } from './forecastResultPolicy'

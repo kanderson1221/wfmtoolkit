@@ -14,7 +14,9 @@ export const defaultRoute = {
   forecastId: null,
   sourceKind: null,
   forecastType: null,
-  coverageStartMonthIndex: null
+  coverageStartMonthIndex: null,
+  coverageStartDate: null,
+  coverageEndDate: null
 }
 
 const PLANNING_HOME_HASH = '#planning'
@@ -86,16 +88,17 @@ export const buildPlanningGroupNewForecastHash = (
   }
 
   const normalizedSourceKind = String(options.sourceKind || '').trim().toLowerCase()
+  const coverageStartDate = String(options.coverageStartDate || '').trim()
+  const coverageEndDate = String(options.coverageEndDate || '').trim()
   const sourceSegment =
     normalizedSourceKind && normalizedSourceKind !== 'modeled_daily'
       ? `/source/${encodeURIComponent(normalizedSourceKind)}`
       : ''
-  const coverageStartMonthIndex = Number(options.coverageStartMonthIndex)
-  const startSegment = Number.isInteger(coverageStartMonthIndex) && coverageStartMonthIndex > 0 && coverageStartMonthIndex <= 11
-    ? `/start/${coverageStartMonthIndex}`
+  const coverageSegment = coverageStartDate && coverageEndDate
+    ? `/coverage/${encodeURIComponent(coverageStartDate)}/${encodeURIComponent(coverageEndDate)}`
     : ''
 
-  return `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new${sourceSegment}/type/budget${startSegment}`
+  return `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new${sourceSegment}/type/budget${coverageSegment}`
 }
 
 export const buildPlanningGroupHash = (centerId, groupId, year = null, options = {}) => {
@@ -192,16 +195,7 @@ export const parseHashRoute = (hash) => {
   }
 
   if (normalizedHash === 'forecasting' || normalizedHash === 'forecast') {
-    return {
-      app: 'calculators',
-      page: 'tool',
-      tool: 'forecasting',
-      centerId: null,
-      groupId: null,
-      planId: null,
-      year: null,
-      forecastId: null
-    }
+    return defaultRoute
   }
 
   if (normalizedHash === 'monthly-plan') {
@@ -222,15 +216,17 @@ export const parseHashRoute = (hash) => {
   }
 
   if (parts[0] === 'calculators') {
+    if (parts[1] === 'forecasting' || parts[1] === 'forecast') {
+      return defaultRoute
+    }
+
     return {
       app: 'calculators',
       page: 'tool',
       tool:
         parts[1] === 'batch'
           ? 'batch'
-          : parts[1] === 'forecasting' || parts[1] === 'forecast'
-            ? 'forecasting'
-            : 'interval',
+          : 'interval',
       centerId: null,
       groupId: null,
       planId: null,
@@ -253,6 +249,8 @@ export const parseHashRoute = (hash) => {
       const year = Number(parts[7]) || null
       let cursor = 9
       let sourceKind = null
+      let coverageStartDate = null
+      let coverageEndDate = null
 
       if (parts[cursor] === 'source' && parts[cursor + 1]) {
         sourceKind = decodeURIComponent(parts[cursor + 1])
@@ -261,19 +259,14 @@ export const parseHashRoute = (hash) => {
 
       if (parts[cursor] === 'type' && parts[cursor + 1]) {
         const forecastType = String(parts[cursor + 1] || '').trim().toLowerCase()
+        cursor += 2
+
+        if (parts[cursor] === 'coverage' && parts[cursor + 1] && parts[cursor + 2]) {
+          coverageStartDate = decodeURIComponent(parts[cursor + 1])
+          coverageEndDate = decodeURIComponent(parts[cursor + 2])
+        }
+
         if (forecastType === 'budget') {
-          cursor += 2
-          let coverageStartMonthIndex = 0
-
-          if (parts[cursor] === 'start' && parts[cursor + 1]) {
-            const parsedStartMonthIndex = Number(parts[cursor + 1])
-            coverageStartMonthIndex = Number.isInteger(parsedStartMonthIndex) &&
-              parsedStartMonthIndex >= 0 &&
-              parsedStartMonthIndex <= 11
-              ? parsedStartMonthIndex
-              : 0
-          }
-
           return {
             app: 'planning',
             page: 'group-forecasts',
@@ -285,7 +278,9 @@ export const parseHashRoute = (hash) => {
             forecastId: null,
             sourceKind,
             forecastType: 'budget',
-            coverageStartMonthIndex
+            coverageStartMonthIndex: 0,
+            coverageStartDate,
+            coverageEndDate
           }
         }
       }

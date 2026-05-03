@@ -26,8 +26,17 @@ describe('appRoutes', () => {
     expect(buildPlanningGroupForecastsHash('center-1', 'group-1', 2027)).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027')
     expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'budget' })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/budget')
     expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { sourceKind: 'imported_daily', forecastType: 'budget' })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/imported_daily/type/budget')
-    expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'reforecast', coverageStartMonthIndex: 3 })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/budget/start/3')
-    expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { sourceKind: 'manual_monthly', forecastType: 'reforecast', coverageStartMonthIndex: 3 })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget/start/3')
+    expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, {
+      forecastType: 'reforecast',
+      coverageStartDate: '2027-04-01',
+      coverageEndDate: '2027-12-31'
+    })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/type/budget/coverage/2027-04-01/2027-12-31')
+    expect(buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, {
+      sourceKind: 'manual_monthly',
+      forecastType: 'reforecast',
+      coverageStartDate: '2027-04-01',
+      coverageEndDate: '2027-12-31'
+    })).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget/coverage/2027-04-01/2027-12-31')
     expect(buildPlanningPlanHash('center-1', 'group-1', 'plan-1')).toBe('#planning/center/center-1/group/group-1/plan/plan-1')
     expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027)).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/workload_ratio')
     expect(buildPlanningNewPlanHash('center-1', 'group-1', 2027, { requirementMethod: 'workload_ratio' })).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/workload_ratio')
@@ -55,15 +64,11 @@ describe('appRoutes', () => {
     expect(parseHashRoute('#/apps')).toEqual(defaultRoute)
   })
 
-  it('parses calculator tool hashes including forecasting', () => {
-    expect(parseHashRoute('#forecasting')).toMatchObject({
-      app: 'calculators',
-      tool: 'forecasting'
-    })
-    expect(parseHashRoute('#calculators/forecasting')).toMatchObject({
-      app: 'calculators',
-      tool: 'forecasting'
-    })
+  it('routes legacy standalone forecasting hashes to planning home', () => {
+    expect(parseHashRoute('#forecasting')).toEqual(defaultRoute)
+    expect(parseHashRoute('#forecast')).toEqual(defaultRoute)
+    expect(parseHashRoute('#calculators/forecasting')).toEqual(defaultRoute)
+    expect(parseHashRoute('#calculators/forecast')).toEqual(defaultRoute)
   })
 
   it('parses staffing-group forecast routes inside planning', () => {
@@ -97,6 +102,17 @@ describe('appRoutes', () => {
       year: 2027,
       sourceKind: 'imported_daily',
       forecastType: 'budget'
+    })
+    expect(parseHashRoute('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget/coverage/2027-10-01/2028-03-31')).toMatchObject({
+      app: 'planning',
+      page: 'group-forecasts',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      year: 2027,
+      sourceKind: 'manual_monthly',
+      forecastType: 'budget',
+      coverageStartDate: '2027-10-01',
+      coverageEndDate: '2028-03-31'
     })
     expect(parseHashRoute('#planning/center/center-1/forecasts')).toMatchObject({
       app: 'planning',

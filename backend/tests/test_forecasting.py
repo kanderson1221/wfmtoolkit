@@ -292,41 +292,53 @@ class ForecastingTests(unittest.TestCase):
         self.assertEqual(result["monthlyRollup"][-1]["monthStart"], "2025-12-01")
 
     @patch("backend.app.forecasting.Prophet", FakeProphet)
-    def test_plan_aligned_budget_forecast_allows_partial_year_window(self) -> None:
+    def test_budget_forecast_returns_full_future_year_rollup(self) -> None:
         payload = self._payload(
-            planningYear=2025,
+            planningYear=2026,
             forecastType="budget",
-            coverageStartDate="2025-08-01",
-            coverageEndDate="2025-12-31",
+            coverageStartDate="2026-01-01",
+            coverageEndDate="2026-12-31",
             modelConfig={**self._payload().modelConfig.model_dump(), "growth": "linear", "holdoutDays": 0},
         )
 
         result = run_daily_volume_forecast(payload)
 
         self.assertTrue(result["summary"]["planningReady"])
-        self.assertEqual(result["summary"]["coverageStartMonthIndex"], 7)
-        self.assertEqual(len(result["monthlyRollup"]), 5)
-        self.assertEqual(result["monthlyRollup"][0]["monthStart"], "2025-08-01")
-        self.assertEqual(result["monthlyRollup"][-1]["monthStart"], "2025-12-01")
+        self.assertEqual(result["summary"]["planningYear"], 2026)
+        self.assertEqual(result["summary"]["coverageStartDate"], "2026-01-01")
+        self.assertEqual(result["summary"]["coverageEndDate"], "2026-12-31")
+        self.assertEqual(len(result["monthlyRollup"]), 12)
+        self.assertEqual(result["monthlyRollup"][0]["monthStart"], "2026-01-01")
+        self.assertEqual(result["monthlyRollup"][-1]["monthStart"], "2026-12-01")
 
     @patch("backend.app.forecasting.Prophet", FakeProphet)
-    def test_plan_aligned_budget_forecast_allows_cross_year_window(self) -> None:
+    def test_cross_year_month_range_forecast_returns_expected_rollup(self) -> None:
         payload = self._payload(
             planningYear=2025,
             forecastType="budget",
-            coverageStartDate="2025-05-01",
-            coverageEndDate="2026-04-30",
+            coverageStartDate="2025-10-01",
+            coverageEndDate="2026-03-31",
             modelConfig={**self._payload().modelConfig.model_dump(), "growth": "linear", "holdoutDays": 0},
         )
 
         result = run_daily_volume_forecast(payload)
 
         self.assertTrue(result["summary"]["planningReady"])
-        self.assertEqual(len(result["monthlyRollup"]), 12)
-        self.assertEqual(result["monthlyRollup"][0]["monthStart"], "2025-05-01")
-        self.assertEqual(result["monthlyRollup"][-1]["monthStart"], "2026-04-01")
+        self.assertEqual(result["summary"]["coverageStartMonthIndex"], 9)
+        self.assertEqual(len(result["monthlyRollup"]), 6)
+        self.assertEqual(
+            [row["monthStart"] for row in result["monthlyRollup"]],
+            [
+                "2025-10-01",
+                "2025-11-01",
+                "2025-12-01",
+                "2026-01-01",
+                "2026-02-01",
+                "2026-03-01",
+            ],
+        )
 
-    def test_plan_aligned_budget_forecast_requires_complete_month_window(self) -> None:
+    def test_plan_aligned_budget_forecast_requires_month_aligned_window(self) -> None:
         payload = self._payload(
             planningYear=2025,
             forecastType="budget",
@@ -337,7 +349,22 @@ class ForecastingTests(unittest.TestCase):
         with self.assertRaises(ValueError) as raised:
             run_daily_volume_forecast(payload)
 
-        self.assertIn("start on the first day of a month", str(raised.exception))
+        self.assertIn("Forecast coverage must start on the first day of a month", str(raised.exception))
+
+    @patch("backend.app.forecasting.Prophet", FakeProphet)
+    def test_plan_aligned_forecast_rejects_computed_horizon_over_limit(self) -> None:
+        payload = self._payload(
+            planningYear=2027,
+            forecastType="budget",
+            coverageStartDate="2027-01-01",
+            coverageEndDate="2027-12-31",
+            modelConfig={**self._payload().modelConfig.model_dump(), "growth": "linear", "holdoutDays": 0},
+        )
+
+        with self.assertRaises(ValueError) as raised:
+            run_daily_volume_forecast(payload)
+
+        self.assertIn("maximum supported horizon is 730 days", str(raised.exception))
 
     @patch("backend.app.forecasting.Prophet", BrokenProphet)
     def test_forecast_run_surfaces_backend_initialization_errors(self) -> None:

@@ -66,7 +66,7 @@ test('opens the terms page from the public footer', async ({ page }) => {
 test('opens the planning workspace directly and creates a call center', async ({ page }) => {
   await page.goto('/#planning')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Call Centers' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Planning Portfolio' })).toBeVisible()
   await page.getByRole('button', { name: 'New Center' }).first().click()
 
   await expect(page.getByRole('heading', { name: 'Create Call Center' })).toBeVisible()
@@ -99,10 +99,11 @@ test('opens staffing-group forecasts from the call-center workspace', async ({ p
   await page.getByRole('button', { name: 'Forecasts' }).click()
   await expect(page.getByText('No forecasts yet')).toBeVisible()
   await page.getByRole('button', { name: 'New Forecast' }).first().click()
-  const forecastCreateDialog = page.getByRole('dialog').filter({ hasText: 'Choose the plan year for a forecast built from this staffing group\'s shared history.' })
+  const forecastCreateDialog = page.getByRole('dialog').filter({ hasText: 'Choose the forecast source and period for this staffing group.' })
   await expect(forecastCreateDialog).toBeVisible()
-  await forecastCreateDialog.getByLabel('Plan Year').selectOption({ label: '2026' })
-  await page.getByRole('button', { name: 'Create Forecast' }).last().click()
+  await expect(forecastCreateDialog.getByLabel('Forecast Source')).toHaveValue('modeled_daily')
+  await forecastCreateDialog.getByLabel('Forecast Year').selectOption({ label: '2026' })
+  await page.getByRole('button', { name: /Build Forecast/ }).last().click()
 
   await expect(page.getByRole('heading', { level: 2, name: 'Consumer Voice 2026 Demand Forecast' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeHidden()
@@ -212,8 +213,6 @@ test('confirms before deleting a call center from the portfolio list', async ({ 
 })
 
 test('creates a staffing group and opens a new plan from the call-center detail pane', async ({ page }) => {
-  const planningYear = new Date().getFullYear()
-
   await page.goto('/#planning')
 
   await page.getByRole('button', { name: 'New Center' }).first().click()

@@ -98,30 +98,29 @@ describe('PlannerForecastPanel', () => {
     expect(wrapper.findAll('h3').filter((node) => node.text() === 'Consumer Voice 2026 Forecast')).toHaveLength(1)
   })
 
-  it('warns when a selected forecast overlaps actuals or misses future months', () => {
+  it('blocks monthly-only forecasts when Intraday Erlang needs daily rows', () => {
     const wrapper = mountPanel({
-      demandSource: createPlanDemandSource({
-        mode: 'forecast'
-      }),
+      requiresDailyForecast: true,
       selectedForecastProjectId: 'forecast-1',
       forecastSelectOptions: [
         { label: 'Select a saved forecast', value: '' },
-        { label: 'Consumer Voice May Reforecast', value: 'forecast-1' }
+        { label: 'Consumer Voice 2026 Forecast', value: 'forecast-1' }
       ],
       selectedForecastPreviewSummary: {
-        projectName: 'Consumer Voice May Reforecast',
-        coverageLabel: 'May 2026-Oct 2026',
-        totalContacts: 90000,
+        projectName: 'Consumer Voice 2026 Forecast',
+        sourceKindLabel: 'Monthly',
+        coverageLabel: 'Covers 12/12 required months',
+        totalContacts: 175000,
         averageAhtSeconds: 286.4,
-        matchedMonthCount: 6,
-        missingMonthCount: 2,
-        overlapMonthCount: 4
+        matchedMonthCount: 12,
+        dailySnapshotCount: 0
       },
-      forecastCanApply: true
+      forecastCanApply: false
     })
 
-    expect(wrapper.text()).toContain('4 already actualized months are excluded from this import.')
-    expect(wrapper.text()).toContain('This forecast is missing 2 future months for this plan.')
+    expect(wrapper.text()).toContain('This forecast does not include daily rows')
+    expect(wrapper.text()).toContain('Apply Forecast to Contacts, AHT & Daily Rows')
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined()
   })
 
   it('shows saved-forecast controls only when forecast sourcing is selected', () => {
@@ -179,6 +178,49 @@ describe('PlannerForecastPanel', () => {
     expect(wrapper.text()).toContain('175000')
     expect(wrapper.text()).toContain('286.4 sec')
     expect(wrapper.text()).toContain('Select another saved forecast to preview and replace the currently applied source.')
+  })
+
+  it('shows locked-budget guidance instead of replacement controls for read-only plans', () => {
+    const wrapper = mountPanel({
+      readOnly: true,
+      readOnlyMessage: 'Budget plan is locked. Create an updated plan to change future assumptions.',
+      demandSource: createPlanDemandSource({
+        mode: 'forecast',
+        forecastProjectId: 'forecast-1',
+        forecastProjectName: 'Consumer Voice 2026 Forecast',
+        importedAt: '2026-04-07T12:00:00Z',
+        forecastMonthSnapshot: [
+          {
+            monthIndex: 0,
+            monthLabel: 'Jan',
+            contacts: 14000,
+            ahtSeconds: 286.4
+          }
+        ]
+      }),
+      forecastSelectOptions: [
+        { label: 'Select a saved forecast', value: '' },
+        { label: 'Replacement Forecast', value: 'forecast-2' }
+      ],
+      currentDemandSourceSummary: {
+        projectName: 'Consumer Voice 2026 Forecast',
+        sourceKindLabel: 'Modeled',
+        forecastType: 'budget',
+        coverageLabel: '12/12 months',
+        totalContacts: 175000,
+        averageAhtSeconds: 286.4,
+        peakMonthLabel: 'January',
+        runAt: '2026-04-06T12:00:00Z'
+      },
+      forecastCanApply: true
+    })
+
+    expect(wrapper.text()).toContain('Currently Applied')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Forecast')
+    expect(wrapper.text()).toContain('Budget plan is locked. Create an updated plan to change future assumptions.')
+    expect(wrapper.text()).not.toContain('Replace Forecast')
+    expect(wrapper.text()).not.toContain('Reapply Forecast to Contacts & AHT')
+    expect(wrapper.find('#planner-demand-source-forecast').exists()).toBe(false)
   })
 
   it('shows the one-time legacy conversion state for manual plans', () => {

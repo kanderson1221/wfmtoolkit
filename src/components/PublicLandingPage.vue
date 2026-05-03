@@ -139,6 +139,9 @@ const scrollToSection = (sectionId) => {
             <p class="text-sm italic leading-6 text-slate-600">
               WFMToolkit does not use accounts or store planning data on a server. Your work stays in your browser.
             </p>
+            <p class="text-sm italic leading-6 text-slate-600">
+              WFMToolkit is a work in progress and changes frequently. Review key workflows and outputs after updates.
+            </p>
           </div>
         </div>
       </section>

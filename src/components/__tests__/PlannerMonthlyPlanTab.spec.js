@@ -257,10 +257,13 @@ describe('PlannerMonthlyPlanTab', () => {
           }
         ]
       }),
+      currentDemandSourceSummary: {
+        projectName: 'Daily Budget Forecast'
+      },
       requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
       erlangStatus: {
-        status: 'forecast_required',
-        message: 'Intraday Erlang plans require an applied daily forecast.'
+        status: 'schedule_required',
+        message: 'Set the staffing group operating hours before running intraday Erlang.'
       },
       monthlyRecords: [
         {
@@ -317,9 +320,39 @@ describe('PlannerMonthlyPlanTab', () => {
     expect(wrapper.text()).toContain('P80 Total HC')
     expect(wrapper.text()).toContain('P90 Total HC')
     expect(wrapper.text()).not.toContain('RequiredHrs')
-    expect(wrapper.text()).toContain('Intraday Erlang plans require an applied daily forecast.')
+    expect(wrapper.text()).toContain('1 daily rows are available for Intraday Erlang.')
+    expect(wrapper.text()).not.toContain('Intraday Erlang plans require an applied daily forecast.')
     expect(wrapper.text()).toContain('325')
     expect(wrapper.findAll('input')).toHaveLength(0)
+  })
+
+  it('explains when Intraday Erlang has monthly forecast values but no daily rows', () => {
+    const wrapper = mountTab({
+      demandSource: createPlanDemandSource({
+        mode: 'forecast',
+        forecastProjectName: 'Monthly Budget Forecast',
+        forecastMonthSnapshot: [
+          {
+            monthIndex: 0,
+            monthLabel: 'Jan 2026',
+            monthStart: '2026-01-01',
+            contacts: 12000,
+            ahtSeconds: 325
+          }
+        ]
+      }),
+      currentDemandSourceSummary: {
+        projectName: 'Monthly Budget Forecast'
+      },
+      requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+      erlangStatus: {
+        status: 'forecast_required',
+        message: 'Intraday Erlang plans require an applied daily forecast.'
+      }
+    })
+
+    expect(wrapper.text()).toContain('Forecast monthly values are applied from Monthly Budget Forecast, but daily rows are missing.')
+    expect(wrapper.text()).toContain('Apply a modeled or imported daily forecast before running Intraday Erlang.')
   })
 
   it('switches the Erlang interval pressure column between peak day and percentile headcount', async () => {

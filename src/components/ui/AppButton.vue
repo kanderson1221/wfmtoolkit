@@ -61,6 +61,7 @@ const forwardedAttrs = computed(() => {
 })
 
 const sizeClasses = {
+  xs: 'rounded-xl px-2.5 py-1.5 text-xs',
   sm: 'rounded-2xl px-3 py-2 text-sm',
   md: 'rounded-2xl px-4 py-2.5 text-sm',
   lg: 'rounded-2xl px-5 py-3 text-sm'

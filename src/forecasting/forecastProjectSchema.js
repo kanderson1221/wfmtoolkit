@@ -131,7 +131,7 @@ export const createForecastCenterSnapshot = (overrides = {}) => {
 
 export const createForecastProject = (overrides = {}) => {
   const snapshot = overrides && typeof overrides === 'object' ? clonePlain(overrides) : {}
-  const { intervalModel: legacyIntervalModel, ...projectSnapshot } = snapshot
+  const { intervalModel: _legacyIntervalModel, ...projectSnapshot } = snapshot
   const {
     runNotes: _legacyRunNotes,
     weeklyFourierOrder: _legacyWeeklyFourierOrder,

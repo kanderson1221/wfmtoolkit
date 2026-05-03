@@ -50,10 +50,19 @@ export const forecastProjectBelongsToPlanningContext = (project, centerId, group
 const buildForecastSubjectName = ({
   groupName,
   centerName,
+  planName,
   planningYear
 } = {}) => {
+  if (groupName && planName) {
+    return `${groupName} ${planName}`
+  }
+
   if (groupName && planningYear > 0) {
     return `${groupName} ${planningYear}`
+  }
+
+  if (planName) {
+    return planName
   }
 
   if (groupName) {
@@ -84,6 +93,7 @@ export function buildForecastBaseName(seed = {}) {
   const snapshot = seed && typeof seed === 'object' ? seed : {}
   const planningContext = snapshot.planningContext || {}
   const groupName = String(snapshot.groupName || planningContext.groupName || '').trim()
+  const planName = String(snapshot.planName || planningContext.planName || '').trim()
   const planningYear = getForecastPlanningYear(snapshot)
   const centerName = String(
     snapshot.centerName ||
@@ -96,6 +106,7 @@ export function buildForecastBaseName(seed = {}) {
   const subjectName = buildForecastSubjectName({
     groupName,
     centerName,
+    planName,
     planningYear
   })
   const coverageStartMonthLabel = getCoverageStartMonthLabel(snapshot, planningYear, forecastType)
@@ -114,6 +125,10 @@ export function buildForecastBaseName(seed = {}) {
   }
 
   if (subjectName) {
+    if (planName) {
+      return `${subjectName} Forecast`
+    }
+
     if (isRollingCoverage) {
       return `${subjectName} ${coverageStartMonthLabel} Reforecast`
     }

@@ -239,6 +239,9 @@ export function usePlanningCenterForecastLibrary({
         forecast.lastRun?.summary?.projectedTotalContacts ??
           monthlyRollup.reduce((sum, row) => sum + Number(row?.contacts || 0), 0)
       ) || 0
+      const monthlyRollupMonthStarts = new Set(monthlyRollup.map((row) => String(row?.monthStart || '')))
+      const matchedCoverageMonthCount = (coverageWindow.expectedMonthStarts || [])
+        .filter((monthStart) => monthlyRollupMonthStarts.has(monthStart)).length
       const historyRangeLabel = sourceKind === FORECAST_SOURCE_MODELED_DAILY
         ? historyRows.length
           ? `${formatDate(historyRows[0].ds)} to ${formatDate(historyRows[historyRows.length - 1].ds)}`
@@ -263,6 +266,8 @@ export function usePlanningCenterForecastLibrary({
         sourceKindLabel: getForecastSourceKindLabel(sourceKind),
         forecastType,
         forecastTypeLabel: getForecastTypeLabel(forecastType),
+        coverageStartDate: coverageWindow.coverageStartDate,
+        coverageEndDate: coverageWindow.coverageEndDate,
         coverageWindowLabel: coverageWindow.coverageMonthLabel || 'Legacy coverage',
         historyRangeLabel,
         observationCountLabel: sourceKind === FORECAST_SOURCE_IMPORTED_DAILY
@@ -271,7 +276,7 @@ export function usePlanningCenterForecastLibrary({
             ? `${formatWhole(monthlyRollup.length)} months`
             : formatWhole(historyRows.length),
         monthlyCoverageLabel: monthlyRollup.length
-          ? `${monthlyRollup.length}/${coverageWindow.expectedMonthCount || monthlyRollup.length} months`
+          ? `${matchedCoverageMonthCount || monthlyRollup.length}/${coverageWindow.expectedMonthCount || monthlyRollup.length} months`
           : 'Not run yet',
         projectedContactsLabel: monthlyRollup.length ? formatWhole(projectedTotalContacts) : '—',
         peakMonthLabel: monthlyRollup.length

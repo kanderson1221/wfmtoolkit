@@ -19,7 +19,7 @@ import {
   HOLIDAY_SCHEDULE_CLOSED,
   normalizeHolidayScheduleMode
 } from '../planner/holidayCalendars'
-import { createPlanningGroupActuals } from '../planner/groupActuals'
+import { resolvePlanningGroupActuals } from '../planner/groupActuals'
 import { buildForecastTrainingSeedFromPlanningGroupActuals } from '../planner/groupActualsForecastSeed'
 import {
   findLinkedPriorPlan,
@@ -232,7 +232,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       serviceLevelPercent: currentGroup.value.serviceLevelPercent,
       serviceLevelThresholdSeconds: currentGroup.value.serviceLevelThresholdSeconds,
       intraday: currentGroup.value.intraday ? { ...currentGroup.value.intraday } : null,
-      actuals: createPlanningGroupActuals(currentGroup.value.actuals),
+      actuals: resolvePlanningGroupActuals(currentGroup.value),
       startingHeadcount: seededStartingPosition.rosterHeadcount,
       startingFrontlineHeadcount: seededStartingPosition.frontlineHeadcount,
       presenceMonths: Array.from({ length: 12 }, () => ({
@@ -287,12 +287,9 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
           ? `${customHolidays.length} custom holiday${customHolidays.length === 1 ? '' : 's'}`
           : 'No holiday calendar'
     const seededForecastType = FORECAST_TYPE_BUDGET
-    const seededCoverageStartMonthIndex = Math.max(
-      0,
-      Math.min(11, Math.round(Number(currentRoute.value.coverageStartMonthIndex) || 0))
-    )
-    const seededCoverageStartDate = `${resolvedPlanningYear}-${String(seededCoverageStartMonthIndex + 1).padStart(2, '0')}-01`
-    const seededCoverageEndDate = `${resolvedPlanningYear}-12-31`
+    const seededCoverageStartMonthIndex = Number(currentRoute.value.coverageStartMonthIndex) || 0
+    const seededCoverageStartDate = String(currentRoute.value.coverageStartDate || '').trim()
+    const seededCoverageEndDate = String(currentRoute.value.coverageEndDate || '').trim()
     const seededSourceKind =
       currentRoute.value.page === 'group-forecasts'
         ? (currentRoute.value.sourceKind || FORECAST_SOURCE_MODELED_DAILY)
@@ -308,7 +305,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
     const sharedHistorySeed =
       currentRoute.value.page === 'group-forecasts' &&
       seededSourceKind === FORECAST_SOURCE_MODELED_DAILY
-        ? buildForecastTrainingSeedFromPlanningGroupActuals(currentGroup.value?.actuals, {
+        ? buildForecastTrainingSeedFromPlanningGroupActuals(resolvePlanningGroupActuals(currentGroup.value), {
             group: currentGroup.value,
             center: currentCenter.value
           })

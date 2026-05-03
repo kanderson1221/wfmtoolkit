@@ -1,9 +1,13 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import {
+  mdiAccountGroupOutline,
+  mdiChartLineVariant,
   mdiDotsVertical,
+  mdiGauge,
   mdiOfficeBuildingOutline,
   mdiPlus,
+  mdiTarget
 } from '@mdi/js'
 
 import CallCenterSettingsModal from './planning/CallCenterSettingsModal.vue'
@@ -15,18 +19,14 @@ import AppIcon from './ui/AppIcon.vue'
 import AppMenu from './ui/AppMenu.vue'
 import AppPageHeader from './ui/AppPageHeader.vue'
 import AppPanel from './ui/AppPanel.vue'
-import AppSectionHeader from './ui/AppSectionHeader.vue'
 import AppSelect from './ui/AppSelect.vue'
-import AppStatStrip from './ui/AppStatStrip.vue'
-import AppTableShell from './ui/AppTableShell.vue'
 import { buildPlanningCenterHash, navigateToHash } from '../appRoutes'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
-import { createPlanningCenterDraft, resolvePlanHolidaySnapshot } from '../planningStorage'
-import { getCenterGroups, getGroupPlans, summarizeCenterForYear, summarizeCenterPortfolioForYear } from '../planningSummary'
+import { createPlanningCenterDraft } from '../planningStorage'
+import { getCenterGroups, getGroupPlans } from '../planningSummary'
+import { buildAnnualPlanningRollup } from '../planner/annualPlanningRollup'
 import { resolvePlanningGroupActuals } from '../planner/groupActuals'
 import { getCurrentCalendarYear } from '../planner/shared'
-import { computeMonthlyRecords } from '../planner/demandModel'
-import { computeStaffingRecords } from '../planner/staffingModel'
 
 const props = defineProps({
   centers: {
@@ -53,26 +53,78 @@ const {
   confirmPendingAction: confirmDeleteCenter
 } = useConfirmDialog()
 
+const toFiniteNumber = (value, fallback = 0) => {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 const formatWhole = (value) =>
   new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 0
-  }).format(value || 0)
+  }).format(toFiniteNumber(value))
 
 const formatNumber = (value, digits = 1) =>
   new Intl.NumberFormat('en-US', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits
-  }).format(value || 0)
+  }).format(toFiniteNumber(value))
 
 const formatAht = (seconds) => {
-  const totalSeconds = Number(seconds) || 0
-  if (totalSeconds <= 0) {
-    return '0m 00s'
+  const totalSeconds = Number(seconds)
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return '-'
   }
 
   const minutes = Math.floor(totalSeconds / 60)
   const remainingSeconds = Math.round(totalSeconds % 60)
   return `${minutes}m ${String(remainingSeconds).padStart(2, '0')}s`
+}
+
+const formatOptionalWhole = (value) => {
+  if (value == null || value === '') {
+    return '-'
+  }
+
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? formatWhole(numericValue) : '-'
+}
+
+const formatOptionalSignedNumber = (value, digits = 1) => {
+  if (value == null || value === '') {
+    return '-'
+  }
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return '-'
+  }
+
+  const prefix = numericValue > 0 ? '+' : ''
+  return `${prefix}${formatNumber(numericValue, digits)}`
+}
+
+const formatOptionalPercent = (value, digits = 1) => {
+  if (value == null || value === '') {
+    return 'Waiting for actuals'
+  }
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 'Waiting for actuals'
+  }
+
+  const prefix = numericValue > 0 ? '+' : ''
+  return `${prefix}${formatNumber(numericValue, digits)}%`
+}
+
+const signedValueClass = (value, positiveGood = true) => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue) || Math.abs(numericValue) <= 0.05) {
+    return 'text-slate-700'
+  }
+
+  const isPositive = numericValue > 0
+  return isPositive === positiveGood ? 'text-emerald-700' : 'text-rose-700'
 }
 
 const availablePlanningYears = computed(() => {
@@ -121,20 +173,116 @@ const planningYearOptions = computed(() =>
   }))
 )
 
-const dashboardSummary = computed(() => summarizeCenterPortfolioForYear(props.centers, selectedPlanningYear.value))
-const centerRows = computed(() =>
+const portfolioAnnualPlan = computed(() =>
+  buildAnnualPlanningRollup({
+    centers: props.centers,
+    planningYear: selectedPlanningYear.value
+  })
+)
+
+const portfolioMonthlyRows = computed(() => portfolioAnnualPlan.value.monthlyRows)
+const dashboardSummary = computed(() => portfolioAnnualPlan.value.summary)
+
+const modeledCenterCount = computed(() =>
+  centerCommandRows.value.filter((center) => center.plannedGroupCount > 0).length
+)
+
+const centerStatusConfig = (centerRow) => {
+  if (centerRow.groupCount === 0) {
+    return {
+      label: 'Setup Needed',
+      tone: 'info'
+    }
+  }
+
+  if (centerRow.missingPlanCount > 0) {
+    return {
+      label: 'Plan Gap',
+      tone: 'warning'
+    }
+  }
+
+  if (centerRow.hasStaffingRisk) {
+    return {
+      label: 'Staffing Risk',
+      tone: 'danger'
+    }
+  }
+
+  if (centerRow.hasActualsGap) {
+    return {
+      label: 'Actuals Gap',
+      tone: 'warning'
+    }
+  }
+
+  return {
+    label: 'Ready',
+    tone: 'success'
+  }
+}
+
+const centerCommandRows = computed(() =>
   props.centers
-    .map((center) => ({
-      ...center,
-      summary: summarizeCenterForYear(center, selectedPlanningYear.value)
-    }))
+    .map((center) => {
+      const rollup = buildAnnualPlanningRollup({
+        centers: [center],
+        planningYear: selectedPlanningYear.value
+      })
+      const summary = rollup.summary
+      const groupCount = toFiniteNumber(summary.groupCount)
+      const plannedGroupCount = toFiniteNumber(summary.plannedGroupCount)
+      const groupsWithActualsCount = toFiniteNumber(summary.groupsWithActualsCount)
+      const missingPlanCount = Math.max(groupCount - plannedGroupCount, 0)
+      const missingActualsCount = Math.max(groupCount - groupsWithActualsCount, 0)
+      const monthsBelowRequirement = toFiniteNumber(summary.monthsBelowRequirement)
+      const averageGapToRequirement = toFiniteNumber(summary.averageGapToRequirement)
+      const peakRequiredHeadcount = toFiniteNumber(summary.peakRequiredHeadcount)
+      const expectedContacts = toFiniteNumber(summary.expectedContacts)
+      const hasStaffingRisk = monthsBelowRequirement > 0 || averageGapToRequirement < -0.05
+      const hasActualsGap = groupCount > 0 && (
+        groupsWithActualsCount < groupCount ||
+        toFiniteNumber(summary.monthsWithActualsCount) < 12
+      )
+      const baseRow = {
+        ...center,
+        rollup,
+        summary,
+        groupCount,
+        plannedGroupCount,
+        groupsWithActualsCount,
+        missingPlanCount,
+        missingActualsCount,
+        monthsBelowRequirement,
+        averageGapToRequirement,
+        peakRequiredHeadcount,
+        expectedContacts,
+        hasStaffingRisk,
+        hasActualsGap,
+        planCoverageLabel: `${formatWhole(plannedGroupCount)}/${formatWhole(groupCount)}`,
+        actualsCoverageLabel: `${formatWhole(groupsWithActualsCount)}/${formatWhole(groupCount)}`,
+        actualsCoverageMeta: `${formatWhole(summary.monthsWithActualsCount)} of 12 months`,
+        riskRank: hasStaffingRisk ? 0 : 1
+      }
+      const status = centerStatusConfig(baseRow)
+
+      return {
+        ...baseRow,
+        statusLabel: status.label,
+        statusTone: status.tone
+      }
+    })
     .sort((left, right) => {
-      const peakDifference = (Number(right.summary.totalPeakHeadcount) || 0) - (Number(left.summary.totalPeakHeadcount) || 0)
+      if (left.riskRank !== right.riskRank) {
+        return left.riskRank - right.riskRank
+      }
+
+      const peakDifference = right.peakRequiredHeadcount - left.peakRequiredHeadcount
       if (peakDifference !== 0) {
         return peakDifference
       }
 
-      const contactDifference = (Number(right.summary.annualContacts) || 0) - (Number(left.summary.annualContacts) || 0)
+      const contactDifference = right.expectedContacts - left.expectedContacts
       if (contactDifference !== 0) {
         return contactDifference
       }
@@ -143,155 +291,71 @@ const centerRows = computed(() =>
     })
 )
 
-const modeledCenterCount = computed(() =>
-  centerRows.value.filter((center) => Number(center.summary.totalPlanCount) > 0).length
-)
+const portfolioHeadcountChart = computed(() => ({
+  neededTotals: portfolioMonthlyRows.value.map((row) => row.requiredHeadcount),
+  startingFrontlineTotals: portfolioMonthlyRows.value.map((row) => row.startingFrontlineHeadcount),
+  frontlineAdditionTotals: portfolioMonthlyRows.value.map((row) => row.frontlineReadyHeadcount),
+  frontlineTotals: portfolioMonthlyRows.value.map((row) => row.endingFrontlineHeadcount),
+  totalHeadcountTotals: portfolioMonthlyRows.value.map((row) => row.endingRosterHeadcount),
+  hireTotals: portfolioMonthlyRows.value.map((row) => row.hireHeadcount),
+  attritionTotals: portfolioMonthlyRows.value.map((row) => row.frontlineAttritionHeadcount)
+}))
 
-const centersWithoutPlansCount = computed(() =>
-  Math.max((Number(dashboardSummary.value.callCenterCount) || 0) - Number(modeledCenterCount.value || 0), 0)
-)
+const portfolioCommandStats = computed(() => {
+  const summary = dashboardSummary.value
+  const hasActuals = toFiniteNumber(summary.monthsWithActualsCount) > 0
 
-const groupsWithoutPlansCount = computed(() =>
-  Math.max((Number(dashboardSummary.value.totalGroupCount) || 0) - (Number(dashboardSummary.value.totalPlanCount) || 0), 0)
-)
-
-const groupPlanCoveragePercent = computed(() => {
-  const totalGroups = Number(dashboardSummary.value.totalGroupCount) || 0
-  if (totalGroups <= 0) {
-    return 0
-  }
-
-  return ((Number(dashboardSummary.value.totalPlanCount) || 0) / totalGroups) * 100
-})
-
-const summaryStripItems = computed(() => [
-  {
-    label: 'Call Centers',
-    value: formatWhole(dashboardSummary.value.callCenterCount),
-    meta: 'Configured operations'
-  },
-  {
-    label: 'Modeled Centers',
-    value: formatWhole(modeledCenterCount.value),
-    meta: 'With saved plans'
-  },
-  {
-    label: 'Without Plans',
-    value: formatWhole(centersWithoutPlansCount.value),
-    meta: 'Without saved plans'
-  },
-  {
-    label: 'Staffing Groups',
-    value: formatWhole(dashboardSummary.value.totalGroupCount),
-    meta: 'Planned teams'
-  },
-  {
-    label: 'Annual Plans',
-    value: formatWhole(dashboardSummary.value.totalPlanCount),
-    meta: 'Saved plan years'
-  },
-  {
-    label: 'Plan Coverage',
-    value: `${formatNumber(groupPlanCoveragePercent.value, 1)}%`,
-    meta: `${formatWhole(groupsWithoutPlansCount.value)} groups without saved plans`
-  },
-  {
-    label: 'Annual Contacts',
-    value: formatWhole(dashboardSummary.value.annualContacts),
-    meta: 'Modeled demand'
-  },
-  {
-    label: 'Workload Hours',
-    value: formatWhole(dashboardSummary.value.annualWorkloadHours),
-    meta: 'Annual workload'
-  },
-  {
-    label: 'Average AHT',
-    value: formatAht(dashboardSummary.value.averageAhtSeconds),
-    meta: 'Blended handle time'
-  },
-  {
-    label: 'Required Staff Hours',
-    value: formatWhole(dashboardSummary.value.totalNeededStaffHours),
-    meta: 'Staffing requirement'
-  },
-  {
-    label: 'Average Required Headcount',
-    value: formatNumber(dashboardSummary.value.totalAvgRequiredHeadcount, 1),
-    meta: 'Average requirement'
-  },
-  {
-    label: 'Peak Required Headcount',
-    value: formatNumber(dashboardSummary.value.totalPeakHeadcount, 1),
-    meta: 'Peak headcount'
-  }
-])
-
-const portfolioHeadcountChart = computed(() => {
-  const neededTotals = Array.from({ length: 12 }, () => 0)
-  const frontlineTotals = Array.from({ length: 12 }, () => 0)
-  const totalHeadcountTotals = Array.from({ length: 12 }, () => 0)
-
-  props.centers.forEach((center) => {
-    getCenterGroups(center).forEach((group) => {
-      const plan = getGroupPlans(group).find((item) => Number(item?.planningYear) === Number(selectedPlanningYear.value))
-
-      if (!plan) {
-        return
-      }
-
-      const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, selectedPlanningYear.value)
-
-      const monthlyRecords = computeMonthlyRecords({
-        planningYear: Number(selectedPlanningYear.value),
-        requirementMethod: plan?.requirementMethod,
-        demandSource: plan?.demandSource,
-        operatingWeekdays:
-          Array.isArray(plan.operatingWeekdays) && plan.operatingWeekdays.length
-            ? plan.operatingWeekdays
-            : Array.isArray(center.operatingWeekdays) && center.operatingWeekdays.length
-              ? center.operatingWeekdays
-            : [1, 2, 3, 4, 5],
-        holidayCalendarId: holidaySnapshot.holidayCalendarId,
-        disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
-        customHolidays: holidaySnapshot.customHolidays,
-        presenceMonths: Array.isArray(plan.presenceMonths) ? plan.presenceMonths : [],
-        randomDefaults: plan.randomDefaults || {},
-        useMonthlyRandomOverrides: Boolean(plan.useMonthlyRandomOverrides),
-        randomMonths: Array.isArray(plan.randomMonths) ? plan.randomMonths : [],
-        planMonths: Array.isArray(plan.planMonths) ? plan.planMonths : []
-      })
-      const staffingRecords = computeStaffingRecords(
-        monthlyRecords,
-        Number(selectedPlanningYear.value),
-        Number(plan.startingHeadcount) || 0,
-        Number(plan.startingFrontlineHeadcount) || 0,
-        Array.isArray(plan.staffingMonths) ? plan.staffingMonths : [],
-        Array.isArray(plan.trainingClasses) ? plan.trainingClasses : [],
-        plan.trainingSettings || {},
-        {
-          holidayCalendarId: holidaySnapshot.holidayCalendarId,
-          disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
-          customHolidays: holidaySnapshot.customHolidays
-        }
-      )
-
-      monthlyRecords.forEach((record, monthIndex) => {
-        neededTotals[monthIndex] += Number(record.requiredHeadcount) || 0
-      })
-
-      staffingRecords.forEach((record, monthIndex) => {
-        frontlineTotals[monthIndex] += Number(record.endingFrontlineHeadcount) || 0
-        totalHeadcountTotals[monthIndex] += Number(record.endingRosterHeadcount) || 0
-      })
-    })
-  })
-
-  return {
-    neededTotals,
-    frontlineTotals,
-    totalHeadcountTotals
-  }
+  return [
+    {
+      label: 'Call Centers',
+      value: formatWhole(summary.centerCount),
+      meta: `${formatWhole(modeledCenterCount.value)} with ${selectedPlanningYear.value} plans`,
+      icon: mdiOfficeBuildingOutline
+    },
+    {
+      label: 'Staffing Groups',
+      value: formatWhole(summary.groupCount),
+      meta: `${formatWhole(summary.plannedGroupCount)} planned`,
+      icon: mdiAccountGroupOutline
+    },
+    {
+      label: 'Plan Coverage',
+      value: `${formatWhole(summary.plannedGroupCount)}/${formatWhole(summary.groupCount)}`,
+      meta: `${formatNumber(summary.planCoveragePercent, 0)}% of groups`,
+      icon: mdiTarget
+    },
+    {
+      label: 'Actuals Coverage',
+      value: `${formatWhole(summary.groupsWithActualsCount)}/${formatWhole(summary.groupCount)}`,
+      meta: `${formatWhole(summary.monthsWithActualsCount)} of 12 months`,
+      icon: mdiChartLineVariant
+    },
+    {
+      label: 'Expected Contacts',
+      value: formatWhole(summary.expectedContacts),
+      meta: `${selectedPlanningYear.value} plan`,
+      icon: mdiGauge
+    },
+    {
+      label: 'Actual Contacts',
+      value: hasActuals ? formatWhole(summary.actualContacts) : '-',
+      meta: hasActuals ? 'Loaded actuals' : 'Waiting for actuals',
+      icon: mdiChartLineVariant
+    },
+    {
+      label: 'Staffing Gap',
+      value: formatOptionalSignedNumber(summary.averageGapToRequirement, 1),
+      meta: `${formatWhole(summary.monthsBelowRequirement)} months below requirement`,
+      icon: mdiTarget,
+      valueClass: signedValueClass(summary.averageGapToRequirement)
+    },
+    {
+      label: 'Peak Required HC',
+      value: formatNumber(summary.peakRequiredHeadcount, 1),
+      meta: `Avg ${formatNumber(summary.averageRequiredHeadcount, 1)}`,
+      icon: mdiAccountGroupOutline
+    }
+  ]
 })
 
 const centerMenuItems = [
@@ -326,6 +390,13 @@ const centerSettingsMinimumHolidayYear = computed(() => {
 
   return earliestYears.length ? Math.min(...earliestYears) : null
 })
+
+const statusPillClass = (tone) => ({
+  danger: 'border-rose-200 bg-rose-50 text-rose-700',
+  warning: 'border-amber-200 bg-amber-50 text-amber-700',
+  info: 'border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]',
+  success: 'border-emerald-200 bg-emerald-50 text-emerald-700'
+}[tone] || 'border-slate-200 bg-slate-50 text-slate-600')
 
 const openCreateCenter = () => {
   centerDraft.value = createPlanningCenterDraft()
@@ -366,7 +437,7 @@ const openCenter = (centerId) => {
 const requestDeleteCenter = (center) => {
   requestDeleteCenterConfirmation({
     title: 'Delete Call Center?',
-    description: `Delete "${center.name}"? This removes the call center and all ${center.summary.groupCount} staffing group${center.summary.groupCount === 1 ? '' : 's'} inside it.`,
+    description: `Delete "${center.name}"? This removes the call center and all ${center.groupCount} staffing group${center.groupCount === 1 ? '' : 's'} inside it.`,
     confirmLabel: 'Delete Call Center',
     onConfirm: () => {
       emit('delete-center', center.id)
@@ -394,9 +465,8 @@ const handleCenterMenuSelect = (center, item) => {
           { label: 'Home', href: '#home' },
           { label: 'Call Centers' }
         ]"
-        kicker="Planning Portfolio"
-        title="Call Centers"
-        description="Manage call centers, staffing groups, and saved annual plans."
+        title="Planning Portfolio"
+        description="Demand, actuals, staffing coverage, and call-center performance for the selected year."
       >
         <template #actions>
           <div class="flex flex-wrap items-end gap-2">
@@ -423,139 +493,229 @@ const handleCenterMenuSelect = (center, item) => {
         </template>
       </AppPageHeader>
 
-      <AppTableShell>
-        <div class="border-b border-slate-200 px-6 py-4">
-          <div class="grid gap-1">
-            <h2 class="text-xl font-semibold tracking-[-0.04em] text-slate-950">All Call Centers</h2>
-            <p class="text-sm text-slate-500">
-              {{ selectedPlanningYear }} plans ranked by peak requirement, then annual contact volume.
-            </p>
-          </div>
-        </div>
+      <AppPanel v-if="!props.centers.length">
+        <AppEmptyState
+          title="Create the first call center"
+          description="Create a call center, add staffing groups, then build annual plans so the portfolio view has data to compare."
+        />
+      </AppPanel>
 
-        <div v-if="!props.centers.length" class="px-6 py-6">
-          <AppEmptyState
-            class="gap-1.5 px-5 py-5"
-            title="Create the first call center"
-            description="Use New Center to create your first call center, then add staffing groups and annual plans beneath it."
+      <template v-else>
+        <section class="grid overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+          <article
+            v-for="item in portfolioCommandStats"
+            :key="item.label"
+            class="grid gap-2 border-b border-slate-200 px-4 py-3 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0 xl:border-r xl:last:border-r-0"
           >
-          </AppEmptyState>
+            <div class="flex items-center gap-2">
+              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[14px] border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]">
+                <AppIcon :path="item.icon" class="h-4 w-4" />
+              </span>
+              <span class="text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                {{ item.label }}
+              </span>
+            </div>
+            <strong
+              class="text-xl font-semibold tracking-[-0.04em]"
+              :class="item.valueClass || 'text-slate-950'"
+            >
+              {{ item.value }}
+            </strong>
+            <small class="text-[0.78rem] leading-4 text-slate-500">
+              {{ item.meta }}
+            </small>
+          </article>
+        </section>
+
+        <div class="grid gap-4">
+          <AppPanel :padded="false">
+            <div class="border-b border-slate-200 px-5 py-4">
+              <div class="grid gap-1">
+                <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">Portfolio Monthly Operating Plan</h2>
+                <p class="text-sm text-slate-500">
+                  All call centers combined for {{ selectedPlanningYear }}.
+                </p>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[76rem] border-collapse text-sm">
+                <thead class="border-b border-slate-200 bg-slate-50/85">
+                  <tr>
+                    <th scope="col" class="px-4 py-3 text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Month</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Plan Contacts</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Actual Contacts</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Variance</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Plan AHT</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Actual AHT</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Req HC</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Frontline HC</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Gap</th>
+                    <th scope="col" class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Actual Days</th>
+                  </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-200 bg-white">
+                  <tr
+                    v-for="row in portfolioMonthlyRows"
+                    :key="row.monthStart"
+                    class="transition hover:bg-slate-50/70"
+                    :class="row.isBelowRequirement ? 'bg-rose-50/35' : 'bg-white'"
+                  >
+                    <td class="px-4 py-3 font-semibold text-slate-950">{{ row.monthLabel }}</td>
+                    <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">{{ formatWhole(row.expectedContacts) }}</td>
+                    <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">{{ formatOptionalWhole(row.actualContacts) }}</td>
+                    <td
+                      class="px-4 py-3 text-right font-semibold tabular-nums"
+                      :class="signedValueClass(row.contactVariance, false)"
+                    >
+                      {{ formatOptionalSignedNumber(row.contactVariance, 0) }}
+                    </td>
+                    <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">{{ formatAht(row.expectedAhtSeconds) }}</td>
+                    <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">{{ formatAht(row.actualAhtSeconds) }}</td>
+                    <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">{{ formatNumber(row.requiredHeadcount, 1) }}</td>
+                    <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">{{ formatNumber(row.endingFrontlineHeadcount, 1) }}</td>
+                    <td
+                      class="px-4 py-3 text-right font-semibold tabular-nums"
+                      :class="signedValueClass(row.gapToRequirement)"
+                    >
+                      {{ formatOptionalSignedNumber(row.gapToRequirement, 1) }}
+                    </td>
+                    <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">
+                      {{ row.daysLoaded ? formatWhole(row.daysLoaded) : '-' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </AppPanel>
         </div>
 
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-[980px] w-full border-collapse text-sm text-slate-700">
-            <thead class="border-b border-slate-200 bg-slate-50/85">
-              <tr>
-                <th class="px-6 py-3.5 text-left text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Call Center
-                </th>
-                <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Annual Plans
-                </th>
-                <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Annual Contacts
-                </th>
-                <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Required Staff Hours
-                </th>
-                <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Average Required Headcount
-                </th>
-                <th class="px-4 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Peak Required Headcount
-                </th>
-                <th class="px-6 py-3.5 text-right text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200">
-              <tr
-                v-for="center in centerRows"
-                :key="center.id"
-                class="bg-white transition hover:bg-slate-50"
-              >
-                <td class="px-6 py-4 align-middle">
-                  <div class="grid grid-cols-[auto_1fr] items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-[20px] border border-slate-200 bg-slate-50 text-sm font-semibold text-[#15395f]">
-                      <AppIcon :path="mdiOfficeBuildingOutline" class="h-5 w-5" />
-                    </div>
-                    <div class="grid gap-1">
-                      <strong class="text-sm font-semibold text-slate-950">{{ center.name }}</strong>
-                      <div class="flex flex-wrap gap-2 text-xs text-slate-500">
-                        <span v-if="center.summary.totalPlanCount > 0">
-                          {{ center.summary.totalPlanCount === 1 ? `1 plan in ${selectedPlanningYear}` : `${formatWhole(center.summary.totalPlanCount)} plans in ${selectedPlanningYear}` }}
-                        </span>
-                        <span v-else>No {{ selectedPlanningYear }} plan</span>
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td class="px-4 py-4 text-right align-middle tabular-nums">
-                  {{ formatWhole(center.summary.totalPlanCount) }}
-                </td>
-                <td class="px-4 py-4 text-right align-middle tabular-nums">
-                  {{ center.summary.totalPlanCount > 0 ? formatWhole(center.summary.annualContacts) : '—' }}
-                </td>
-                <td class="px-4 py-4 text-right align-middle tabular-nums">
-                  {{ center.summary.totalPlanCount > 0 ? formatWhole(center.summary.totalNeededStaffHours) : '—' }}
-                </td>
-                <td class="px-4 py-4 text-right align-middle tabular-nums">
-                  {{ center.summary.totalPlanCount > 0 ? formatNumber(center.summary.totalAvgRequiredHeadcount, 1) : '—' }}
-                </td>
-                <td class="px-4 py-4 text-right align-middle tabular-nums font-medium text-slate-900">
-                  {{ center.summary.totalPlanCount > 0 ? formatNumber(center.summary.totalPeakHeadcount, 1) : '—' }}
-                </td>
-                <td class="px-6 py-4 align-middle">
-                  <div class="flex justify-end gap-2 whitespace-nowrap">
-                    <AppButton size="sm" variant="quiet" @click="openCenter(center.id)">Open</AppButton>
-                    <div @click.stop @keydown.stop>
-                      <AppMenu
-                        :items="centerMenuItems"
-                        :trigger-icon="mdiDotsVertical"
-                        :trigger-label="`Open actions for ${center.name}`"
-                        compact
-                        trigger-variant="icon-quiet"
-                        @select="handleCenterMenuSelect(center, $event)"
-                      />
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </AppTableShell>
+        <PlanningPortfolioHeadcountChart
+          :planning-year="selectedPlanningYear"
+          :needed-totals="portfolioHeadcountChart.neededTotals"
+          :starting-frontline-totals="portfolioHeadcountChart.startingFrontlineTotals"
+          :frontline-addition-totals="portfolioHeadcountChart.frontlineAdditionTotals"
+          :frontline-totals="portfolioHeadcountChart.frontlineTotals"
+          :total-headcount-totals="portfolioHeadcountChart.totalHeadcountTotals"
+          :hire-totals="portfolioHeadcountChart.hireTotals"
+          :attrition-totals="portfolioHeadcountChart.attritionTotals"
+          :format-number="formatNumber"
+        />
 
-      <AppPanel :padded="false">
-        <div class="grid gap-0">
+        <AppPanel :padded="false">
           <div class="border-b border-slate-200 px-5 py-4">
-            <div class="grid gap-2">
-              <AppSectionHeader
-                title="Portfolio Summary"
-                :description="`Combined demand and staffing requirement for ${selectedPlanningYear} across saved plans.`"
-              />
-              <p class="text-[0.82rem] font-medium leading-5 text-slate-500">
-                {{ formatWhole(modeledCenterCount) }} of {{ formatWhole(dashboardSummary.callCenterCount) }} call centers have {{ selectedPlanningYear }} plans
+            <div class="grid gap-1">
+              <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">Call Center Command List</h2>
+              <p class="text-sm text-slate-500">
+                Ranked by staffing risk, then peak requirement, then annual contact volume.
               </p>
             </div>
           </div>
 
-          <div class="px-5 py-4">
-            <AppStatStrip :items="summaryStripItems" columns="md:grid-cols-3 xl:grid-cols-6" />
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[78rem] border-collapse text-sm text-slate-700">
+              <thead class="border-b border-slate-200 bg-slate-50/85">
+                <tr>
+                  <th class="px-5 py-3.5 text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Call Center</th>
+                  <th class="px-4 py-3.5 text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Status</th>
+                  <th class="px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Plan Coverage</th>
+                  <th class="px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Actuals</th>
+                  <th class="px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Plan Contacts</th>
+                  <th class="px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Actual Vs Plan</th>
+                  <th class="px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Avg Req HC</th>
+                  <th class="px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Peak Req HC</th>
+                  <th class="px-4 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Staffing Gap</th>
+                  <th class="px-5 py-3.5 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 bg-white">
+                <tr
+                  v-for="center in centerCommandRows"
+                  :key="center.id"
+                  class="transition hover:bg-slate-50"
+                >
+                  <td class="px-5 py-4 align-middle">
+                    <div class="grid grid-cols-[auto_1fr] items-center gap-3">
+                      <div class="flex h-11 w-11 items-center justify-center rounded-[16px] border border-[#d5e0ea] bg-[#eef4f8] text-[#15395f]">
+                        <AppIcon :path="mdiOfficeBuildingOutline" class="h-5 w-5" />
+                      </div>
+                      <div class="grid gap-1">
+                        <strong class="text-sm font-semibold text-slate-950">{{ center.name }}</strong>
+                        <span class="text-xs text-slate-500">
+                          {{ formatWhole(center.groupCount) }} staffing group{{ center.groupCount === 1 ? '' : 's' }}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4 align-middle">
+                    <span
+                      class="inline-flex items-center rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em]"
+                      :class="statusPillClass(center.statusTone)"
+                    >
+                      {{ center.statusLabel }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-4 text-right align-middle tabular-nums">
+                    <div class="grid gap-0.5">
+                      <strong class="font-semibold text-slate-900">{{ center.planCoverageLabel }}</strong>
+                      <span class="text-xs text-slate-500">groups planned</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4 text-right align-middle tabular-nums">
+                    <div class="grid gap-0.5">
+                      <strong class="font-semibold text-slate-900">{{ center.actualsCoverageLabel }}</strong>
+                      <span class="text-xs text-slate-500">{{ center.actualsCoverageMeta }}</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4 text-right align-middle tabular-nums">
+                    {{ center.plannedGroupCount > 0 ? formatWhole(center.summary.expectedContacts) : '-' }}
+                  </td>
+                  <td
+                    class="px-4 py-4 text-right align-middle font-semibold tabular-nums"
+                    :class="signedValueClass(center.summary.contactVariance, false)"
+                  >
+                    <div class="grid gap-0.5">
+                      <span>{{ formatOptionalSignedNumber(center.summary.contactVariance, 0) }}</span>
+                      <span class="text-xs font-medium text-slate-500">{{ formatOptionalPercent(center.summary.contactVariancePercent, 1) }}</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4 text-right align-middle tabular-nums">
+                    {{ center.plannedGroupCount > 0 ? formatNumber(center.summary.averageRequiredHeadcount, 1) : '-' }}
+                  </td>
+                  <td class="px-4 py-4 text-right align-middle font-semibold tabular-nums text-slate-900">
+                    {{ center.plannedGroupCount > 0 ? formatNumber(center.summary.peakRequiredHeadcount, 1) : '-' }}
+                  </td>
+                  <td
+                    class="px-4 py-4 text-right align-middle font-semibold tabular-nums"
+                    :class="signedValueClass(center.summary.averageGapToRequirement)"
+                  >
+                    <div class="grid gap-0.5">
+                      <span>{{ center.plannedGroupCount > 0 ? formatOptionalSignedNumber(center.summary.averageGapToRequirement, 1) : '-' }}</span>
+                      <span class="text-xs font-medium text-slate-500">{{ formatWhole(center.summary.monthsBelowRequirement) }} months below</span>
+                    </div>
+                  </td>
+                  <td class="px-5 py-4 align-middle">
+                    <div class="flex justify-end gap-2 whitespace-nowrap">
+                      <AppButton size="sm" variant="quiet" @click="openCenter(center.id)">Open</AppButton>
+                      <div @click.stop @keydown.stop>
+                        <AppMenu
+                          :items="centerMenuItems"
+                          :trigger-icon="mdiDotsVertical"
+                          :trigger-label="`Open actions for ${center.name}`"
+                          compact
+                          trigger-variant="icon-quiet"
+                          @select="handleCenterMenuSelect(center, $event)"
+                        />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-
-          <div class="border-t border-slate-200 px-5 py-4">
-            <PlanningPortfolioHeadcountChart
-              :planning-year="selectedPlanningYear"
-              :needed-totals="portfolioHeadcountChart.neededTotals"
-              :frontline-totals="portfolioHeadcountChart.frontlineTotals"
-              :total-headcount-totals="portfolioHeadcountChart.totalHeadcountTotals"
-              :format-number="formatNumber"
-            />
-          </div>
-        </div>
-      </AppPanel>
+        </AppPanel>
+      </template>
     </div>
 
     <CallCenterSettingsModal

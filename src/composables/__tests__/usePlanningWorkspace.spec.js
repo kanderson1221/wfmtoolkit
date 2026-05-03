@@ -202,6 +202,55 @@ describe('usePlanningWorkspace', () => {
     expect(workspace.plannerDraftKey.value).toBe('user-1:plan:plan-1')
   })
 
+  it('resolves legacy actuals years when seeding group forecasts from planning', async () => {
+    planningRepository.loadWorkspace.mockResolvedValue([
+      {
+        ...centers[0],
+        groups: [
+          {
+            ...centers[0].groups[0],
+            actuals: undefined,
+            actualsYears: [
+              {
+                year: 2025,
+                sourceMode: 'daily_upload',
+                dailyRows: buildActualsRows()
+              }
+            ]
+          }
+        ]
+      }
+    ])
+
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'group-forecasts',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      year: 2026
+    })
+    const currentUser = ref({ id: 'user-1' })
+    const hasWorkspaceAccess = computed(() => true)
+    const storageScope = computed(() => currentUser.value.id)
+
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser,
+      hasWorkspaceAccess,
+      storageScope
+    })
+
+    await workspace.loadCentersForScope()
+    await nextTick()
+
+    expect(workspace.forecastSeed.value?.historyRows).toHaveLength(15)
+    expect(workspace.forecastSeed.value?.historyRows?.[0]).toMatchObject({
+      ds: '2025-01-01',
+      y: 900
+    })
+    expect(workspace.forecastSeed.value?.ahtHistoryRows).toHaveLength(15)
+  })
+
   it('preserves recurring holiday rule metadata when seeding a forecast from planning', async () => {
     const holidayTemplateCenters = [
       {

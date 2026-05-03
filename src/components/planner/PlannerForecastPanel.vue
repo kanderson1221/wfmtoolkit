@@ -55,6 +55,18 @@ const props = defineProps({
     type: String,
     default: 'success'
   },
+  readOnly: {
+    type: Boolean,
+    default: false
+  },
+  readOnlyMessage: {
+    type: String,
+    default: ''
+  },
+  requiresDailyForecast: {
+    type: Boolean,
+    default: false
+  },
   formatWhole: {
     type: Function,
     required: true
@@ -83,17 +95,40 @@ const hasAppliedForecast = computed(() =>
   Array.isArray(demandSource.value?.forecastMonthSnapshot) && demandSource.value.forecastMonthSnapshot.length > 0
 )
 const appliedForecastMatchesSelection = computed(() => demandSource.value?.forecastProjectId === selectedForecastProjectId.value)
-const selectedForecastHasCoverage = computed(() => (props.selectedForecastPreviewSummary?.matchedMonthCount || 0) > 0)
-const selectedForecastMissingMonthCount = computed(() =>
-  Math.max(Number(props.selectedForecastPreviewSummary?.missingMonthCount || 0), 0)
+const selectedForecastHasCoverage = computed(() =>
+  Boolean(props.selectedForecastPreviewSummary) &&
+  !props.selectedForecastPreviewSummary.missingCoverageLabel &&
+  (props.selectedForecastPreviewSummary?.matchedMonthCount || 0) > 0
 )
-const selectedForecastOverlapMonthCount = computed(() =>
-  Math.max(Number(props.selectedForecastPreviewSummary?.overlapMonthCount || 0), 0)
+const selectedForecastHasDailyRows = computed(() =>
+  !props.requiresDailyForecast || Number(props.selectedForecastPreviewSummary?.dailySnapshotCount || 0) > 0
+)
+const appliedForecastHasDailyRows = computed(() =>
+  !props.requiresDailyForecast || Number(props.currentDemandSourceSummary?.dailySnapshotCount || 0) > 0
+)
+const appliedForecastDailyRowsMissing = computed(() =>
+  props.requiresDailyForecast && hasAppliedForecast.value && !appliedForecastHasDailyRows.value
 )
 const shouldShowSelectedForecastPreview = computed(() =>
   Boolean(props.selectedForecastPreviewSummary) &&
   (!hasAppliedForecast.value || !appliedForecastMatchesSelection.value)
 )
+const demandSourceDescription = computed(() =>
+  props.readOnly
+    ? 'Review the forecast currently applied to this locked budget plan. Create an updated plan before changing forecast assumptions.'
+    : 'Review the forecast currently applied to this plan, or choose another saved staffing-group forecast to replace monthly contacts and starting AHT assumptions.'
+)
+const readOnlyForecastMessage = computed(() =>
+  props.readOnlyMessage || 'This plan is locked. Create an updated plan to change the applied forecast.'
+)
+const forecastItemGridClass = computed(() =>
+  props.requiresDailyForecast ? 'lg:grid-cols-6' : 'lg:grid-cols-5'
+)
+
+const formatDailyRowCount = (count) => {
+  const numericCount = Number(count || 0)
+  return numericCount > 0 ? `${props.formatWhole(numericCount)} daily rows` : 'Not available'
+}
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -119,7 +154,7 @@ const selectedForecastItems = computed(() => {
     return []
   }
 
-  return [
+  const items = [
     {
       label: 'Source',
       value: props.selectedForecastPreviewSummary.sourceKindLabel || 'Modeled'
@@ -130,7 +165,9 @@ const selectedForecastItems = computed(() => {
     },
     {
       label: 'Coverage',
-      value: props.selectedForecastPreviewSummary.coverageLabel || '0/12 months'
+      value: props.selectedForecastPreviewSummary.coverageStatusLabel ||
+        props.selectedForecastPreviewSummary.coverageLabel ||
+        'Covers 0 required months'
     },
     {
       label: 'Forecast Contacts',
@@ -143,6 +180,15 @@ const selectedForecastItems = computed(() => {
         : '—'
     }
   ]
+
+  if (props.requiresDailyForecast) {
+    items.push({
+      label: 'Daily Rows',
+      value: formatDailyRowCount(props.selectedForecastPreviewSummary.dailySnapshotCount)
+    })
+  }
+
+  return items
 })
 
 const selectedForecastSummaryLine = computed(() => {
@@ -153,8 +199,18 @@ const selectedForecastSummaryLine = computed(() => {
   return [
     props.selectedForecastPreviewSummary.sourceKindLabel || '',
     getForecastTypeLabel(props.selectedForecastPreviewSummary.forecastType),
-    props.selectedForecastPreviewSummary.coverageLabel || '0/12 months',
+    props.selectedForecastPreviewSummary.coverageStatusLabel ||
+      props.selectedForecastPreviewSummary.coverageLabel ||
+      'Covers 0 required months',
+    props.selectedForecastPreviewSummary.missingCoverageLabel || '',
     props.selectedForecastPreviewSummary.coverageWindowLabel || '',
+    props.requiresDailyForecast
+      ? (
+          Number(props.selectedForecastPreviewSummary.dailySnapshotCount || 0) > 0
+            ? 'Daily rows available for Intraday Erlang'
+            : 'Daily rows unavailable for Intraday Erlang'
+        )
+      : '',
     `${props.formatWhole(props.selectedForecastPreviewSummary.totalContacts)} contacts`,
     props.selectedForecastPreviewSummary.peakMonthLabel
       ? `Peak ${props.selectedForecastPreviewSummary.peakMonthLabel}`
@@ -170,7 +226,7 @@ const appliedForecastItems = computed(() => {
     return []
   }
 
-  return [
+  const items = [
     {
       label: 'Source',
       value: props.currentDemandSourceSummary.sourceKindLabel || 'Saved Forecast'
@@ -194,6 +250,15 @@ const appliedForecastItems = computed(() => {
         : '—'
     }
   ]
+
+  if (props.requiresDailyForecast) {
+    items.push({
+      label: 'Daily Rows',
+      value: formatDailyRowCount(props.currentDemandSourceSummary.dailySnapshotCount)
+    })
+  }
+
+  return items
 })
 
 const appliedForecastSummaryLine = computed(() => {
@@ -206,6 +271,13 @@ const appliedForecastSummaryLine = computed(() => {
     getForecastTypeLabel(props.currentDemandSourceSummary.forecastType),
     props.currentDemandSourceSummary.coverageLabel || '0/12 months',
     props.currentDemandSourceSummary.coverageWindowLabel || '',
+    props.requiresDailyForecast
+      ? (
+          Number(props.currentDemandSourceSummary.dailySnapshotCount || 0) > 0
+            ? 'Daily rows available for Intraday Erlang'
+            : 'Daily rows unavailable for Intraday Erlang'
+        )
+      : '',
     `${props.formatWhole(props.currentDemandSourceSummary.totalContacts)} contacts`,
     props.currentDemandSourceSummary.peakMonthLabel
       ? `Peak ${props.currentDemandSourceSummary.peakMonthLabel}`
@@ -239,6 +311,10 @@ const selectForecastPrompt = computed(() =>
     ? 'Select another saved forecast to preview and replace the currently applied source.'
     : 'Select a saved forecast to preview its coverage for this plan year.'
 )
+const applyForecastButtonLabel = computed(() => {
+  const target = props.requiresDailyForecast ? 'Contacts, AHT & Daily Rows' : 'Contacts & AHT'
+  return `${hasAppliedForecast.value ? 'Reapply' : 'Apply'} Forecast to ${target}`
+})
 </script>
 
 <template>
@@ -247,7 +323,7 @@ const selectForecastPrompt = computed(() =>
 
     <AppWorkspaceSection
       title="Demand Source"
-      description="Review the forecast currently applied to this plan, or choose another saved staffing-group forecast to replace monthly contacts and starting AHT assumptions."
+      :description="demandSourceDescription"
     >
       <template v-if="props.hasLegacyManualDemandSource">
         <div class="grid gap-4">
@@ -255,7 +331,11 @@ const selectForecastPrompt = computed(() =>
             This plan still uses legacy manual monthly contacts. Convert them into a saved staffing-group monthly forecast to keep demand sourcing in one place.
           </AppStatusMessage>
 
-          <div class="grid gap-2 border-t border-slate-200 pt-4">
+          <AppStatusMessage v-if="props.readOnly" tone="info">
+            {{ readOnlyForecastMessage }}
+          </AppStatusMessage>
+
+          <div v-else class="grid gap-2 border-t border-slate-200 pt-4">
             <p class="text-sm text-slate-600">
               {{ props.formatWhole(props.legacyManualSummary?.totalContacts || 0) }} contacts across
               {{ props.formatWhole(props.legacyManualSummary?.monthCount || 0) }} months will be saved as a monthly forecast artifact.
@@ -316,9 +396,16 @@ const selectForecastPrompt = computed(() =>
             {{ deletedForecastNote }}
           </p>
 
+          <AppStatusMessage v-if="appliedForecastDailyRowsMissing" tone="error">
+            Forecast monthly values are applied, but daily rows are not available for Intraday Erlang. Apply a modeled or imported daily forecast before running Erlang.
+          </AppStatusMessage>
+
           <div
             v-if="appliedForecastItems.length"
-            class="grid gap-0 overflow-hidden border-t border-slate-200 md:grid-cols-2 lg:grid-cols-5 lg:divide-x lg:divide-slate-200"
+            :class="[
+              'grid gap-0 overflow-hidden border-t border-slate-200 md:grid-cols-2 lg:divide-x lg:divide-slate-200',
+              forecastItemGridClass
+            ]"
           >
             <div
               v-for="item in appliedForecastItems"
@@ -335,21 +422,30 @@ const selectForecastPrompt = computed(() =>
           </div>
         </div>
 
-        <AppStatusMessage v-if="props.forecastsLoading">
-          Loading saved forecasts for this staffing group.
+        <AppStatusMessage v-if="props.readOnly" tone="info">
+          {{ readOnlyForecastMessage }}
         </AppStatusMessage>
 
-        <AppStatusMessage v-else-if="props.forecastsError" tone="error">
-          {{ props.forecastsError }}
-        </AppStatusMessage>
+        <template v-else-if="props.forecastsLoading">
+          <AppStatusMessage>
+            Loading saved forecasts for this staffing group.
+          </AppStatusMessage>
+        </template>
 
-        <AppEmptyState
-          v-else-if="!hasForecastChoices"
-          :title="hasSavedForecastProjects ? 'No completed forecasts available' : 'No saved forecasts available'"
-          :description="hasSavedForecastProjects
-            ? 'A saved forecast exists, but it needs a completed monthly rollup before it can be applied here.'
-            : 'Create and save a staffing-group forecast first, then return here to apply it to the plan.'"
-        />
+        <template v-else-if="props.forecastsError">
+          <AppStatusMessage tone="error">
+            {{ props.forecastsError }}
+          </AppStatusMessage>
+        </template>
+
+        <template v-else-if="!hasForecastChoices">
+          <AppEmptyState
+            :title="hasSavedForecastProjects ? 'No completed forecasts available' : 'No saved forecasts available'"
+            :description="hasSavedForecastProjects
+              ? 'A saved forecast exists, but it needs a completed monthly rollup before it can be applied here.'
+              : 'Create and save a staffing-group forecast first, then return here to apply it to the plan.'"
+          />
+        </template>
 
         <template v-else>
           <div class="grid gap-4">
@@ -373,7 +469,7 @@ const selectForecastPrompt = computed(() =>
                   :disabled="!props.forecastCanApply"
                   @click="emit('apply-forecast')"
                 >
-                  {{ hasAppliedForecast ? 'Reapply Forecast to Contacts & AHT' : 'Apply Forecast to Contacts & AHT' }}
+                  {{ applyForecastButtonLabel }}
                 </AppButton>
               </div>
             </div>
@@ -393,7 +489,14 @@ const selectForecastPrompt = computed(() =>
               v-else-if="shouldShowSelectedForecastPreview && !selectedForecastHasCoverage"
               tone="error"
             >
-              The selected forecast does not include monthly rollup rows for this plan year.
+              {{ props.selectedForecastPreviewSummary?.missingCoverageLabel || 'The selected forecast does not include the monthly rollup rows this plan needs.' }}
+            </AppStatusMessage>
+
+            <AppStatusMessage
+              v-else-if="shouldShowSelectedForecastPreview && !selectedForecastHasDailyRows"
+              tone="error"
+            >
+              This forecast does not include daily rows, so it cannot run Intraday Erlang. Select a modeled or imported daily forecast.
             </AppStatusMessage>
 
             <div
@@ -419,29 +522,12 @@ const selectForecastPrompt = computed(() =>
                 </p>
               </div>
 
-              <div class="grid gap-2">
-                <AppStatusMessage
-                  v-if="selectedForecastOverlapMonthCount"
-                  tone="warning"
-                >
-                  {{ selectedForecastOverlapMonthCount }} already actualized
-                  {{ selectedForecastOverlapMonthCount === 1 ? 'month is' : 'months are' }}
-                  excluded from this import.
-                </AppStatusMessage>
-
-                <AppStatusMessage
-                  v-if="selectedForecastMissingMonthCount"
-                  tone="warning"
-                >
-                  This forecast is missing {{ selectedForecastMissingMonthCount }} future
-                  {{ selectedForecastMissingMonthCount === 1 ? 'month' : 'months' }}
-                  for this plan.
-                </AppStatusMessage>
-              </div>
-
               <div
                 v-if="selectedForecastItems.length"
-                class="grid gap-0 overflow-hidden border-t border-slate-200 lg:grid-cols-5 lg:divide-x lg:divide-slate-200"
+                :class="[
+                  'grid gap-0 overflow-hidden border-t border-slate-200 lg:divide-x lg:divide-slate-200',
+                  forecastItemGridClass
+                ]"
               >
                 <div
                   v-for="item in selectedForecastItems"

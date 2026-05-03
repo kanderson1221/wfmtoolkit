@@ -3,7 +3,6 @@ import { computed } from 'vue'
 
 import CsvBatchCalculator from './CsvBatchCalculator.vue'
 import ErlangCForm from './ErlangCForm.vue'
-import ForecastingWorkspace from './ForecastingWorkspace.vue'
 import AppOptionPills from './ui/AppOptionPills.vue'
 import AppPanel from './ui/AppPanel.vue'
 import AppPageHeader from './ui/AppPageHeader.vue'
@@ -37,8 +36,6 @@ const activeToolTitle = computed(() =>
   erlangTools.find((tab) => tab.id === props.activeTool)?.title || 'Erlang Calculators'
 )
 
-const showErlangWorkspace = computed(() => props.activeTool !== 'forecasting')
-
 const erlangToolItems = computed(() =>
   erlangTools.map((tab) => ({
     id: tab.id,
@@ -54,9 +51,6 @@ const activeToolSelection = computed({
 </script>
 
 <template>
-  <ForecastingWorkspace v-if="!showErlangWorkspace" :storage-scope="props.storageScope" />
-
-  <template v-else>
   <section class="bg-slate-50/80 py-2">
     <div class="app-frame grid gap-3">
       <AppPageHeader
@@ -87,5 +81,4 @@ const activeToolSelection = computed({
 
   <ErlangCForm v-if="props.activeTool === 'interval'" />
   <CsvBatchCalculator v-else-if="props.activeTool === 'batch'" />
-  </template>
 </template>

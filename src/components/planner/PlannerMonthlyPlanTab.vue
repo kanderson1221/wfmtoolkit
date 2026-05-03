@@ -93,6 +93,11 @@ const selectedMonth = computed(
 const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
 const requirementTitle = computed(() => 'Demand Model')
 const previousLabel = computed(() => isIntradayErlang.value ? 'Back to Erlang Inputs' : 'Back to Random/Variability')
+const appliedDailyForecastRowCount = computed(() =>
+  Array.isArray(props.demandSource?.forecastDailySnapshot)
+    ? props.demandSource.forecastDailySnapshot.length
+    : 0
+)
 
 const parseFiniteNumber = (value) => {
   const number = Number(value)
@@ -530,7 +535,11 @@ const summaryColumns = computed(() =>
 const contactsSourceMessage = computed(() => {
   if (isIntradayErlang.value) {
     if (props.demandSource?.mode === DEMAND_SOURCE_FORECAST && props.currentDemandSourceSummary?.projectName) {
-      return `Daily contacts and monthly AHT assumptions come from ${props.currentDemandSourceSummary.projectName}. Intraday Erlang uses those forecast-owned inputs as read-only demand.`
+      if (appliedDailyForecastRowCount.value > 0) {
+        return `Forecast monthly values are applied from ${props.currentDemandSourceSummary.projectName}. ${props.formatWhole(appliedDailyForecastRowCount.value)} daily rows are available for Intraday Erlang.`
+      }
+
+      return `Forecast monthly values are applied from ${props.currentDemandSourceSummary.projectName}, but daily rows are missing. Apply a modeled or imported daily forecast before running Intraday Erlang.`
     }
 
     return 'Intraday Erlang plans require an applied daily forecast. Contacts and monthly AHT assumptions are forecast-owned in this mode.'

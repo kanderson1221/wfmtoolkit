@@ -139,17 +139,29 @@ describe('CallCenterSettingsModal', () => {
     expect(wrapper.props('holidayProfiles')[0].customHolidays.some((holiday) => holiday.date.startsWith('2027-'))).toBe(true)
   })
 
-  it('includes historical years down to the earliest staffing-group data year', () => {
+  it('includes seven historical and seven future holiday years around the selected year', () => {
     const wrapper = mountModal({
-      displayYear: 2026,
-      minimumHolidayYear: 2023
+      displayYear: 2026
     })
 
     const holidayYearSelect = wrapper.find('#holiday-year')
     const optionValues = holidayYearSelect.findAll('option').map((option) => option.element.value)
 
-    expect(optionValues).toContain('2023')
-    expect(optionValues).toContain('2031')
+    expect(optionValues).toContain('2019')
+    expect(optionValues).toContain('2033')
+  })
+
+  it('still extends historical years down to the earliest staffing-group data year when needed', () => {
+    const wrapper = mountModal({
+      displayYear: 2026,
+      minimumHolidayYear: 2017
+    })
+
+    const holidayYearSelect = wrapper.find('#holiday-year')
+    const optionValues = holidayYearSelect.findAll('option').map((option) => option.element.value)
+
+    expect(optionValues).toContain('2017')
+    expect(optionValues).toContain('2033')
   })
 
   it('renders holiday rows in a compact shared-header layout', () => {

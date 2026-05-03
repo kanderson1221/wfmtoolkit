@@ -36,7 +36,7 @@ const handleSelect = (item) => {
     v-model:visible="visible"
     kicker="New Forecast"
     title="Choose Forecast Source"
-    description="Create a staffing-group forecast from modeled history, an imported daily file, or monthly contacts."
+    description="Create a staffing-group forecast from modeled history, imported daily contacts and AHT, or monthly contacts."
     allow-backdrop-close
     max-width="max-w-3xl"
     @close="emit('close')"

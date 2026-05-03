@@ -162,7 +162,8 @@ const buildProjectSeedForSourceKind = (sourceKind) =>
   createForecastProject({
     ...(props.projectSeed || {}),
     sourceKind,
-    forecastType: FORECAST_TYPE_BUDGET
+    forecastType: FORECAST_TYPE_BUDGET,
+    coverageStartMonthIndex: 0
   })
 
 const handleCreateProjectFromSourceKind = (sourceKind) => {
@@ -245,17 +246,18 @@ const saveReadOnlyProject = async (nextProject, successMessage = 'Forecast saved
   return saveCurrentProject(successMessage)
 }
 
-const handleApplyImportedDaily = async ({ sourceData, importedDailyRows } = {}) => {
+const handleApplyImportedDaily = async ({ sourceData, importedDailyRows, ahtMonthOverrides } = {}) => {
   const isReplacingCurrentProject = getForecastProjectSourceKind(currentProject.value) === FORECAST_SOURCE_IMPORTED_DAILY
   const baseProject = isReplacingCurrentProject
     ? createForecastProject(currentProject.value)
     : buildProjectSeedForSourceKind(FORECAST_SOURCE_IMPORTED_DAILY)
   const nextForecastType = FORECAST_TYPE_BUDGET
+  const nextCoverageStartMonthIndex = baseProject.coverageStartMonthIndex ?? 0
   const lastRun = createImportedDailyForecastResults({
     rows: importedDailyRows,
     planningYear: baseProject.planningYear,
     forecastType: nextForecastType,
-    coverageStartMonthIndex: baseProject.coverageStartMonthIndex,
+    coverageStartMonthIndex: nextCoverageStartMonthIndex,
     coverageStartDate: baseProject.coverageStartDate,
     coverageEndDate: baseProject.coverageEndDate
   })
@@ -263,6 +265,7 @@ const handleApplyImportedDaily = async ({ sourceData, importedDailyRows } = {}) 
     ...baseProject,
     sourceKind: FORECAST_SOURCE_IMPORTED_DAILY,
     forecastType: nextForecastType,
+    coverageStartMonthIndex: nextCoverageStartMonthIndex,
     uploadedFileName: '',
     uploadedHeaders: [],
     uploadedRows: [],
@@ -270,6 +273,12 @@ const handleApplyImportedDaily = async ({ sourceData, importedDailyRows } = {}) 
     parserIssues: [],
     normalizationIssues: [],
     manualAdjustments: [],
+    modelConfig: {
+      ...baseProject.modelConfig,
+      ahtMonthOverrides: Array.isArray(ahtMonthOverrides)
+        ? ahtMonthOverrides.map((row) => ({ ...row }))
+        : []
+    },
     sourceData,
     lastRun
   })
@@ -287,11 +296,12 @@ const handleApplyManualMonthly = async ({ monthlyRows } = {}) => {
     ? createForecastProject(currentProject.value)
     : buildProjectSeedForSourceKind(FORECAST_SOURCE_MANUAL_MONTHLY)
   const nextForecastType = FORECAST_TYPE_BUDGET
+  const nextCoverageStartMonthIndex = baseProject.coverageStartMonthIndex ?? 0
   const lastRun = createManualMonthlyForecastResults({
     rows: monthlyRows,
     planningYear: baseProject.planningYear,
     forecastType: nextForecastType,
-    coverageStartMonthIndex: baseProject.coverageStartMonthIndex,
+    coverageStartMonthIndex: nextCoverageStartMonthIndex,
     coverageStartDate: baseProject.coverageStartDate,
     coverageEndDate: baseProject.coverageEndDate
   })
@@ -299,6 +309,7 @@ const handleApplyManualMonthly = async ({ monthlyRows } = {}) => {
     ...baseProject,
     sourceKind: FORECAST_SOURCE_MANUAL_MONTHLY,
     forecastType: nextForecastType,
+    coverageStartMonthIndex: nextCoverageStartMonthIndex,
     uploadedFileName: '',
     uploadedHeaders: [],
     uploadedRows: [],

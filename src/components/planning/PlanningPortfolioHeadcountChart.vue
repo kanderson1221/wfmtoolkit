@@ -1,6 +1,7 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
+import AppChart from '../ui/AppChart.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import { MONTH_LABELS } from '../../planner/shared'
@@ -14,11 +15,27 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  startingFrontlineTotals: {
+    type: Array,
+    default: () => []
+  },
+  frontlineAdditionTotals: {
+    type: Array,
+    default: () => []
+  },
   frontlineTotals: {
     type: Array,
     default: () => []
   },
   totalHeadcountTotals: {
+    type: Array,
+    default: () => []
+  },
+  hireTotals: {
+    type: Array,
+    default: () => []
+  },
+  attritionTotals: {
     type: Array,
     default: () => []
   },
@@ -28,368 +45,350 @@ const props = defineProps({
   }
 })
 
-const chartWidth = 960
-const chartHeight = 320
-const chartPadding = {
-  top: 20,
-  right: 20,
-  bottom: 50,
-  left: 56
+const toNumber = (value) => {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : 0
 }
 
-const niceChartMax = (value) => {
-  const numericValue = Number(value) || 0
-  if (numericValue <= 0) {
-    return 1
-  }
-
-  const magnitude = 10 ** Math.floor(Math.log10(numericValue))
-  const normalized = numericValue / magnitude
-
-  if (normalized <= 1) return 1 * magnitude
-  if (normalized <= 2) return 2 * magnitude
-  if (normalized <= 5) return 5 * magnitude
-  return 10 * magnitude
-}
-
-const tooltipRef = ref(null)
-const activeTooltip = ref(null)
-
-const monthlyTotals = computed(() =>
-  MONTH_LABELS.map((_, monthIndex) => Number(props.neededTotals?.[monthIndex]) || 0)
-)
-
-const chartMax = computed(() =>
-  niceChartMax(
-    Math.max(
-      ...monthlyTotals.value,
-      ...(Array.isArray(props.frontlineTotals) ? props.frontlineTotals : []),
-      ...(Array.isArray(props.totalHeadcountTotals) ? props.totalHeadcountTotals : []),
-      0
-    )
-  )
-)
-
-const yTicks = computed(() => {
-  const tickCount = 4
-  return Array.from({ length: tickCount + 1 }, (_, index) => {
-    const value = (chartMax.value / tickCount) * index
-    const y =
-      chartHeight -
-      chartPadding.bottom -
-      (value / chartMax.value) * (chartHeight - chartPadding.top - chartPadding.bottom)
-
-    return {
-      value,
-      y
-    }
-  })
-})
-
-const scaleY = (value) =>
-  chartHeight -
-  chartPadding.bottom -
-  ((Number(value) || 0) / chartMax.value) * (chartHeight - chartPadding.top - chartPadding.bottom)
-
-const chartBars = computed(() => {
-  const plotWidth = chartWidth - chartPadding.left - chartPadding.right
-  const stepWidth = plotWidth / MONTH_LABELS.length
-  const barWidth = Math.min(42, stepWidth * 0.62)
-
-  return MONTH_LABELS.map((label, monthIndex) => {
-    const x = chartPadding.left + monthIndex * stepWidth + (stepWidth - barWidth) / 2
-    const total = Number(props.neededTotals?.[monthIndex]) || 0
+const monthlyMovementRows = computed(() =>
+  MONTH_LABELS.map((label, monthIndex) => {
+    const opening = toNumber(props.startingFrontlineTotals?.[monthIndex])
+    const additions = toNumber(props.frontlineAdditionTotals?.[monthIndex])
+    const hiresStarted = toNumber(props.hireTotals?.[monthIndex])
+    const attrition = toNumber(props.attritionTotals?.[monthIndex])
+    const ending = toNumber(props.frontlineTotals?.[monthIndex])
+    const required = toNumber(props.neededTotals?.[monthIndex])
+    const roster = toNumber(props.totalHeadcountTotals?.[monthIndex])
 
     return {
       label,
-      monthIndex,
-      total,
-      totalY: scaleY(total),
-      totalX: x + barWidth / 2,
-      x,
-      width: barWidth,
-      y: scaleY(total),
-      height: Math.max(chartHeight - chartPadding.bottom - scaleY(total), 0)
+      opening,
+      additions,
+      hiresStarted,
+      attrition,
+      ending,
+      required,
+      roster
     }
   })
-})
-
-const linePoints = computed(() =>
-  chartBars.value.map((bar) => ({
-    label: bar.label,
-    monthIndex: bar.monthIndex,
-    x: bar.totalX,
-    neededHeadcount: bar.total,
-    neededY: bar.totalY,
-    frontlineHeadcount: Number(props.frontlineTotals?.[bar.monthIndex]) || 0,
-    frontlineY: scaleY(props.frontlineTotals?.[bar.monthIndex] || 0),
-    totalHeadcount: Number(props.totalHeadcountTotals?.[bar.monthIndex]) || 0,
-    totalY: scaleY(props.totalHeadcountTotals?.[bar.monthIndex] || 0)
-  }))
 )
-
-const buildLinePath = (type) =>
-  linePoints.value
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${type === 'frontline' ? point.frontlineY : point.totalY}`)
-    .join(' ')
 
 const hasData = computed(() =>
-  monthlyTotals.value.some((value) => value > 0) ||
-  (Array.isArray(props.frontlineTotals) && props.frontlineTotals.some((value) => Number(value) > 0)) ||
-  (Array.isArray(props.totalHeadcountTotals) && props.totalHeadcountTotals.some((value) => Number(value) > 0))
+  monthlyMovementRows.value.some((row) =>
+    row.opening > 0 ||
+    row.additions > 0 ||
+    row.hiresStarted > 0 ||
+    row.attrition > 0 ||
+    row.ending > 0 ||
+    row.required > 0 ||
+    row.roster > 0
+  )
 )
 
-const updateTooltipPosition = (event) => {
-  if (!tooltipRef.value || !activeTooltip.value) {
-    return
+const formatHeadcount = (value) => props.formatNumber(value, 1)
+
+const waterfallSteps = computed(() =>
+  monthlyMovementRows.value.flatMap((row) => [
+    {
+      row,
+      step: 'opening',
+      stepLabel: 'Opening Frontline',
+      shortLabel: 'Open',
+      categoryLabel: `${row.label} Opening`,
+      offset: 0,
+      value: row.opening
+    },
+    {
+      row,
+      step: 'additions',
+      stepLabel: 'Frontline Additions',
+      shortLabel: '+',
+      categoryLabel: `${row.label} Additions`,
+      offset: row.opening,
+      value: row.additions
+    },
+    {
+      row,
+      step: 'attrition',
+      stepLabel: 'Attrition',
+      shortLabel: '-',
+      categoryLabel: `${row.label} Attrition`,
+      offset: row.ending,
+      value: row.attrition
+    },
+    {
+      row,
+      step: 'ending',
+      stepLabel: 'Ending Frontline',
+      shortLabel: 'End',
+      categoryLabel: `${row.label} Ending`,
+      offset: 0,
+      value: row.ending
+    }
+  ])
+)
+
+const buildTooltip = (params) => {
+  const dataIndex = Array.isArray(params)
+    ? params.find((item) => item?.dataIndex != null)?.dataIndex
+    : params?.dataIndex
+  const step = waterfallSteps.value[dataIndex]
+
+  if (!step?.row) {
+    return ''
   }
 
-  const containerRect = tooltipRef.value.parentElement?.getBoundingClientRect?.()
-  if (!containerRect) {
-    return
+  const { row } = step
+  const lines = [
+    `<div class="font-semibold text-white">${row.label} ${props.planningYear} · ${step.stepLabel}</div>`,
+    `<div>Opening frontline: ${formatHeadcount(row.opening)}</div>`,
+    `<div>Frontline additions: +${formatHeadcount(row.additions)}</div>`,
+    `<div>Attrition: -${formatHeadcount(row.attrition)}</div>`,
+    `<div>Ending frontline: ${formatHeadcount(row.ending)}</div>`,
+    `<div>Required headcount: ${formatHeadcount(row.required)}</div>`,
+    `<div>Roster headcount: ${formatHeadcount(row.roster)}</div>`
+  ]
+
+  if (row.hiresStarted > 0) {
+    lines.push(`<div>Hires started: ${formatHeadcount(row.hiresStarted)}</div>`)
   }
 
-  const tooltipWidth = 220
-  const tooltipHeight = 96
-  const nextLeft = Math.min(
-    Math.max(event.clientX - containerRect.left + 16, 12),
-    containerRect.width - tooltipWidth - 12
-  )
-  const nextTop = Math.min(
-    Math.max(event.clientY - containerRect.top - tooltipHeight - 10, 12),
-    containerRect.height - tooltipHeight - 12
-  )
-
-  activeTooltip.value = {
-    ...activeTooltip.value,
-    left: nextLeft,
-    top: nextTop
-  }
+  return lines.join('')
 }
 
-const showSegmentTooltip = (bar, event) => {
-  activeTooltip.value = {
-    monthLabel: bar.label,
-    neededHeadcount: bar.total,
-    frontlineHeadcount: Number(props.frontlineTotals?.[bar.monthIndex]) || 0,
-    totalHeadcount: Number(props.totalHeadcountTotals?.[bar.monthIndex]) || 0,
-    left: 0,
-    top: 0
+const offsetBar = (data) => ({
+  name: '__Waterfall Offset',
+  type: 'bar',
+  stack: 'waterfall',
+  data,
+  barWidth: 22,
+  silent: true,
+  legendHoverLink: false,
+  tooltip: {
+    show: false
+  },
+  itemStyle: {
+    color: 'transparent',
+    borderColor: 'transparent'
+  },
+  emphasis: {
+    disabled: true
   }
+})
 
-  updateTooltipPosition(event)
-}
+const waterfallBar = ({ name, data, color, borderRadius = [4, 4, 2, 2] }) => ({
+  name,
+  type: 'bar',
+  stack: 'waterfall',
+  data,
+  barWidth: 22,
+  itemStyle: {
+    color,
+    borderColor: color,
+    borderWidth: 1,
+    borderRadius
+  },
+  emphasis: {
+    focus: 'series',
+    itemStyle: {
+      shadowBlur: 10,
+      shadowColor: 'rgba(15, 23, 42, 0.18)'
+    }
+  },
+  z: 3
+})
 
-const showLineTooltip = (point, event) => {
-  activeTooltip.value = {
-    monthLabel: point.label,
-    neededHeadcount: point.neededHeadcount,
-    frontlineHeadcount: point.frontlineHeadcount,
-    totalHeadcount: point.totalHeadcount,
-    left: 0,
-    top: 0
+const lineSeries = ({ name, data, color, dashed = false }) => ({
+  name,
+  type: 'line',
+  data,
+  smooth: false,
+  symbol: 'circle',
+  symbolSize: 7,
+  showSymbol: true,
+  lineStyle: {
+    color,
+    width: 2.5,
+    type: dashed ? 'dashed' : 'solid'
+  },
+  itemStyle: {
+    color,
+    borderColor: '#ffffff',
+    borderWidth: 2
+  },
+  emphasis: {
+    focus: 'series'
+  },
+  z: 6
+})
+
+const chartOption = computed(() => {
+  const categories = waterfallSteps.value.map((step) => step.categoryLabel)
+  const offsetData = waterfallSteps.value.map((step) => step.offset)
+  const dataForStep = (stepName) =>
+    waterfallSteps.value.map((step) => (step.step === stepName ? step.value : '-'))
+  const requiredData = waterfallSteps.value.map((step) => step.row.required)
+  const rosterData = waterfallSteps.value.map((step) => step.row.roster)
+
+  return {
+    animation: false,
+    color: ['#15395f', '#15803d', '#e11d48', '#2563eb', '#0f172a', '#64748b'],
+    grid: {
+      left: 58,
+      right: 24,
+      top: 70,
+      bottom: 52
+    },
+    legend: {
+      top: 8,
+      left: 6,
+      itemWidth: 16,
+      itemHeight: 10,
+      itemGap: 16,
+      textStyle: {
+        color: '#334155',
+        fontFamily: 'inherit',
+        fontSize: 12,
+        fontWeight: 600
+      },
+      data: [
+        'Opening Frontline',
+        'Frontline Additions',
+        'Attrition',
+        'Ending Frontline',
+        'Required Headcount',
+        'Roster Headcount'
+      ]
+    },
+    tooltip: {
+      trigger: 'axis',
+      confine: true,
+      backgroundColor: '#0f172a',
+      borderColor: '#0f172a',
+      textStyle: {
+        color: '#e2e8f0',
+        fontFamily: 'inherit',
+        fontSize: 12
+      },
+      axisPointer: {
+        type: 'shadow',
+        shadowStyle: {
+          color: 'rgba(15, 57, 95, 0.08)'
+        }
+      },
+      formatter: buildTooltip
+    },
+    xAxis: {
+      type: 'category',
+      data: categories,
+      axisTick: {
+        show: false
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#cbd5e1'
+        }
+      },
+      axisLabel: {
+        color: '#64748b',
+        fontFamily: 'inherit',
+        fontSize: 11,
+        fontWeight: 700,
+        interval: 0,
+        formatter: (_value, index) => {
+          const step = waterfallSteps.value[index]
+          if (!step) {
+            return ''
+          }
+
+          return step.step === 'opening'
+            ? `${step.row.label}\n${step.shortLabel}`
+            : step.shortLabel
+        }
+      }
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      splitNumber: 4,
+      axisLine: {
+        show: false
+      },
+      axisTick: {
+        show: false
+      },
+      axisLabel: {
+        color: '#64748b',
+        fontFamily: 'inherit',
+        fontSize: 12,
+        fontWeight: 600,
+        formatter: (value) => formatHeadcount(value)
+      },
+      splitLine: {
+        lineStyle: {
+          color: '#e2e8f0'
+        }
+      }
+    },
+    series: [
+      offsetBar(offsetData),
+      waterfallBar({
+        name: 'Opening Frontline',
+        data: dataForStep('opening'),
+        color: '#15395f'
+      }),
+      waterfallBar({
+        name: 'Frontline Additions',
+        data: dataForStep('additions'),
+        color: '#15803d'
+      }),
+      waterfallBar({
+        name: 'Attrition',
+        data: dataForStep('attrition'),
+        color: '#e11d48',
+        borderRadius: [2, 2, 4, 4]
+      }),
+      waterfallBar({
+        name: 'Ending Frontline',
+        data: dataForStep('ending'),
+        color: '#2563eb'
+      }),
+      lineSeries({
+        name: 'Required Headcount',
+        data: requiredData,
+        color: '#0f172a'
+      }),
+      lineSeries({
+        name: 'Roster Headcount',
+        data: rosterData,
+        color: '#64748b',
+        dashed: true
+      })
+    ]
   }
-
-  updateTooltipPosition(event)
-}
-
-const clearTooltip = () => {
-  activeTooltip.value = null
-}
+})
 </script>
 
 <template>
   <section class="grid gap-4">
     <AppSectionHeader
-      title="Monthly Required Headcount vs Staffing"
+      title="Monthly Staffing Waterfall"
+      :description="`Opening frontline headcount, additions, attrition, and ending frontline headcount for ${props.planningYear}.`"
     />
 
     <AppEmptyState
       v-if="!hasData"
-      title="No monthly required headcount data"
-      :description="`No staffing groups have modeled required headcount for ${props.planningYear}.`"
+      title="No monthly staffing waterfall data"
+      :description="`No staffing groups have modeled staffing movement for ${props.planningYear}.`"
     />
 
-    <div v-else class="grid gap-4">
-      <div
-        class="relative overflow-x-auto rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-sm"
-        @mouseleave="clearTooltip"
-      >
-        <div
-          v-if="activeTooltip"
-          ref="tooltipRef"
-          class="pointer-events-none absolute z-10 w-[220px] rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-600 shadow-lg"
-          :style="{ left: `${activeTooltip.left}px`, top: `${activeTooltip.top}px` }"
-          role="status"
-          aria-live="polite"
-        >
-          <p class="mb-2 text-sm font-semibold text-slate-950">
-            {{ activeTooltip.monthLabel }}
-          </p>
-          <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            <span>Required Headcount</span>
-            <strong>{{ props.formatNumber(activeTooltip.neededHeadcount, 1) }}</strong>
-            <span>Frontline Headcount</span>
-            <strong>{{ props.formatNumber(activeTooltip.frontlineHeadcount, 1) }}</strong>
-            <span>Roster Headcount</span>
-            <strong>{{ props.formatNumber(activeTooltip.totalHeadcount, 1) }}</strong>
-          </div>
-        </div>
-
-        <svg
-          :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
-          class="block min-w-[920px]"
-          role="img"
-          :aria-label="`Monthly required headcount versus frontline and roster staffing for ${props.planningYear}`"
-        >
-          <line
-            v-for="tick in yTicks"
-            :key="`grid-${tick.value}`"
-            :x1="chartPadding.left"
-            :x2="chartWidth - chartPadding.right"
-            :y1="tick.y"
-            :y2="tick.y"
-            stroke="#e2e8f0"
-            stroke-width="1"
-          />
-
-          <line
-            :x1="chartPadding.left"
-            :x2="chartPadding.left"
-            :y1="chartPadding.top"
-            :y2="chartHeight - chartPadding.bottom"
-            stroke="#cbd5e1"
-            stroke-width="1"
-          />
-          <line
-            :x1="chartPadding.left"
-            :x2="chartWidth - chartPadding.right"
-            :y1="chartHeight - chartPadding.bottom"
-            :y2="chartHeight - chartPadding.bottom"
-            stroke="#cbd5e1"
-            stroke-width="1"
-          />
-
-          <text
-            v-for="tick in yTicks"
-            :key="`tick-${tick.value}`"
-            :x="chartPadding.left - 10"
-            :y="tick.y + 4"
-            text-anchor="end"
-            fill="#64748b"
-            font-size="12"
-            font-weight="600"
-          >
-            {{ props.formatNumber(tick.value, 1) }}
-          </text>
-
-          <g v-for="bar in chartBars" :key="bar.label">
-            <rect
-              :x="bar.x"
-              :y="bar.y"
-              :width="bar.width"
-              :height="bar.height"
-              fill="#d7e1ec"
-              rx="4"
-              ry="4"
-              tabindex="0"
-              @mouseenter="showSegmentTooltip(bar, $event)"
-              @mousemove="updateTooltipPosition($event)"
-              @focus="showSegmentTooltip(bar, $event)"
-              @blur="clearTooltip"
-            >
-              <title>{{ bar.label }} | Required headcount {{ props.formatNumber(bar.total, 1) }}</title>
-            </rect>
-
-            <text
-              v-if="bar.total > 0"
-              :x="bar.totalX"
-              :y="bar.totalY - 8"
-              text-anchor="middle"
-              fill="#475569"
-              font-size="11"
-              font-weight="600"
-            >
-              {{ props.formatNumber(bar.total, 1) }}
-            </text>
-
-            <text
-              :x="bar.totalX"
-              :y="chartHeight - chartPadding.bottom + 18"
-              text-anchor="middle"
-              fill="#64748b"
-              font-size="12"
-              font-weight="600"
-            >
-              {{ bar.label }}
-            </text>
-          </g>
-
-          <path
-            :d="buildLinePath('total')"
-            fill="none"
-            stroke="#64748b"
-            stroke-width="2.5"
-            stroke-dasharray="6 4"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <path
-            :d="buildLinePath('frontline')"
-            fill="none"
-            stroke="#15395f"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-
-          <circle
-            v-for="point in linePoints"
-            :key="`total-${point.monthIndex}`"
-            :cx="point.x"
-            :cy="point.totalY"
-            r="4"
-            fill="#64748b"
-            stroke="#ffffff"
-            stroke-width="2"
-            tabindex="0"
-            @mouseenter="showLineTooltip(point, $event)"
-            @mousemove="updateTooltipPosition($event)"
-            @focus="showLineTooltip(point, $event)"
-            @blur="clearTooltip"
-          />
-          <circle
-            v-for="point in linePoints"
-            :key="`frontline-${point.monthIndex}`"
-            :cx="point.x"
-            :cy="point.frontlineY"
-            r="4"
-            fill="#15395f"
-            stroke="#ffffff"
-            stroke-width="2"
-            tabindex="0"
-            @mouseenter="showLineTooltip(point, $event)"
-            @mousemove="updateTooltipPosition($event)"
-            @focus="showLineTooltip(point, $event)"
-            @blur="clearTooltip"
-          />
-        </svg>
-      </div>
-
-      <div class="flex flex-wrap gap-2.5">
-        <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
-          <span class="h-2.5 w-2.5 rounded-sm bg-[#d7e1ec]" aria-hidden="true" />
-          <span class="font-medium text-slate-900">Required Headcount</span>
-        </div>
-        <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
-          <span class="h-0 w-5 border-t-2 border-[#15395f]" aria-hidden="true" />
-          <span class="font-medium text-slate-900">Frontline Headcount</span>
-        </div>
-        <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">
-          <span class="h-0 w-5 border-t-2 border-dashed border-slate-500" aria-hidden="true" />
-          <span class="font-medium text-slate-900">Roster Headcount</span>
-        </div>
-      </div>
-    </div>
+    <AppChart
+      v-else
+      :option="chartOption"
+      height-class="h-[25rem]"
+      min-width-class="min-w-[1540px]"
+      :aria-label="`Monthly staffing waterfall for ${props.planningYear}, showing opening frontline headcount, additions, attrition, ending frontline, required headcount, and roster headcount`"
+      fallback-text="Monthly staffing waterfall chart could not be loaded."
+    />
   </section>
 </template>

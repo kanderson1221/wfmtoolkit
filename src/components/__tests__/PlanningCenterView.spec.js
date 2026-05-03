@@ -22,6 +22,11 @@ const AppStatusMessageStub = {
   template: '<div><slot /></div>'
 }
 
+const AppTableShellStub = {
+  name: 'AppTableShell',
+  template: '<section><slot /></section>'
+}
+
 const AppMenuStub = {
   name: 'AppMenu',
   props: ['items', 'triggerLabel'],
@@ -65,15 +70,20 @@ const PlanningForecastCreateModalStub = {
   name: 'PlanningForecastCreateModal',
   props: [
     'planningYear',
+    'sourceKind',
     'yearOptions',
-    'canCreate'
+    'canCreate',
+    'modeledForecastUnavailableMessage'
   ],
-  emits: ['cancel', 'create', 'update:planningYear'],
+  emits: ['cancel', 'create', 'update:planningYear', 'update:sourceKind'],
   template: `
     <div>
       <p>New Forecast</p>
       <p>Plan Year: {{ planningYear || 'empty' }}</p>
+      <p>Source: {{ sourceKind || 'empty' }}</p>
+      <p v-if="modeledForecastUnavailableMessage">Modeled Blocked: {{ modeledForecastUnavailableMessage }}</p>
       <button @click="$emit('update:planningYear', 2027)">Set Year</button>
+      <button @click="$emit('update:sourceKind', 'imported_daily')">Set Import Source</button>
       <button @click="$emit('create')">Create Forecast</button>
     </div>
   `
@@ -188,7 +198,7 @@ const buildWrapper = (props = {}) =>
           }
         ]
       },
-      selectedGroupId: '',
+      selectedGroupId: 'group-1',
       selectedYear: 2026,
       storageScope: 'default',
       weekdayOptions: [
@@ -209,8 +219,8 @@ const buildWrapper = (props = {}) =>
         AppIcon: true,
         AppMenu: AppMenuStub,
         AppPanel: AppPanelStub,
-        AppStatStrip: true,
         AppStatusMessage: AppStatusMessageStub,
+        AppTableShell: AppTableShellStub,
         CallCenterSettingsModal: true,
         PlanningGroupSettingsModal: true,
         PlanningForecastCreateModal: PlanningForecastCreateModalStub,
@@ -299,6 +309,109 @@ describe('PlanningCenterView', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('shows a call-center summary before drilling into a staffing group', () => {
+    const wrapper = buildWrapper({
+      selectedGroupId: ''
+    })
+
+    expect(wrapper.text()).toContain('Call Center Plan')
+    expect(wrapper.text()).toContain('Expected vs actuals across staffing groups.')
+    expect(wrapper.text()).toContain('Total / Avg')
+    expect(wrapper.text()).toContain('Gap vs Actual Req HC')
+    expect(wrapper.text()).toContain('Voice Support')
+    expect(wrapper.text()).toContain('Actual Contacts')
+    expect(wrapper.text()).not.toContain('Monthly Actuals From Data')
+    expect(wrapper.text()).not.toContain('Plan Coverage')
+    expect(wrapper.text()).not.toContain('Actuals Coverage')
+    expect(wrapper.text()).not.toContain('Expected Contacts')
+    expect(wrapper.text()).not.toContain('Staffing Group Summary')
+    expect(wrapper.text()).not.toContain('Add Data')
+  })
+
+  it('keeps call-center actuals month details collapsed by default', () => {
+    const wrapper = buildWrapper({
+      selectedGroupId: ''
+    })
+
+    const monthToggles = wrapper.findAll('button[aria-expanded]')
+
+    expect(monthToggles.length).toBeGreaterThan(0)
+    expect(monthToggles.every((button) => button.attributes('aria-expanded') === 'false')).toBe(true)
+    expect(monthToggles.some((button) => button.attributes('aria-label')?.startsWith('Expand Jan'))).toBe(true)
+    expect(monthToggles.some((button) => button.attributes('aria-label')?.startsWith('Collapse'))).toBe(false)
+  })
+
+  it('visually separates expanded month totals from staffing-group detail rows', async () => {
+    const wrapper = buildWrapper({
+      selectedGroupId: ''
+    })
+
+    const firstMonthToggle = wrapper.findAll('button[aria-expanded]')[0]
+    await firstMonthToggle.trigger('click')
+
+    const bodyRows = wrapper.findAll('tbody tr')
+
+    expect(bodyRows[0].classes()).toContain('bg-[#eef4f8]')
+    expect(bodyRows[0].findAll('td')[0].classes()).toContain('font-semibold')
+    expect(bodyRows[1].classes()).toContain('bg-[#f8fbfd]')
+    expect(bodyRows[1].find('.border-l-2').exists()).toBe(true)
+  })
+
+  it('does not show workload variance percentages for months without actuals', () => {
+    const wrapper = buildWrapper({
+      selectedGroupId: '',
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 85,
+            defaultAdherencePercent: 95,
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: [
+                { serviceDate: '2026-01-05', contacts: 100, ahtSeconds: 360 }
+              ]
+            },
+            plans: [
+              {
+                id: 'budget-2026',
+                planningYear: 2026,
+                planType: 'budget',
+                planMonths: Array.from({ length: 12 }, () => ({
+                  contacts: 1000,
+                  ahtSeconds: 360,
+                  peakDayUpliftPercent: 0
+                })),
+                presenceMonths: Array.from({ length: 12 }, () => ({
+                  paidHoursPerDay: 8
+                })),
+                randomDefaults: {
+                  occupancyPercent: 100,
+                  adherencePercent: 100
+                },
+                startingHeadcount: 10,
+                startingFrontlineHeadcount: 10
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    expect(wrapper.text()).toContain('-90.0%')
+    expect(wrapper.text()).not.toContain('-100.0%')
   })
 
   it('keeps versioned plan headers on a single line with compact labels', async () => {
@@ -490,6 +603,40 @@ describe('PlanningCenterView', () => {
     expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Actuals Options: 1')
   })
 
+  it('labels draft budgets and does not offer update creation until finalized', async () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            plans: [
+              {
+                id: 'budget-draft-2026',
+                name: '2026 Budget',
+                planningYear: 2026,
+                planType: 'budget',
+                status: 'draft',
+                isCurrent: true,
+                updatedAt: '2026-01-01T00:00:00.000Z'
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    await openTab(wrapper, 'Plans')
+
+    expect(wrapper.text()).toContain('Draft Budget')
+    expect(wrapper.text()).not.toContain('Create Updated Plan')
+  })
+
   it('uses matching compact xl header heights for the group and plan panes', () => {
     const wrapper = buildWrapper()
     const staffingGroupsHeading = findHeadingByText(wrapper, 'Staffing Groups')
@@ -539,7 +686,7 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).not.toContain('New Forecast')
   })
 
-  it('opens a year-only create-forecast modal and routes new forecasts through shared history', async () => {
+  it('opens a source-aware create-forecast modal and routes modeled forecasts through shared history', async () => {
     window.location.hash = '#planning'
 
     const wrapper = buildWrapper()
@@ -549,6 +696,7 @@ describe('PlanningCenterView', () => {
 
     expect(wrapper.text()).toContain('New Forecast')
     expect(wrapper.text()).toContain('Plan Year: 2026')
+    expect(wrapper.text()).toContain('Source: modeled_daily')
 
     const setYearButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Year')
     const createForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Create Forecast')
@@ -557,7 +705,62 @@ describe('PlanningCenterView', () => {
     await createForecastButton.trigger('click')
 
     expect(window.location.hash).toBe(
-      buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, { forecastType: 'budget' })
+      buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, {
+        forecastType: 'budget',
+        coverageStartDate: '2027-01-01',
+        coverageEndDate: '2027-12-31'
+      })
+    )
+  })
+
+  it('routes imported forecast creation from the staffing-group forecast tab without shared history', async () => {
+    window.location.hash = '#planning'
+
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 85,
+            defaultAdherencePercent: 95,
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: []
+            },
+            plans: []
+          }
+        ]
+      }
+    })
+    await openTab(wrapper, 'Forecasts')
+    const newForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'New Forecast')
+    await newForecastButton.trigger('click')
+
+    expect(wrapper.text()).toContain('Modeled Blocked: Add at least 14 daily history rows in Data before building a modeled forecast for Voice Support.')
+
+    const setImportSourceButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Import Source')
+    const createForecastButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Create Forecast')
+
+    await setImportSourceButton.trigger('click')
+    await createForecastButton.trigger('click')
+
+    expect(window.location.hash).toBe(
+      buildPlanningGroupNewForecastHash('center-1', 'group-1', 2026, {
+        sourceKind: 'imported_daily',
+        forecastType: 'budget',
+        coverageStartDate: '2026-01-01',
+        coverageEndDate: '2026-12-31'
+      })
     )
   })
 

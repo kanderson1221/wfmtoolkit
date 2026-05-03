@@ -53,8 +53,6 @@ const TOP_LEVEL_BACKUP_TABLES = new Set(ALL_TABLE_NAMES)
 const clonePlain = (value) => JSON.parse(JSON.stringify(value))
 const normalizeScope = (scope = DEFAULT_SCOPE) => String(scope || DEFAULT_SCOPE)
 const nowIso = () => new Date().toISOString()
-const scopedLocalStorageKey = (baseKey, scope = DEFAULT_SCOPE) =>
-  `${baseKey}.${normalizeScope(scope)}`
 
 const emitLocalDataChanged = () => {
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {

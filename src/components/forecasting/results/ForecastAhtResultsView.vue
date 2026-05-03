@@ -3,7 +3,6 @@ import ForecastMonthlyAhtChart from '../ForecastMonthlyAhtChart.vue'
 import AppButton from '../../ui/AppButton.vue'
 import AppTableNumberField from '../../ui/AppTableNumberField.vue'
 import { formatForecastAhtSeconds } from '../../../forecasting/handleTimeAssumptions'
-import { formatWhole } from '../../../forecasting/shared'
 
 defineProps({
   ahtHighlights: {

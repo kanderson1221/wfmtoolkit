@@ -34,22 +34,11 @@ test('opens the batch planner workspace', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Output Workspace' })).toBeVisible()
 })
 
-test('opens the forecasting workspace', async ({ page }) => {
+test('legacy forecasting calculator hash redirects to planning home', async ({ page }) => {
   await page.goto('/#calculators/forecasting')
 
   await expect(page.getByRole('heading', { level: 1, name: 'Erlang Calculators' })).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 3, name: 'Erlang Calculators' })).toHaveCount(0)
-  await expect(page.getByRole('link', { name: 'Forecasting Workspace Open' })).toHaveCount(0)
-  await expect(page.getByRole('heading', { level: 2, name: 'Untitled Forecast' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'New Forecast' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Open Forecast' })).toBeVisible()
-  await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeVisible()
-  await expect(page.getByLabel('Forecast workflow')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Cancel' }).click()
-  await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeHidden()
-
-  await page.getByRole('button', { name: 'Open Forecast' }).click()
-  await expect(page.getByRole('heading', { level: 2, name: 'Open Forecast' })).toBeVisible()
-  await page.getByRole('button', { name: 'Close' }).click()
-  await expect(page.getByRole('heading', { level: 2, name: 'Open Forecast' })).toBeHidden()
+  await expect(page.getByRole('heading', { level: 2, name: 'Untitled Forecast' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 1, name: 'Planning Portfolio' })).toBeVisible()
 })

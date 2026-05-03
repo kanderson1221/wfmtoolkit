@@ -7,11 +7,16 @@ import { plannerDraftRepository } from '../../plannerDraftRepository'
 import { BrowserStorageError } from '../../storage/browserStorage'
 import { clearLocalDataStore } from '../../storage/localDataStore'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
-import { PLAN_TYPE_BUDGET, PLAN_TYPE_UPDATE } from '../../planningStorage'
+import {
+  PLAN_STATUS_DRAFT,
+  PLAN_STATUS_FINALIZED,
+  PLAN_TYPE_BUDGET,
+  PLAN_TYPE_UPDATE
+} from '../../planningStorage'
 
 const plannerStubs = {
   PlannerForecastPanel: {
-    props: ['hasLegacyManualDemandSource', 'currentDemandSourceSummary'],
+    props: ['hasLegacyManualDemandSource', 'currentDemandSourceSummary', 'requiresDailyForecast'],
     template: '<div data-test="planner-forecast-panel">planner-forecast {{ hasLegacyManualDemandSource ? "legacy" : "saved" }}</div>'
   },
   PlannerPresenceTab: {
@@ -26,8 +31,8 @@ const plannerStubs = {
     template: '<div data-test="plan-tab">{{ requirementMethod }}</div>'
   },
   PlannerStaffingPlanTab: {
-    props: ['inheritedTrainingClasses', 'startingPositionInherited', 'startingPositionInheritedFromYear'],
-    template: '<div data-test="staffing-tab">staffing {{ inheritedTrainingClasses.length }}|{{ startingPositionInherited ? startingPositionInheritedFromYear : "editable" }}</div>'
+    props: ['inheritedTrainingClasses', 'startingPositionInherited', 'startingPositionInheritedFromYear', 'readOnly'],
+    template: '<div data-test="staffing-tab">staffing {{ inheritedTrainingClasses.length }}|{{ startingPositionInherited ? startingPositionInheritedFromYear : "editable" }}|{{ readOnly ? "read-only" : "editable" }}</div>'
   },
   PlannerActualsPanel: {
     template: '<div data-test="actuals-tab">actuals</div>'
@@ -40,6 +45,24 @@ const plannerBusinessDayStub = {
 }
 
 const clonePlain = (value) => JSON.parse(JSON.stringify(value))
+
+const buildFullYearMonthlyRollup = (year = 2026, baseContacts = 10000) =>
+  Array.from({ length: 12 }, (_, index) => {
+    const monthNumber = index + 1
+    const monthStart = `${year}-${String(monthNumber).padStart(2, '0')}-01`
+    const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(new Date(`${monthStart}T00:00:00Z`))
+
+    return {
+      monthStart,
+      monthLabel,
+      contacts: baseContacts + (index * 100),
+      ahtSeconds: 390,
+      averageDailyVolume: 500 + (index * 5),
+      peakDailyVolume: 650 + (index * 5),
+      lowerBoundContacts: baseContacts - 500 + (index * 100),
+      upperBoundContacts: baseContacts + 500 + (index * 100)
+    }
+  })
 
 const centerDefaults = {
   centerId: 'center-1',
@@ -224,7 +247,7 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.find('[data-test="staffing-tab"]').exists()).toBe(false)
   })
 
-  it('opens saved Budget plans read-only and blocks saving', async () => {
+  it('opens finalized Budget plans read-only and blocks saving', async () => {
     const wrapper = await mountBuilder({
       initialPlan: {
         id: 'budget-2026',
@@ -235,14 +258,103 @@ describe('MonthlyPlanBuilder', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Budget plan is locked. Create an updated plan to change future assumptions.')
-    expect(findButtonByText(wrapper, 'Save Plan')).toBeUndefined()
-    expect(wrapper.findAll('a').some((link) => link.text().trim() === 'Create Updated Plan')).toBe(true)
+    expect(wrapper.text()).toContain('Finalized budget plan is locked. Create an updated plan to change future assumptions.')
+    expect(findButtonByText(wrapper, 'Save Draft')).toBeUndefined()
+    expect(findButtonByText(wrapper, 'Finalize Budget')).toBeUndefined()
+    expect(wrapper.findAll('a').some((link) => link.text().trim() === 'Create Updated Plan')).toBe(false)
     expect(wrapper.find('fieldset').attributes('disabled')).toBeDefined()
 
     await wrapper.vm.builder.savePlan()
 
     expect(wrapper.emitted('save')).toBeFalsy()
+  })
+
+  it('keeps saved draft Budget plans editable and saves them as drafts', async () => {
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'budget-2026',
+        name: '2026 Budget',
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        planningYear: 2026,
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }
+    })
+
+    expect(wrapper.text()).toContain('Budget draft is editable.')
+    expect(wrapper.find('fieldset').attributes('disabled')).toBeUndefined()
+    expect(findButtonByText(wrapper, 'Save Draft')).toBeTruthy()
+    expect(findButtonByText(wrapper, 'Finalize Budget').attributes('disabled')).toBeDefined()
+
+    await findButtonByText(wrapper, 'Save Draft').trigger('click')
+
+    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+      id: 'budget-2026',
+      planType: PLAN_TYPE_BUDGET,
+      status: PLAN_STATUS_DRAFT,
+      finalizedAt: ''
+    })
+  })
+
+  it('finalizes complete draft Budget plans as locked baselines', async () => {
+    const forecastMonthSnapshot = Array.from({ length: 12 }, (_, monthIndex) => ({
+      monthIndex,
+      monthLabel: String(monthIndex + 1),
+      monthStart: `2026-${String(monthIndex + 1).padStart(2, '0')}-01`,
+      contacts: 1000,
+      ahtSeconds: 300
+    }))
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'budget-2026',
+        name: '2026 Budget',
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        planningYear: 2026,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-1',
+          forecastProjectName: '2026 Demand Forecast',
+          forecastMonthSnapshot
+        }),
+        planMonths: Array.from({ length: 12 }, () => ({
+          contacts: 1000,
+          ahtSeconds: 300,
+          peakDayUpliftPercent: 0
+        })),
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }
+    })
+
+    const finalizeButton = findButtonByText(wrapper, 'Finalize Budget')
+    expect(finalizeButton.attributes('disabled')).toBeUndefined()
+
+    await finalizeButton.trigger('click')
+
+    const savedPlan = wrapper.emitted('save')?.[0]?.[0]
+    expect(savedPlan).toMatchObject({
+      id: 'budget-2026',
+      planType: PLAN_TYPE_BUDGET,
+      status: PLAN_STATUS_FINALIZED
+    })
+    expect(savedPlan.finalizedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  it('keeps saved Budget staffing plan details expandable while preserving read-only editing', async () => {
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'budget-2026',
+        name: '2026 Budget',
+        planType: PLAN_TYPE_BUDGET,
+        planningYear: 2026,
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }
+    })
+
+    await wrapper.find('[data-section-id="staffing"]').trigger('click')
+
+    expect(wrapper.find('fieldset').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-test="staffing-tab"]').text()).toContain('read-only')
   })
 
   it('saves update drafts as current update versions with budget metadata', async () => {
@@ -302,10 +414,11 @@ describe('MonthlyPlanBuilder', () => {
     await wrapper.find('[data-section-id="requirement"]').trigger('click')
     expect(wrapper.find('[data-test="plan-tab"]').text()).toContain(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
 
-    await findButtonByText(wrapper, 'Save Plan').trigger('click')
+    await findButtonByText(wrapper, 'Save Draft').trigger('click')
     expect(wrapper.emitted('save')).toBeTruthy()
     expect(wrapper.emitted('save')[0][0]).toMatchObject({
       requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+      status: PLAN_STATUS_DRAFT,
       summary: {
         requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
       }
@@ -415,13 +528,14 @@ describe('MonthlyPlanBuilder', () => {
       prefilledYear: 2026
     })
 
-    await findButtonByText(wrapper, 'Save Plan').trigger('click')
+    await findButtonByText(wrapper, 'Save Draft').trigger('click')
 
     expect(wrapper.emitted('save')).toBeTruthy()
     expect(wrapper.emitted('save')[0][0]).toMatchObject({
       id: null,
       name: '2026 Budget',
       planType: PLAN_TYPE_BUDGET,
+      status: PLAN_STATUS_DRAFT,
       planningYear: 2026,
       operatingWeekdays: [1, 2, 3, 4, 5],
       holidayCalendarId: 'us_federal',
@@ -451,7 +565,7 @@ describe('MonthlyPlanBuilder', () => {
       ]
     })
 
-    await findButtonByText(wrapper, 'Save Plan').trigger('click')
+    await findButtonByText(wrapper, 'Save Draft').trigger('click')
 
     expect(alertSpy).not.toHaveBeenCalled()
     expect(wrapper.emitted('save')).toBeFalsy()
@@ -825,6 +939,143 @@ describe('MonthlyPlanBuilder', () => {
     })
   })
 
+  it('applies history-backed modeled daily rows for intraday Erlang forecasts', async () => {
+    const monthlyRollup = buildFullYearMonthlyRollup(2026, 24000)
+
+    vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
+      projects: [
+        {
+          id: 'forecast-history-backed',
+          name: '2026 History Backed Forecast',
+          planningYear: 2026,
+          forecastType: 'budget',
+          planningContext: {
+            groupId: 'group-1',
+            planningYear: 2026
+          },
+          lastRun: {
+            runAt: '2026-01-10T12:00:00.000Z',
+            monthlyRollup,
+            dailyForecast: [
+              { ds: '2026-01-01', actualValue: 812, yhat: 700, isHistory: true },
+              { ds: '2026-01-02', yhat: 730, isHistory: true },
+              { ds: '2026-01-03', yhat: 740, isHistory: false }
+            ],
+            components: {},
+            diagnostics: {},
+            summary: {
+              forecastDateRange: '2026-01-01 to 2026-12-31'
+            }
+          }
+        }
+      ],
+      error: null
+    })
+
+    const wrapper = await mountBuilder({
+      draftKey: 'intraday-history-backed-forecast',
+      prefilledYear: 2026,
+      storageScope: 'intraday-history-backed-forecast-spec',
+      centerDefaults: {
+        ...centerDefaults,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      }
+    })
+
+    wrapper.vm.builder.selectedForecastProjectId = 'forecast-history-backed'
+    await flushPromises()
+
+    expect(wrapper.vm.builder.forecastCanApply).toBe(true)
+    expect(wrapper.vm.builder.applyForecastToDemand()).toBe(true)
+    await flushPromises()
+
+    expect(wrapper.vm.builder.demandSource.forecastDailySnapshot).toEqual([
+      { serviceDate: '2026-01-01', monthIndex: 0, monthLabel: 'Jan', contacts: 812 },
+      { serviceDate: '2026-01-02', monthIndex: 0, monthLabel: 'Jan', contacts: 730 },
+      { serviceDate: '2026-01-03', monthIndex: 0, monthLabel: 'Jan', contacts: 740 }
+    ])
+    expect(wrapper.vm.builder.demandSourceSummary).toMatchObject({
+      dailySnapshotCount: 3,
+      dailyForecastReady: true
+    })
+    expect(wrapper.vm.builder.erlangStatus.status).not.toBe('forecast_required')
+  })
+
+  it('backfills a missing daily snapshot from the linked forecast without changing monthly values', async () => {
+    const monthlyRollup = buildFullYearMonthlyRollup(2026, 18000)
+
+    vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
+      projects: [
+        {
+          id: 'forecast-linked',
+          name: '2026 Linked Forecast',
+          planningYear: 2026,
+          forecastType: 'budget',
+          planningContext: {
+            groupId: 'group-1',
+            planningYear: 2026
+          },
+          lastRun: {
+            runAt: '2026-01-10T12:00:00.000Z',
+            monthlyRollup,
+            dailyForecast: [
+              { ds: '2026-01-01', actualValue: 512, yhat: 500, isHistory: true },
+              { ds: '2026-01-02', yhat: 530, isHistory: false }
+            ],
+            components: {},
+            diagnostics: {},
+            summary: {
+              forecastDateRange: '2026-01-01 to 2026-12-31'
+            }
+          }
+        }
+      ],
+      error: null
+    })
+
+    const wrapper = await mountBuilder({
+      draftKey: 'intraday-linked-forecast-self-heal',
+      prefilledYear: 2026,
+      storageScope: 'intraday-linked-forecast-self-heal-spec',
+      centerDefaults: {
+        ...centerDefaults,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      },
+      initialPlan: {
+        id: 'intraday-linked-plan',
+        name: '2026 Plan',
+        planningYear: 2026,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-linked',
+          forecastProjectName: '2026 Linked Forecast',
+          importedAt: '2026-02-01T12:00:00.000Z',
+          forecastMonthSnapshot: monthlyRollup.map((row, index) => ({
+            monthIndex: index,
+            monthLabel: row.monthLabel,
+            monthStart: row.monthStart,
+            contacts: row.contacts
+          }))
+        }),
+        planMonths: Array.from({ length: 12 }, (_, index) => ({
+          contacts: index === 0 ? 999 : 0,
+          ahtSeconds: 300,
+          peakDayUpliftPercent: 0
+        }))
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.vm.builder.demandSource.forecastDailySnapshot).toEqual([
+      { serviceDate: '2026-01-01', monthIndex: 0, monthLabel: 'Jan', contacts: 512 },
+      { serviceDate: '2026-01-02', monthIndex: 0, monthLabel: 'Jan', contacts: 530 }
+    ])
+    expect(wrapper.vm.builder.planMonths[0].contacts).toBe(999)
+    expect(wrapper.vm.builder.demandSource.forecastMonthSnapshot[0].contacts).toBe(18000)
+  })
+
   it('keeps a single eligible saved forecast unselected until the user explicitly picks it', async () => {
     vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
       projects: [
@@ -978,6 +1229,86 @@ describe('MonthlyPlanBuilder', () => {
 
     expect(wrapper.vm.builder.applyForecastToDemand()).toBe(true)
     expect(wrapper.vm.builder.forecastApplyMessage).toContain('Reapplied 2026 Demand Forecast')
+  })
+
+  it('auto-selects the only replacement forecast when the applied source was deleted', async () => {
+    const monthlyRollup = Array.from({ length: 12 }, (_, index) => {
+      const monthNumber = index + 1
+      const monthStart = `2026-${String(monthNumber).padStart(2, '0')}-01`
+      const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(new Date(`${monthStart}T00:00:00Z`))
+
+      return {
+        monthStart,
+        monthLabel,
+        contacts: 15000 + (index * 100),
+        averageDailyVolume: 750 + (index * 5),
+        peakDailyVolume: 950 + (index * 5),
+        lowerBoundContacts: 14400 + (index * 100),
+        upperBoundContacts: 15600 + (index * 100)
+      }
+    })
+
+    vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
+      projects: [
+        {
+          id: 'forecast-replacement',
+          name: '2026 Replacement Forecast',
+          planningYear: 2026,
+          forecastType: 'budget',
+          planningContext: {
+            groupId: 'group-1',
+            planningYear: 2026
+          },
+          lastRun: {
+            runAt: '2026-01-15T12:00:00.000Z',
+            monthlyRollup,
+            components: {},
+            diagnostics: {},
+            summary: {
+              forecastDateRange: '2026-01-01 to 2026-12-31'
+            }
+          }
+        }
+      ],
+      error: null
+    })
+
+    const wrapper = await mountBuilder({
+      draftKey: 'deleted-forecast-single-replacement-plan',
+      prefilledYear: 2026,
+      storageScope: 'deleted-forecast-single-replacement-spec',
+      initialPlan: {
+        id: 'deleted-forecast-single-replacement-plan',
+        name: '2026 Plan',
+        planningYear: 2026,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-deleted',
+          forecastProjectName: 'Deleted Staffing Forecast',
+          importedAt: '2026-04-12T15:00:00.000Z',
+          forecastMonthSnapshot: [
+            {
+              monthIndex: 0,
+              monthLabel: 'Jan 2026',
+              monthStart: '2026-01-01',
+              contacts: 14000
+            }
+          ]
+        })
+      }
+    })
+
+    await wrapper.find('[data-section-id="forecast"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.builder.demandSourceSummary).toMatchObject({
+      sourceMissing: true,
+      projectName: 'Deleted Staffing Forecast'
+    })
+    expect(wrapper.vm.builder.forecastSelectOptions.some((option) => option.value === 'forecast-replacement')).toBe(true)
+    expect(wrapper.vm.builder.selectedForecastProjectId).toBe('forecast-replacement')
+    expect(wrapper.vm.builder.selectedForecastPreviewSummary.projectName).toBe('2026 Replacement Forecast')
+    expect(wrapper.vm.builder.forecastCanApply).toBe(true)
   })
 
   it('shows a subtle warning when the plan references a deleted forecast source', async () => {

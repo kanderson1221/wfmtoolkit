@@ -135,9 +135,9 @@ const holidayYearOptions = computed(() => {
   const anchorYear = normalizeHolidayYear(props.displayYear)
   const minimumHolidayYear = Number.isInteger(Number(props.minimumHolidayYear)) && Number(props.minimumHolidayYear) > 0
     ? normalizeHolidayYear(props.minimumHolidayYear, anchorYear)
-    : anchorYear - 2
-  const startYear = Math.min(anchorYear - 2, minimumHolidayYear)
-  const endYear = anchorYear + 5
+    : anchorYear - 7
+  const startYear = Math.min(anchorYear - 7, minimumHolidayYear)
+  const endYear = anchorYear + 7
   const years = new Set(normalizedHolidayProfiles.value.map((profile) => profile.year))
 
   buildPlanningYearRange(anchorYear, anchorYear - startYear, endYear - anchorYear).forEach((year) => {
