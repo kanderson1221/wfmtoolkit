@@ -22,7 +22,7 @@ export const FORECAST_SOURCE_KIND_OPTIONS = [
   {
     id: FORECAST_SOURCE_IMPORTED_DAILY,
     label: 'Import Daily Forecast',
-    description: 'Upload an existing daily forecast without using Prophet.'
+    description: 'Upload existing daily contacts and average handle time without using Prophet.'
   },
   {
     id: FORECAST_SOURCE_MANUAL_MONTHLY,

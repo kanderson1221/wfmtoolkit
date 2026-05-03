@@ -101,6 +101,7 @@ class CoverageWindow:
     end_date: pd.Timestamp | None
     start_month_index: int
     expected_month_count: int
+    expected_month_starts: list[str]
     plan_aligned: bool
 
 
@@ -170,6 +171,17 @@ def _parse_date(value: str, field_name: str) -> pd.Timestamp:
     return parsed.normalize()
 
 
+def _is_last_day_of_month(value: pd.Timestamp) -> bool:
+    return value.day == value.days_in_month
+
+
+def _build_expected_month_starts(start_date: pd.Timestamp, end_date: pd.Timestamp) -> list[str]:
+    return [
+        month_start.date().isoformat()
+        for month_start in pd.date_range(start=start_date, end=end_date, freq="MS")
+    ]
+
+
 def _resolve_coverage_window(payload: ForecastRunRequest) -> CoverageWindow:
     planning_year = int(payload.planningYear or 0) or None
     forecast_type = payload.forecastType or ("budget" if planning_year else "")
@@ -182,6 +194,7 @@ def _resolve_coverage_window(payload: ForecastRunRequest) -> CoverageWindow:
             end_date=None,
             start_month_index=0,
             expected_month_count=0,
+            expected_month_starts=[],
             plan_aligned=False,
         )
 
@@ -191,21 +204,19 @@ def _resolve_coverage_window(payload: ForecastRunRequest) -> CoverageWindow:
     if start_date > end_date:
         raise ValueError("coverageStartDate must be on or before coverageEndDate.")
 
-    if start_date.year != planning_year or end_date.year != planning_year:
-        raise ValueError("Forecast coverage must stay inside the selected planning year.")
+    if start_date.day != 1 or not _is_last_day_of_month(end_date):
+        raise ValueError("Forecast coverage must start on the first day of a month and end on the last day of a month.")
 
-    expected_start = pd.Timestamp(year=planning_year, month=1, day=1)
-    expected_end = pd.Timestamp(year=planning_year, month=12, day=31)
-    if start_date != expected_start or end_date != expected_end:
-        raise ValueError("Budget forecasts must cover January 1 through December 31 of the plan year.")
+    expected_month_starts = _build_expected_month_starts(start_date, end_date)
 
     return CoverageWindow(
         planning_year=planning_year,
         forecast_type=forecast_type,
         start_date=start_date,
         end_date=end_date,
-        start_month_index=0,
-        expected_month_count=12,
+        start_month_index=start_date.month - 1,
+        expected_month_count=len(expected_month_starts),
+        expected_month_starts=expected_month_starts,
         plan_aligned=True,
     )
 
@@ -579,7 +590,14 @@ def _resolve_forecast_periods(
         return int(payload.forecastHorizonDays)
 
     history_cutoff = history["ds"].max()
-    return max(int((coverage_window.end_date - history_cutoff).days), 0)
+    periods = max(int((coverage_window.end_date - history_cutoff).days), 0)
+
+    if periods > 730:
+        raise ValueError(
+            f"Forecast coverage requires {periods} forecast days from the latest history date, but the maximum supported horizon is 730 days."
+        )
+
+    return periods
 
 
 def _build_plan_aligned_daily_coverage_frame(
@@ -709,16 +727,8 @@ def _monthly_rollup_matches_coverage_window(
     if not coverage_window.plan_aligned:
         return False
 
-    expected_month_starts = [
-        pd.Timestamp(
-            year=coverage_window.planning_year,
-            month=coverage_window.start_month_index + offset + 1,
-            day=1,
-        ).date().isoformat()
-        for offset in range(coverage_window.expected_month_count)
-    ]
     actual_month_starts = [row.get("monthStart", "") for row in monthly_rollup]
-    return actual_month_starts == expected_month_starts
+    return actual_month_starts == coverage_window.expected_month_starts
 
 
 def _build_components(forecast: pd.DataFrame) -> dict[str, list[dict[str, Any]]]:

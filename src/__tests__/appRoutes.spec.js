@@ -19,10 +19,12 @@ describe('appRoutes', () => {
     const hash = buildPlanningGroupNewForecastHash('center-1', 'group-1', 2027, {
       sourceKind: 'manual_monthly',
       forecastType: 'reforecast',
-      coverageStartMonthIndex: 5
+      coverageStartMonthIndex: 5,
+      coverageStartDate: '2027-06-01',
+      coverageEndDate: '2027-12-31'
     })
 
-    expect(hash).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget')
+    expect(hash).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget/coverage/2027-06-01/2027-12-31')
     expect(parseHashRoute(hash)).toMatchObject({
       app: 'planning',
       page: 'group-forecasts',
@@ -31,7 +33,9 @@ describe('appRoutes', () => {
       year: 2027,
       sourceKind: 'manual_monthly',
       forecastType: 'budget',
-      coverageStartMonthIndex: 0
+      coverageStartMonthIndex: 0,
+      coverageStartDate: '2027-06-01',
+      coverageEndDate: '2027-12-31'
     })
   })
 })

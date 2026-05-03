@@ -246,18 +246,20 @@ const saveReadOnlyProject = async (nextProject, successMessage = 'Forecast saved
   return saveCurrentProject(successMessage)
 }
 
-const handleApplyImportedDaily = async ({ sourceData, importedDailyRows } = {}) => {
+const handleApplyImportedDaily = async ({ sourceData, importedDailyRows, ahtMonthOverrides } = {}) => {
   const isReplacingCurrentProject = getForecastProjectSourceKind(currentProject.value) === FORECAST_SOURCE_IMPORTED_DAILY
   const baseProject = isReplacingCurrentProject
     ? createForecastProject(currentProject.value)
     : buildProjectSeedForSourceKind(FORECAST_SOURCE_IMPORTED_DAILY)
   const nextForecastType = FORECAST_TYPE_BUDGET
-  const nextCoverageStartMonthIndex = 0
+  const nextCoverageStartMonthIndex = baseProject.coverageStartMonthIndex ?? 0
   const lastRun = createImportedDailyForecastResults({
     rows: importedDailyRows,
     planningYear: baseProject.planningYear,
     forecastType: nextForecastType,
-    coverageStartMonthIndex: nextCoverageStartMonthIndex
+    coverageStartMonthIndex: nextCoverageStartMonthIndex,
+    coverageStartDate: baseProject.coverageStartDate,
+    coverageEndDate: baseProject.coverageEndDate
   })
   const nextProject = createForecastProject({
     ...baseProject,
@@ -271,6 +273,12 @@ const handleApplyImportedDaily = async ({ sourceData, importedDailyRows } = {}) 
     parserIssues: [],
     normalizationIssues: [],
     manualAdjustments: [],
+    modelConfig: {
+      ...baseProject.modelConfig,
+      ahtMonthOverrides: Array.isArray(ahtMonthOverrides)
+        ? ahtMonthOverrides.map((row) => ({ ...row }))
+        : []
+    },
     sourceData,
     lastRun
   })
@@ -288,12 +296,14 @@ const handleApplyManualMonthly = async ({ monthlyRows } = {}) => {
     ? createForecastProject(currentProject.value)
     : buildProjectSeedForSourceKind(FORECAST_SOURCE_MANUAL_MONTHLY)
   const nextForecastType = FORECAST_TYPE_BUDGET
-  const nextCoverageStartMonthIndex = 0
+  const nextCoverageStartMonthIndex = baseProject.coverageStartMonthIndex ?? 0
   const lastRun = createManualMonthlyForecastResults({
     rows: monthlyRows,
     planningYear: baseProject.planningYear,
     forecastType: nextForecastType,
-    coverageStartMonthIndex: nextCoverageStartMonthIndex
+    coverageStartMonthIndex: nextCoverageStartMonthIndex,
+    coverageStartDate: baseProject.coverageStartDate,
+    coverageEndDate: baseProject.coverageEndDate
   })
   const nextProject = createForecastProject({
     ...baseProject,

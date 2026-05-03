@@ -2,6 +2,8 @@ import { getCurrentCalendarYear } from '../planner/shared'
 import {
   createPlanningCenterDraft,
   loadPlanningCenters,
+  PLAN_STATUS_DRAFT,
+  PLAN_STATUS_FINALIZED,
   PLAN_TYPE_BUDGET,
   PLAN_TYPE_UPDATE,
   removePlanningPlan,
@@ -191,10 +193,47 @@ describe('planningStorage', () => {
       name: '2026 Operating Plan',
       planningYear: 2026,
       planType: PLAN_TYPE_BUDGET,
+      status: PLAN_STATUS_FINALIZED,
       isCurrent: true,
       budgetPlanId: 'plan-1',
       sourcePlanId: '',
       actualsThroughMonth: ''
+    })
+  })
+
+  it('persists draft budgets without converting them to finalized baselines', () => {
+    const centers = [
+      {
+        id: 'center-1',
+        name: 'North America Operations',
+        timezone: 'America/New_York',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        defaultPaidHoursPerDay: 8,
+        defaultOccupancyPercent: 90,
+        defaultAdherencePercent: 95,
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Consumer Voice',
+            plans: []
+          }
+        ]
+      }
+    ]
+
+    const nextCenters = upsertPlanningPlan(centers, 'center-1', 'group-1', {
+      name: '2026 Budget',
+      planningYear: 2026,
+      planType: PLAN_TYPE_BUDGET,
+      status: PLAN_STATUS_DRAFT
+    })
+
+    expect(nextCenters[0].groups[0].plans[0]).toMatchObject({
+      name: '2026 Budget',
+      planningYear: 2026,
+      planType: PLAN_TYPE_BUDGET,
+      status: PLAN_STATUS_DRAFT,
+      finalizedAt: ''
     })
   })
 

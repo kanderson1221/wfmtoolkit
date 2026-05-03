@@ -43,6 +43,7 @@
   .schedule-chart,
   .schedule-gantt,
   .schedule-plot,
+  .app-chart-surface,
   .forecast-chart-surface {
     @apply overflow-hidden rounded-[24px] border border-white bg-white p-4;
   }

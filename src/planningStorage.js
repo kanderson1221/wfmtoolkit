@@ -25,6 +25,8 @@ export const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
 export const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
 export const PLAN_TYPE_BUDGET = 'budget'
 export const PLAN_TYPE_UPDATE = 'update'
+export const PLAN_STATUS_DRAFT = 'draft'
+export const PLAN_STATUS_FINALIZED = 'finalized'
 
 const buildScopedStorageKey = (baseKey, scope = 'default') => `${baseKey}.${String(scope || 'default')}`
 
@@ -190,6 +192,21 @@ const getPlanYear = (plan) => resolvePlanningYear(plan?.planningYear)
 const normalizePlanType = (value) => String(value || '').trim().toLowerCase() === PLAN_TYPE_UPDATE
   ? PLAN_TYPE_UPDATE
   : PLAN_TYPE_BUDGET
+export const normalizePlanStatus = (value, planType = PLAN_TYPE_BUDGET) => {
+  if (normalizePlanType(planType) === PLAN_TYPE_UPDATE) {
+    return PLAN_STATUS_FINALIZED
+  }
+
+  return String(value || '').trim().toLowerCase() === PLAN_STATUS_DRAFT
+    ? PLAN_STATUS_DRAFT
+    : PLAN_STATUS_FINALIZED
+}
+export const isDraftBudgetPlan = (plan) =>
+  normalizePlanType(plan?.planType) === PLAN_TYPE_BUDGET &&
+  normalizePlanStatus(plan?.status, PLAN_TYPE_BUDGET) === PLAN_STATUS_DRAFT
+export const isFinalizedBudgetPlan = (plan) =>
+  normalizePlanType(plan?.planType) === PLAN_TYPE_BUDGET &&
+  normalizePlanStatus(plan?.status, PLAN_TYPE_BUDGET) === PLAN_STATUS_FINALIZED
 const normalizeMonthStart = (value) => {
   const normalizedValue = String(value || '').trim()
   return /^\d{4}-\d{2}-01$/.test(normalizedValue) ? normalizedValue : ''
@@ -308,6 +325,7 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
   const { budgets: _discardBudgets, ...planSnapshot } = snapshot
   const resolvedYear = resolvePlanningYear(planSnapshot.planningYear)
   const planType = normalizePlanType(planSnapshot.planType)
+  const status = normalizePlanStatus(planSnapshot.status, planType)
   const id = planSnapshot.id || createEntityId('plan')
   const name = String(planSnapshot.name || '').trim() || buildPlanName(resolvedYear, planType)
 
@@ -316,6 +334,8 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
     id,
     name,
     planType,
+    status,
+    finalizedAt: status === PLAN_STATUS_FINALIZED ? String(planSnapshot.finalizedAt || '').trim() : '',
     isCurrent: Boolean(planSnapshot.isCurrent),
     budgetPlanId: planType === PLAN_TYPE_BUDGET
       ? (planSnapshot.budgetPlanId || id)

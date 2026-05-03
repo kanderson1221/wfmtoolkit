@@ -11,7 +11,6 @@ import {
   getForecastSourceKindLabel,
   forecastProjectBelongsToPlanningContext,
   formatDateTime,
-  getForecastPlanningYear,
   mergeForecastProjectCollections
 } from '../../forecasting/shared'
 import { createManualMonthlyForecastResults } from '../../forecasting/sourceArtifacts'
@@ -22,15 +21,20 @@ import {
   buildForecastDailyDemandSnapshot,
   buildForecastDemandSnapshot,
   createPlanDemandSource,
+  summarizeForecastCoverageForPlan,
   summarizeForecastDemandSnapshot
 } from '../../planner/demandSources'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../planner/shared'
 
 export const usePlannerForecastDemandSource = ({
   props,
   planningYear,
   demandSource,
   planMonths,
-  selectedForecastProjectId
+  selectedForecastProjectId,
+  planType,
+  requirementMethod,
+  actualsThroughMonth
 }) => {
   const availableForecastProjects = ref([])
   const forecastsLoaded = ref(false)
@@ -57,10 +61,18 @@ export const usePlannerForecastDemandSource = ({
     )]
   })
 
+  const planCoverageOptions = computed(() => ({
+    planType: planType?.value || '',
+    actualsThroughMonth: actualsThroughMonth?.value || ''
+  }))
+
+  const requiresDailyForecast = computed(() =>
+    requirementMethod?.value === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+  )
+
   const isPlanAssignableForecast = (project) => (
     Array.isArray(project?.lastRun?.monthlyRollup) &&
     project.lastRun.monthlyRollup.length &&
-    getForecastPlanningYear(project) === planningYear.value &&
     computeForecastPlanningReady(project)
   )
 
@@ -144,6 +156,16 @@ export const usePlannerForecastDemandSource = ({
         return
       }
 
+      if (
+        loaded &&
+        normalizedAppliedForecastId &&
+        !availableProjectIds.has(normalizedAppliedForecastId) &&
+        projects.length === 1
+      ) {
+        selectedForecastProjectId.value = normalizeForecastId(projects[0]?.id)
+        return
+      }
+
       if (loaded && normalizedSelectedForecastId) {
         selectedForecastProjectId.value = ''
       }
@@ -168,19 +190,52 @@ export const usePlannerForecastDemandSource = ({
 
   const selectedForecastSnapshot = computed(() =>
     selectedForecastProject.value
-      ? buildForecastDemandSnapshot(selectedForecastProject.value, planningYear.value)
+      ? buildForecastDemandSnapshot(selectedForecastProject.value, planningYear.value, planCoverageOptions.value)
       : []
   )
 
   const selectedForecastDailySnapshot = computed(() =>
     selectedForecastProject.value
-      ? buildForecastDailyDemandSnapshot(selectedForecastProject.value, planningYear.value)
+      ? buildForecastDailyDemandSnapshot(selectedForecastProject.value, planningYear.value, planCoverageOptions.value)
+      : []
+  )
+
+  const selectedForecastHasDailySnapshot = computed(() => selectedForecastDailySnapshot.value.length > 0)
+
+  const selectedForecastCoverageSummary = computed(() =>
+    selectedForecastProject.value
+      ? summarizeForecastCoverageForPlan(selectedForecastProject.value, planningYear.value, planCoverageOptions.value)
+      : null
+  )
+
+  const appliedForecastProject = computed(() => {
+    if (demandSource.value.mode !== DEMAND_SOURCE_FORECAST) {
+      return null
+    }
+
+    const appliedForecastId = normalizeForecastId(demandSource.value.forecastProjectId)
+    if (!appliedForecastId) {
+      return null
+    }
+
+    return forecastProjectsWithResults.value.find(
+      (project) => normalizeForecastId(project?.id) === appliedForecastId
+    ) || null
+  })
+
+  const appliedForecastDailySnapshot = computed(() =>
+    appliedForecastProject.value
+      ? buildForecastDailyDemandSnapshot(appliedForecastProject.value, planningYear.value, planCoverageOptions.value)
       : []
   )
 
   const selectedForecastPreviewSummary = computed(() => {
     if (selectedForecastProject.value) {
-      const snapshotSummary = summarizeForecastDemandSnapshot(selectedForecastSnapshot.value)
+      const coverageSummary = selectedForecastCoverageSummary.value
+      const snapshotSummary = summarizeForecastDemandSnapshot(
+        selectedForecastSnapshot.value,
+        coverageSummary?.requiredMonthCount || 12
+      )
 
       return {
         projectName: selectedForecastProject.value.name,
@@ -194,6 +249,12 @@ export const usePlannerForecastDemandSource = ({
         coverageWindowLabel: selectedForecastProject.value.lastRun?.summary?.coverageStartDate && selectedForecastProject.value.lastRun?.summary?.coverageEndDate
           ? `${selectedForecastProject.value.lastRun.summary.coverageStartDate} to ${selectedForecastProject.value.lastRun.summary.coverageEndDate}`
           : '',
+        coverageStatusLabel: coverageSummary?.coverageLabel || '',
+        missingCoverageLabel: coverageSummary?.missingCoverageLabel || '',
+        requiredMonthCount: coverageSummary?.requiredMonthCount || 0,
+        dailySnapshotCount: selectedForecastDailySnapshot.value.length,
+        requiresDailyForecast: requiresDailyForecast.value,
+        dailyForecastReady: !requiresDailyForecast.value || selectedForecastHasDailySnapshot.value,
         ...snapshotSummary
       }
     }
@@ -203,7 +264,13 @@ export const usePlannerForecastDemandSource = ({
 
   const demandSourceSummary = computed(() => {
     if (demandSource.value.forecastProjectName || demandSource.value.forecastMonthSnapshot.length) {
-      const snapshotSummary = summarizeForecastDemandSnapshot(demandSource.value.forecastMonthSnapshot)
+      const dailySnapshotCount = Array.isArray(demandSource.value.forecastDailySnapshot)
+        ? demandSource.value.forecastDailySnapshot.length
+        : 0
+      const snapshotSummary = summarizeForecastDemandSnapshot(
+        demandSource.value.forecastMonthSnapshot,
+        demandSource.value.forecastMonthSnapshot.length || 12
+      )
 
       return {
         projectName: demandSource.value.forecastProjectName || 'Saved Forecast',
@@ -216,6 +283,9 @@ export const usePlannerForecastDemandSource = ({
         coverageStartMonthIndex: demandSource.value.coverageStartMonthIndex ?? null,
         coverageWindowLabel: '',
         sourceMissing: appliedForecastProjectMissing.value,
+        dailySnapshotCount,
+        requiresDailyForecast: requiresDailyForecast.value,
+        dailyForecastReady: !requiresDailyForecast.value || dailySnapshotCount > 0,
         ...snapshotSummary
       }
     }
@@ -223,14 +293,28 @@ export const usePlannerForecastDemandSource = ({
     return null
   })
 
-  const forecastCanApply = computed(() =>
-    Boolean(selectedForecastProject.value) && selectedForecastSnapshot.value.length > 0
-  )
+  const forecastCanApply = computed(() => {
+    const hasMonthlySnapshot = Boolean(selectedForecastProject.value) &&
+      Boolean(selectedForecastCoverageSummary.value?.hasRequiredCoverage) &&
+      selectedForecastSnapshot.value.length > 0
+
+    if (!hasMonthlySnapshot) {
+      return false
+    }
+
+    return !requiresDailyForecast.value || selectedForecastHasDailySnapshot.value
+  })
 
   const applyForecastToDemand = () => {
     if (!selectedForecastProject.value || !selectedForecastSnapshot.value.length) {
       forecastApplyTone.value = 'error'
       forecastApplyMessage.value = 'Select a completed saved forecast before applying it to this plan.'
+      return false
+    }
+
+    if (requiresDailyForecast.value && !selectedForecastHasDailySnapshot.value) {
+      forecastApplyTone.value = 'error'
+      forecastApplyMessage.value = 'Intraday Erlang requires a modeled or imported daily forecast. Select a forecast with daily rows before applying it.'
       return false
     }
 
@@ -250,9 +334,39 @@ export const usePlannerForecastDemandSource = ({
       forecastDailySnapshot: selectedForecastDailySnapshot.value
     })
     forecastApplyTone.value = 'success'
-    forecastApplyMessage.value = `${wasSameForecast ? 'Reapplied' : 'Applied'} ${selectedForecastProject.value.name}. Monthly contacts and starting AHT assumptions were refreshed from the saved forecast.`
+    forecastApplyMessage.value = requiresDailyForecast.value
+      ? `${wasSameForecast ? 'Reapplied' : 'Applied'} ${selectedForecastProject.value.name}. Monthly contacts, AHT assumptions, and daily rows were refreshed from the saved forecast.`
+      : `${wasSameForecast ? 'Reapplied' : 'Applied'} ${selectedForecastProject.value.name}. Monthly contacts and starting AHT assumptions were refreshed from the saved forecast.`
     return true
   }
+
+  watch(
+    [
+      appliedForecastProject,
+      appliedForecastDailySnapshot,
+      () => demandSource.value.mode,
+      () => demandSource.value.forecastMonthSnapshot?.length || 0,
+      () => demandSource.value.forecastDailySnapshot?.length || 0
+    ],
+    ([project, dailySnapshot, mode, monthlySnapshotLength, dailySnapshotLength]) => {
+      if (
+        mode !== DEMAND_SOURCE_FORECAST ||
+        !project ||
+        monthlySnapshotLength <= 0 ||
+        dailySnapshotLength > 0 ||
+        !Array.isArray(dailySnapshot) ||
+        dailySnapshot.length <= 0
+      ) {
+        return
+      }
+
+      demandSource.value = createPlanDemandSource({
+        ...demandSource.value,
+        forecastDailySnapshot: dailySnapshot
+      })
+    },
+    { immediate: true }
+  )
 
   const hasLegacyManualDemandSource = computed(() =>
     Boolean(props.initialPlan?.id) && demandSource.value.mode !== DEMAND_SOURCE_FORECAST

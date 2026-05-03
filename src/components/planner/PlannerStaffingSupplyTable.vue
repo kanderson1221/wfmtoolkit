@@ -27,6 +27,10 @@ const props = defineProps({
   startingPositionInheritedFromYear: {
     type: Number,
     default: null
+  },
+  readOnly: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -110,7 +114,11 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
       <AppStatusMessage v-if="startingPositionMessage" tone="info">
         {{ startingPositionMessage }}
       </AppStatusMessage>
-      <AppCheckbox v-model="yearEndTargetEnabled" input-id="year-end-headcount-target">
+      <AppCheckbox
+        v-model="yearEndTargetEnabled"
+        input-id="year-end-headcount-target"
+        :disabled="props.readOnly"
+      >
         Set a target next January starting frontline headcount.
       </AppCheckbox>
       <p class="pl-7 text-sm leading-6 text-slate-600">
@@ -195,7 +203,7 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
               <td>{{ props.formatNumber(isIntradayErlang ? record.peakIntervalRequiredHeadcount : record.peakDayRequiredHeadcount, 1) }}</td>
               <td>
                 <AppTableNumberField
-                  v-if="record.monthIndex === 0 && !props.startingPositionInherited"
+                  v-if="record.monthIndex === 0 && !props.startingPositionInherited && !props.readOnly"
                   v-model.number="startingHeadcount"
                   :min="0"
                   :step="0.1"
@@ -206,7 +214,7 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
               </td>
               <td>
                 <AppTableNumberField
-                  v-if="record.monthIndex === 0 && !props.startingPositionInherited"
+                  v-if="record.monthIndex === 0 && !props.startingPositionInherited && !props.readOnly"
                   v-model.number="startingFrontlineHeadcount"
                   :min="0"
                   :max="startingHeadcount"
@@ -221,6 +229,7 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
               <td>{{ props.formatNumber(record.inTrainingHeadcount, 1) }}</td>
               <td>
                 <AppTableNumberField
+                  v-if="!props.readOnly"
                   v-model.number="staffingMonths[record.monthIndex].frontlineAttritionHeadcount"
                   :min="0"
                   :step="0.1"
@@ -228,10 +237,11 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
                   :title="`Derived attrition: ${props.formatNumber(record.frontlineAttritionPercent, 1)}% of starting frontline headcount`"
                   aria-label="Frontline attrition headcount"
                 />
+                <template v-else>{{ props.formatNumber(record.frontlineAttritionHeadcount, 1) }}</template>
             </td>
             <td>{{ props.formatNumber(record.endingRosterHeadcount, 1) }}</td>
             <td>
-              <div v-if="record.monthIndex === 11 && yearEndTargetEnabled" class="grid gap-1">
+              <div v-if="record.monthIndex === 11 && yearEndTargetEnabled && !props.readOnly" class="grid gap-1">
                 <AppTableNumberField
                   v-model.number="yearEndHeadcountTarget"
                   :min="0"

@@ -1,24 +1,5 @@
 <script setup>
-import { computed } from 'vue'
-import { use } from 'echarts/core'
-import { LineChart } from 'echarts/charts'
-import {
-  DataZoomComponent,
-  GridComponent,
-  MarkLineComponent,
-  TooltipComponent
-} from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-import VChart from 'vue-echarts'
-
-use([
-  CanvasRenderer,
-  LineChart,
-  DataZoomComponent,
-  GridComponent,
-  MarkLineComponent,
-  TooltipComponent
-])
+import AppChart from './AppChart.vue'
 
 const props = defineProps({
   ariaDescribedby: {
@@ -64,49 +45,8 @@ const props = defineProps({
     })
   }
 })
-
-const cloneChartValue = (value) => {
-  if (Array.isArray(value)) {
-    return value.map(cloneChartValue)
-  }
-
-  if (value instanceof Date) {
-    return new Date(value)
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entryValue]) => [key, cloneChartValue(entryValue)])
-    )
-  }
-
-  return value
-}
-
-const chartOption = computed(() => cloneChartValue(props.option || {}))
-const chartUpdateOptions = computed(() => cloneChartValue(props.updateOptions || { notMerge: false }))
-const outerClass = computed(() => (props.scrollable ? 'overflow-x-auto' : 'h-full min-h-0'))
-const surfaceClass = computed(() => [
-  props.surface ? 'forecast-chart-surface' : '',
-  props.heightClass,
-  props.minWidthClass
-])
 </script>
 
 <template>
-  <div :class="outerClass">
-    <div :class="surfaceClass">
-      <VChart
-        :id="props.chartId || undefined"
-        class="h-full w-full"
-        :option="chartOption"
-        :update-options="chartUpdateOptions"
-        autoresize
-        :aria-label="props.ariaLabel || undefined"
-        :aria-describedby="props.ariaDescribedby || undefined"
-      >
-        {{ props.fallbackText }}
-      </VChart>
-    </div>
-  </div>
+  <AppChart v-bind="props" />
 </template>

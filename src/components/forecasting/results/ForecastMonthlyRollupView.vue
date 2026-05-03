@@ -1,12 +1,15 @@
 <script setup>
+import { computed } from 'vue'
+
 import { formatForecastAhtSeconds } from '../../../forecasting/handleTimeAssumptions'
 import {
+  FORECAST_SOURCE_IMPORTED_DAILY,
   FORECAST_SOURCE_MANUAL_MONTHLY,
   formatDate,
   formatWhole
 } from '../../../forecasting/shared'
 
-defineProps({
+const props = defineProps({
   embeddedMonthlyHighlights: {
     type: Array,
     default: () => []
@@ -35,6 +38,18 @@ defineProps({
     type: Array,
     default: () => []
   }
+})
+
+const ahtAssumptionDescription = computed(() => {
+  if (props.sourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
+    return 'Assumed AHT comes from the imported daily AHT column, rolled up to monthly weighted averages.'
+  }
+
+  const overrideText = props.monthlyAhtSummary.overrideMonthCount
+    ? `, with ${formatWhole(props.monthlyAhtSummary.overrideMonthCount)} monthly override${props.monthlyAhtSummary.overrideMonthCount === 1 ? '' : 's'}`
+    : ''
+
+  return `Assumed AHT comes from shared staffing-group history using ${String(props.monthlyAhtSummary.methodLabel || '').toLowerCase()}${overrideText}.`
 })
 </script>
 
@@ -66,7 +81,7 @@ defineProps({
         v-if="showAhtAssumptions"
         class="mt-2 text-sm leading-6 text-slate-600"
       >
-        Assumed AHT comes from shared staffing-group history using {{ monthlyAhtSummary.methodLabel.toLowerCase() }}<span v-if="monthlyAhtSummary.overrideMonthCount">, with {{ formatWhole(monthlyAhtSummary.overrideMonthCount) }} monthly override<span v-if="monthlyAhtSummary.overrideMonthCount !== 1">s</span></span>.
+        {{ ahtAssumptionDescription }}
       </p>
 
       <div class="mt-3 overflow-hidden border border-slate-200 bg-white">

@@ -576,6 +576,36 @@ const workflowSections = computed(() => [
   }
 ])
 
+const budgetFinalizeProgressItems = computed(() => [
+  forecastProgress.value,
+  availabilityProgress.value,
+  variabilityProgress.value,
+  requirementProgress.value,
+  staffingProgress.value
+])
+const budgetFinalizeBlocker = computed(() => {
+  const blockedItem = budgetFinalizeProgressItems.value.find((item) => !item.isReady)
+  return blockedItem?.blocker || blockedItem?.detail || 'Review the highlighted sections before finalizing.'
+})
+const canFinalizeBudget = computed(() =>
+  builder.isDraftBudget && budgetFinalizeProgressItems.value.every((item) => item.isReady)
+)
+const savePlanButtonLabel = computed(() => builder.isDraftBudget ? 'Save Draft' : 'Save Plan')
+const savePlanButtonVariant = computed(() => builder.isDraftBudget ? 'secondary' : 'primary')
+const editableBudgetStatusMessage = computed(() =>
+  canFinalizeBudget.value
+    ? 'Budget draft is ready to finalize. Finalizing locks this plan as the budget baseline.'
+    : `Budget draft is editable. Complete required sections before finalizing. Next: ${budgetFinalizeBlocker.value}`
+)
+
+const finalizeBudgetPlan = async () => {
+  if (!canFinalizeBudget.value) {
+    return
+  }
+
+  await builder.finalizePlan()
+}
+
 const handleWorkflowItemSelect = (item) => {
   if (item?.id) {
     builder.setActiveSection(item.id)
@@ -598,13 +628,8 @@ const breadcrumbItems = computed(() => {
     { label: builder.displayPlanLabel }
   ]
 })
-const plansHref = computed(() =>
-  buildPlanningGroupHash(
-    props.centerDefaults?.centerId,
-    props.centerDefaults?.groupId,
-    builder.planningYear,
-    { tab: 'plans' }
-  )
+const planWorkspaceDisabled = computed(() =>
+  builder.isReadOnlyBudget && builder.activeSection !== 'staffing'
 )
 </script>
 
@@ -624,15 +649,20 @@ const plansHref = computed(() =>
             :autosave-status-message="builder.autosaveStatusMessage"
             :autosave-state="builder.autosaveState"
           />
-          <AppButton
-            v-if="builder.isReadOnlyBudget"
-            size="md"
-            variant="primary"
-            :href="plansHref"
-          >
-            Create Updated Plan
-          </AppButton>
-          <AppButton v-else size="md" variant="primary" @click="builder.savePlan">Save Plan</AppButton>
+          <template v-if="!builder.isReadOnlyBudget">
+            <AppButton size="md" :variant="savePlanButtonVariant" @click="builder.savePlan">
+              {{ savePlanButtonLabel }}
+            </AppButton>
+            <AppButton
+              v-if="builder.isDraftBudget"
+              size="md"
+              variant="primary"
+              :disabled="!canFinalizeBudget"
+              @click="finalizeBudgetPlan"
+            >
+              Finalize Budget
+            </AppButton>
+          </template>
         </div>
       </div>
 
@@ -646,6 +676,10 @@ const plansHref = computed(() =>
 
       <AppStatusMessage v-else-if="builder.validationMessage" tone="error" class="mb-3">
         {{ builder.validationMessage }}
+      </AppStatusMessage>
+
+      <AppStatusMessage v-else-if="builder.isDraftBudget" :tone="canFinalizeBudget ? 'success' : 'info'" class="mb-3">
+        {{ editableBudgetStatusMessage }}
       </AppStatusMessage>
 
       <AppPanel :padded="false" class="monthly-flow-card">
@@ -667,7 +701,7 @@ const plansHref = computed(() =>
           </section>
 
           <section class="min-w-0 p-3">
-            <fieldset :disabled="builder.isReadOnlyBudget" class="contents">
+            <fieldset :disabled="planWorkspaceDisabled" class="contents">
               <div class="grid gap-3">
                 <div
                   v-if="builder.activeSection === 'forecast'"
@@ -687,6 +721,9 @@ const plansHref = computed(() =>
                     :forecast-can-apply="builder.forecastCanApply"
                     :forecast-apply-message="builder.forecastApplyMessage"
                     :forecast-apply-tone="builder.forecastApplyTone"
+                    :read-only="builder.isReadOnlyBudget"
+                    :read-only-message="builder.readOnlyBudgetMessage"
+                    :requires-daily-forecast="isIntradayErlang"
                     :format-whole="builder.formatWhole"
                     :format-number="builder.formatNumber"
                     @apply-forecast="builder.applyForecastToDemand"
@@ -767,6 +804,8 @@ const plansHref = computed(() =>
                   :inherited-training-classes="builder.inheritedTrainingClasses"
                   :staffing-records="builder.staffingRecords"
                   :format-number="builder.formatNumber"
+                  :read-only="builder.isReadOnlyBudget"
+                  :save-label="savePlanButtonLabel"
                   :year-end-target-defaults="{
                     frontlineHeadcount: builder.staffingSummary.endingFrontlineHeadcount,
                   }"

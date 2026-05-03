@@ -360,12 +360,26 @@ describe('ForecastingWorkspace', () => {
   })
 
   it('emits save-complete after importing a read-only daily forecast', async () => {
+    const importedDailyRows = Array.from({ length: 31 }, (_, index) => ({
+      ds: `2025-01-${String(index + 1).padStart(2, '0')}`,
+      yhat: 1000 + (index * 20),
+      yhatLower: 1000 + (index * 20),
+      yhatUpper: 1000 + (index * 20),
+      ahtSeconds: 300 + (index % 3) * 15,
+      actualValue: null,
+      isHistory: false
+    }))
+    const persistWorkspace = vi.spyOn(forecastingRepository, 'persistWorkspace').mockImplementation(
+      async (projects) => projects
+    )
     const wrapper = mount(ForecastingWorkspace, {
       props: {
         storageScope: 'forecast-imported-daily-save-spec',
         projectSeed: createForecastProject({
           groupName: 'Consumer Voice',
           planningYear: 2025,
+          coverageStartDate: '2025-01-01',
+          coverageEndDate: '2025-01-31',
           planningContext: {
             centerId: 'center-1',
             groupId: 'group-1',
@@ -386,20 +400,26 @@ describe('ForecastingWorkspace', () => {
       coverageStartMonthIndex: 0,
       sourceData: {
         fileName: 'consumer-voice-2025-forecast.csv',
-        headers: ['date', 'forecast'],
-        rows: [
-          { rowIndex: 2, date: '2025-01-01', forecast: '1000' },
-          { rowIndex: 3, date: '2025-01-02', forecast: '1020' }
-        ],
+        headers: ['date', 'forecast', 'aht_seconds'],
+        rows: importedDailyRows.map((row, index) => ({
+          rowIndex: index + 2,
+          date: row.ds,
+          forecast: String(row.yhat),
+          aht_seconds: String(row.ahtSeconds)
+        })),
         mapping: {
           dateColumn: 'date',
-          forecastColumn: 'forecast'
+          forecastColumn: 'forecast',
+          ahtColumn: 'aht_seconds'
         },
         issues: []
       },
-      importedDailyRows: [
-        { ds: '2025-01-01', yhat: 1000, yhatLower: 1000, yhatUpper: 1000, actualValue: null, isHistory: false },
-        { ds: '2025-01-02', yhat: 1020, yhatLower: 1020, yhatUpper: 1020, actualValue: null, isHistory: false }
+      importedDailyRows,
+      ahtMonthOverrides: [
+        {
+          monthStart: '2025-01-01',
+          ahtSeconds: 315.1485148514852
+        }
       ]
     })
     for (let attempt = 0; attempt < 6 && !wrapper.emitted('save-complete')?.length; attempt += 1) {
@@ -407,6 +427,13 @@ describe('ForecastingWorkspace', () => {
     }
 
     expect(wrapper.emitted('save-complete')).toHaveLength(1)
+    const savedProjects = persistWorkspace.mock.calls.at(-1)?.[0] || []
+    expect(savedProjects[0].modelConfig.ahtMonthOverrides).toEqual([
+      {
+        monthStart: '2025-01-01',
+        ahtSeconds: 315.1485148514852
+      }
+    ])
   })
 
   it('emits cancel-create when a new manual monthly forecast is cancelled before save', async () => {

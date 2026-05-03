@@ -111,6 +111,37 @@ describe('usePlanningGroupDataActions', () => {
     expect(actions.forecastHistoryRequirementMessage.value).toContain('Add at least 14 daily history rows')
   })
 
+  it('counts migrated legacy actuals years when checking modeled forecast history', () => {
+    const actions = usePlanningGroupDataActions({
+      center: createCenterRef(),
+      selectedGroup: ref({
+        id: 'group-1',
+        name: 'Voice Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        actualsYears: [
+          {
+            year: 2025,
+            sourceMode: 'daily_upload',
+            dailyRows: buildActualsRows()
+          }
+        ]
+      }),
+      actualsViewRef: ref({
+        clearSelection: vi.fn(),
+        deleteSelectedScope: vi.fn(),
+        clearAllData: vi.fn(),
+        openImportModal: vi.fn()
+      }),
+      requestConfirmation: vi.fn(),
+      onSaveGroup: vi.fn()
+    })
+
+    expect(actions.canLaunchModeledForecast.value).toBe(true)
+    expect(actions.showForecastHistoryRequirement()).toBe(true)
+    expect(actions.forecastHistoryRequirementMessage.value).toBe('')
+    expect(actions.actualsMenuItems.value.map((item) => item.label)).toEqual(['Delete All Data'])
+  })
+
   it('opens the import modal, clears selection, and supports a destructive clear-all path', () => {
     const actualsViewRef = ref({
       clearSelection: vi.fn(),

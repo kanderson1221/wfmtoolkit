@@ -35,7 +35,9 @@ const resetDraftProject = () => {
   monthlyRows.value = createManualMonthlyEntryRows({
     planningYear: draftProject.value.planningYear,
     forecastType: FORECAST_TYPE_BUDGET,
-    coverageStartMonthIndex: 0,
+    coverageStartMonthIndex: draftProject.value.coverageStartMonthIndex ?? 0,
+    coverageStartDate: draftProject.value.coverageStartDate,
+    coverageEndDate: draftProject.value.coverageEndDate,
     seedRows: Array.isArray(props.project?.sourceData?.rows) ? props.project.sourceData.rows : []
   })
 }
@@ -60,7 +62,9 @@ watch(
     monthlyRows.value = createManualMonthlyEntryRows({
       planningYear: draftProject.value.planningYear,
       forecastType: FORECAST_TYPE_BUDGET,
-      coverageStartMonthIndex: 0,
+      coverageStartMonthIndex: draftProject.value.coverageStartMonthIndex ?? 0,
+      coverageStartDate: draftProject.value.coverageStartDate,
+      coverageEndDate: draftProject.value.coverageEndDate,
       seedRows: monthlyRows.value
     })
   }

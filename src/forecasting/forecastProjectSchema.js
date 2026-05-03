@@ -159,7 +159,9 @@ export const createForecastProject = (overrides = {}) => {
   const coverageWindow = resolveForecastCoverageWindow({
     planningYear,
     forecastType,
-    coverageStartMonthIndex: snapshot.coverageStartMonthIndex
+    coverageStartMonthIndex: snapshot.coverageStartMonthIndex,
+    coverageStartDate: snapshot.coverageStartDate,
+    coverageEndDate: snapshot.coverageEndDate
   })
   const normalizedLastRun = snapshot.lastRun?.runAt ? createEmptyForecastResults(snapshot.lastRun) : createEmptyForecastResults()
   const sourceKind = resolveForecastSourceKind(snapshot.sourceKind)
@@ -183,6 +185,8 @@ export const createForecastProject = (overrides = {}) => {
       planningYear,
       forecastType,
       coverageStartMonthIndex: coverageWindow.coverageStartMonthIndex,
+      coverageStartDate: coverageWindow.coverageStartDate,
+      coverageEndDate: coverageWindow.coverageEndDate,
       lastRun: normalizedLastRun
     }),
     sourceCenterSnapshot: snapshot.sourceCenterSnapshot

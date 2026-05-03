@@ -2,6 +2,7 @@ import {
   applyForecastSnapshotToPlanMonths,
   buildForecastDailyDemandSnapshot,
   buildForecastDemandSnapshot,
+  summarizeForecastCoverageForPlan,
   createPlanDemandSource,
   summarizeForecastDailyDemandForOpenDays,
   summarizeForecastDemandSnapshot
@@ -196,10 +197,113 @@ describe('planner demand sources', () => {
     ])
     expect(summarizeForecastDemandSnapshot(demandSource.forecastMonthSnapshot)).toMatchObject({
       matchedMonthCount: 2,
-      coverageLabel: '2/12 months',
+      coverageLabel: 'Covers 2/12 required months',
       totalContacts: 29500,
       peakMonthLabel: 'Feb 2026',
       peakMonthContacts: 15500
+    })
+  })
+
+  it('accepts a forecast that covers required plan months when metadata year differs', () => {
+    const snapshot = buildForecastDemandSnapshot(
+      {
+        planningYear: 2026,
+        forecastType: 'budget',
+        groupId: 'group-1',
+        coverageStartDate: '2027-01-01',
+        coverageEndDate: '2027-12-31',
+        lastRun: {
+          runAt: '2026-04-08T14:00:00Z',
+          monthlyRollup: Array.from({ length: 12 }, (_, index) => ({
+            monthStart: `2027-${String(index + 1).padStart(2, '0')}-01`,
+            monthLabel: `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]} 2027`,
+            contacts: 10000 + (index * 100),
+            lowerBoundContacts: 9500 + (index * 100),
+            upperBoundContacts: 10500 + (index * 100)
+          }))
+        }
+      },
+      2027
+    )
+
+    expect(snapshot).toHaveLength(12)
+    expect(snapshot[0]).toMatchObject({
+      monthStart: '2027-01-01',
+      contacts: 10000
+    })
+    expect(snapshot.at(-1)).toMatchObject({
+      monthStart: '2027-12-01',
+      contacts: 11100
+    })
+  })
+
+  it('summarizes required forecast coverage for update plans after actuals', () => {
+    const forecastProject = {
+      planningYear: 2027,
+      forecastType: 'budget',
+      groupId: 'group-1',
+      coverageStartDate: '2027-07-01',
+      coverageEndDate: '2027-12-31',
+      lastRun: {
+        runAt: '2026-04-08T14:00:00Z',
+        monthlyRollup: Array.from({ length: 6 }, (_, index) => ({
+          monthStart: `2027-${String(index + 7).padStart(2, '0')}-01`,
+          monthLabel: `${['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]} 2027`,
+          contacts: 10000 + (index * 100)
+        }))
+      }
+    }
+
+    expect(summarizeForecastCoverageForPlan(forecastProject, 2027, {
+      planType: 'update',
+      actualsThroughMonth: '2027-06-01'
+    })).toMatchObject({
+      matchedMonthCount: 6,
+      requiredMonthCount: 6,
+      hasRequiredCoverage: true,
+      coverageLabel: 'Covers 6/6 required months',
+      missingCoverageLabel: ''
+    })
+    expect(summarizeForecastCoverageForPlan(forecastProject, 2027)).toMatchObject({
+      matchedMonthCount: 6,
+      requiredMonthCount: 12,
+      hasRequiredCoverage: false,
+      missingCoverageLabel: 'Missing Jan 2027-Jun 2027'
+    })
+  })
+
+  it('snapshots only the required update-plan months from a longer forecast', () => {
+    const snapshot = buildForecastDemandSnapshot(
+      {
+        planningYear: 2027,
+        forecastType: 'budget',
+        groupId: 'group-1',
+        coverageStartDate: '2027-01-01',
+        coverageEndDate: '2027-12-31',
+        lastRun: {
+          runAt: '2026-04-08T14:00:00Z',
+          monthlyRollup: Array.from({ length: 12 }, (_, index) => ({
+            monthStart: `2027-${String(index + 1).padStart(2, '0')}-01`,
+            monthLabel: `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]} 2027`,
+            contacts: 10000 + (index * 100)
+          }))
+        }
+      },
+      2027,
+      {
+        planType: 'update',
+        actualsThroughMonth: '2027-03-01'
+      }
+    )
+
+    expect(snapshot).toHaveLength(9)
+    expect(snapshot[0]).toMatchObject({
+      monthStart: '2027-04-01',
+      monthIndex: 3
+    })
+    expect(snapshot.at(-1)).toMatchObject({
+      monthStart: '2027-12-01',
+      monthIndex: 11
     })
   })
 
@@ -293,8 +397,9 @@ describe('planner demand sources', () => {
           })),
           dailyForecast: [
             { ds: '2025-12-31', yhat: 900, isHistory: false },
-            { ds: '2026-01-01', yhat: 1000, isHistory: true },
-            { ds: '2026-01-02', yhat: 1100, isHistory: false },
+            { ds: '2026-01-01', actualValue: 1300, yhat: 1000, isHistory: true },
+            { ds: '2026-01-02', yhat: 1100, isHistory: true },
+            { ds: '2026-01-03', yhat: 1150, isHistory: false },
             { ds: '2026-02-01', yhat: 1200, isHistory: false }
           ]
         }
@@ -303,9 +408,35 @@ describe('planner demand sources', () => {
     )
 
     expect(snapshot).toEqual([
+      { serviceDate: '2026-01-01', monthIndex: 0, monthLabel: 'Jan', contacts: 1300 },
       { serviceDate: '2026-01-02', monthIndex: 0, monthLabel: 'Jan', contacts: 1100 },
+      { serviceDate: '2026-01-03', monthIndex: 0, monthLabel: 'Jan', contacts: 1150 },
       { serviceDate: '2026-02-01', monthIndex: 1, monthLabel: 'Feb', contacts: 1200 }
     ])
+  })
+
+  it('does not create daily demand rows for monthly-only forecasts', () => {
+    const snapshot = buildForecastDailyDemandSnapshot(
+      {
+        planningYear: 2026,
+        forecastType: 'budget',
+        planningContext: {
+          groupId: 'group-1',
+          planningYear: 2026
+        },
+        lastRun: {
+          runAt: '2026-04-08T14:00:00Z',
+          monthlyRollup: Array.from({ length: 12 }, (_, index) => ({
+            monthStart: `2026-${String(index + 1).padStart(2, '0')}-01`,
+            monthLabel: `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]} 2026`,
+            contacts: 10000 + (index * 100)
+          }))
+        }
+      },
+      2026
+    )
+
+    expect(snapshot).toEqual([])
   })
 
   it('summarizes daily forecast demand using only open days', () => {

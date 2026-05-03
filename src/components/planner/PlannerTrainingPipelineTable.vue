@@ -29,6 +29,10 @@ const props = defineProps({
   selectedMonthIndex: {
     type: Number,
     required: true
+  },
+  readOnly: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -140,6 +144,10 @@ const getTrainingStatus = (trainingClass) => {
 }
 
 const addTrainingClass = () => {
+  if (props.readOnly) {
+    return
+  }
+
   trainingClasses.value = [
     ...trainingClasses.value,
     createTrainingClass({
@@ -152,6 +160,10 @@ const addTrainingClass = () => {
 }
 
 const removeTrainingClass = (classId) => {
+  if (props.readOnly) {
+    return
+  }
+
   trainingClasses.value = trainingClasses.value.filter((trainingClass) => trainingClass.id !== classId)
 }
 
@@ -193,6 +205,10 @@ const trainingClassMenuItems = [
 ]
 
 const handleTrainingClassMenuSelect = (trainingClass, item) => {
+  if (props.readOnly) {
+    return
+  }
+
   if (item.id === 'delete-training-class') {
     removeTrainingClass(trainingClass.id)
   }
@@ -220,7 +236,7 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
         </div>
       </button>
 
-      <div v-if="pipelineOpen" class="training-class-toolbar">
+      <div v-if="pipelineOpen && !props.readOnly" class="training-class-toolbar">
         <AppButton variant="secondary" @click="emit('open-settings')">Training Settings</AppButton>
         <AppButton variant="primary" @click="addTrainingClass">Add Training Class</AppButton>
         <AppButton
@@ -253,7 +269,9 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
           <tbody>
             <tr v-if="!sortedTrainingClasses.length">
               <td colspan="7" class="training-empty-state">
-                Add a training class or use recommendations to start feeding hire and graduation headcount into the staffing plan.
+                {{ props.readOnly
+                  ? 'No training classes are planned for this budget.'
+                  : 'Add a training class or use recommendations to start feeding hire and graduation headcount into the staffing plan.' }}
               </td>
             </tr>
             <tr
@@ -269,6 +287,9 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
                   <span class="font-medium text-slate-800">{{ formatHireDate(resolveHireDate(trainingClass)) }}</span>
                   <span class="training-origin-pill">{{ getInheritedOriginLabel(trainingClass) }}</span>
                 </div>
+                <template v-else-if="props.readOnly">
+                  {{ formatHireDate(resolveHireDate(trainingClass)) }}
+                </template>
                 <AppTableDateField
                   v-else
                   v-model="trainingClass.hireDate"
@@ -278,7 +299,7 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
                 />
               </td>
               <td>
-                <template v-if="isInheritedTrainingClass(trainingClass)">
+                <template v-if="isInheritedTrainingClass(trainingClass) || props.readOnly">
                   {{ props.formatNumber(trainingClass.hireCount, 1) }}
                 </template>
                 <AppTableNumberField
@@ -301,7 +322,7 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
                 </span>
               </td>
               <td class="training-action-cell">
-                <span v-if="isInheritedTrainingClass(trainingClass)" class="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
+                <span v-if="isInheritedTrainingClass(trainingClass) || props.readOnly" class="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                   Read only
                 </span>
                 <AppMenu

@@ -123,7 +123,9 @@ const getPlanAlignedHorizonValidationMessage = (project) => {
   const coverageWindow = resolveForecastCoverageWindow({
     planningYear,
     forecastType,
-    coverageStartMonthIndex: project.coverageStartMonthIndex
+    coverageStartMonthIndex: project.coverageStartMonthIndex,
+    coverageStartDate: project.coverageStartDate,
+    coverageEndDate: project.coverageEndDate
   })
 
   const historyEndDate = parseForecastDateValue(trainingHistoryRows.at(-1)?.ds || '')
@@ -455,6 +457,8 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       currentProject.value.planningYear,
       currentProject.value.forecastType,
       currentProject.value.coverageStartMonthIndex,
+      currentProject.value.coverageStartDate,
+      currentProject.value.coverageEndDate,
       currentProject.value.planningContext?.groupId
     ],
     () => {
@@ -473,7 +477,9 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       const coverageWindow = resolveForecastCoverageWindow({
         planningYear: resolvedPlanningYear,
         forecastType: resolvedForecastType,
-        coverageStartMonthIndex: currentProject.value.coverageStartMonthIndex
+        coverageStartMonthIndex: currentProject.value.coverageStartMonthIndex,
+        coverageStartDate: currentProject.value.coverageStartDate,
+        coverageEndDate: currentProject.value.coverageEndDate
       })
 
       if (currentProject.value.coverageStartMonthIndex !== coverageWindow.coverageStartMonthIndex) {
