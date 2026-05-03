@@ -32,6 +32,7 @@ export default [
       'playwright-report/**',
       'test-results/**',
       '.venv/**',
+      'venv/**',
       'node_modules/**'
     ]
   },

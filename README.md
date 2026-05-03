@@ -10,6 +10,16 @@ Vue 3 + Vite frontend with a FastAPI backend that runs Erlang C/Erlang A staffin
 
 ## Run locally
 
+For the usual local development path, run:
+
+```bash
+npm run dev:app
+```
+
+This command installs missing frontend dependencies, creates the backend virtual environment when needed, installs missing backend dependencies, and starts both FastAPI and Vite.
+
+Manual setup is still available when you want to run each service separately:
+
 1. Install frontend dependencies:
 
 ```bash

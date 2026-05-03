@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:app": "node scripts/dev-app.mjs",
     "build": "vite build",
     "lint": "eslint . --ext .js,.mjs,.vue",
     "lint:fix": "eslint . --ext .js,.mjs,.vue --fix",
