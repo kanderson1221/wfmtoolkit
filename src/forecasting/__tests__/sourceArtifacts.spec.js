@@ -22,7 +22,7 @@ describe('forecast source artifacts', () => {
 
     expect(state.importedDailyRows).toHaveLength(2)
     expect(state.issues).toContain(
-      'This imported 2025 budget forecast must contain one complete daily forecast from 2025-01-01 through 2025-12-31.'
+      'This imported 2025 demand forecast must contain one complete daily forecast from 2025-01-01 through 2025-12-31.'
     )
   })
 

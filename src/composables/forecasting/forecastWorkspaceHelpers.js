@@ -276,7 +276,9 @@ export const buildForecastPayload = (project) => {
   const coverageWindow = resolveForecastCoverageWindow({
     planningYear,
     forecastType,
-    coverageStartMonthIndex: project.coverageStartMonthIndex
+    coverageStartMonthIndex: project.coverageStartMonthIndex,
+    coverageStartDate: project.coverageStartDate,
+    coverageEndDate: project.coverageEndDate
   })
   const adHocForecastHorizonDays = Math.max(1, Number(project.forecastHorizonDays) || 365)
   const trainingHistoryRows = filterTrainingHistoryRowsToOpenDays(

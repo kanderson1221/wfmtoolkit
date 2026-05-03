@@ -31,6 +31,7 @@ export default [
       'coverage/**',
       'playwright-report/**',
       'test-results/**',
+      '.venv/**',
       'node_modules/**'
     ]
   },

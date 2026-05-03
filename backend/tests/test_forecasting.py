@@ -291,18 +291,53 @@ class ForecastingTests(unittest.TestCase):
         self.assertEqual(result["monthlyRollup"][0]["monthStart"], "2025-01-01")
         self.assertEqual(result["monthlyRollup"][-1]["monthStart"], "2025-12-01")
 
-    def test_plan_aligned_budget_forecast_requires_full_year_window(self) -> None:
+    @patch("backend.app.forecasting.Prophet", FakeProphet)
+    def test_plan_aligned_budget_forecast_allows_partial_year_window(self) -> None:
         payload = self._payload(
             planningYear=2025,
             forecastType="budget",
             coverageStartDate="2025-08-01",
+            coverageEndDate="2025-12-31",
+            modelConfig={**self._payload().modelConfig.model_dump(), "growth": "linear", "holdoutDays": 0},
+        )
+
+        result = run_daily_volume_forecast(payload)
+
+        self.assertTrue(result["summary"]["planningReady"])
+        self.assertEqual(result["summary"]["coverageStartMonthIndex"], 7)
+        self.assertEqual(len(result["monthlyRollup"]), 5)
+        self.assertEqual(result["monthlyRollup"][0]["monthStart"], "2025-08-01")
+        self.assertEqual(result["monthlyRollup"][-1]["monthStart"], "2025-12-01")
+
+    @patch("backend.app.forecasting.Prophet", FakeProphet)
+    def test_plan_aligned_budget_forecast_allows_cross_year_window(self) -> None:
+        payload = self._payload(
+            planningYear=2025,
+            forecastType="budget",
+            coverageStartDate="2025-05-01",
+            coverageEndDate="2026-04-30",
+            modelConfig={**self._payload().modelConfig.model_dump(), "growth": "linear", "holdoutDays": 0},
+        )
+
+        result = run_daily_volume_forecast(payload)
+
+        self.assertTrue(result["summary"]["planningReady"])
+        self.assertEqual(len(result["monthlyRollup"]), 12)
+        self.assertEqual(result["monthlyRollup"][0]["monthStart"], "2025-05-01")
+        self.assertEqual(result["monthlyRollup"][-1]["monthStart"], "2026-04-01")
+
+    def test_plan_aligned_budget_forecast_requires_complete_month_window(self) -> None:
+        payload = self._payload(
+            planningYear=2025,
+            forecastType="budget",
+            coverageStartDate="2025-08-15",
             coverageEndDate="2025-12-31",
         )
 
         with self.assertRaises(ValueError) as raised:
             run_daily_volume_forecast(payload)
 
-        self.assertIn("Budget forecasts must cover January 1 through December 31", str(raised.exception))
+        self.assertIn("start on the first day of a month", str(raised.exception))
 
     @patch("backend.app.forecasting.Prophet", BrokenProphet)
     def test_forecast_run_surfaces_backend_initialization_errors(self) -> None:

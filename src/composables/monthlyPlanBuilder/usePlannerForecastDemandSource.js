@@ -11,7 +11,6 @@ import {
   getForecastSourceKindLabel,
   forecastProjectBelongsToPlanningContext,
   formatDateTime,
-  getForecastPlanningYear,
   mergeForecastProjectCollections
 } from '../../forecasting/shared'
 import { createManualMonthlyForecastResults } from '../../forecasting/sourceArtifacts'
@@ -39,6 +38,18 @@ export const usePlannerForecastDemandSource = ({
   const forecastApplyMessage = ref('')
   const forecastApplyTone = ref('success')
   const normalizeForecastId = (value) => String(value || '').trim()
+  const resolveActualsThroughMonthIndex = () => {
+    const match = String(props.initialPlan?.actualsThroughMonth || '').match(/^(\d{4})-(\d{2})-01$/)
+    if (!match || Number(match[1]) !== Number(planningYear.value)) {
+      return -1
+    }
+
+    const monthIndex = Number(match[2]) - 1
+    return monthIndex >= 0 && monthIndex <= 11 ? monthIndex : -1
+  }
+  const firstNeededForecastMonthIndex = computed(() =>
+    Math.max(0, Math.min(11, resolveActualsThroughMonthIndex() + 1))
+  )
 
   const forecastStorageScope = computed(() =>
     props.centerDefaults?.forecastStorageScope ||
@@ -60,8 +71,8 @@ export const usePlannerForecastDemandSource = ({
   const isPlanAssignableForecast = (project) => (
     Array.isArray(project?.lastRun?.monthlyRollup) &&
     project.lastRun.monthlyRollup.length &&
-    getForecastPlanningYear(project) === planningYear.value &&
-    computeForecastPlanningReady(project)
+    computeForecastPlanningReady(project) &&
+    buildForecastDemandSnapshot(project, planningYear.value).length > 0
   )
 
   const loadForecastProjects = async () => {
@@ -119,6 +130,17 @@ export const usePlannerForecastDemandSource = ({
     forecastProjectsWithResults.value.find((project) => project.id === selectedForecastProjectId.value) || null
   )
 
+  const appliedForecastProject = computed(() => {
+    const appliedForecastId = normalizeForecastId(demandSource.value.forecastProjectId)
+    if (demandSource.value.mode !== DEMAND_SOURCE_FORECAST || !appliedForecastId) {
+      return null
+    }
+
+    return forecastProjectsWithResults.value.find((project) =>
+      normalizeForecastId(project?.id) === appliedForecastId
+    ) || null
+  })
+
   watch(
     [
       forecastProjectsWithResults,
@@ -169,18 +191,70 @@ export const usePlannerForecastDemandSource = ({
   const selectedForecastSnapshot = computed(() =>
     selectedForecastProject.value
       ? buildForecastDemandSnapshot(selectedForecastProject.value, planningYear.value)
+        .filter((month) => month.monthIndex >= firstNeededForecastMonthIndex.value)
       : []
   )
 
   const selectedForecastDailySnapshot = computed(() =>
     selectedForecastProject.value
       ? buildForecastDailyDemandSnapshot(selectedForecastProject.value, planningYear.value)
+        .filter((row) => row.monthIndex >= firstNeededForecastMonthIndex.value)
       : []
+  )
+
+  watch(
+    [
+      appliedForecastProject,
+      () => demandSource.value.mode,
+      () => demandSource.value.forecastProjectId,
+      () => demandSource.value.forecastDailySnapshot?.length || 0,
+      firstNeededForecastMonthIndex
+    ],
+    ([project, mode]) => {
+      if (!project || mode !== DEMAND_SOURCE_FORECAST) {
+        return
+      }
+
+      const forecastFutureRows = buildForecastDailyDemandSnapshot(project, planningYear.value)
+        .filter((row) => row.monthIndex >= firstNeededForecastMonthIndex.value)
+      if (!forecastFutureRows.length) {
+        return
+      }
+
+      const currentRows = Array.isArray(demandSource.value.forecastDailySnapshot)
+        ? demandSource.value.forecastDailySnapshot
+        : []
+      const currentFutureDates = new Set(
+        currentRows
+          .filter((row) => row.monthIndex >= firstNeededForecastMonthIndex.value)
+          .map((row) => row.serviceDate)
+      )
+      const alreadyHasFutureCoverage = forecastFutureRows.every((row) =>
+        currentFutureDates.has(row.serviceDate)
+      )
+      if (alreadyHasFutureCoverage) {
+        return
+      }
+
+      const preservedRows = currentRows.filter((row) =>
+        row.monthIndex < firstNeededForecastMonthIndex.value
+      )
+      demandSource.value = createPlanDemandSource({
+        ...demandSource.value,
+        forecastDailySnapshot: [...preservedRows, ...forecastFutureRows]
+      })
+    },
+    { immediate: true }
   )
 
   const selectedForecastPreviewSummary = computed(() => {
     if (selectedForecastProject.value) {
       const snapshotSummary = summarizeForecastDemandSnapshot(selectedForecastSnapshot.value)
+      const fullYearSnapshot = buildForecastDemandSnapshot(selectedForecastProject.value, planningYear.value)
+      const overlapMonthCount = fullYearSnapshot.filter((month) =>
+        month.monthIndex < firstNeededForecastMonthIndex.value
+      ).length
+      const expectedMonthCount = 12 - firstNeededForecastMonthIndex.value
 
       return {
         projectName: selectedForecastProject.value.name,
@@ -194,6 +268,9 @@ export const usePlannerForecastDemandSource = ({
         coverageWindowLabel: selectedForecastProject.value.lastRun?.summary?.coverageStartDate && selectedForecastProject.value.lastRun?.summary?.coverageEndDate
           ? `${selectedForecastProject.value.lastRun.summary.coverageStartDate} to ${selectedForecastProject.value.lastRun.summary.coverageEndDate}`
           : '',
+        expectedMonthCount,
+        missingMonthCount: Math.max(expectedMonthCount - selectedForecastSnapshot.value.length, 0),
+        overlapMonthCount,
         ...snapshotSummary
       }
     }

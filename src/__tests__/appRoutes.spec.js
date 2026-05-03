@@ -22,7 +22,7 @@ describe('appRoutes', () => {
       coverageStartMonthIndex: 5
     })
 
-    expect(hash).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget')
+    expect(hash).toBe('#planning/center/center-1/group/group-1/forecasts/year/2027/new/source/manual_monthly/type/budget/start/5')
     expect(parseHashRoute(hash)).toMatchObject({
       app: 'planning',
       page: 'group-forecasts',
@@ -31,7 +31,7 @@ describe('appRoutes', () => {
       year: 2027,
       sourceKind: 'manual_monthly',
       forecastType: 'budget',
-      coverageStartMonthIndex: 0
+      coverageStartMonthIndex: 5
     })
   })
 })

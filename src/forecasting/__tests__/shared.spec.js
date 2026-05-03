@@ -1,7 +1,8 @@
 import {
   createForecastProject,
   getForecastProjectDailyRows,
-  getForecastProjectMonthlyRollup
+  getForecastProjectMonthlyRollup,
+  resolveForecastCoverageWindow
 } from '../shared'
 
 describe('forecasting shared helpers', () => {
@@ -11,7 +12,7 @@ describe('forecasting shared helpers', () => {
     expect(project.modelConfig.holdoutDays).toBe(60)
   })
 
-  it('uses plan version names when creating default staffing-group forecast names', () => {
+  it('uses neutral demand forecast names for staffing-group forecast defaults', () => {
     const project = createForecastProject({
       groupName: 'Consumer Voice',
       planningYear: 2026,
@@ -28,8 +29,38 @@ describe('forecasting shared helpers', () => {
       }
     })
 
-    expect(project.name).toBe('Consumer Voice 2026 Apr Update Forecast')
+    expect(project.name).toBe('Consumer Voice 2026 Demand Forecast')
     expect(project.planningContext.planName).toBe('2026 Apr Update')
+  })
+
+  it('uses reforecast names and honors rolling coverage windows', () => {
+    const project = createForecastProject({
+      groupName: 'Consumer Voice',
+      planningYear: 2026,
+      forecastType: 'budget',
+      coverageStartMonthIndex: 4,
+      planningContext: {
+        groupId: 'group-1',
+        planningYear: 2026,
+        groupName: 'Consumer Voice'
+      }
+    })
+    const coverage = resolveForecastCoverageWindow({
+      planningYear: 2026,
+      forecastType: 'budget',
+      coverageStartDate: '2026-05-01',
+      coverageEndDate: '2027-04-30'
+    })
+
+    expect(project.name).toBe('Consumer Voice 2026 May Reforecast')
+    expect(project.coverageStartDate).toBe('2026-05-01')
+    expect(project.coverageEndDate).toBe('2026-12-31')
+    expect(coverage).toMatchObject({
+      coverageStartMonthIndex: 4,
+      coverageStartDate: '2026-05-01',
+      coverageEndDate: '2027-04-30',
+      expectedMonthCount: 12
+    })
   })
 
   it('applies range adjustment rules to future daily rows and recomputes monthly rollups', () => {

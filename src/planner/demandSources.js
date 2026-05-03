@@ -1,9 +1,6 @@
 import {
-  computeForecastPlanningReady,
   FORECAST_SOURCE_MODELED_DAILY,
-  FORECAST_SOURCE_MANUAL_MONTHLY,
   getForecastProjectDailyRows,
-  getForecastPlanningYear,
   getForecastProjectMonthlyRollup
 } from '../forecasting/shared'
 import { buildForecastMonthlyHandleTimeAssumptions } from '../forecasting/handleTimeAssumptions'
@@ -95,10 +92,7 @@ export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
     buildForecastMonthlyHandleTimeAssumptions(forecastProject).map((row) => [row.monthStart, row])
   )
 
-  if (
-    !computeForecastPlanningReady(forecastProject) ||
-    getForecastPlanningYear(forecastProject) !== resolvedPlanningYear
-  ) {
+  if (!monthlyRollup.length) {
     return []
   }
 
@@ -131,13 +125,6 @@ export const buildForecastDemandSnapshot = (forecastProject, planningYear) => {
 
 export const buildForecastDailyDemandSnapshot = (forecastProject, planningYear) => {
   const resolvedPlanningYear = resolvePlanningYear(planningYear)
-
-  if (
-    !computeForecastPlanningReady(forecastProject) ||
-    getForecastPlanningYear(forecastProject) !== resolvedPlanningYear
-  ) {
-    return []
-  }
 
   return getForecastProjectDailyRows(forecastProject)
     .filter((row) => !row?.isHistory)
@@ -272,6 +259,14 @@ export const summarizeForecastDemandSnapshot = (snapshot) => {
     ),
     null
   )
+  const sortedMonths = [...normalizedSnapshot]
+    .filter((month) => month.monthStart)
+    .sort((left, right) => String(left.monthStart).localeCompare(String(right.monthStart)))
+  const firstMonth = sortedMonths[0]
+  const lastMonth = sortedMonths.at(-1)
+  const coverageLabel = firstMonth && lastMonth
+    ? `${firstMonth.monthLabel || MONTH_LABELS[firstMonth.monthIndex]}-${lastMonth.monthLabel || MONTH_LABELS[lastMonth.monthIndex]}`
+    : `${normalizedSnapshot.length}/${MONTH_LABELS.length} months`
 
   return {
     matchedMonthCount: normalizedSnapshot.length,
@@ -279,6 +274,6 @@ export const summarizeForecastDemandSnapshot = (snapshot) => {
     averageAhtSeconds: weightedAhtContacts > 0 ? weightedAhtTotal / weightedAhtContacts : null,
     peakMonthLabel: peakMonth?.monthLabel || '',
     peakMonthContacts: peakMonth ? Math.max(toNumber(peakMonth.contacts, 0), 0) : 0,
-    coverageLabel: `${normalizedSnapshot.length}/${MONTH_LABELS.length} months`
+    coverageLabel
   }
 }

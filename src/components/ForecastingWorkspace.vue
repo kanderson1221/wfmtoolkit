@@ -162,8 +162,7 @@ const buildProjectSeedForSourceKind = (sourceKind) =>
   createForecastProject({
     ...(props.projectSeed || {}),
     sourceKind,
-    forecastType: FORECAST_TYPE_BUDGET,
-    coverageStartMonthIndex: 0
+    forecastType: FORECAST_TYPE_BUDGET
   })
 
 const handleCreateProjectFromSourceKind = (sourceKind) => {
@@ -252,18 +251,18 @@ const handleApplyImportedDaily = async ({ sourceData, importedDailyRows } = {}) 
     ? createForecastProject(currentProject.value)
     : buildProjectSeedForSourceKind(FORECAST_SOURCE_IMPORTED_DAILY)
   const nextForecastType = FORECAST_TYPE_BUDGET
-  const nextCoverageStartMonthIndex = 0
   const lastRun = createImportedDailyForecastResults({
     rows: importedDailyRows,
     planningYear: baseProject.planningYear,
     forecastType: nextForecastType,
-    coverageStartMonthIndex: nextCoverageStartMonthIndex
+    coverageStartMonthIndex: baseProject.coverageStartMonthIndex,
+    coverageStartDate: baseProject.coverageStartDate,
+    coverageEndDate: baseProject.coverageEndDate
   })
   const nextProject = createForecastProject({
     ...baseProject,
     sourceKind: FORECAST_SOURCE_IMPORTED_DAILY,
     forecastType: nextForecastType,
-    coverageStartMonthIndex: nextCoverageStartMonthIndex,
     uploadedFileName: '',
     uploadedHeaders: [],
     uploadedRows: [],
@@ -288,18 +287,18 @@ const handleApplyManualMonthly = async ({ monthlyRows } = {}) => {
     ? createForecastProject(currentProject.value)
     : buildProjectSeedForSourceKind(FORECAST_SOURCE_MANUAL_MONTHLY)
   const nextForecastType = FORECAST_TYPE_BUDGET
-  const nextCoverageStartMonthIndex = 0
   const lastRun = createManualMonthlyForecastResults({
     rows: monthlyRows,
     planningYear: baseProject.planningYear,
     forecastType: nextForecastType,
-    coverageStartMonthIndex: nextCoverageStartMonthIndex
+    coverageStartMonthIndex: baseProject.coverageStartMonthIndex,
+    coverageStartDate: baseProject.coverageStartDate,
+    coverageEndDate: baseProject.coverageEndDate
   })
   const nextProject = createForecastProject({
     ...baseProject,
     sourceKind: FORECAST_SOURCE_MANUAL_MONTHLY,
     forecastType: nextForecastType,
-    coverageStartMonthIndex: nextCoverageStartMonthIndex,
     uploadedFileName: '',
     uploadedHeaders: [],
     uploadedRows: [],

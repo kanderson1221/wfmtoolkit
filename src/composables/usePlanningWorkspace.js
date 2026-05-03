@@ -287,7 +287,12 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
           ? `${customHolidays.length} custom holiday${customHolidays.length === 1 ? '' : 's'}`
           : 'No holiday calendar'
     const seededForecastType = FORECAST_TYPE_BUDGET
-    const seededCoverageStartMonthIndex = 0
+    const seededCoverageStartMonthIndex = Math.max(
+      0,
+      Math.min(11, Math.round(Number(currentRoute.value.coverageStartMonthIndex) || 0))
+    )
+    const seededCoverageStartDate = `${resolvedPlanningYear}-${String(seededCoverageStartMonthIndex + 1).padStart(2, '0')}-01`
+    const seededCoverageEndDate = `${resolvedPlanningYear}-12-31`
     const seededSourceKind =
       currentRoute.value.page === 'group-forecasts'
         ? (currentRoute.value.sourceKind || FORECAST_SOURCE_MODELED_DAILY)
@@ -321,6 +326,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       sourceKind: seededSourceKind,
       forecastType: seededForecastType,
       coverageStartMonthIndex: seededCoverageStartMonthIndex,
+      coverageStartDate: seededCoverageStartDate,
+      coverageEndDate: seededCoverageEndDate,
       centerManagedHolidays: true,
       timezone: currentCenter.value.timezone,
       ...sharedHistorySeed,

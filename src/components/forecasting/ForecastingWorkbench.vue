@@ -19,6 +19,7 @@ import {
   getForecastProjectResultTabs,
   getForecastProjectSourceKind,
   getForecastSourceActionLabel,
+  isPlanAlignedForecast,
   isForecastProjectReadOnly
 } from '../../forecasting/shared'
 import { buildForecastRunInputSignature } from '../../composables/forecasting/forecastWorkspaceHelpers'
@@ -187,6 +188,13 @@ const currentRunLabel = computed(() =>
     ? `Current run: ${formatDateTime(project.value.lastRun.runAt)}`
     : ''
 )
+const coverageLabel = computed(() => {
+  if (!isPlanAlignedForecast(project.value) || !project.value?.coverageStartDate || !project.value?.coverageEndDate) {
+    return ''
+  }
+
+  return `Coverage: ${project.value.coverageStartDate} to ${project.value.coverageEndDate}`
+})
 const adjustedDayCount = computed(() =>
   forecastRows.value.filter((row) => row.isAdjusted).length
 )
@@ -257,6 +265,9 @@ watch(
           <h2 class="text-[1.85rem] font-semibold tracking-[-0.04em] text-slate-950">
             {{ project.name || 'Untitled Forecast' }}
           </h2>
+          <p v-if="coverageLabel" class="text-sm font-medium text-slate-600">
+            {{ coverageLabel }}
+          </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2 xl:justify-end">

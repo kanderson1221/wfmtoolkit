@@ -600,8 +600,8 @@ describe('ForecastingWorkspace', () => {
     )
     const savedProjects = await forecastingRepository.loadWorkspace('forecast-run-spec')
     expect(savedProjects[0].uploadedFileName).toBe('history.csv')
-    expect(savedProjects[0].name).toBe('Consumer Voice 2026 Budget Forecast')
-    expect(wrapper.text()).toContain('Consumer Voice 2026 Budget Forecast')
+    expect(savedProjects[0].name).toBe('Consumer Voice 2026 Demand Forecast')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Demand Forecast')
     expect(wrapper.text()).toContain('Forecasted demand vs historical volume')
     expect(wrapper.text()).toContain('Test period')
     expect(wrapper.text()).toContain('MAPE')
@@ -712,7 +712,7 @@ describe('ForecastingWorkspace', () => {
 
     const savedProjects = await forecastingRepository.loadWorkspace('forecast-save-spec')
     expect(savedProjects[0].uploadedFileName).toBe('saved-history.csv')
-    expect(savedProjects[0].name).toBe('Consumer Voice 2026 Budget Forecast')
+    expect(savedProjects[0].name).toBe('Consumer Voice 2026 Demand Forecast')
     expect(initialWrapper.text()).not.toContain('Forecast saved.')
 
     const wrapper = mount(ForecastingWorkspace, {
@@ -732,7 +732,7 @@ describe('ForecastingWorkspace', () => {
 
     await clickBodyButton('Open Forecast', { last: true })
 
-    expect(wrapper.text()).toContain('Consumer Voice 2026 Budget Forecast')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Demand Forecast')
     expect(wrapper.text()).toContain('Data')
     expect(document.body.textContent || '').not.toContain('No file loaded')
   })
@@ -763,7 +763,7 @@ describe('ForecastingWorkspace', () => {
         {
           ...firstProject,
           id: 'forecast-1',
-          name: 'Consumer Voice 2026 Budget Forecast'
+          name: 'Consumer Voice 2026 Demand Forecast'
         },
         {
           ...secondProject,
@@ -786,7 +786,7 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).toContain('Consumer Voice 2026 Budget Forecast 2')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Demand Forecast 2')
     expect(wrapper.text()).toContain('Data')
     expect(wrapper.find('button[aria-label="Expand model parameters"]').exists()).toBe(true)
     expect(wrapper.findAll('button').some((button) => button.text().trim() === 'Run')).toBe(false)
@@ -840,7 +840,7 @@ describe('ForecastingWorkspace', () => {
         createForecastProject({
           ...createLoadedProject('saved-history.csv'),
           id: 'saved-forecast',
-          name: 'Consumer Voice 2026 Budget Forecast',
+          name: 'Consumer Voice 2026 Demand Forecast',
           groupName: 'Consumer Voice',
           planningYear: 2026,
           planningContext: {
@@ -893,7 +893,7 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
     await flushUi()
 
-    expect(wrapper.text()).toContain('Consumer Voice 2026 Budget Forecast')
+    expect(wrapper.text()).toContain('Consumer Voice 2026 Demand Forecast')
     expect(wrapper.text()).not.toContain('Plan Year')
     expect(wrapper.text()).not.toContain('Forecast Type')
     expect(wrapper.text()).toContain('Range adjustment rules')
@@ -1152,7 +1152,7 @@ describe('ForecastingWorkspace', () => {
               ]
             }
           },
-          name: 'Consumer Voice 2026 Budget Forecast'
+          name: 'Consumer Voice 2026 Demand Forecast'
         })
       }
     })

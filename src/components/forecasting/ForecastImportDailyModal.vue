@@ -33,8 +33,7 @@ const importedDailyRows = ref([])
 const resetDraftProject = () => {
   draftProject.value = createForecastProject({
     ...props.project,
-    forecastType: FORECAST_TYPE_BUDGET,
-    coverageStartMonthIndex: 0
+    forecastType: FORECAST_TYPE_BUDGET
   })
   draftProject.value.sourceData = {
     fileName: props.project?.sourceData?.fileName || '',
@@ -114,7 +113,9 @@ const handleFileSelect = async (event) => {
     {
       planningYear: draftProject.value.planningYear,
       forecastType: FORECAST_TYPE_BUDGET,
-      coverageStartMonthIndex: 0
+      coverageStartMonthIndex: draftProject.value.coverageStartMonthIndex,
+      coverageStartDate: draftProject.value.coverageStartDate,
+      coverageEndDate: draftProject.value.coverageEndDate
     }
   )
 
@@ -145,7 +146,9 @@ watch(
       currentMapping: draftProject.value.sourceData.mapping || {},
       planningYear: draftProject.value.planningYear,
       forecastType: FORECAST_TYPE_BUDGET,
-      coverageStartMonthIndex: 0
+      coverageStartMonthIndex: draftProject.value.coverageStartMonthIndex,
+      coverageStartDate: draftProject.value.coverageStartDate,
+      coverageEndDate: draftProject.value.coverageEndDate
     })
 
     draftProject.value.sourceData.issues = nextState.issues

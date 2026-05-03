@@ -84,6 +84,12 @@ const hasAppliedForecast = computed(() =>
 )
 const appliedForecastMatchesSelection = computed(() => demandSource.value?.forecastProjectId === selectedForecastProjectId.value)
 const selectedForecastHasCoverage = computed(() => (props.selectedForecastPreviewSummary?.matchedMonthCount || 0) > 0)
+const selectedForecastMissingMonthCount = computed(() =>
+  Math.max(Number(props.selectedForecastPreviewSummary?.missingMonthCount || 0), 0)
+)
+const selectedForecastOverlapMonthCount = computed(() =>
+  Math.max(Number(props.selectedForecastPreviewSummary?.overlapMonthCount || 0), 0)
+)
 const shouldShowSelectedForecastPreview = computed(() =>
   Boolean(props.selectedForecastPreviewSummary) &&
   (!hasAppliedForecast.value || !appliedForecastMatchesSelection.value)
@@ -411,6 +417,26 @@ const selectForecastPrompt = computed(() =>
                 >
                   {{ props.currentDemandSourceSummary.projectName }} is still applied. Reapply to replace it with the selected forecast.
                 </p>
+              </div>
+
+              <div class="grid gap-2">
+                <AppStatusMessage
+                  v-if="selectedForecastOverlapMonthCount"
+                  tone="warning"
+                >
+                  {{ selectedForecastOverlapMonthCount }} already actualized
+                  {{ selectedForecastOverlapMonthCount === 1 ? 'month is' : 'months are' }}
+                  excluded from this import.
+                </AppStatusMessage>
+
+                <AppStatusMessage
+                  v-if="selectedForecastMissingMonthCount"
+                  tone="warning"
+                >
+                  This forecast is missing {{ selectedForecastMissingMonthCount }} future
+                  {{ selectedForecastMissingMonthCount === 1 ? 'month' : 'months' }}
+                  for this plan.
+                </AppStatusMessage>
               </div>
 
               <div

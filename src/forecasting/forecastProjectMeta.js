@@ -1,10 +1,10 @@
 import {
   FORECAST_SOURCE_IMPORTED_DAILY,
-  FORECAST_SOURCE_MANUAL_MONTHLY,
-  FORECAST_TYPE_BUDGET
+  FORECAST_SOURCE_MANUAL_MONTHLY
 } from './forecastConstants'
 import {
   getForecastPlanningYear,
+  resolveForecastCoverageWindow,
   resolveForecastSourceKind,
   resolveForecastType
 } from './forecastResultPolicy'
@@ -47,29 +47,11 @@ export const forecastProjectBelongsToPlanningContext = (project, centerId, group
   return !projectGroupId || projectGroupId === normalizedGroupId
 }
 
-const startsWithName = (value, prefix) =>
-  Boolean(
-    value &&
-      prefix &&
-      value.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase())
-  )
-
 const buildForecastSubjectName = ({
   groupName,
   centerName,
-  planningYear,
-  planName
+  planningYear
 } = {}) => {
-  const normalizedPlanName = String(planName || '').trim()
-
-  if (normalizedPlanName) {
-    if (startsWithName(normalizedPlanName, groupName) || startsWithName(normalizedPlanName, centerName)) {
-      return normalizedPlanName
-    }
-
-    return groupName ? `${groupName} ${normalizedPlanName}` : normalizedPlanName
-  }
-
   if (groupName && planningYear > 0) {
     return `${groupName} ${planningYear}`
   }
@@ -85,6 +67,19 @@ const buildForecastSubjectName = ({
   return centerName
 }
 
+const getCoverageStartMonthLabel = (snapshot = {}, planningYear = null, forecastType = '') => {
+  const coverageWindow = resolveForecastCoverageWindow({
+    planningYear,
+    forecastType,
+    coverageStartMonthIndex: snapshot.coverageStartMonthIndex,
+    coverageStartDate: snapshot.coverageStartDate,
+    coverageEndDate: snapshot.coverageEndDate
+  })
+  const match = String(coverageWindow.coverageStartDate || '').match(/^\d{4}-(\d{2})-01$/)
+
+  return match ? new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(2000, Number(match[1]) - 1, 1)) : ''
+}
+
 export function buildForecastBaseName(seed = {}) {
   const snapshot = seed && typeof seed === 'object' ? seed : {}
   const planningContext = snapshot.planningContext || {}
@@ -96,15 +91,15 @@ export function buildForecastBaseName(seed = {}) {
       planningContext.centerName ||
       ''
   ).trim()
-  const planName = String(snapshot.planName || planningContext.planName || '').trim()
   const forecastType = resolveForecastType(snapshot.forecastType, snapshot)
   const sourceKind = resolveForecastSourceKind(snapshot.sourceKind)
   const subjectName = buildForecastSubjectName({
     groupName,
     centerName,
-    planningYear,
-    planName
+    planningYear
   })
+  const coverageStartMonthLabel = getCoverageStartMonthLabel(snapshot, planningYear, forecastType)
+  const isRollingCoverage = Boolean(coverageStartMonthLabel && coverageStartMonthLabel !== 'Jan')
 
   if (sourceKind === FORECAST_SOURCE_IMPORTED_DAILY) {
     if (subjectName) {
@@ -119,15 +114,11 @@ export function buildForecastBaseName(seed = {}) {
   }
 
   if (subjectName) {
-    if (planName) {
-      return `${subjectName} Forecast`
+    if (isRollingCoverage) {
+      return `${subjectName} ${coverageStartMonthLabel} Reforecast`
     }
 
-    if (forecastType === FORECAST_TYPE_BUDGET) {
-      return `${subjectName} Budget Forecast`
-    }
-
-    return `${subjectName} Forecast`
+    return `${subjectName} Demand Forecast`
   }
 
   return 'Untitled Forecast'

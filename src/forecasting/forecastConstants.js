@@ -10,7 +10,7 @@ export const FORECAST_SOURCE_IMPORTED_DAILY = 'imported_daily'
 export const FORECAST_SOURCE_MANUAL_MONTHLY = 'manual_monthly'
 
 export const FORECAST_TYPE_OPTIONS = [
-  { label: 'Budget Forecast', value: FORECAST_TYPE_BUDGET }
+  { label: 'Demand Forecast', value: FORECAST_TYPE_BUDGET }
 ]
 
 export const FORECAST_SOURCE_KIND_OPTIONS = [

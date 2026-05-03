@@ -231,7 +231,9 @@ export function usePlanningCenterForecastLibrary({
       const coverageWindow = resolveForecastCoverageWindow({
         planningYear,
         forecastType,
-        coverageStartMonthIndex: forecast.coverageStartMonthIndex
+        coverageStartMonthIndex: forecast.coverageStartMonthIndex,
+        coverageStartDate: forecast.coverageStartDate,
+        coverageEndDate: forecast.coverageEndDate
       })
       const projectedTotalContacts = Number(
         forecast.lastRun?.summary?.projectedTotalContacts ??

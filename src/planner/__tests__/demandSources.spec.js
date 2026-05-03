@@ -49,6 +49,42 @@ describe('planner demand sources', () => {
     })
   })
 
+  it('slices a cross-year forecast to the selected planning year', () => {
+    const forecastProject = {
+      planningYear: 2026,
+      forecastType: 'budget',
+      coverageStartDate: '2026-05-01',
+      coverageEndDate: '2027-04-30',
+      planningContext: {
+        groupId: 'group-1',
+        planningYear: 2026
+      },
+      lastRun: {
+        runAt: '2026-04-08T14:00:00Z',
+        monthlyRollup: Array.from({ length: 12 }, (_, index) => {
+          const date = new Date(Date.UTC(2026, 4 + index, 1))
+          const monthStart = date.toISOString().slice(0, 10)
+          return {
+            monthStart,
+            monthLabel: new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date),
+            contacts: 1000 + index,
+            lowerBoundContacts: 900 + index,
+            upperBoundContacts: 1100 + index
+          }
+        })
+      }
+    }
+
+    const forecast2026 = buildForecastDemandSnapshot(forecastProject, 2026)
+    const forecast2027 = buildForecastDemandSnapshot(forecastProject, 2027)
+
+    expect(forecast2026).toHaveLength(8)
+    expect(forecast2026[0]).toMatchObject({ monthIndex: 4, monthStart: '2026-05-01' })
+    expect(forecast2026.at(-1)).toMatchObject({ monthIndex: 11, monthStart: '2026-12-01' })
+    expect(forecast2027).toHaveLength(4)
+    expect(forecast2027[0]).toMatchObject({ monthIndex: 0, monthStart: '2027-01-01' })
+  })
+
   it('applies a forecast snapshot into monthly contacts and derives peak-day uplift without disturbing AHT inputs', () => {
     const appliedMonths = applyForecastSnapshotToPlanMonths(
       [
@@ -196,7 +232,7 @@ describe('planner demand sources', () => {
     ])
     expect(summarizeForecastDemandSnapshot(demandSource.forecastMonthSnapshot)).toMatchObject({
       matchedMonthCount: 2,
-      coverageLabel: '2/12 months',
+      coverageLabel: 'Jan 2026-Feb 2026',
       totalContacts: 29500,
       peakMonthLabel: 'Feb 2026',
       peakMonthContacts: 15500

@@ -191,21 +191,20 @@ def _resolve_coverage_window(payload: ForecastRunRequest) -> CoverageWindow:
     if start_date > end_date:
         raise ValueError("coverageStartDate must be on or before coverageEndDate.")
 
-    if start_date.year != planning_year or end_date.year != planning_year:
-        raise ValueError("Forecast coverage must stay inside the selected planning year.")
+    if start_date.day != 1:
+        raise ValueError("Forecast coverage must start on the first day of a month.")
 
-    expected_start = pd.Timestamp(year=planning_year, month=1, day=1)
-    expected_end = pd.Timestamp(year=planning_year, month=12, day=31)
-    if start_date != expected_start or end_date != expected_end:
-        raise ValueError("Budget forecasts must cover January 1 through December 31 of the plan year.")
+    expected_end_day = pd.Timestamp(year=end_date.year, month=end_date.month, day=1).days_in_month
+    if end_date.day != expected_end_day:
+        raise ValueError("Forecast coverage must end on the last day of a month.")
 
     return CoverageWindow(
         planning_year=planning_year,
         forecast_type=forecast_type,
         start_date=start_date,
         end_date=end_date,
-        start_month_index=0,
-        expected_month_count=12,
+        start_month_index=start_date.month - 1,
+        expected_month_count=((end_date.year - start_date.year) * 12) + end_date.month - start_date.month + 1,
         plan_aligned=True,
     )
 
@@ -709,12 +708,11 @@ def _monthly_rollup_matches_coverage_window(
     if not coverage_window.plan_aligned:
         return False
 
+    if coverage_window.start_date is None:
+        return False
+
     expected_month_starts = [
-        pd.Timestamp(
-            year=coverage_window.planning_year,
-            month=coverage_window.start_month_index + offset + 1,
-            day=1,
-        ).date().isoformat()
+        (coverage_window.start_date + pd.DateOffset(months=offset)).date().isoformat()
         for offset in range(coverage_window.expected_month_count)
     ]
     actual_month_starts = [row.get("monthStart", "") for row in monthly_rollup]

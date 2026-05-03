@@ -104,7 +104,7 @@ test('opens staffing-group forecasts from the call-center workspace', async ({ p
   await forecastCreateDialog.getByLabel('Plan Year').selectOption({ label: '2026' })
   await page.getByRole('button', { name: 'Create Forecast' }).last().click()
 
-  await expect(page.getByRole('heading', { level: 2, name: 'Consumer Voice 2026 Budget Forecast' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Consumer Voice 2026 Demand Forecast' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeHidden()
 })
 

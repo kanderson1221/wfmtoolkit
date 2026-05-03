@@ -19,7 +19,6 @@ import {
   getForecastProjectSourceKind,
   getForecastTrainingHistoryRows,
   getForecastTrainingWindow,
-  isPlanAlignedForecast
 } from '../../forecasting/shared'
 
 const props = defineProps({
@@ -43,7 +42,6 @@ const project = defineModel('project', {
 
 const sourceKind = computed(() => getForecastProjectSourceKind(project.value))
 const usesCenterManagedHolidays = computed(() => Boolean(project.value.centerManagedHolidays))
-const isPlanAligned = computed(() => isPlanAlignedForecast(project.value))
 const availableTrainingWindow = computed(() => getForecastTrainingWindow(project.value))
 const historyRowCount = computed(() => availableTrainingWindow.value.availableRowCount)
 const trainingHistoryRows = computed(() => getForecastTrainingHistoryRows(project.value))
@@ -148,7 +146,7 @@ const intervalWidthPercent = computed({
   }
 })
 
-const showScopeSection = computed(() => !isPlanAligned.value)
+const showScopeSection = true
 const shortAhtMethodLabel = computed(() => {
   if (project.value.modelConfig.ahtAssumptionMethod === 'weighted_average') {
     return 'Weighted Avg'

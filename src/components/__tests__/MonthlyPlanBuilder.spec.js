@@ -906,6 +906,11 @@ describe('MonthlyPlanBuilder', () => {
         upperBoundContacts: 14800 + (index * 100)
       }
     })
+    const dailyForecast = [
+      { ds: '2026-01-02', yhat: 420 },
+      { ds: '2026-06-01', yhat: 520 },
+      { ds: '2026-06-02', yhat: 540 }
+    ]
 
     vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
       projects: [
@@ -921,6 +926,7 @@ describe('MonthlyPlanBuilder', () => {
           lastRun: {
             runAt: '2026-01-10T12:00:00.000Z',
             monthlyRollup,
+            dailyForecast,
             components: {},
             diagnostics: {},
             summary: {
@@ -943,6 +949,7 @@ describe('MonthlyPlanBuilder', () => {
         budgetPlanId: 'budget-2026',
         sourcePlanId: 'budget-2026',
         planningYear: 2026,
+        actualsThroughMonth: '2026-05-01',
         demandSource: createPlanDemandSource({
           mode: 'forecast',
           forecastProjectId: 'forecast-1',
@@ -964,6 +971,10 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.vm.builder.forecastSelectOptions.some((option) => option.value === 'forecast-1')).toBe(true)
     expect(wrapper.vm.builder.selectedForecastProjectId).toBe('forecast-1')
     expect(wrapper.vm.builder.forecastCanApply).toBe(true)
+    expect(wrapper.vm.builder.demandSource.forecastDailySnapshot.map((row) => row.serviceDate)).toEqual([
+      '2026-06-01',
+      '2026-06-02'
+    ])
 
     expect(wrapper.vm.builder.applyForecastToDemand()).toBe(true)
     expect(wrapper.vm.builder.forecastApplyMessage).toContain('Reapplied 2026 Demand Forecast')

@@ -98,6 +98,32 @@ describe('PlannerForecastPanel', () => {
     expect(wrapper.findAll('h3').filter((node) => node.text() === 'Consumer Voice 2026 Forecast')).toHaveLength(1)
   })
 
+  it('warns when a selected forecast overlaps actuals or misses future months', () => {
+    const wrapper = mountPanel({
+      demandSource: createPlanDemandSource({
+        mode: 'forecast'
+      }),
+      selectedForecastProjectId: 'forecast-1',
+      forecastSelectOptions: [
+        { label: 'Select a saved forecast', value: '' },
+        { label: 'Consumer Voice May Reforecast', value: 'forecast-1' }
+      ],
+      selectedForecastPreviewSummary: {
+        projectName: 'Consumer Voice May Reforecast',
+        coverageLabel: 'May 2026-Oct 2026',
+        totalContacts: 90000,
+        averageAhtSeconds: 286.4,
+        matchedMonthCount: 6,
+        missingMonthCount: 2,
+        overlapMonthCount: 4
+      },
+      forecastCanApply: true
+    })
+
+    expect(wrapper.text()).toContain('4 already actualized months are excluded from this import.')
+    expect(wrapper.text()).toContain('This forecast is missing 2 future months for this plan.')
+  })
+
   it('shows saved-forecast controls only when forecast sourcing is selected', () => {
     const wrapper = mountPanel({
       entryMode: 'forecast',

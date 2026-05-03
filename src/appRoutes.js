@@ -90,8 +90,12 @@ export const buildPlanningGroupNewForecastHash = (
     normalizedSourceKind && normalizedSourceKind !== 'modeled_daily'
       ? `/source/${encodeURIComponent(normalizedSourceKind)}`
       : ''
+  const coverageStartMonthIndex = Number(options.coverageStartMonthIndex)
+  const startSegment = Number.isInteger(coverageStartMonthIndex) && coverageStartMonthIndex > 0 && coverageStartMonthIndex <= 11
+    ? `/start/${coverageStartMonthIndex}`
+    : ''
 
-  return `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new${sourceSegment}/type/budget`
+  return `${PLANNING_HOME_HASH}/center/${centerId}/group/${groupId}/forecasts/year/${normalizedYear}/new${sourceSegment}/type/budget${startSegment}`
 }
 
 export const buildPlanningGroupHash = (centerId, groupId, year = null, options = {}) => {
@@ -258,6 +262,18 @@ export const parseHashRoute = (hash) => {
       if (parts[cursor] === 'type' && parts[cursor + 1]) {
         const forecastType = String(parts[cursor + 1] || '').trim().toLowerCase()
         if (forecastType === 'budget') {
+          cursor += 2
+          let coverageStartMonthIndex = 0
+
+          if (parts[cursor] === 'start' && parts[cursor + 1]) {
+            const parsedStartMonthIndex = Number(parts[cursor + 1])
+            coverageStartMonthIndex = Number.isInteger(parsedStartMonthIndex) &&
+              parsedStartMonthIndex >= 0 &&
+              parsedStartMonthIndex <= 11
+              ? parsedStartMonthIndex
+              : 0
+          }
+
           return {
             app: 'planning',
             page: 'group-forecasts',
@@ -269,7 +285,7 @@ export const parseHashRoute = (hash) => {
             forecastId: null,
             sourceKind,
             forecastType: 'budget',
-            coverageStartMonthIndex: 0
+            coverageStartMonthIndex
           }
         }
       }
