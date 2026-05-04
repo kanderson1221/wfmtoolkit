@@ -319,11 +319,54 @@ describe('PlannerMonthlyPlanTab', () => {
     expect(wrapper.text()).toContain('Peak Day HC')
     expect(wrapper.text()).toContain('P80 Total HC')
     expect(wrapper.text()).toContain('P90 Total HC')
+    expect(wrapper.text()).toContain('Run Staffing Calculations')
     expect(wrapper.text()).not.toContain('RequiredHrs')
     expect(wrapper.text()).toContain('1 daily rows are available for Intraday Erlang.')
     expect(wrapper.text()).not.toContain('Intraday Erlang plans require an applied daily forecast.')
     expect(wrapper.text()).toContain('325')
     expect(wrapper.findAll('input')).toHaveLength(0)
+  })
+
+  it('emits an explicit run event and shows calculation progress for intraday Erlang', async () => {
+    const wrapper = mountTab({
+      requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+      erlangStatus: {
+        status: 'ready_to_run',
+        message: 'Run staffing calculations to populate monthly Erlang staffing outputs.',
+        canRun: true,
+        isRunning: false,
+        hasResults: false
+      }
+    })
+
+    const runButton = wrapper.findAll('button').find((button) => button.text().includes('Run Staffing Calculations'))
+
+    expect(runButton).toBeTruthy()
+
+    await runButton.trigger('click')
+
+    expect(wrapper.emitted('run-erlang')).toHaveLength(1)
+
+    await wrapper.setProps({
+      erlangStatus: {
+        status: 'loading',
+        message: 'Calculating staffing for Feb.',
+        canRun: false,
+        isRunning: true,
+        hasResults: false,
+        progress: {
+          completedMonths: 1,
+          totalMonths: 4,
+          currentMonthLabel: 'Feb',
+          completedRows: 48,
+          totalRows: 192
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Calculating staffing for Feb.')
+    expect(wrapper.text()).toContain('Calculating Feb. 1 of 4 months complete.')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('25')
   })
 
   it('explains when Intraday Erlang has monthly forecast values but no daily rows', () => {

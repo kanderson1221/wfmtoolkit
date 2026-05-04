@@ -400,7 +400,9 @@ const requirementProgress = computed(() => {
     const configuredCount = intradayMonthsWithForecastAht.value
     const isReady = erlangStatus === 'ready'
     const isLoading = erlangStatus === 'loading'
-    const isStarted = hasDailyForecast || isLoading || isReady
+    const hasStoredResults = Boolean(builder.erlangStatus?.hasResults)
+    const isStale = erlangStatus === 'stale'
+    const isStarted = hasDailyForecast || isLoading || isReady || hasStoredResults
     const forecastName = builder.demandSourceSummary?.projectName || ''
     const missingAhtMonthLabel = intradayFirstMissingAhtMonthLabel.value
 
@@ -412,13 +414,19 @@ const requirementProgress = computed(() => {
         ? 'Calculated'
         : isLoading
           ? 'Calculating'
-          : formatMonthCoverage(configuredCount),
+          : isStale
+            ? 'Rerun needed'
+            : erlangStatus === 'ready_to_run'
+              ? 'Ready to run'
+              : formatMonthCoverage(configuredCount),
       detail: isReady
         ? forecastName
-          ? `Daily demand and monthly AHT are locked from ${forecastName}. Interval Erlang outputs are now populating this plan.`
-          : 'Daily forecast demand and monthly AHT assumptions are locked and driving the monthly Erlang outputs.'
+          ? `Daily demand and monthly AHT are locked from ${forecastName}. Interval Erlang outputs are stored with this plan.`
+          : 'Daily forecast demand and monthly AHT assumptions are locked and driving stored monthly Erlang outputs.'
         : isLoading
           ? 'Flattening the applied daily forecast into 30-minute intervals and calculating monthly Erlang staffing outputs.'
+          : isStale
+            ? String(builder.erlangStatus?.message || '').trim()
           : !hasDailyForecast
             ? 'Apply a saved daily forecast to provide the daily demand stream this plan requires.'
             : configuredCount < TOTAL_PLAN_MONTHS
@@ -783,6 +791,7 @@ const planWorkspaceDisabled = computed(() =>
                   :format-number="builder.formatNumber"
                   :format-percent="builder.formatPercent"
                   :format-factor="builder.formatFactor"
+                  @run-erlang="builder.runIntradayErlangCalculations"
                   @previous="builder.moveForecastStep(-1)"
                   @continue="builder.setActiveSection('staffing')"
                 />

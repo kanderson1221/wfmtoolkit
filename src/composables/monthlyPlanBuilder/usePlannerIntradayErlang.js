@@ -1,7 +1,9 @@
 import { computed, ref, watch } from 'vue'
 
-import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../planner/shared'
+import { MONTH_LABELS, PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../planner/shared'
 import { buildPlannerIntradayErlangPayload } from '../../planner/intradayErlang'
+
+const ERLANG_RESULTS_VERSION = 1
 
 const extractApiErrorMessage = async (response) => {
   const rawErrorText = await response.text().catch(() => '')
@@ -93,6 +95,81 @@ const enrichIntervalOutputRows = (intervalPlans = [], requestRows = []) =>
     }
   })
 
+const hashText = (text) => {
+  let hash = 2166136261
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return (hash >>> 0).toString(36)
+}
+
+const buildInputSignature = (rows = []) => {
+  const signatureRows = (Array.isArray(rows) ? rows : []).map((row) => ({
+    monthIndex: row.monthIndex,
+    serviceDate: row.serviceDate,
+    intervalStart: row.intervalStart,
+    callsOffered: row.callsOffered,
+    averageHandleTime: row.averageHandleTime,
+    intervalLengthMinutes: row.intervalLengthMinutes,
+    serviceLevelGoal: row.serviceLevelGoal,
+    serviceLevelThreshold: row.serviceLevelThreshold,
+    maxOccupancy: row.maxOccupancy,
+    averageCustomerPatience: row.averageCustomerPatience ?? null
+  }))
+  const serialized = JSON.stringify(signatureRows)
+
+  return `v${ERLANG_RESULTS_VERSION}:${signatureRows.length}:${hashText(serialized)}`
+}
+
+const cloneRows = (rows = []) =>
+  (Array.isArray(rows) ? rows : []).map((row) => ({ ...row }))
+
+const normalizeStoredResults = (results) => {
+  if (!results || typeof results !== 'object') {
+    return null
+  }
+
+  const monthlyOutputs = cloneRows(results.monthlyOutputs || results.monthlyPlans)
+  const intervalOutputs = cloneRows(results.intervalOutputs || results.intervalPlans)
+  const dailyOutputs = cloneRows(results.dailyOutputs || results.dailyPlans)
+
+  if (!monthlyOutputs.length && !intervalOutputs.length && !dailyOutputs.length) {
+    return null
+  }
+
+  return {
+    version: Number(results.version) || ERLANG_RESULTS_VERSION,
+    calculatedAt: String(results.calculatedAt || '').trim(),
+    inputSignature: String(results.inputSignature || '').trim(),
+    rowCount: Number(results.rowCount) || intervalOutputs.length,
+    monthCount: Number(results.monthCount) || monthlyOutputs.length,
+    monthlyOutputs,
+    intervalOutputs,
+    dailyOutputs
+  }
+}
+
+const buildMonthGroups = (rows = []) => {
+  const groupsByMonthIndex = new Map()
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const monthIndex = Math.max(0, Math.min(MONTH_LABELS.length - 1, Math.round(Number(row?.monthIndex) || 0)))
+    const existingRows = groupsByMonthIndex.get(monthIndex) || []
+    groupsByMonthIndex.set(monthIndex, [...existingRows, row])
+  }
+
+  return [...groupsByMonthIndex.entries()]
+    .sort(([leftMonthIndex], [rightMonthIndex]) => leftMonthIndex - rightMonthIndex)
+    .map(([monthIndex, groupRows]) => ({
+      monthIndex,
+      monthLabel: MONTH_LABELS[monthIndex] || `Month ${monthIndex + 1}`,
+      rows: groupRows
+    }))
+}
+
 export const usePlannerIntradayErlang = ({
   requirementMethod,
   planningYear,
@@ -106,13 +183,23 @@ export const usePlannerIntradayErlang = ({
   operatingCloseTime,
   serviceLevelPercent,
   serviceLevelThresholdSeconds,
-  intraday
+  intraday,
+  storedResults
 }) => {
   const status = ref('idle')
   const message = ref('')
+  const progress = ref({
+    completedMonths: 0,
+    totalMonths: 0,
+    currentMonthLabel: '',
+    completedRows: 0,
+    totalRows: 0
+  })
+  const currentInputSignature = ref('')
   const monthlyOutputsByMonthIndex = ref(new Map())
   const intervalOutputs = ref([])
   const dailyOutputs = ref([])
+  const storedResultsRef = storedResults || ref(null)
   let requestToken = 0
 
   const payloadState = computed(() => {
@@ -140,40 +227,143 @@ export const usePlannerIntradayErlang = ({
     })
   })
 
-  watch(
-    payloadState,
-    async (nextPayloadState) => {
-      requestToken += 1
-      const currentToken = requestToken
+  const hasStoredResults = computed(() => Boolean(normalizeStoredResults(storedResultsRef.value)))
 
+  const applyResults = (results) => {
+    const normalizedResults = normalizeStoredResults(results)
+
+    if (!normalizedResults) {
+      monthlyOutputsByMonthIndex.value = new Map()
       intervalOutputs.value = []
       dailyOutputs.value = []
+      return null
+    }
 
-      if (nextPayloadState.status === 'inactive') {
-        status.value = 'idle'
-        message.value = ''
-        monthlyOutputsByMonthIndex.value = new Map()
-        return
-      }
+    monthlyOutputsByMonthIndex.value = new Map(
+      normalizedResults.monthlyOutputs.map((row) => [row.monthIndex, row])
+    )
+    intervalOutputs.value = cloneRows(normalizedResults.intervalOutputs)
+    dailyOutputs.value = cloneRows(normalizedResults.dailyOutputs)
 
-      if (nextPayloadState.status !== 'ready') {
-        status.value = nextPayloadState.status
-        message.value = nextPayloadState.message || ''
-        monthlyOutputsByMonthIndex.value = new Map()
-        return
-      }
+    return normalizedResults
+  }
 
-      status.value = 'loading'
-      message.value = 'Calculating interval Erlang outputs from the applied daily forecast.'
+  const resetProgress = () => {
+    progress.value = {
+      completedMonths: 0,
+      totalMonths: 0,
+      currentMonthLabel: '',
+      completedRows: 0,
+      totalRows: 0
+    }
+  }
 
-      try {
+  const evaluatePayloadState = (nextPayloadState) => {
+    requestToken += 1
+    resetProgress()
+
+    if (nextPayloadState.status === 'inactive') {
+      status.value = 'idle'
+      message.value = ''
+      currentInputSignature.value = ''
+      applyResults(null)
+      return
+    }
+
+    if (nextPayloadState.status !== 'ready') {
+      status.value = nextPayloadState.status
+      message.value = nextPayloadState.message || ''
+      currentInputSignature.value = ''
+      applyResults(null)
+      return
+    }
+
+    const inputSignature = buildInputSignature(nextPayloadState.rows)
+    const normalizedResults = applyResults(storedResultsRef.value)
+
+    currentInputSignature.value = inputSignature
+
+    if (!normalizedResults) {
+      status.value = 'ready_to_run'
+      message.value = 'Run staffing calculations to populate monthly Erlang staffing outputs.'
+      return
+    }
+
+    if (normalizedResults.inputSignature === inputSignature) {
+      status.value = 'ready'
+      message.value = ''
+      return
+    }
+
+    status.value = 'stale'
+    message.value = 'Plan inputs changed after the last staffing calculation. Rerun staffing calculations to refresh the Erlang outputs.'
+  }
+
+  watch(
+    [payloadState, () => storedResultsRef.value],
+    ([nextPayloadState]) => {
+      evaluatePayloadState(nextPayloadState)
+    },
+    { deep: true, immediate: true }
+  )
+
+  const runErlangCalculations = async () => {
+    const nextPayloadState = payloadState.value
+
+    if (nextPayloadState.status !== 'ready') {
+      evaluatePayloadState(nextPayloadState)
+      return false
+    }
+
+    const monthGroups = buildMonthGroups(nextPayloadState.rows)
+    if (!monthGroups.length) {
+      status.value = 'no_open_days'
+      message.value = 'No open forecast days are available in this plan year after applying operating days and holiday closures.'
+      applyResults(null)
+      return false
+    }
+
+    requestToken += 1
+    const currentToken = requestToken
+    const totalRows = nextPayloadState.rows.length
+    const inputSignature = buildInputSignature(nextPayloadState.rows)
+    const monthlyOutputs = []
+    const intervalOutputRows = []
+    const dailyOutputRows = []
+    let completedRows = 0
+
+    status.value = 'loading'
+    message.value = `Calculating staffing for ${monthGroups[0].monthLabel}.`
+    progress.value = {
+      completedMonths: 0,
+      totalMonths: monthGroups.length,
+      currentMonthLabel: monthGroups[0].monthLabel,
+      completedRows: 0,
+      totalRows
+    }
+
+    try {
+      for (const [groupIndex, monthGroup] of monthGroups.entries()) {
+        if (currentToken !== requestToken) {
+          return false
+        }
+
+        message.value = `Calculating staffing for ${monthGroup.monthLabel}.`
+        progress.value = {
+          completedMonths: groupIndex,
+          totalMonths: monthGroups.length,
+          currentMonthLabel: monthGroup.monthLabel,
+          completedRows,
+          totalRows
+        }
+
         const response = await fetch('/api/planner/intraday-erlang/calculate', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            rows: nextPayloadState.rows
+            rows: monthGroup.rows
           })
         })
 
@@ -184,43 +374,81 @@ export const usePlannerIntradayErlang = ({
         const payload = await response.json()
 
         if (currentToken !== requestToken) {
-          return
+          return false
         }
 
-        monthlyOutputsByMonthIndex.value = new Map(
-          (Array.isArray(payload?.monthlyPlans) ? payload.monthlyPlans : []).map((row) => [row.monthIndex, row])
-        )
-        intervalOutputs.value = enrichIntervalOutputRows(payload?.intervalPlans, nextPayloadState.rows)
-        dailyOutputs.value = Array.isArray(payload?.dailyPlans) ? payload.dailyPlans : []
-        status.value = 'ready'
-        message.value = ''
-      } catch (error) {
-        if (currentToken !== requestToken) {
-          return
+        monthlyOutputs.push(...cloneRows(payload?.monthlyPlans))
+        intervalOutputRows.push(...enrichIntervalOutputRows(payload?.intervalPlans, monthGroup.rows))
+        dailyOutputRows.push(...cloneRows(payload?.dailyPlans))
+        completedRows += monthGroup.rows.length
+
+        progress.value = {
+          completedMonths: groupIndex + 1,
+          totalMonths: monthGroups.length,
+          currentMonthLabel: monthGroup.monthLabel,
+          completedRows,
+          totalRows
         }
-
-        monthlyOutputsByMonthIndex.value = new Map()
-
-        if (error instanceof TypeError && /fetch/i.test(error.message || '')) {
-          status.value = 'error'
-          message.value = 'Unable to reach the planner API. If you are running locally, make sure the backend is running on 127.0.0.1:8000.'
-          return
-        }
-
-        status.value = 'error'
-        message.value = error instanceof Error ? error.message : 'Unable to calculate interval Erlang outputs.'
       }
-    },
-    { deep: true, immediate: true }
+
+      if (currentToken !== requestToken) {
+        return false
+      }
+
+      const nextResults = {
+        version: ERLANG_RESULTS_VERSION,
+        calculatedAt: new Date().toISOString(),
+        inputSignature,
+        rowCount: totalRows,
+        monthCount: monthGroups.length,
+        monthlyOutputs,
+        intervalOutputs: intervalOutputRows,
+        dailyOutputs: dailyOutputRows
+      }
+
+      storedResultsRef.value = nextResults
+      applyResults(nextResults)
+      currentInputSignature.value = inputSignature
+      status.value = 'ready'
+      message.value = ''
+
+      return true
+    } catch (error) {
+      if (currentToken !== requestToken) {
+        return false
+      }
+
+      if (error instanceof TypeError && /fetch/i.test(error.message || '')) {
+        status.value = 'error'
+        message.value = 'Unable to reach the planner API. If you are running locally, make sure the backend is running on 127.0.0.1:8000.'
+        return false
+      }
+
+      status.value = 'error'
+      message.value = error instanceof Error ? error.message : 'Unable to calculate interval Erlang outputs.'
+      return false
+    }
+  }
+
+  const erlangCanRun = computed(() =>
+    payloadState.value.status === 'ready' && status.value !== 'loading'
   )
 
   const erlangStatus = computed(() => ({
     status: status.value,
-    message: message.value
+    message: message.value,
+    canRun: erlangCanRun.value,
+    isRunning: status.value === 'loading',
+    isStale: status.value === 'stale',
+    hasResults: hasStoredResults.value,
+    calculatedAt: normalizeStoredResults(storedResultsRef.value)?.calculatedAt || '',
+    inputSignature: currentInputSignature.value,
+    progress: { ...progress.value }
   }))
 
   return {
     erlangStatus,
+    runErlangCalculations,
     monthlyOutputsByMonthIndex,
     intervalOutputs,
     dailyOutputs

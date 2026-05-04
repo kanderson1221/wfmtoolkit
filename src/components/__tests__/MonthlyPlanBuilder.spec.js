@@ -425,6 +425,45 @@ describe('MonthlyPlanBuilder', () => {
     })
   })
 
+  it('persists stored intraday Erlang results when saving an intraday plan', async () => {
+    const storedResults = {
+      version: 1,
+      calculatedAt: '2026-01-15T12:00:00.000Z',
+      inputSignature: 'v1:2:abc123',
+      rowCount: 2,
+      monthCount: 1,
+      monthlyOutputs: [
+        {
+          monthIndex: 0,
+          erlangStaffedHours: 123.4
+        }
+      ],
+      intervalOutputs: [
+        {
+          monthIndex: 0,
+          serviceDate: '2026-01-02',
+          intervalStart: '2026-01-02T08:00:00',
+          requiredStaffNet: 12
+        }
+      ],
+      dailyOutputs: []
+    }
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'intraday-plan',
+        planningYear: 2026,
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        intradayErlangResults: storedResults
+      }
+    })
+
+    await wrapper.vm.builder.savePlan()
+
+    expect(wrapper.emitted('save')?.[0]?.[0].intradayErlangResults).toMatchObject(storedResults)
+  })
+
   it('keeps workload-ratio new plans on the original planner workflow even when an Erlang draft exists for the same year', async () => {
     await plannerDraftRepository.persistDraft('user-1:group-1:plan:new:2026:intraday_erlang', {
       plan: {

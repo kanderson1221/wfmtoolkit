@@ -60,51 +60,68 @@ describe('usePlannerIntradayErlang', () => {
     await flushPromises()
 
     expect(fetchSpy).not.toHaveBeenCalled()
-    expect(result.erlangStatus.value).toEqual({
+    expect(result.erlangStatus.value).toMatchObject({
       status: 'forecast_required',
-      message: 'Intraday Erlang plans require an applied daily forecast.'
+      message: 'Intraday Erlang plans require an applied daily forecast.',
+      canRun: false,
+      hasResults: false
     })
     expect(result.monthlyOutputsByMonthIndex.value.size).toBe(0)
   })
 
-  it('calls the planner API and stores monthly outputs when the payload is ready', async () => {
+  it('waits for an explicit run before calling the planner API', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        intervalPlans: [
+          {
+            monthIndex: 0,
+            serviceDate: '2026-01-02',
+            intervalStart: '2026-01-02T08:00:00',
+            intervalLengthMinutes: 30,
+            requiredStaffNet: 13,
+            serviceLevel: 0.83,
+            occupancy: 0.72
+          }
+        ],
+        dailyPlans: [],
+        monthlyPlans: [
+          {
+            monthIndex: 0,
+            workloadHours: 8.3333,
+            erlangStaffedHours: 123.4,
+            weightedOccupancyPercent: 82.7,
+            weightedServiceLevelPercent: 78.4,
+            peakIntervalRequiredHeadcount: 7
+          }
+        ]
+      })
+    })
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          intervalPlans: [
-            {
-              monthIndex: 0,
-              serviceDate: '2026-01-02',
-              intervalStart: '2026-01-02T08:00:00',
-              intervalLengthMinutes: 30,
-              requiredStaffNet: 13,
-              serviceLevel: 0.83,
-              occupancy: 0.72
-            }
-          ],
-          dailyPlans: [],
-          monthlyPlans: [
-            {
-              monthIndex: 0,
-              workloadHours: 8.3333,
-              erlangStaffedHours: 123.4,
-              weightedOccupancyPercent: 82.7,
-              weightedServiceLevelPercent: 78.4,
-              peakIntervalRequiredHeadcount: 7
-            }
-          ]
-        })
-      })
+      fetchSpy
     )
 
     const result = usePlannerIntradayErlang(createBaseArgs())
     await flushPromises()
 
-    expect(result.erlangStatus.value).toEqual({
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(result.erlangStatus.value).toMatchObject({
+      status: 'ready_to_run',
+      message: 'Run staffing calculations to populate monthly Erlang staffing outputs.',
+      canRun: true,
+      hasResults: false
+    })
+
+    await result.runErlangCalculations()
+    await flushPromises()
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(result.erlangStatus.value).toMatchObject({
       status: 'ready',
-      message: ''
+      message: '',
+      canRun: true,
+      hasResults: true
     })
     expect(result.monthlyOutputsByMonthIndex.value.get(0)).toMatchObject({
       workloadHours: 8.3333,
@@ -122,6 +139,64 @@ describe('usePlannerIntradayErlang', () => {
     })
   })
 
+  it('marks stored outputs stale when Erlang-driving inputs change', async () => {
+    const storedResults = ref(null)
+    const args = createBaseArgs()
+    args.storedResults = storedResults
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          intervalPlans: [
+            {
+              monthIndex: 0,
+              serviceDate: '2026-01-02',
+              intervalStart: '2026-01-02T08:00:00',
+              intervalLengthMinutes: 30,
+              requiredStaffNet: 13
+            }
+          ],
+          dailyPlans: [],
+          monthlyPlans: [
+            {
+              monthIndex: 0,
+              erlangStaffedHours: 123.4
+            }
+          ]
+        })
+      })
+    )
+
+    const result = usePlannerIntradayErlang(args)
+    await result.runErlangCalculations()
+    await flushPromises()
+
+    expect(result.erlangStatus.value).toMatchObject({
+      status: 'ready',
+      hasResults: true
+    })
+    expect(storedResults.value).toMatchObject({
+      version: 1,
+      rowCount: 2,
+      monthCount: 1
+    })
+
+    args.serviceLevelPercent.value = 85
+    await flushPromises()
+
+    expect(result.erlangStatus.value).toMatchObject({
+      status: 'stale',
+      canRun: true,
+      hasResults: true,
+      message: 'Plan inputs changed after the last staffing calculation. Rerun staffing calculations to refresh the Erlang outputs.'
+    })
+    expect(result.monthlyOutputsByMonthIndex.value.get(0)).toMatchObject({
+      erlangStaffedHours: 123.4
+    })
+  })
+
   it('stays idle outside intraday Erlang mode', async () => {
     const args = createBaseArgs()
     args.requirementMethod.value = PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
@@ -132,9 +207,10 @@ describe('usePlannerIntradayErlang', () => {
     await flushPromises()
 
     expect(fetchSpy).not.toHaveBeenCalled()
-    expect(result.erlangStatus.value).toEqual({
+    expect(result.erlangStatus.value).toMatchObject({
       status: 'idle',
-      message: ''
+      message: '',
+      canRun: false
     })
   })
 })

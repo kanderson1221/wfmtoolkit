@@ -1,5 +1,5 @@
 <script setup>
-import { mdiDownload } from '@mdi/js'
+import { mdiCalculatorVariantOutline, mdiDownload } from '@mdi/js'
 import { computed, ref } from 'vue'
 
 import AppButton from '../ui/AppButton.vue'
@@ -10,8 +10,7 @@ import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import { DEMAND_SOURCE_FORECAST, derivePeakDayUpliftPercent } from '../../planner/demandSources'
 import {
-  PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
-  getPlanRequirementMethodLabel
+  PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
 } from '../../plannerModel'
 
 const props = defineProps({
@@ -43,7 +42,19 @@ const props = defineProps({
     type: Object,
     default: () => ({
       status: '',
-      message: ''
+      message: '',
+      canRun: false,
+      isRunning: false,
+      isStale: false,
+      hasResults: false,
+      calculatedAt: '',
+      progress: {
+        completedMonths: 0,
+        totalMonths: 0,
+        currentMonthLabel: '',
+        completedRows: 0,
+        totalRows: 0
+      }
     })
   },
   formatWhole: {
@@ -64,7 +75,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['previous', 'continue'])
+const emit = defineEmits(['previous', 'continue', 'run-erlang'])
 
 const CSV_MIME_TYPE = 'text/csv;charset=utf-8'
 
@@ -564,12 +575,24 @@ const requirementModeMessage = computed(() => {
   const status = String(props.erlangStatus?.status || '').trim()
   const message = String(props.erlangStatus?.message || '').trim()
 
-  if (!message) {
-    if (status === 'ready') {
-      return `Monthly Erlang hours and peak interval staffing are being calculated from the applied daily forecast in ${getPlanRequirementMethodLabel(props.requirementMethod)} mode.`
+  if (status === 'loading') {
+    return message || 'Staffing calculations are running.'
+  }
+
+  if (status === 'ready') {
+    if (props.erlangStatus?.calculatedAt) {
+      return `Staffing calculations are complete and stored with this plan. Last run: ${formatCalculatedAt(props.erlangStatus.calculatedAt)}.`
     }
 
-    return ''
+    return 'Staffing calculations are complete and stored with this plan.'
+  }
+
+  if (status === 'ready_to_run') {
+    return message || 'Run staffing calculations to populate monthly Erlang staffing outputs.'
+  }
+
+  if (status === 'stale') {
+    return message || 'Plan inputs changed after the last staffing calculation. Rerun staffing calculations to refresh the Erlang outputs.'
   }
 
   return message
@@ -580,9 +603,63 @@ const requirementModeTone = computed(() => {
     return 'info'
   }
 
-  return ['error', 'forecast_required', 'aht_required', 'service_level_required', 'schedule_required', 'intraday_required', 'no_open_days'].includes(props.erlangStatus?.status)
+  return ['error', 'stale', 'forecast_required', 'aht_required', 'service_level_required', 'schedule_required', 'intraday_required', 'no_open_days'].includes(props.erlangStatus?.status)
     ? 'error'
     : 'info'
+})
+
+const formatCalculatedAt = (value) => {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'recently'
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(date)
+}
+
+const erlangProgress = computed(() => props.erlangStatus?.progress || {})
+const erlangProgressPercent = computed(() => {
+  const totalMonths = Number(erlangProgress.value.totalMonths) || 0
+  const completedMonths = Number(erlangProgress.value.completedMonths) || 0
+
+  if (totalMonths <= 0) {
+    return 0
+  }
+
+  return Math.max(0, Math.min(100, (completedMonths / totalMonths) * 100))
+})
+const erlangProgressRounded = computed(() => Math.round(erlangProgressPercent.value))
+const erlangProgressLabel = computed(() => {
+  const completedMonths = Number(erlangProgress.value.completedMonths) || 0
+  const totalMonths = Number(erlangProgress.value.totalMonths) || 0
+  const currentMonthLabel = String(erlangProgress.value.currentMonthLabel || '').trim()
+
+  if (!totalMonths) {
+    return 'Preparing staffing calculations.'
+  }
+
+  if (completedMonths >= totalMonths) {
+    return `${completedMonths} of ${totalMonths} months calculated.`
+  }
+
+  return currentMonthLabel
+    ? `Calculating ${currentMonthLabel}. ${completedMonths} of ${totalMonths} months complete.`
+    : `${completedMonths} of ${totalMonths} months complete.`
+})
+const erlangRunButtonLabel = computed(() => {
+  if (props.erlangStatus?.isRunning) {
+    return 'Running Calculations'
+  }
+
+  return props.erlangStatus?.hasResults
+    ? 'Rerun Staffing Calculations'
+    : 'Run Staffing Calculations'
 })
 </script>
 
@@ -600,11 +677,44 @@ const requirementModeTone = computed(() => {
       {{ requirementModeMessage }}
     </AppStatusMessage>
 
+    <div
+      v-if="isIntradayErlang && props.erlangStatus?.isRunning"
+      class="grid gap-1 rounded-lg border border-[#d5e0ea] bg-white px-4 py-3"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2 text-sm font-medium text-[#15395f]">
+        <span>{{ erlangProgressLabel }}</span>
+        <span>{{ props.formatNumber(erlangProgressPercent, 0) }}%</span>
+      </div>
+      <div
+        class="h-2 overflow-hidden rounded-full bg-slate-100"
+        role="progressbar"
+        :aria-valuemin="0"
+        :aria-valuemax="100"
+        :aria-valuenow="erlangProgressRounded"
+        aria-label="Staffing calculation progress"
+      >
+        <div
+          class="h-full rounded-full bg-[#1f6f9f] transition-[width] duration-300"
+          :style="{ width: `${erlangProgressPercent}%` }"
+        />
+      </div>
+    </div>
+
     <section class="grid gap-3">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <AppSectionHeader title="Monthly Requirement Worksheet" />
 
         <div class="flex flex-wrap items-center gap-2">
+          <AppButton
+            v-if="isIntradayErlang"
+            variant="primary"
+            size="sm"
+            :icon="mdiCalculatorVariantOutline"
+            :disabled="!props.erlangStatus?.canRun"
+            @click="emit('run-erlang')"
+          >
+            {{ erlangRunButtonLabel }}
+          </AppButton>
           <AppButton
             variant="secondary"
             size="sm"

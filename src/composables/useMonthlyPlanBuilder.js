@@ -66,6 +66,29 @@ import {
   resolvePlannerInitialState
 } from './monthlyPlanBuilder/shared'
 
+const cloneIntradayErlangResults = (results) => {
+  if (!results || typeof results !== 'object') {
+    return null
+  }
+
+  return {
+    version: Number(results.version) || 1,
+    calculatedAt: String(results.calculatedAt || '').trim(),
+    inputSignature: String(results.inputSignature || '').trim(),
+    rowCount: Number(results.rowCount) || 0,
+    monthCount: Number(results.monthCount) || 0,
+    monthlyOutputs: Array.isArray(results.monthlyOutputs)
+      ? results.monthlyOutputs.map((row) => ({ ...row }))
+      : [],
+    intervalOutputs: Array.isArray(results.intervalOutputs)
+      ? results.intervalOutputs.map((row) => ({ ...row }))
+      : [],
+    dailyOutputs: Array.isArray(results.dailyOutputs)
+      ? results.dailyOutputs.map((row) => ({ ...row }))
+      : []
+  }
+}
+
 export const useMonthlyPlanBuilder = (props, emit) => {
   const CORE_SECTION_IDS = new Set(['availability', 'variability', 'requirement', 'staffing'])
   const SAME_YEAR_RECOMMENDATION_SOURCE = 'recommended'
@@ -125,11 +148,14 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       : sourcePlan?.id || initialPlan.id
         ? [...CORE_SECTION_IDS]
         : []
-    const initialState = resolvePlannerInitialState({
-      sourcePlan,
-      centerDefaults: props.centerDefaults,
-      prefilledYear
-    })
+    const initialState = {
+      ...resolvePlannerInitialState({
+        sourcePlan,
+        centerDefaults: props.centerDefaults,
+        prefilledYear
+      }),
+      intradayErlangResults: cloneIntradayErlangResults(sourcePlan?.intradayErlangResults)
+    }
     const initialSelectedForecastProjectId = initialUi.selectedForecastProjectId || initialState.demandSource.forecastProjectId || ''
     const legacyInitialTab = initialUi.activeTab === 'random' || initialUi.activeTab === 'plan'
       ? initialUi.activeTab
@@ -206,6 +232,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides.value = bootstrapState.initialState.useMonthlyRandomOverrides
     randomMonths.value = bootstrapState.initialState.randomMonths.map((month) => createRandomMonth(month))
     planMonths.value = bootstrapState.initialState.planMonths.map((month) => createPlanMonth(month))
+    intradayErlangResults.value = cloneIntradayErlangResults(bootstrapState.initialState.intradayErlangResults)
     demandSource.value = createPlanDemandSource(bootstrapState.initialState.demandSource)
     selectedForecastProjectId.value = bootstrapState.selectedForecastProjectId
     trainingSettings.value = createTrainingSettings(bootstrapState.initialState.trainingSettings)
@@ -262,6 +289,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const useMonthlyRandomOverrides = ref(initialBootstrapState.initialState.useMonthlyRandomOverrides)
   const randomMonths = ref(initialBootstrapState.initialState.randomMonths.map((month) => createRandomMonth(month)))
   const planMonths = ref(initialBootstrapState.initialState.planMonths.map((month) => createPlanMonth(month)))
+  const intradayErlangResults = ref(cloneIntradayErlangResults(initialBootstrapState.initialState.intradayErlangResults))
   const demandSource = ref(createPlanDemandSource(initialBootstrapState.initialState.demandSource))
   const selectedForecastProjectId = ref(initialBootstrapState.selectedForecastProjectId)
   const trainingSettings = ref(createTrainingSettings(initialBootstrapState.initialState.trainingSettings))
@@ -394,6 +422,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides.value = false
     randomMonths.value = examplePlan.randomMonths
     planMonths.value = examplePlan.planMonths
+    intradayErlangResults.value = null
     demandSource.value = createPlanDemandSource(examplePlan.demandSource)
     selectedForecastProjectId.value = examplePlan.demandSource?.forecastProjectId || ''
     startingHeadcount.value = examplePlan.startingHeadcount
@@ -426,6 +455,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     useMonthlyRandomOverrides.value = false
     randomMonths.value = MONTH_LABELS.map(() => createRandomMonth(plannerSeedDefaults.value.randomDefaults))
     planMonths.value = buildPlanMonths()
+    intradayErlangResults.value = null
     demandSource.value = createPlanDemandSource()
     selectedForecastProjectId.value = ''
     trainingSettings.value = createTrainingSettings()
@@ -542,6 +572,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const {
     erlangStatus: intradayErlangStatus,
+    runErlangCalculations: runIntradayErlangCalculations,
     monthlyOutputsByMonthIndex: intradayErlangMonthlyOutputsByMonthIndex,
     intervalOutputs: intradayErlangIntervalOutputs,
     dailyOutputs: intradayErlangDailyOutputs
@@ -558,7 +589,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     operatingCloseTime: intradayErlangCloseTime,
     serviceLevelPercent: intradayErlangServiceLevelPercent,
     serviceLevelThresholdSeconds: intradayErlangServiceLevelThresholdSeconds,
-    intraday: intradayErlangProfile
+    intraday: intradayErlangProfile,
+    storedResults: intradayErlangResults
   })
 
   const monthlyRecords = computed(() =>
@@ -779,6 +811,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
         intervalLengthMinutes: intradayErlangProfile.value.intervalLengthMinutes,
         intervalRatios: intradayErlangProfile.value.intervalRatios.map((row) => ({ ...row }))
       },
+      intradayErlangResults: requirementMethod.value === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+        ? cloneIntradayErlangResults(intradayErlangResults.value)
+        : null,
       demandSource: createPlanDemandSource(demandSource.value),
       trainingSettings: createTrainingSettings(trainingSettings.value),
       nextYearOpening: createNextYearOpening({
@@ -989,6 +1024,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       useMonthlyRandomOverrides,
       randomMonths,
       planMonths,
+      intradayErlangResults,
       demandSource,
       selectedForecastProjectId,
       trainingSettings,
@@ -1103,6 +1139,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     intradayErlangCloseTime,
     intradayErlangProfile,
     erlangStatus: intradayErlangStatus,
+    runIntradayErlangCalculations,
     actualsErlangStatus,
     autosaveStatusMessage,
     validationMessage,
