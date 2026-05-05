@@ -2,6 +2,7 @@ import {
   CENTERS_STORAGE_KEY,
   LEGACY_PLANS_STORAGE_KEY
 } from '../../planningStorage'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 import { FORECAST_PROJECTS_STORAGE_KEY } from '../../forecastingStorage'
 import { DRAFT_STORAGE_KEY } from '../../plannerDraftStorage'
 import {
@@ -18,6 +19,8 @@ import {
   persistPlanningWorkspaceToDexie
 } from '../localDataStore'
 import { wfmDexie } from '../wfmDexie'
+
+const clonePlain = (value) => JSON.parse(JSON.stringify(value))
 
 const sampleCenters = [
   {
@@ -348,6 +351,78 @@ describe('localDataStore', () => {
 
     expect(persistedDraft.autosavedAt).toBeTruthy()
     expect(loadedDraft).toBeNull()
+  })
+
+  it('preserves an intraday Erlang plan method after Dexie save and reload', async () => {
+    const centers = clonePlain(sampleCenters)
+    centers[0].groups[0].plans[0] = {
+      ...centers[0].groups[0].plans[0],
+      requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+      intradayErlangResults: {
+        version: 1,
+        calculatedAt: '2026-01-15T12:00:00.000Z',
+        inputSignature: 'v1:2:abc123',
+        rowCount: 2,
+        monthCount: 1,
+        monthlyOutputs: [
+          {
+            monthIndex: 0,
+            erlangStaffedHours: 123.4
+          }
+        ],
+        intervalOutputs: [],
+        dailyOutputs: []
+      }
+    }
+
+    await persistPlanningWorkspaceToDexie(centers, 'default')
+
+    const loadedCenters = await loadPlanningWorkspaceFromDexie('default')
+    const loadedPlan = loadedCenters[0].groups[0].plans[0]
+
+    expect(loadedPlan.requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+    expect(loadedPlan.intradayErlangResults).toMatchObject({
+      inputSignature: 'v1:2:abc123',
+      monthlyOutputs: [
+        {
+          monthIndex: 0,
+          erlangStaffedHours: 123.4
+        }
+      ]
+    })
+  })
+
+  it('infers intraday Erlang for older stored plan rows that have Erlang results but no method', async () => {
+    const centers = clonePlain(sampleCenters)
+    centers[0].groups[0].plans[0] = {
+      ...centers[0].groups[0].plans[0],
+      requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+      intradayErlangResults: {
+        version: 1,
+        calculatedAt: '2026-01-15T12:00:00.000Z',
+        inputSignature: 'v1:2:abc123',
+        rowCount: 2,
+        monthCount: 1,
+        monthlyOutputs: [
+          {
+            monthIndex: 0,
+            erlangStaffedHours: 123.4
+          }
+        ],
+        intervalOutputs: [],
+        dailyOutputs: []
+      }
+    }
+
+    await persistPlanningWorkspaceToDexie(centers, 'default')
+
+    const [storedPlanRow] = await wfmDexie.plans.toArray()
+    delete storedPlanRow.requirementMethod
+    await wfmDexie.plans.put(storedPlanRow)
+
+    const loadedCenters = await loadPlanningWorkspaceFromDexie('default')
+
+    expect(loadedCenters[0].groups[0].plans[0].requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
   })
 
   it('migrates legacy localStorage data into Dexie once', async () => {

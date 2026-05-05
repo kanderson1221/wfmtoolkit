@@ -7,6 +7,7 @@ import {
   normalizePlanningCenter,
   sortPlanningCenters
 } from '../planningStorage'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../planner/shared'
 import {
   FORECAST_PROJECTS_STORAGE_KEY,
   normalizeForecastProject,
@@ -105,6 +106,9 @@ const buildForecastRunRowId = (runId, kind, rowIndex) => `${runId}:${kind}:${row
 const buildForecastComponentRowId = (runId, componentType, rowIndex) => `${runId}:${componentType}:${rowIndex}`
 
 const getScopeRows = async (table, scope) => table.where('scope').equals(scope).toArray()
+const resolveStoredPlanRequirementMethod = (plan = {}) =>
+  plan.requirementMethod ||
+  (plan.intradayErlangResults ? PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG : '')
 
 const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
   const normalizedScope = normalizeScope(scope)
@@ -196,6 +200,7 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
           actualsThroughMonth: plan.actualsThroughMonth || '',
           actualizedAt: plan.actualizedAt || '',
           planningYear: plan.planningYear,
+          requirementMethod: resolveStoredPlanRequirementMethod(plan),
           operatingWeekdays: [...(plan.operatingWeekdays || [])],
           holidayCalendarId: plan.holidayCalendarId || '',
           disabledHolidayRuleIds: [...(plan.disabledHolidayRuleIds || [])],
@@ -338,6 +343,7 @@ const hydratePlanningWorkspace = (scope, rows) => {
         actualsThroughMonth: row.actualsThroughMonth || '',
         actualizedAt: row.actualizedAt || '',
         planningYear: row.planningYear,
+        requirementMethod: resolveStoredPlanRequirementMethod(row),
         operatingWeekdays: [...(row.operatingWeekdays || [])],
         holidayCalendarId: row.holidayCalendarId,
         disabledHolidayRuleIds: [...(row.disabledHolidayRuleIds || [])],
