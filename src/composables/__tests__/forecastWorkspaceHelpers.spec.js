@@ -91,29 +91,29 @@ describe('forecastWorkspaceHelpers', () => {
       {
         name: 'Independence Day',
         date: '2022-07-04',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Independence Day',
         date: '2023-07-04',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Independence Day',
         date: '2024-07-04',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Independence Day',
         date: '2025-07-04',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       }
     ])
@@ -149,6 +149,45 @@ describe('forecastWorkspaceHelpers', () => {
       {
         name: 'Company Day',
         date: '2025-12-26',
+        lowerWindow: -1,
+        upperWindow: 1,
+        priorScale: 10
+      }
+    ])
+  })
+
+  it('preserves explicitly configured zero-day holiday windows', () => {
+    const project = createForecastProject({
+      planningYear: 2025,
+      forecastType: 'budget',
+      planningContext: {
+        groupId: 'group-1',
+        planningYear: 2025
+      },
+      historyRows: [
+        { ds: '2024-01-01', y: 800, cap: null, floor: null },
+        { ds: '2024-12-31', y: 975, cap: null, floor: null }
+      ],
+      modelConfig: {
+        builtInHolidayCountry: '',
+        customHolidays: [
+          {
+            id: 'inventory-day-2025',
+            name: 'Inventory Day',
+            date: '2025-06-12',
+            lowerWindow: 0,
+            upperWindow: 0
+          }
+        ]
+      }
+    })
+
+    const payload = buildForecastPayload(project)
+
+    expect(payload.modelConfig.customHolidays).toEqual([
+      {
+        name: 'Inventory Day',
+        date: '2025-06-12',
         lowerWindow: 0,
         upperWindow: 0,
         priorScale: 10
@@ -213,29 +252,29 @@ describe('forecastWorkspaceHelpers', () => {
       {
         name: 'Independence Day',
         date: '2022-07-04',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Independence Day',
         date: '2023-07-04',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Independence Day',
         date: '2024-07-04',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Independence Day',
         date: '2025-07-04',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       }
     ])
@@ -289,36 +328,36 @@ describe('forecastWorkspaceHelpers', () => {
       {
         name: 'Thanksgiving Day',
         date: '2022-11-24',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Thanksgiving Day',
         date: '2023-11-23',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Thanksgiving Day',
         date: '2024-11-28',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Thanksgiving Day',
         date: '2025-11-27',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       },
       {
         name: 'Thanksgiving Day',
         date: '2026-11-26',
-        lowerWindow: 0,
-        upperWindow: 0,
+        lowerWindow: -1,
+        upperWindow: 1,
         priorScale: 10
       }
     ])

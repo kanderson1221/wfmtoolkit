@@ -196,8 +196,8 @@ onBeforeUnmount(() => {
         :draft-key="plannerDraftKey"
         :storage-scope="storageScope"
         :storage-refresh-token="storageRefreshToken"
+        :save-plan-action="handleSavePlan"
         @cancel="openPlanningHome"
-        @save="handleSavePlan"
       />
 
       <PlanningHome

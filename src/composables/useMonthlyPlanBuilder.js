@@ -674,6 +674,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const {
     actualsErlangStatus,
+    runActualsErlangCalculations,
     monthlyOutputsByMonthIndex: actualsIntradayErlangMonthlyOutputsByMonthIndex
   } = usePlannerActualsIntradayErlang({
     requirementMethod,
@@ -962,6 +963,28 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     return true
   }
 
+  const persistPlanPayload = async (payload) => {
+    if (typeof props.savePlanAction === 'function') {
+      try {
+        const result = await props.savePlanAction(payload)
+        return result !== false
+      } catch (error) {
+        validationMessage.value = error instanceof Error && error.message
+          ? error.message
+          : 'Unable to save plan. The local draft is still available.'
+        return false
+      }
+    }
+
+    emit('save', payload)
+    return true
+  }
+
+  const resumeAutosaveAfterFailedSave = async () => {
+    suspendAutosave.value = false
+    await flushAutosave()
+  }
+
   const savePlanWithStatus = async (nextStatus) => {
     if (!ensurePlannerEditable()) {
       return
@@ -972,8 +995,18 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     }
 
     const savedAt = new Date().toISOString()
+    const planPayload = buildPlanPayload({ status: nextStatus, savedAt })
+
+    suspendAutosave.value = true
+    const didSave = await persistPlanPayload(planPayload)
+
+    if (!didSave) {
+      validationMessage.value ||= 'Unable to save plan. The local draft is still available.'
+      await resumeAutosaveAfterFailedSave()
+      return
+    }
+
     await completeManualSave(savedAt)
-    emit('save', buildPlanPayload({ status: nextStatus, savedAt }))
   }
 
   const savePlan = async () => {
@@ -996,8 +1029,18 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     }
 
     const savedAt = new Date().toISOString()
+    const planPayload = buildPlanPayload({ status: PLAN_STATUS_DRAFT, savedAt })
+
+    suspendAutosave.value = true
+    const didSave = await persistPlanPayload(planPayload)
+
+    if (!didSave) {
+      validationMessage.value ||= 'Unable to save plan. The local draft is still available.'
+      await resumeAutosaveAfterFailedSave()
+      return
+    }
+
     await completeManualSave(savedAt)
-    emit('save', buildPlanPayload({ status: PLAN_STATUS_DRAFT, savedAt }))
   }
 
   const cancelEditor = () => {
@@ -1141,6 +1184,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     erlangStatus: intradayErlangStatus,
     runIntradayErlangCalculations,
     actualsErlangStatus,
+    runActualsErlangCalculations,
     autosaveStatusMessage,
     validationMessage,
     formatNumber,

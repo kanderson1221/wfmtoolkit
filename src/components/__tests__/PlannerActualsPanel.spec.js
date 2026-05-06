@@ -3,54 +3,57 @@ import { mount } from '@vue/test-utils'
 import PlannerActualsPanel from '../planner/PlannerActualsPanel.vue'
 
 describe('PlannerActualsPanel', () => {
-  it('renders actuals summary, chart section, and worksheet columns', async () => {
-    const formatNumber = (value, digits = 1) =>
-      Number(value ?? 0).toLocaleString('en-US', {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits
-      })
-
-    const wrapper = mount(PlannerActualsPanel, {
-      props: {
-        actualsRecords: [
-          {
-            monthIndex: 0,
-            label: 'Jan',
-            fullLabel: 'January',
-            isLoaded: true,
-            plannedContacts: 10000,
-            actualContacts: 10200,
-            plannedAhtSeconds: 300,
-            actualAhtSeconds: 310,
-            plannedWorkloadHours: 833.3,
-            actualWorkloadHours: 878.3,
-            actualRequiredHeadcount: 11.2,
-            plannedRequiredHeadcount: 10.4,
-            requiredHeadcountVariance: 0.8,
-            plannedStartingTotalHeadcount: 14,
-            plannedStartingFrontlineHeadcount: 12,
-            plannedEndingTotalHeadcount: 15,
-            plannedEndingFrontlineHeadcount: 13
-          }
-        ],
-        actualsSummary: {
-          loadedMonthsCount: 1,
-          contactsVariance: 200,
-          averageAhtVarianceSeconds: 10,
-          averageRequiredHeadcountVariance: 0.8,
-          peakActualRequiredHeadcount: 11.2,
-          peakPlannedRequiredHeadcount: 10.4
-        },
-        formatWhole: (value) => String(value ?? 0),
-        formatNumber
-      },
-      global: {
-        stubs: {
-          PlannerActualsComparisonChart: true,
-          AppSectionHeader: true
-        }
-      }
+  const formatNumber = (value, digits = 1) =>
+    Number(value ?? 0).toLocaleString('en-US', {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits
     })
+
+  const mountPanel = (props = {}) => mount(PlannerActualsPanel, {
+    props: {
+      actualsRecords: [
+        {
+          monthIndex: 0,
+          label: 'Jan',
+          fullLabel: 'January',
+          isLoaded: true,
+          plannedContacts: 10000,
+          actualContacts: 10200,
+          plannedAhtSeconds: 300,
+          actualAhtSeconds: 310,
+          plannedWorkloadHours: 833.3,
+          actualWorkloadHours: 878.3,
+          actualRequiredHeadcount: 11.2,
+          plannedRequiredHeadcount: 10.4,
+          requiredHeadcountVariance: 0.8,
+          plannedStartingTotalHeadcount: 14,
+          plannedStartingFrontlineHeadcount: 12,
+          plannedEndingTotalHeadcount: 15,
+          plannedEndingFrontlineHeadcount: 13
+        }
+      ],
+      actualsSummary: {
+        loadedMonthsCount: 1,
+        contactsVariance: 200,
+        averageAhtVarianceSeconds: 10,
+        averageRequiredHeadcountVariance: 0.8,
+        peakActualRequiredHeadcount: 11.2,
+        peakPlannedRequiredHeadcount: 10.4
+      },
+      formatWhole: (value) => String(value ?? 0),
+      formatNumber,
+      ...props
+    },
+    global: {
+      stubs: {
+        PlannerActualsComparisonChart: true,
+        AppSectionHeader: true
+      }
+    }
+  })
+
+  it('renders actuals summary, chart section, and worksheet columns', async () => {
+    const wrapper = mountPanel()
 
     expect(wrapper.text()).toContain('Months Loaded')
     expect(wrapper.text()).toContain('Workload')
@@ -80,5 +83,47 @@ describe('PlannerActualsPanel', () => {
 
     expect(wrapper.text()).toContain('15.0')
     expect(wrapper.text()).toContain('3.8')
+  })
+
+  it('lets users explicitly run actual Erlang calculations', async () => {
+    const wrapper = mountPanel({
+      actualsErlangStatus: {
+        status: 'ready_to_run',
+        message: 'Run actual staffing calculations to populate actual Intraday Erlang requirements.',
+        canRun: true,
+        isRunning: false,
+        hasResults: false
+      }
+    })
+
+    const runButton = wrapper.findAll('button').find((button) => button.text().includes('Run Actual Calculations'))
+
+    expect(runButton).toBeTruthy()
+
+    await runButton.trigger('click')
+
+    expect(wrapper.emitted('run-actuals-erlang')).toHaveLength(1)
+    expect(wrapper.text()).toContain('Run actual staffing calculations')
+  })
+
+  it('shows actual Erlang progress while calculations are running', () => {
+    const wrapper = mountPanel({
+      actualsErlangStatus: {
+        status: 'loading',
+        message: 'Calculating actual staffing for Feb.',
+        canRun: false,
+        isRunning: true,
+        progress: {
+          completedMonths: 1,
+          totalMonths: 3,
+          currentMonthLabel: 'Feb',
+          completedRows: 20,
+          totalRows: 60
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Calculating Actual Requirements')
+    expect(wrapper.text()).toContain('1/3 months complete')
   })
 })

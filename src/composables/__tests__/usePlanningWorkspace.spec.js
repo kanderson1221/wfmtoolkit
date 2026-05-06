@@ -458,8 +458,9 @@ describe('usePlanningWorkspace', () => {
     })
 
     await workspace.loadCentersForScope()
-    await workspace.handleSavePlan({ planningYear: 2026 })
+    const didSave = await workspace.handleSavePlan({ planningYear: 2026 })
 
+    expect(didSave).toBe(true)
     expect(planningRepository.savePlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
     expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
     expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', 2026, { tab: 'plans' }))

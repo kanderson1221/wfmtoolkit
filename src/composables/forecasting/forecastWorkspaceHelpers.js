@@ -23,6 +23,9 @@ import { GROUP_HOLIDAY_CALENDAR_INHERIT } from '../../planner/holidayCalendars'
 import { createPlanningGroupOpenDayChecker } from '../../planner/groupOpenDays'
 import { buildHolidayEntriesForYear } from '../../planner/holidayCalendars'
 
+const DEFAULT_HOLIDAY_LOWER_WINDOW = -1
+const DEFAULT_HOLIDAY_UPPER_WINDOW = 1
+
 export const resolveMaybeRef = (value) => {
   if (isRef(value)) {
     return value.value
@@ -128,11 +131,20 @@ const resolveCustomHolidayYears = ({ project, coverageWindow, adHocForecastHoriz
   return Array.from({ length: endYear - startYear + 1 }, (_, index) => startYear + index)
 }
 
+const resolveHolidayWindow = (value, fallback) => {
+  if (value === undefined || value === null || value === '') {
+    return fallback
+  }
+
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 const formatHolidayPayloadEntry = (entry, project, item = {}) => ({
   name: entry.label || item.name?.trim() || '',
   date: formatDateInputValue(entry.date),
-  lowerWindow: Number(item.lowerWindow) || 0,
-  upperWindow: Number(item.upperWindow) || 0,
+  lowerWindow: resolveHolidayWindow(item.lowerWindow, DEFAULT_HOLIDAY_LOWER_WINDOW),
+  upperWindow: resolveHolidayWindow(item.upperWindow, DEFAULT_HOLIDAY_UPPER_WINDOW),
   priorScale: Number(item.priorScale) || Number(project.modelConfig.holidaysPriorScale) || 10
 })
 

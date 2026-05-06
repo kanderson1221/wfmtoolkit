@@ -475,12 +475,12 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
 
     if (!targetCenterId || !targetGroupId) {
       navigateToHash(buildPlanningHomeHash())
-      return
+      return false
     }
 
     const nextCenters = planningRepository.savePlan(planningCenters.value, targetCenterId, targetGroupId, planDraft)
     if (!await persistAndSetCenters(nextCenters)) {
-      return
+      return false
     }
 
     const savedCenter = planningRepository.findCenter(nextCenters, targetCenterId)
@@ -506,6 +506,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         { tab: 'plans' }
       )
     )
+    return true
   }
 
   const handleDeletePlan = async ({ centerId, groupId, planId, planningYear }) => {

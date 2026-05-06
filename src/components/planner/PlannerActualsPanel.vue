@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { mdiChartTimelineVariant, mdiInformationOutline } from '@mdi/js'
+import { mdiCalculatorVariantOutline, mdiChartTimelineVariant, mdiInformationOutline } from '@mdi/js'
 
+import AppButton from '../ui/AppButton.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppSelect from '../ui/AppSelect.vue'
@@ -22,7 +23,9 @@ const props = defineProps({
     type: Object,
     default: () => ({
       status: '',
-      message: ''
+      message: '',
+      canRun: false,
+      isRunning: false
     })
   },
   formatWhole: {
@@ -34,6 +37,8 @@ const props = defineProps({
     required: true
   }
 })
+
+const emit = defineEmits(['run-actuals-erlang'])
 
 const staffingMetricOptions = [
   { label: 'Starting Frontline Headcount', value: 'plannedStartingFrontlineHeadcount' },
@@ -148,27 +153,81 @@ const staffingGapClass = (value) => ({
 })
 
 const infoIconPath = mdiInformationOutline
+const actualsErlangStatusValue = computed(() => String(props.actualsErlangStatus?.status || '').trim())
+const actualsErlangCanRun = computed(() => Boolean(props.actualsErlangStatus?.canRun))
+const actualsErlangIsRunning = computed(() => Boolean(props.actualsErlangStatus?.isRunning))
+const actualsErlangHasAction = computed(() =>
+  actualsErlangCanRun.value ||
+  actualsErlangIsRunning.value ||
+  ['ready_to_run', 'ready', 'stale', 'error'].includes(actualsErlangStatusValue.value)
+)
+const actualsErlangButtonLabel = computed(() => {
+  if (actualsErlangIsRunning.value) {
+    return 'Calculating Actual Requirements'
+  }
+
+  return props.actualsErlangStatus?.hasResults
+    ? 'Rerun Actual Calculations'
+    : 'Run Actual Calculations'
+})
 const actualsErlangMessage = computed(() => {
-  const status = String(props.actualsErlangStatus?.status || '').trim()
+  const status = actualsErlangStatusValue.value
   const message = String(props.actualsErlangStatus?.message || '').trim()
+  const progress = props.actualsErlangStatus?.progress || {}
+  const totalMonths = Number(progress.totalMonths) || 0
+
+  if (status === 'loading') {
+    if (totalMonths > 0) {
+      const completedMonths = Math.max(0, Number(progress.completedMonths) || 0)
+      const currentMonthLabel = String(progress.currentMonthLabel || '').trim()
+      const progressLabel = `${Math.min(completedMonths, totalMonths)}/${totalMonths} months complete`
+      return currentMonthLabel
+        ? `${message || `Calculating actual staffing for ${currentMonthLabel}.`} ${progressLabel}.`
+        : `${message || 'Calculating actual Intraday Erlang requirements.'} ${progressLabel}.`
+    }
+
+    return message || 'Calculating actual Intraday Erlang requirements from Data tab daily actuals.'
+  }
 
   if (message) {
     return message
   }
 
-  return status === 'loading'
-    ? 'Calculating actual Intraday Erlang requirements from Data tab daily actuals.'
-    : ''
+  if (status === 'ready_to_run') {
+    return 'Run actual staffing calculations to populate actual Intraday Erlang requirements.'
+  }
+
+  if (status === 'ready') {
+    return 'Actual staffing calculations are complete for loaded actuals.'
+  }
+
+  return ''
 })
 
-const actualsErlangTone = computed(() =>
-  props.actualsErlangStatus?.status === 'error' ? 'error' : 'info'
-)
+const actualsErlangTone = computed(() => {
+  if (['error', 'stale', 'no_open_days'].includes(actualsErlangStatusValue.value)) {
+    return 'error'
+  }
+
+  return actualsErlangStatusValue.value === 'ready' ? 'success' : 'info'
+})
 </script>
 
 <template>
   <section class="grid gap-4">
-    <AppSectionHeader title="Actuals & Variance" :icon="mdiChartTimelineVariant" />
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <AppSectionHeader title="Actuals & Variance" :icon="mdiChartTimelineVariant" />
+      <AppButton
+        v-if="actualsErlangHasAction"
+        size="sm"
+        :variant="actualsErlangIsRunning ? 'secondary' : 'primary'"
+        :icon="mdiCalculatorVariantOutline"
+        :disabled="!actualsErlangCanRun || actualsErlangIsRunning"
+        @click="emit('run-actuals-erlang')"
+      >
+        {{ actualsErlangButtonLabel }}
+      </AppButton>
+    </div>
 
     <AppStatStrip :items="summaryItems" columns="md:grid-cols-2 xl:grid-cols-6" />
 

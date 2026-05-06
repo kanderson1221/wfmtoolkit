@@ -669,17 +669,21 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.find('[data-test="planner-forecast-panel"]').exists()).toBe(true)
   })
 
-  it('clears the scoped new-plan draft before emitting save for a new intraday Erlang plan', async () => {
-    let resolveClearDraft
+  it('keeps the scoped new-plan draft until the save action succeeds', async () => {
+    let resolveSaveAction
+    const savePlanAction = vi.fn(() => new Promise((resolve) => {
+      resolveSaveAction = resolve
+    }))
     const clearDraftSpy = vi.spyOn(plannerDraftRepository, 'clearDraft').mockImplementation(
       async () => new Promise((resolve) => {
-        resolveClearDraft = resolve
+        resolve()
       })
     )
 
     const wrapper = await mountBuilder({
       draftKey: 'user-1:group-1:plan:new:2026:intraday_erlang',
       prefilledYear: 2026,
+      savePlanAction,
       centerDefaults: {
         ...centerDefaults,
         requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
@@ -689,13 +693,37 @@ describe('MonthlyPlanBuilder', () => {
     const savePromise = wrapper.vm.builder.savePlan()
     await flushPromises()
 
-    expect(clearDraftSpy).toHaveBeenCalledWith('user-1:group-1:plan:new:2026:intraday_erlang')
+    expect(savePlanAction).toHaveBeenCalledTimes(1)
+    expect(clearDraftSpy).not.toHaveBeenCalled()
     expect(wrapper.emitted('save')).toBeFalsy()
 
-    resolveClearDraft()
+    resolveSaveAction(true)
     await savePromise
 
-    expect(wrapper.emitted('save')).toBeTruthy()
+    expect(clearDraftSpy).toHaveBeenCalledWith('user-1:group-1:plan:new:2026:intraday_erlang')
+    expect(wrapper.emitted('save')).toBeFalsy()
+  })
+
+  it('preserves the local draft when the save action fails', async () => {
+    const savePlanAction = vi.fn().mockResolvedValue(false)
+    const clearDraftSpy = vi.spyOn(plannerDraftRepository, 'clearDraft')
+
+    const wrapper = await mountBuilder({
+      draftKey: 'user-1:group-1:plan:new:2026:intraday_erlang',
+      prefilledYear: 2026,
+      savePlanAction,
+      centerDefaults: {
+        ...centerDefaults,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      }
+    })
+
+    await wrapper.vm.builder.savePlan()
+    await flushPromises()
+
+    expect(savePlanAction).toHaveBeenCalledTimes(1)
+    expect(clearDraftSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Unable to save plan. The local draft is still available.')
   })
 
   it('shows an autosave error when the local draft cannot be persisted', async () => {

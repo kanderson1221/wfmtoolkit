@@ -87,8 +87,8 @@ export const createForecastHoliday = (overrides = {}) => ({
   id: createForecastEntityId('forecast-holiday'),
   name: '',
   date: '',
-  lowerWindow: 0,
-  upperWindow: 0,
+  lowerWindow: -1,
+  upperWindow: 1,
   priorScale: 10,
   ...overrides
 })

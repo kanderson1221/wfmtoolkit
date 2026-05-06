@@ -57,6 +57,10 @@ const props = defineProps({
   forecastSeed: {
     type: Object,
     default: null
+  },
+  savePlanAction: {
+    type: Function,
+    default: null
   }
 })
 
@@ -829,6 +833,7 @@ const planWorkspaceDisabled = computed(() =>
                   :actuals-erlang-status="builder.actualsErlangStatus"
                   :format-whole="builder.formatWhole"
                   :format-number="builder.formatNumber"
+                  @run-actuals-erlang="builder.runActualsErlangCalculations"
                 />
               </div>
             </fieldset>
