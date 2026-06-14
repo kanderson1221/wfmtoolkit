@@ -1,0 +1,5 @@
+interval_start,contacts,average_handle_time_seconds,interval_length_minutes
+2027-05-03T09:00:00,80,390,30
+2027-05-03T09:30:00,100,405,30
+2027-05-03T10:00:00,120,420,30
+2027-05-03T10:30:00,110,410,30

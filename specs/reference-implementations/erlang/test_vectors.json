@@ -1,0 +1,194 @@
+{
+  "staffingCases": [
+    {
+      "name": "standard_c",
+      "model": "erlang_c",
+      "input": {
+        "calls_offered": 25,
+        "interval_duration_seconds": 1800,
+        "avg_handle_time_seconds": 360,
+        "target_service_level": 0.8,
+        "service_level_answer_time_seconds": 40,
+        "max_occupancy": 0.85,
+        "avg_caller_patience_seconds": 180
+      },
+      "expected": {
+        "required_staff": 8,
+        "service_level": 0.8801483107665521,
+        "occupancy": 0.625,
+        "average_speed_of_answer_seconds": 20.071980799410795,
+        "percent_answered_immediately": 0.8327334933382433,
+        "abandon_percent": 0.03388132409467233
+      }
+    },
+    {
+      "name": "standard_a",
+      "model": "erlang_a",
+      "input": {
+        "calls_offered": 25,
+        "interval_duration_seconds": 1800,
+        "avg_handle_time_seconds": 360,
+        "target_service_level": 0.8,
+        "service_level_answer_time_seconds": 40,
+        "max_occupancy": 0.85,
+        "avg_caller_patience_seconds": 180
+      },
+      "expected": {
+        "required_staff": 7,
+        "service_level": 0.8558403249585248,
+        "occupancy": 0.6664094124555114,
+        "average_speed_of_answer_seconds": 9.136773632491865,
+        "percent_answered_immediately": 0.7891002544153936,
+        "abandon_percent": 0.06702682256228387
+      }
+    },
+    {
+      "name": "zero_c",
+      "model": "erlang_c",
+      "input": {
+        "calls_offered": 0,
+        "interval_duration_seconds": 1800,
+        "avg_handle_time_seconds": 360,
+        "target_service_level": 0.8,
+        "service_level_answer_time_seconds": 40,
+        "max_occupancy": 0.85,
+        "avg_caller_patience_seconds": 180
+      },
+      "expected": {
+        "required_staff": 0,
+        "service_level": 1.0,
+        "occupancy": 0.0,
+        "average_speed_of_answer_seconds": 0.0,
+        "percent_answered_immediately": 1.0,
+        "abandon_percent": 0.0
+      }
+    },
+    {
+      "name": "strict_c",
+      "model": "erlang_c",
+      "input": {
+        "calls_offered": 80,
+        "interval_duration_seconds": 1800,
+        "avg_handle_time_seconds": 300,
+        "target_service_level": 0.9,
+        "service_level_answer_time_seconds": 20,
+        "max_occupancy": 0.85,
+        "avg_caller_patience_seconds": 120
+      },
+      "expected": {
+        "required_staff": 19,
+        "service_level": 0.9291722045822274,
+        "occupancy": 0.7017543859649124,
+        "average_speed_of_answer_seconds": 5.470967268662409,
+        "percent_answered_immediately": 0.8966595071474879,
+        "abandon_percent": 0.01464791507877412
+      }
+    },
+    {
+      "name": "strict_a",
+      "model": "erlang_a",
+      "input": {
+        "calls_offered": 80,
+        "interval_duration_seconds": 1800,
+        "avg_handle_time_seconds": 300,
+        "target_service_level": 0.9,
+        "service_level_answer_time_seconds": 20,
+        "max_occupancy": 0.85,
+        "avg_caller_patience_seconds": 120
+      },
+      "expected": {
+        "required_staff": 18,
+        "service_level": 0.9334394265626961,
+        "occupancy": 0.7232408024599135,
+        "average_speed_of_answer_seconds": 2.3348216891551137,
+        "percent_answered_immediately": 0.8905782184505971,
+        "abandon_percent": 0.023624916679117036
+      }
+    }
+  ],
+  "planningCase": {
+    "name": "two_interval_monthly_rollup",
+    "rows": [
+      {
+        "month_index": 0,
+        "service_date": "2026-01-05",
+        "interval_start": "2026-01-05T09:00:00",
+        "calls_offered": 25,
+        "average_handle_time_seconds": 360,
+        "interval_duration_seconds": 1800,
+        "mean_patience_seconds": 180,
+        "max_occupancy": 0.85,
+        "service_level_goal": 0.8,
+        "service_level_threshold_seconds": 40
+      },
+      {
+        "month_index": 0,
+        "service_date": "2026-01-05",
+        "interval_start": "2026-01-05T09:30:00",
+        "calls_offered": 30,
+        "average_handle_time_seconds": 300,
+        "interval_duration_seconds": 1800,
+        "mean_patience_seconds": 180,
+        "max_occupancy": 0.85,
+        "service_level_goal": 0.8,
+        "service_level_threshold_seconds": 40
+      }
+    ],
+    "expected": {
+      "intervalPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-05",
+          "intervalStart": "2026-01-05T09:00:00",
+          "callsOffered": 25.0,
+          "averageHandleTimeSeconds": 360.0,
+          "workloadHours": 2.5,
+          "requiredStaffNet": 8,
+          "laborHoursNet": 4.0,
+          "serviceLevel": 0.8801483107665521,
+          "occupancy": 0.625,
+          "averageSpeedOfAnswerSeconds": 20.071980799410795,
+          "percentAnsweredImmediately": 0.8327334933382433,
+          "abandonPercent": 0.03388132409467233,
+          "intervalLengthMinutes": 30.0
+        },
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-05",
+          "intervalStart": "2026-01-05T09:30:00",
+          "callsOffered": 30.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 2.5,
+          "requiredStaffNet": 8,
+          "laborHoursNet": 4.0,
+          "serviceLevel": 0.8878779075542708,
+          "occupancy": 0.625,
+          "averageSpeedOfAnswerSeconds": 16.72665066617566,
+          "percentAnsweredImmediately": 0.8327334933382433,
+          "abandonPercent": 0.03132335598749605,
+          "intervalLengthMinutes": 30.0
+        }
+      ],
+      "dailyPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-05",
+          "intervalCount": 2,
+          "totalLaborHoursNet": 8.0,
+          "peakStaffNet": 8
+        }
+      ],
+      "monthlyPlans": [
+        {
+          "monthIndex": 0,
+          "workloadHours": 5.0,
+          "erlangStaffedHours": 8.0,
+          "weightedOccupancyPercent": 62.5,
+          "weightedServiceLevelPercent": 88.4364,
+          "peakIntervalRequiredHeadcount": 8,
+          "openDayCount": 1
+        }
+      ]
+    }
+  }
+}

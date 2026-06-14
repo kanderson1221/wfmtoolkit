@@ -1,0 +1,3 @@
+service_date,contacts,average_handle_time_seconds,source_record_id,source_queue,external_version_label,source_notes
+2027-02-01,5100,405,EXT-1001,Consumer Voice,2027 Budget v3,Approved source row
+2027-02-02,5275,412,EXT-1002,Consumer Voice,2027 Budget v3,Includes campaign uplift

@@ -1,0 +1,4 @@
+service_date,contacts,average_handle_time_seconds,source_notes
+2027-01-01,4800,410,Open date
+2027-01-02,3200,405,Configure this date as closed for the fixture
+2027-01-03,5000,408,Open date

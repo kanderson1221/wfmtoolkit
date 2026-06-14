@@ -1,0 +1,3 @@
+granularity,month,service_date,contacts,average_handle_time_seconds
+monthly,2027-01-01,,125000,420
+daily,,2027-02-01,5100,405
