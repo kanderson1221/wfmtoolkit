@@ -32,18 +32,18 @@ conflict with a decision below.
 
 Read and follow these sources in order:
 
-1. Repository-level `AGENTS.md`
-2. This file
-3. `foundation/FOUND-001-planning-workspace-scope.md`
-4. The remaining specifications in dependency order
-5. `design/SCREEN-WORKFLOWS.md`
-6. `database/README.md` and `database/postgresql-schema.sql`
-7. `examples/csv/README.md` and its CSV fixtures
-8. `reference-implementations/erlang/README.md`
+1. This file
+2. `foundation/FOUND-001-planning-workspace-scope.md`
+3. The remaining specifications in dependency order
+4. `design/SCREEN-WORKFLOWS.md`
+5. `database/README.md` and `database/postgresql-schema.sql`
+6. `examples/csv/README.md` and its CSV fixtures
+7. `reference-implementations/erlang/README.md`
 
 The agent shall then:
 
-1. Inspect the existing repository and identify reusable implementation pieces.
+1. Determine whether this folder is being used in standalone or host-repository
+   mode as defined below.
 2. Produce a specification coverage matrix mapping every specification ID to
    implementation modules, database tables, screens, and automated tests.
 3. Record material architecture choices that are not already fixed here.
@@ -58,23 +58,85 @@ first-release decisions below and continue. Ask the user only when a requested
 change would alter scope, contradict a normative requirement, or require a
 destructive choice that cannot be inferred safely.
 
+# Standalone And Host-Repository Modes
+
+This `specs` folder is a self-contained product contract and may be moved into
+an empty repository. The implementation must not depend on access to the
+repository in which these specifications were originally authored.
+
+## Standalone Greenfield Mode
+
+Use this mode when no application code or repository instructions accompany
+the `specs` folder.
+
+The implementing agent shall:
+
+- treat this README as the implementation entry point
+- create the application, database migration, test, and development structure
+  needed to satisfy the specifications
+- select a maintained frontend, backend, API, validation, migration, and testing
+  stack suitable for a PostgreSQL-backed web application
+- document those choices and the commands required to develop, test, build, and
+  run the system before broad implementation
+- preserve separation between UI orchestration, domain calculations,
+  persistence, imports, and reporting
+- use accessible, operational UI patterns and native tables for dense planning
+  worksheets
+- implement coherent vertical slices in the recommended sequence below
+
+The technology stack is intentionally not prescribed. PostgreSQL 15 or newer,
+the relational schema contract, CSV contracts, calculation rules, Erlang
+conformance behavior, accessibility requirements, and acceptance scenarios are
+prescribed.
+
+## Host-Repository Mode
+
+Use this mode when the `specs` folder is placed in a repository that already
+contains application code or local contributor instructions.
+
+The implementing agent shall inspect and follow applicable host-repository
+instructions and reuse compatible architecture and components. Host conventions
+may determine frameworks, file locations, commands, and visual primitives, but
+they do not override this product contract.
+
+## Informative Legacy References
+
+Individual specifications contain **Implementation Traceability** sections with
+paths such as `src/`, `backend/`, and `public/`. These paths identify code that
+informed the specifications; they are non-normative and may not exist in a
+standalone implementation. Missing traceability paths are not blockers and do
+not need to be recreated. Map each specification to the new implementation in
+the required coverage matrix instead.
+
+## Suggested Initial Prompt
+
+```text
+Read specs/README.md completely and treat it as the implementation entry point.
+If no application code or repository instructions are present, use Standalone
+Greenfield Mode. Follow the source priority and recommended implementation
+sequence, create the required specification coverage matrix, document the
+selected architecture and verification commands, and then implement and verify
+the product one vertical slice at a time.
+```
+
 # Source Priority
 
 When sources disagree, use this order:
 
 1. Explicit user instruction
-2. Repository-level `AGENTS.md`
-3. This implementation README
-4. Approved normative language in individual specifications
-5. PostgreSQL schema and Erlang reference implementation for their respective
+2. This implementation README
+3. Approved normative language in individual specifications
+4. PostgreSQL schema and Erlang reference implementation for their respective
    technical contracts
-6. Screen workflows and CSV fixtures
+5. Screen workflows and CSV fixtures
+6. Applicable host-repository instructions that do not conflict with the
+   product contract
 7. Non-normative implementation traceability
-8. Existing application behavior
+8. Existing host-application behavior
 
-Existing code is evidence and may be reused, but it does not override the
-specifications. Existing forecasting and standalone calculator features are
-outside the target product.
+Host code is evidence and may be reused, but it does not override the
+specifications. Forecasting and standalone calculator features remain outside
+the target product even if a host repository contains them.
 
 # Product Boundary
 
@@ -217,9 +279,12 @@ These decisions are normative for the initial implementation.
 
 ## UI And Review
 
-- Use the repository's established operational UI system and accessibility
-  rules.
-- Dense planning worksheets use native tables and shared table-field wrappers.
+- In host-repository mode, use its established operational UI system when that
+  system does not conflict with these specifications.
+- In standalone mode, establish a consistent, accessible operational design
+  system before building feature screens.
+- Dense planning worksheets use native tables and reusable table-field
+  components.
 - Required sections must be explicitly reviewed before finalization.
 - Warnings do not require a separate acknowledgment beyond section review.
 - Blocking issues cannot be overridden.
@@ -310,29 +375,38 @@ A feature is complete only when:
 - accessibility requirements are preserved
 - no forecasting or standalone calculator behavior has entered scope
 
-At minimum, run:
+The implementation shall provide and document commands for:
+
+- linting and static or type checking
+- unit and domain-calculation tests
+- API and database integration tests
+- production build verification
+- end-to-end tests for major workflows
+- Erlang conformance tests
+
+Command names depend on the selected technology stack. Do not assume that npm,
+Vue, Python, or any original repository command exists except for the bundled
+Python Erlang conformance package.
+
+From the directory containing the extracted `specs` folder, run the portable
+contracts with:
 
 ```bash
-npm run lint
-npm run check:standards
-npm test
-npm run build
-npm run test:e2e
+SPEC_ROOT="${SPEC_ROOT:-specs}"
+
 python3 -m unittest discover \
-  -s specs/reference-implementations/erlang/tests \
+  -s "$SPEC_ROOT/reference-implementations/erlang/tests" \
   -p "test_*.py" \
   -v
-```
-
-Apply and verify the PostgreSQL schema:
-
-```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f specs/database/postgresql-schema.sql
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f specs/database/postgresql-schema-verification.sql
+  -f "$SPEC_ROOT/database/postgresql-schema.sql"
+
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f "$SPEC_ROOT/database/postgresql-schema-verification.sql"
 ```
+
+If the `specs` folder itself is the repository root, set `SPEC_ROOT=.`.
 
 If a command cannot run in the implementation environment, record the reason
 and the unverified risk.
