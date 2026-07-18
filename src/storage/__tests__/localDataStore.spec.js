@@ -475,6 +475,13 @@ describe('localDataStore', () => {
     expect(backupEnvelope.backupFormat).toBe('workspace_snapshot_v2')
     expect(Array.isArray(backupEnvelope.data.workspaces)).toBe(true)
     expect(backupEnvelope.data.planDemandMonths).toBeUndefined()
+    expect(backupSummary).toMatchObject({
+      backupFormat: 'workspace_snapshot_v2',
+      backupFormatLabel: 'Current workspace backup',
+      schemaVersion: 2,
+      exportedAt: backupEnvelope.exportedAt,
+      recordScopeLabel: 'All local data'
+    })
     expect(planningWorkspaceBackup?.planningCenters[0].name).toBe('North America Operations')
     expect(forecastWorkspaceBackup?.forecasts[0].name).toBe('Consumer Voice 2026 Forecast')
 
@@ -526,6 +533,35 @@ describe('localDataStore', () => {
     const loadedCenters = await loadPlanningWorkspaceFromDexie('default')
     expect(loadedCenters).toHaveLength(1)
     expect(loadedCenters[0].name).toBe('North America Operations')
+  })
+
+  it('rejects unsupported future backup schemas before replacing current data', async () => {
+    await persistPlanningWorkspaceToDexie(sampleCenters, 'default')
+    const backupEnvelope = await exportLocalDataBackup()
+    const futureBackupEnvelope = {
+      ...backupEnvelope,
+      schemaVersion: backupEnvelope.schemaVersion + 1
+    }
+
+    expect(() => analyzeLocalDataBackup(futureBackupEnvelope)).toThrow(
+      'Backup file uses newer schema version 3'
+    )
+    await expect(importLocalDataBackup(futureBackupEnvelope)).rejects.toThrow(
+      'Backup file uses newer schema version 3'
+    )
+
+    const loadedCenters = await loadPlanningWorkspaceFromDexie('default')
+    expect(loadedCenters).toHaveLength(1)
+    expect(loadedCenters[0].name).toBe('North America Operations')
+  })
+
+  it('rejects an explicitly unsupported compact backup format', async () => {
+    const backupEnvelope = await exportLocalDataBackup()
+
+    expect(() => analyzeLocalDataBackup({
+      ...backupEnvelope,
+      backupFormat: 'workspace_snapshot_v99'
+    })).toThrow('Backup file uses unsupported format "workspace_snapshot_v99".')
   })
 
   it('migrates legacy standalone monthly plans when no call center workspace exists', async () => {

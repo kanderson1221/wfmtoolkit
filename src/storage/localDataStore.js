@@ -893,8 +893,23 @@ const validateBackupEnvelope = (envelope) => {
     throw new Error('Backup file is not a valid WFM Toolkit backup.')
   }
 
-  if (!Number.isInteger(Number(envelope.schemaVersion))) {
+  const schemaVersion = Number(envelope.schemaVersion)
+
+  if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {
     throw new Error('Backup file is missing a valid schema version.')
+  }
+
+  if (schemaVersion > WFM_LOCAL_DATA_SCHEMA_VERSION) {
+    throw new Error(
+      `Backup file uses newer schema version ${schemaVersion}. This version of WFM Toolkit supports backups through schema version ${WFM_LOCAL_DATA_SCHEMA_VERSION}.`
+    )
+  }
+
+  if (
+    envelope.backupFormat &&
+    ![COMPACT_BACKUP_FORMAT, LEGACY_TABLE_BACKUP_FORMAT].includes(envelope.backupFormat)
+  ) {
+    throw new Error(`Backup file uses unsupported format "${envelope.backupFormat}".`)
   }
 
   if (!envelope.data || typeof envelope.data !== 'object') {
@@ -902,6 +917,10 @@ const validateBackupEnvelope = (envelope) => {
   }
 
   if (Array.isArray(envelope.data.workspaces)) {
+    if (envelope.backupFormat && envelope.backupFormat !== COMPACT_BACKUP_FORMAT) {
+      throw new Error('Backup file format does not match its workspace data.')
+    }
+
     envelope.data.workspaces.forEach((workspace, index) => {
       if (!workspace || typeof workspace !== 'object') {
         throw new Error(`Backup file workspace ${index + 1} is invalid.`)
@@ -922,7 +941,7 @@ const validateBackupEnvelope = (envelope) => {
 
     return {
       format: COMPACT_BACKUP_FORMAT,
-      schemaVersion: Number(envelope.schemaVersion),
+      schemaVersion,
       exportedAt: String(envelope.exportedAt || ''),
       appVersion: String(envelope.appVersion || ''),
       data: {
@@ -939,9 +958,13 @@ const validateBackupEnvelope = (envelope) => {
     }
   }
 
+  if (envelope.backupFormat && envelope.backupFormat !== LEGACY_TABLE_BACKUP_FORMAT) {
+    throw new Error('Backup file format does not match its table data.')
+  }
+
   return {
     format: LEGACY_TABLE_BACKUP_FORMAT,
-    schemaVersion: Number(envelope.schemaVersion),
+    schemaVersion,
     exportedAt: String(envelope.exportedAt || ''),
     appVersion: String(envelope.appVersion || ''),
     data: clonePlain(envelope.data)
@@ -950,11 +973,23 @@ const validateBackupEnvelope = (envelope) => {
 
 const summarizeBackupEnvelope = (validatedEnvelope) => {
   const { data } = validatedEnvelope
+  const backupIdentity = {
+    backupFormat: validatedEnvelope.format,
+    backupFormatLabel:
+      validatedEnvelope.format === COMPACT_BACKUP_FORMAT
+        ? 'Current workspace backup'
+        : 'Legacy table backup',
+    schemaVersion: validatedEnvelope.schemaVersion,
+    exportedAt: validatedEnvelope.exportedAt,
+    appVersion: validatedEnvelope.appVersion,
+    recordScopeLabel: 'All local data'
+  }
 
   if (validatedEnvelope.format === COMPACT_BACKUP_FORMAT) {
     const { centers, staffingGroups, plans, forecasts, drafts } = collectCompactBackupCounts(data)
 
     return {
+      ...backupIdentity,
       callCenterCount: centers.length,
       staffingGroupCount: staffingGroups.length,
       annualPlanCount: plans.length,
@@ -984,6 +1019,7 @@ const summarizeBackupEnvelope = (validatedEnvelope) => {
       .at(-1) || ''
 
   return {
+    ...backupIdentity,
     callCenterCount: data.centers.length,
     staffingGroupCount: data.staffingGroups.length,
     annualPlanCount: data.plans.length,

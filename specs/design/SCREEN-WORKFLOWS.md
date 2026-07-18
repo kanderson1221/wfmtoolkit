@@ -773,7 +773,9 @@ Restore confirmation:
 +---------------------------------------------------------------+
 | Replace Planning Data?                                        |
 |---------------------------------------------------------------|
-| Backup exported: Jun 10, 2026                                 |
+| Backup: wfmtoolkit-backup-2026-06-10.json                     |
+| Exported: Jun 10, 2026 | Current format | Schema 2            |
+| Scope: All local data                                         |
 | Call Centers: 3 | Groups: 12 | Plans: 18 | Forecasts: 9       |
 |                                                               |
 | Current planning data will be replaced as one operation.      |

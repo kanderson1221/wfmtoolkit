@@ -49,7 +49,8 @@ Validation failure shall leave existing planning data intact.
 # Replacement Import
 
 - Restore shall clearly state that current planning data will be replaced.
-- The confirmation shall show backup timestamp and record counts.
+- The confirmation shall identify the selected file and show its backup timestamp, format, schema version, complete-data scope, and record counts.
+- An unsupported future schema or explicitly unsupported backup format shall be rejected before confirmation.
 - Replacement shall execute in one database transaction.
 - On success, the restored hierarchy shall be reloaded.
 - On failure, the prior committed database state shall remain intact.

@@ -1,7 +1,12 @@
 import { mount } from '@vue/test-utils'
 
 import LocalDataStorageDialog from '../LocalDataStorageDialog.vue'
-import { clearLocalDataStore, getLocalDataStorageSummary } from '../../storage/localDataStore'
+import {
+  analyzeLocalDataBackup,
+  clearLocalDataStore,
+  getLocalDataStorageSummary,
+  importLocalDataBackup
+} from '../../storage/localDataStore'
 
 const AppDialogStub = {
   name: 'AppDialog',
@@ -26,6 +31,11 @@ const AppConfirmDialogStub = {
 
 vi.mock('../../storage/localDataStore', () => ({
   analyzeLocalDataBackup: vi.fn(() => ({
+    backupFormat: 'workspace_snapshot_v2',
+    backupFormatLabel: 'Current workspace backup',
+    schemaVersion: 2,
+    exportedAt: '2026-04-08T14:00:00.000Z',
+    recordScopeLabel: 'All local data',
     callCenterCount: 2,
     staffingGroupCount: 3,
     annualPlanCount: 4,
@@ -61,9 +71,43 @@ const flushPromises = async () => {
   await Promise.resolve()
 }
 
+const selectBackupFile = async (wrapper, envelope = { schemaVersion: 2, data: { workspaces: [] } }) => {
+  const fileInput = wrapper.find('input[type="file"]')
+  const backupFile = {
+    name: 'wfmtoolkit-backup-2026-04-08.json',
+    text: vi.fn(async () => JSON.stringify(envelope))
+  }
+
+  Object.defineProperty(fileInput.element, 'files', {
+    configurable: true,
+    value: [backupFile]
+  })
+  await fileInput.trigger('change')
+  await flushPromises()
+}
+
 describe('LocalDataStorageDialog', () => {
   beforeEach(() => {
+    vi.mocked(analyzeLocalDataBackup).mockReturnValue({
+      backupFormat: 'workspace_snapshot_v2',
+      backupFormatLabel: 'Current workspace backup',
+      schemaVersion: 2,
+      exportedAt: '2026-04-08T14:00:00.000Z',
+      recordScopeLabel: 'All local data',
+      callCenterCount: 2,
+      staffingGroupCount: 3,
+      annualPlanCount: 4,
+      savedForecastCount: 5,
+      plannerDraftCount: 6
+    })
     vi.mocked(clearLocalDataStore).mockResolvedValue(undefined)
+    vi.mocked(importLocalDataBackup).mockResolvedValue({
+      callCenterCount: 2,
+      staffingGroupCount: 3,
+      annualPlanCount: 4,
+      savedForecastCount: 5,
+      plannerDraftCount: 6
+    })
     vi.mocked(getLocalDataStorageSummary).mockResolvedValue({
       storageLocationLabel: 'Stored in this browser',
       migrationStatusLabel: 'Using Dexie local database',
@@ -138,6 +182,66 @@ describe('LocalDataStorageDialog', () => {
     expect(clickSpy).toHaveBeenCalled()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:backup')
     clickSpy.mockRestore()
+  })
+
+  it('reviews the validated recovery point before replacement', async () => {
+    const wrapper = mount(LocalDataStorageDialog, {
+      props: {
+        visible: true
+      },
+      global: {
+        stubs: {
+          AppDialog: AppDialogStub,
+          AppConfirmDialog: AppConfirmDialogStub
+        }
+      }
+    })
+
+    await flushPromises()
+    await selectBackupFile(wrapper)
+
+    expect(analyzeLocalDataBackup).toHaveBeenCalledWith({
+      schemaVersion: 2,
+      data: { workspaces: [] }
+    })
+    expect(wrapper.text()).toContain('wfmtoolkit-backup-2026-04-08.json passed validation')
+    expect(wrapper.text()).toContain('Apr 8, 2026')
+    expect(wrapper.text()).toContain('Current workspace backup')
+    expect(wrapper.text()).toContain('Version 2')
+    expect(wrapper.text()).toContain('All local data')
+    expect(wrapper.text()).toContain('Records to restore')
+    expect(wrapper.text()).toContain('If it fails, the current local data remains intact')
+    expect(importLocalDataBackup).not.toHaveBeenCalled()
+
+    await wrapper.find('.cancel-confirmation').trigger('click')
+
+    expect(importLocalDataBackup).not.toHaveBeenCalled()
+  })
+
+  it('replaces data only after the recovery point is confirmed', async () => {
+    const wrapper = mount(LocalDataStorageDialog, {
+      props: {
+        visible: true
+      },
+      global: {
+        stubs: {
+          AppDialog: AppDialogStub,
+          AppConfirmDialog: AppConfirmDialogStub
+        }
+      }
+    })
+
+    await flushPromises()
+    await selectBackupFile(wrapper)
+    await wrapper.find('.confirm-action').trigger('click')
+    await flushPromises()
+
+    expect(importLocalDataBackup).toHaveBeenCalledWith({
+      schemaVersion: 2,
+      data: { workspaces: [] }
+    })
+    expect(wrapper.emitted('imported')).toHaveLength(1)
+    expect(wrapper.text()).toContain('Local data backup imported.')
   })
 
   it('requires scoped confirmation before clearing all local data', async () => {

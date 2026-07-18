@@ -31,6 +31,7 @@ const importConfirmOpen = ref(false)
 const clearConfirmOpen = ref(false)
 const pendingImportEnvelope = ref(null)
 const pendingImportSummary = ref(null)
+const pendingImportFileName = ref('')
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -77,6 +78,19 @@ const importSummaryItems = computed(() => {
     { label: 'Annual Plans', value: String(pendingImportSummary.value.annualPlanCount || 0) },
     { label: 'Saved Forecasts', value: String(pendingImportSummary.value.savedForecastCount || 0) },
     { label: 'Planner Drafts', value: String(pendingImportSummary.value.plannerDraftCount || 0) }
+  ]
+})
+
+const importRecoveryPointItems = computed(() => {
+  if (!pendingImportSummary.value) {
+    return []
+  }
+
+  return [
+    { label: 'Backup Exported', value: formatDateTime(pendingImportSummary.value.exportedAt) },
+    { label: 'Backup Format', value: pendingImportSummary.value.backupFormatLabel || 'WFM Toolkit backup' },
+    { label: 'Schema', value: `Version ${pendingImportSummary.value.schemaVersion}` },
+    { label: 'Record Scope', value: pendingImportSummary.value.recordScopeLabel || 'All local data' }
   ]
 })
 
@@ -148,12 +162,14 @@ const handleImportFileChange = async (event) => {
     const parsedEnvelope = JSON.parse(rawText)
     pendingImportEnvelope.value = parsedEnvelope
     pendingImportSummary.value = analyzeLocalDataBackup(parsedEnvelope)
+    pendingImportFileName.value = file.name || 'Selected backup'
     importConfirmOpen.value = true
     errorMessage.value = ''
   } catch (error) {
     console.error('Unable to prepare the selected backup file.', error)
     pendingImportEnvelope.value = null
     pendingImportSummary.value = null
+    pendingImportFileName.value = ''
     errorMessage.value = error instanceof Error ? error.message : 'Unable to read the selected backup file.'
   }
 }
@@ -173,6 +189,7 @@ const confirmImport = async () => {
     importConfirmOpen.value = false
     pendingImportEnvelope.value = null
     pendingImportSummary.value = null
+    pendingImportFileName.value = ''
     await refreshSummary()
     emit('imported')
   } catch (error) {
@@ -344,13 +361,27 @@ watch(
       cancel-label="Cancel"
       confirm-variant="danger"
       allow-backdrop-close
+      max-width="max-w-4xl"
       @confirm="confirmImport"
     >
-      <div class="grid gap-3">
-        <AppStatusMessage>
-          This backup will restore the following records into this browser.
+      <div class="grid gap-4">
+        <AppStatusMessage tone="success">
+          <strong>{{ pendingImportFileName }}</strong> passed validation. Review the recovery point before replacing current data.
         </AppStatusMessage>
-        <AppStatStrip :items="importSummaryItems" columns="md:grid-cols-3 xl:grid-cols-5" />
+        <AppStatStrip
+          :items="importRecoveryPointItems"
+          columns="md:grid-cols-2 xl:grid-cols-4"
+          compact
+        />
+        <div class="grid gap-2">
+          <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Records to restore
+          </span>
+          <AppStatStrip :items="importSummaryItems" columns="md:grid-cols-3 xl:grid-cols-5" compact />
+        </div>
+        <AppStatusMessage>
+          Replacement runs as one operation. If it fails, the current local data remains intact.
+        </AppStatusMessage>
       </div>
     </AppConfirmDialog>
 
