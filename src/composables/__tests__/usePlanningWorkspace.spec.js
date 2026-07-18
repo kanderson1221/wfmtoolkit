@@ -564,6 +564,62 @@ describe('usePlanningWorkspace', () => {
     ])
   })
 
+  it('surfaces a blocked update route instead of seeding a plan from zero-AHT actuals', async () => {
+    planningRepository.loadWorkspace.mockResolvedValue([
+      {
+        ...centers[0],
+        groups: [
+          {
+            ...centers[0].groups[0],
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: [
+                { serviceDate: '2026-01-02', contacts: 100, ahtSeconds: 0 }
+              ]
+            },
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planType: 'budget',
+                planningYear: 2026,
+                planMonths: Array.from({ length: 12 }, () => ({
+                  contacts: 1000,
+                  ahtSeconds: 300
+                }))
+              }
+            ]
+          }
+        ]
+      }
+    ])
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'new',
+      year: 2026,
+      updateSourcePlanId: 'budget-2026',
+      actualsThroughMonth: '2026-01-01',
+      updatePlanName: '2026 Feb Update'
+    })
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser: ref({ id: 'user-1' }),
+      storageScope: computed(() => 'user-1')
+    })
+
+    await workspace.loadCentersForScope()
+    await nextTick()
+
+    expect(workspace.plannerSeed.value.updateDraftPlan).toBeNull()
+    expect(workspace.plannerSeed.value.updateDraftError).toBe(
+      'Jan 2026 actuals have positive contacts but zero weighted AHT. ' +
+      'Import corrected daily actuals with positive AHT before creating an updated plan through Jan or later.'
+    )
+  })
+
   it('persists guest workspace changes to the default local scope', async () => {
     const currentRoute = ref({
       app: 'planning',

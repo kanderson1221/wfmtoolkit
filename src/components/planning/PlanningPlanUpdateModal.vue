@@ -20,6 +20,10 @@ const props = defineProps({
   actualsThroughOptions: {
     type: Array,
     default: () => []
+  },
+  actualsThroughBlocker: {
+    type: String,
+    default: ''
   }
 })
 
@@ -38,7 +42,10 @@ const updateName = defineModel('updateName', {
   default: ''
 })
 
-const canCreate = computed(() => Boolean(actualsThroughMonth.value && String(updateName.value || '').trim()))
+const canCreate = computed(() =>
+  props.actualsThroughOptions.some((option) => option.value === actualsThroughMonth.value) &&
+  Boolean(String(updateName.value || '').trim())
+)
 </script>
 
 <template>
@@ -62,7 +69,11 @@ const canCreate = computed(() => Boolean(actualsThroughMonth.value && String(upd
       </div>
 
       <AppStatusMessage v-if="!props.actualsThroughOptions.length" tone="warning">
-        Load actuals for {{ props.sourcePlan.planningYear }} before creating an updated plan.
+        {{ props.actualsThroughBlocker || `Load actuals for ${props.sourcePlan.planningYear} before creating an updated plan.` }}
+      </AppStatusMessage>
+
+      <AppStatusMessage v-else-if="props.actualsThroughBlocker" tone="warning">
+        {{ props.actualsThroughBlocker }}
       </AppStatusMessage>
 
       <AppFieldGroup

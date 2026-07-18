@@ -202,15 +202,24 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
             )
         )
       : null
-    const updateDraftPlan = updateSourcePlan
-      ? createUpdatedPlanDraft({
+    let updateDraftPlan = null
+    let updateDraftError = ''
+
+    if (updateSourcePlan) {
+      try {
+        updateDraftPlan = createUpdatedPlanDraft({
           sourcePlan: updateSourcePlan,
           budgetPlan: updateBudgetPlan,
           actuals: currentGroup.value.actuals,
           actualsThroughMonth: currentRoute.value.actualsThroughMonth,
           name: currentRoute.value.updatePlanName
         })
-      : null
+      } catch (error) {
+        updateDraftError = error instanceof Error
+          ? error.message
+          : 'The selected actuals cutoff cannot be used to create an updated plan.'
+      }
+    }
 
     return {
       centerId: currentCenter.value.id,
@@ -244,6 +253,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       },
       requirementMethod: normalizePlanRequirementMethod(seededRequirementMethod),
       updateDraftPlan,
+      updateDraftError,
       forecastStorageScope: buildForecastStorageScope(storageScope.value, currentCenter.value.id, currentGroup.value.id),
       forecastFallbackScopes
     }

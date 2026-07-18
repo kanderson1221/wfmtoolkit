@@ -82,6 +82,7 @@ const newPlanRequirementMethod = ref(PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO)
 const updateSourcePlan = ref(null)
 const updateBudgetPlan = ref(null)
 const updateActualsThroughOptions = ref([])
+const updateActualsThroughBlocker = ref('')
 const updateActualsThroughMonth = ref('')
 const updatePlanName = ref('')
 const {
@@ -371,6 +372,7 @@ const openPlanUpdate = (plan, section = null) => {
   updateSourcePlan.value = plan
   updateBudgetPlan.value = matchedSection?.budgetPlan || null
   updateActualsThroughOptions.value = matchedSection?.actualsThroughOptions || []
+  updateActualsThroughBlocker.value = matchedSection?.actualsThroughBlocker || ''
   updateActualsThroughMonth.value = matchedSection?.defaultActualsThroughMonth || ''
   updatePlanName.value = matchedSection?.defaultUpdateName || `${plan.planningYear} Update`
   planUpdateOpen.value = true
@@ -1331,15 +1333,24 @@ watch(
                         </span>
                       </div>
 
-                      <AppButton
-                        v-if="!section.currentPlan.isDraftBudget"
-                        size="sm"
-                        variant="secondary"
-                        :disabled="!section.actualsThroughOptions.length"
-                        @click="openPlanUpdate(section.currentPlan, section)"
-                      >
-                        Create Updated Plan
-                      </AppButton>
+                      <div v-if="!section.currentPlan.isDraftBudget" class="grid max-w-md justify-items-end gap-1.5">
+                        <AppButton
+                          size="sm"
+                          variant="secondary"
+                          :disabled="!section.actualsThroughOptions.length"
+                          :title="section.actualsThroughBlocker || undefined"
+                          @click="openPlanUpdate(section.currentPlan, section)"
+                        >
+                          Create Updated Plan
+                        </AppButton>
+                        <p
+                          v-if="section.actualsThroughBlocker"
+                          class="text-right text-xs font-medium leading-5 text-rose-700"
+                          role="status"
+                        >
+                          {{ section.actualsThroughBlocker }}
+                        </p>
+                      </div>
                     </div>
 
                     <div class="border-b border-slate-200 px-3 py-2">
@@ -1511,6 +1522,7 @@ watch(
       :source-plan="updateSourcePlan"
       :budget-plan="updateBudgetPlan"
       :actuals-through-options="updateActualsThroughOptions"
+      :actuals-through-blocker="updateActualsThroughBlocker"
       @cancel="closePlanUpdate"
       @create="createPlanUpdate"
     />

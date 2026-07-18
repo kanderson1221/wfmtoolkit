@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { createUpdatedPlanDraft, buildActualsThroughMonthOptions } from '../planUpdates'
+import {
+  buildActualsThroughMonthOptions,
+  buildPlanUpdateActualsState,
+  createUpdatedPlanDraft
+} from '../planUpdates'
 import { PLAN_TYPE_UPDATE } from '../../planningStorage'
 
 const buildPlanMonths = () =>
@@ -31,6 +35,65 @@ describe('planUpdates', () => {
         monthIndex: 1
       }
     ])
+  })
+
+  it('blocks cutoffs at or after positive-contact actuals with zero weighted AHT', () => {
+    const actuals = {
+      dailyRows: [
+        { serviceDate: '2026-01-02', contacts: 100, ahtSeconds: 300 },
+        { serviceDate: '2026-02-03', contacts: 120, ahtSeconds: 0 },
+        { serviceDate: '2026-03-02', contacts: 140, ahtSeconds: 330 }
+      ]
+    }
+    const state = buildPlanUpdateActualsState(actuals, 2026)
+
+    expect(state.options).toEqual([
+      {
+        label: 'Actuals through Jan 2026',
+        value: '2026-01-01',
+        monthIndex: 0
+      }
+    ])
+    expect(state.blocker).toBe(
+      'Feb 2026 actuals have positive contacts but zero weighted AHT. ' +
+      'Import corrected daily actuals with positive AHT before creating an updated plan through Feb or later.'
+    )
+
+    expect(() => createUpdatedPlanDraft({
+      sourcePlan: {
+        id: 'source-plan',
+        planningYear: 2026,
+        planMonths: buildPlanMonths()
+      },
+      actuals,
+      actualsThroughMonth: '2026-03-01'
+    })).toThrow(state.blocker)
+  })
+
+  it('allows zero AHT when the actualized month has no contacts', () => {
+    const actuals = {
+      dailyRows: [
+        { serviceDate: '2026-01-02', contacts: 0, ahtSeconds: 0 }
+      ]
+    }
+
+    expect(buildPlanUpdateActualsState(actuals, 2026)).toMatchObject({
+      blocker: '',
+      options: [
+        {
+          value: '2026-01-01'
+        }
+      ]
+    })
+    expect(() => createUpdatedPlanDraft({
+      sourcePlan: {
+        id: 'source-plan',
+        planningYear: 2026,
+        planMonths: buildPlanMonths()
+      },
+      actuals,
+      actualsThroughMonth: '2026-01-01'
+    })).not.toThrow()
   })
 
   it('creates an update draft that actualizes closed months and keeps future forecast demand', () => {

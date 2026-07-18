@@ -29,14 +29,47 @@ const formatUpdateMonthLabel = (planningYear, actualsThroughMonth) => {
 export const buildPlanUpdateName = (planningYear, actualsThroughMonth) =>
   `${planningYear} ${formatUpdateMonthLabel(planningYear, actualsThroughMonth)} Update`
 
+const isPositiveContactsWithZeroAht = (month = {}) =>
+  toNumber(month.actualContacts, 0) > 0 && toNumber(month.actualAhtSeconds, 0) <= 0
+
+const buildZeroAhtActualizationBlocker = (month, planningYear) =>
+  `${month.label} ${planningYear} actuals have positive contacts but zero weighted AHT. ` +
+  `Import corrected daily actuals with positive AHT before creating an updated plan through ${month.label} or later.`
+
+export const buildPlanUpdateActualsState = (actuals = {}, planningYear) => {
+  const monthlyActuals = buildActualsMonthsFromDailyRows(
+    createPlanningGroupActuals(actuals).dailyRows,
+    planningYear
+  )
+  const firstZeroAhtMonth = monthlyActuals.find(isPositiveContactsWithZeroAht)
+
+  return {
+    options: monthlyActuals
+      .filter((month) => month.actualContacts != null || month.actualAhtSeconds != null)
+      .filter((month) => !firstZeroAhtMonth || month.monthIndex < firstZeroAhtMonth.monthIndex)
+      .map((month) => ({
+        label: `Actuals through ${month.label} ${planningYear}`,
+        value: monthStartForIndex(planningYear, month.monthIndex),
+        monthIndex: month.monthIndex
+      })),
+    blocker: firstZeroAhtMonth
+      ? buildZeroAhtActualizationBlocker(firstZeroAhtMonth, planningYear)
+      : ''
+  }
+}
+
 export const buildActualsThroughMonthOptions = (actuals = {}, planningYear) =>
-  buildActualsMonthsFromDailyRows(createPlanningGroupActuals(actuals).dailyRows, planningYear)
-    .filter((month) => month.actualContacts != null || month.actualAhtSeconds != null)
-    .map((month) => ({
-      label: `Actuals through ${month.label} ${planningYear}`,
-      value: monthStartForIndex(planningYear, month.monthIndex),
-      monthIndex: month.monthIndex
-    }))
+  buildPlanUpdateActualsState(actuals, planningYear).options
+
+const assertActualsSupportCutoff = (monthlyActuals, planningYear, cutoffMonthIndex) => {
+  const zeroAhtMonth = monthlyActuals.find(
+    (month) => month.monthIndex <= cutoffMonthIndex && isPositiveContactsWithZeroAht(month)
+  )
+
+  if (zeroAhtMonth) {
+    throw new Error(buildZeroAhtActualizationBlocker(zeroAhtMonth, planningYear))
+  }
+}
 
 const summarizeDailyActualsByMonthIndex = (dailyRows, planningYear) => {
   const buckets = new Map()
@@ -79,6 +112,7 @@ export const createUpdatedPlanDraft = ({
   const planningYear = toNumber(basePlan.planningYear, new Date().getFullYear())
   const cutoffMonthIndex = parseActualsThroughMonthIndex(actualsThroughMonth, planningYear)
   const monthlyActuals = buildActualsMonthsFromDailyRows(createPlanningGroupActuals(actuals).dailyRows, planningYear)
+  assertActualsSupportCutoff(monthlyActuals, planningYear, cutoffMonthIndex)
   const dailyActualRows = createPlanningGroupActuals(actuals).dailyRows
     .filter((row) => Number(row.serviceDate.slice(0, 4)) === planningYear)
     .filter((row) => {

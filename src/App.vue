@@ -4,8 +4,9 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
 import LocalDataStorageDialog from './components/LocalDataStorageDialog.vue'
+import AppButton from './components/ui/AppButton.vue'
 import AppStatusMessage from './components/ui/AppStatusMessage.vue'
-import { isPublicHomeHash } from './appRoutes'
+import { buildPlanningGroupHash, isPublicHomeHash } from './appRoutes'
 import { useHashNavigation } from './composables/useHashNavigation'
 import { usePlanningWorkspace } from './composables/usePlanningWorkspace'
 import { ensureLegacyLocalStorageMigrated } from './storage/localDataStore'
@@ -184,6 +185,23 @@ onBeforeUnmount(() => {
         :storage-refresh-token="storageRefreshToken"
         :weekday-options="WEEKDAY_OPTIONS"
       />
+
+      <div
+        v-else-if="currentRoute.app === 'planning' && currentRoute.page === 'editor' && plannerSeed?.updateDraftError"
+        class="app-frame grid gap-4"
+      >
+        <AppStatusMessage tone="error">
+          Updated plan creation is blocked. {{ plannerSeed.updateDraftError }}
+        </AppStatusMessage>
+        <div>
+          <AppButton
+            :href="buildPlanningGroupHash(currentCenter?.id, currentGroup?.id, currentRoute.year, { tab: 'plans' })"
+            variant="secondary"
+          >
+            Return to Plans
+          </AppButton>
+        </div>
+      </div>
 
       <MonthlyPlanBuilder
         v-else-if="currentRoute.app === 'planning' && currentRoute.page === 'editor' && currentCenter && currentGroup && (currentRoute.planId === 'new' || currentPlan)"

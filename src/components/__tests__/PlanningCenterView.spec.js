@@ -8,8 +8,9 @@ import { clearLocalDataStore } from '../../storage/localDataStore'
 
 const AppButtonStub = {
   name: 'AppButton',
+  props: ['disabled', 'title'],
   emits: ['click'],
-  template: '<button @click="$emit(\'click\', $event)"><slot /></button>'
+  template: '<button :disabled="disabled" :title="title" @click="$emit(\'click\', $event)"><slot /></button>'
 }
 
 const AppPanelStub = {
@@ -96,6 +97,7 @@ const PlanningPlanUpdateModalStub = {
     'sourcePlan',
     'budgetPlan',
     'actualsThroughOptions',
+    'actualsThroughBlocker',
     'actualsThroughMonth',
     'updateName'
   ],
@@ -105,6 +107,7 @@ const PlanningPlanUpdateModalStub = {
       <p>Update Source: {{ sourcePlan?.name }}</p>
       <p>Budget Baseline: {{ budgetPlan?.name }}</p>
       <p>Actuals Options: {{ actualsThroughOptions.length }}</p>
+      <p v-if="actualsThroughBlocker">Actuals Blocker: {{ actualsThroughBlocker }}</p>
       <p>Actuals Through: {{ actualsThroughMonth }}</p>
       <p>Update Name: {{ updateName }}</p>
       <button @click="$emit('create')">Confirm Updated Plan</button>
@@ -601,6 +604,60 @@ describe('PlanningCenterView', () => {
     expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Update Source: 2026 Apr Update')
     expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Budget Baseline: 2026 Budget')
     expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Actuals Options: 1')
+  })
+
+  it('limits updated-plan cutoffs before the first positive-contact month with zero AHT', async () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: [
+                { serviceDate: '2026-01-02', contacts: 900, ahtSeconds: 300 },
+                { serviceDate: '2026-02-02', contacts: 850, ahtSeconds: 0 },
+                { serviceDate: '2026-03-02', contacts: 920, ahtSeconds: 310 }
+              ]
+            },
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planningYear: 2026,
+                planType: 'budget',
+                isCurrent: true,
+                status: 'finalized'
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    await openTab(wrapper, 'Plans')
+
+    const blocker = 'Feb 2026 actuals have positive contacts but zero weighted AHT.'
+    expect(wrapper.text()).toContain(blocker)
+
+    const createUpdateButton = wrapper
+      .findAll('button')
+      .find((node) => node.text().trim() === 'Create Updated Plan')
+    expect(createUpdateButton.attributes('title')).toContain(blocker)
+    expect(createUpdateButton.attributes()).not.toHaveProperty('disabled')
+
+    await createUpdateButton.trigger('click')
+
+    const modal = wrapper.get('[data-test="plan-update-modal"]')
+    expect(modal.text()).toContain('Actuals Options: 1')
+    expect(modal.text()).toContain(`Actuals Blocker: ${blocker}`)
+    expect(modal.text()).toContain('Actuals Through: 2026-01-01')
   })
 
   it('labels draft budgets and does not offer update creation until finalized', async () => {

@@ -25,7 +25,7 @@ import { computeMonthlyRecords, summarizePlanRecords } from '../../planner/deman
 import { buildAnnualPlanningRollup } from '../../planner/annualPlanningRollup'
 import { resolvePlanningGroupActuals } from '../../planner/groupActuals'
 import { computeStaffingRecords, summarizeStaffingRecords } from '../../planner/staffingModel'
-import { buildActualsThroughMonthOptions, buildPlanUpdateName } from '../../planner/planUpdates'
+import { buildPlanUpdateActualsState, buildPlanUpdateName } from '../../planner/planUpdates'
 import {
   getPlanRequirementMethodLabel,
   normalizePlanRequirementMethod
@@ -568,7 +568,8 @@ export function usePlanningCenterWorkspace({
               new Date(left.updatedAt || left.createdAt || 0).getTime()
           })
 
-        const actualsThroughOptions = buildActualsThroughMonthOptions(selectedGroup.value?.actuals, planningYear)
+        const actualsState = buildPlanUpdateActualsState(selectedGroup.value?.actuals, planningYear)
+        const actualsThroughOptions = actualsState.options
         const defaultActualsThroughMonth = actualsThroughOptions[actualsThroughOptions.length - 1]?.value || ''
 
         return {
@@ -578,6 +579,7 @@ export function usePlanningCenterWorkspace({
           budgetPlan: budgetRow,
           rows: [budgetRow, ...rows],
           actualsThroughOptions,
+          actualsThroughBlocker: actualsState.blocker,
           defaultActualsThroughMonth,
           defaultUpdateName: buildPlanUpdateName(planningYear, defaultActualsThroughMonth)
         }
