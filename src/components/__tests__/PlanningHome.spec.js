@@ -110,7 +110,7 @@ const buildWrapper = (props = {}) =>
         CallCenterSettingsModal: true,
         PlanningPortfolioHeadcountChart: {
           name: 'PlanningPortfolioHeadcountChart',
-          props: ['startingFrontlineTotals', 'frontlineAdditionTotals', 'hireTotals', 'attritionTotals'],
+          props: ['startingFrontlineTotals', 'frontlineAdditionTotals', 'hireTotals', 'attritionTotals', 'scopeDescription'],
           template: '<section>Monthly Staffing Waterfall</section>'
         }
       }
@@ -227,6 +227,50 @@ describe('PlanningHome', () => {
 
     window.location.hash = ''
     await setupButton.trigger('click')
+    expect(window.location.hash).toBe('#planning/center/center-1')
+  })
+
+  it('names excluded groups, scopes partial totals, and withholds mixed-scope variance', async () => {
+    const plannedGroup = buildCenter().groups[0]
+    const wrapper = buildWrapper({
+      centers: [
+        buildCenter({
+          groups: [
+            plannedGroup,
+            {
+              id: 'group-2',
+              name: 'Email Support',
+              actuals: {
+                sourceMode: 'daily_upload',
+                dailyRows: [{ serviceDate: '2026-01-05', contacts: 500, ahtSeconds: 420 }]
+              },
+              plans: []
+            },
+            {
+              id: 'group-3',
+              name: 'Chat Support',
+              actuals: { sourceMode: 'daily_upload', dailyRows: [] },
+              plans: [buildPlan({ id: 'budget-2025', planningYear: 2025 })]
+            }
+          ]
+        })
+      ]
+    })
+    const text = wrapper.text()
+
+    expect(text).toContain('Partial current-plan coverage: 1 of 3 staffing groups')
+    expect(text).toContain('Loaded actuals · 2 groups')
+    expect(text).toContain('Review 2 excluded staffing groups')
+    expect(text).toContain('Email Support — No plans saved for 2026 · Actuals loaded; requirement unavailable')
+    expect(text).toContain('Chat Support — Only 2025 plan available')
+    expect(text).toContain('Actual-versus-plan variance is withheld until every staffing group has a 2026 plan')
+    expect(wrapper.get('[data-testid="portfolio-contact-variance-0"]').text()).toBe('-')
+    expect(text).toContain('Full plan coverage required')
+    expect(wrapper.findComponent({ name: 'PlanningPortfolioHeadcountChart' }).props('scopeDescription'))
+      .toBe('Current-plan staffing totals include 1 of 3 staffing groups in 2026.')
+
+    window.location.hash = ''
+    await wrapper.findAll('button').find((button) => button.text().trim() === 'Open Center').trigger('click')
     expect(window.location.hash).toBe('#planning/center/center-1')
   })
 

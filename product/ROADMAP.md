@@ -28,21 +28,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-18. Replacement retains the selected forecast ID, names all dependent saved plans and states, preserves every plan snapshot, and keeps a failed candidate available for retry.
 - Last reviewed: 2026-07-18.
 
-### `NOW-003` — Portfolio partial-coverage decision state — Ready
+### `NOW-003` — Portfolio partial-coverage decision state — Completed
 
-- Capability: `CAP-REP-002` (Need 45), `CAP-REP-001` (Need 28)
+- Capability: `CAP-REP-002` (Need 30 after this run; 45 before), `CAP-REP-001` (Need 20 after this run; 28 before)
 - Planner outcome: leaders see which totals are partial, which groups are missing, and whether a metric is safe to use.
 - Problem/opportunity: a portfolio with some plans still presents full totals; coverage is visible but the contributing and missing scope is not actionable near every authority-sensitive result.
 - Rationale/evidence: `PORT-005` requires numerator, denominator, and missing scope; the new 0-plan state establishes the presentation boundary but not partial coverage.
 - Dependencies: contributor identity from annual rollups and plan-role semantics.
-- Proposed scope: explicit partial badge/message, missing-group review, scoped metric labels, and tests for actuals-only and out-of-year groups.
-- Success measures: users can name every excluded group from the report; no total implies full coverage; keyboard access and wide-table flow remain intact.
-- Status: ready; `NOW-002` is complete and this is the next executable reporting-integrity slice.
+- Delivered scope: centralized group-level inclusion evidence; open missing-group review with center actions and exclusion reasons; scoped KPI/table/chart language; invalid cross-scope variance withholding; actuals-only and out-of-year regressions.
+- Success measures: users can name every excluded group from the report; no total implies full coverage; incomparable variance is unavailable; keyboard access and wide-table flow remain intact.
+- Status: completed 2026-07-18. `INT-001` remains open to determine whether a future minimum-coverage threshold should withhold even explicitly scoped totals.
 - Last reviewed: 2026-07-18.
 
-## Next
-
-### `NEXT-001` — Side-by-side plan scenario comparison
+### `NOW-004` — Side-by-side plan scenario comparison — Ready
 
 - Capability: `CAP-SCEN-001` (Need 32), `CAP-UX-001` (Need 32)
 - Planner outcome: compare Budget and Updates across assumptions, demand, requirement, supply, and gaps without opening plans serially.
@@ -51,8 +49,10 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Dependencies: stable plan snapshots and comparable requirement semantics.
 - Proposed scope: desktop split comparison, assumption deltas, monthly exceptions, explicit incompatible-method handling, CSV export.
 - Success measures: two plans reconcile to their saved snapshots; changed assumptions and top staffing-gap movements are visible without tab switching.
-- Status: sequenced after Now.
+- Status: ready; promoted from `NEXT-001` after `NOW-003` completed.
 - Last reviewed: 2026-07-18.
+
+## Next
 
 ### `NEXT-002` — Forecast accuracy and uncertainty review
 
@@ -124,7 +124,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Planner outcome: WFM and finance compare hiring, attrition, overtime, and vendor scenarios in labor-cost terms.
 - Problem/opportunity: staffing decisions lack cost consequences, but currency, rate, burden, and vendor semantics are undefined.
 - Rationale/evidence: add cost only after scenario comparison supplies a trusted operational basis.
-- Dependencies: `NEXT-001`, organization/currency decisions, data governance.
+- Dependencies: `NOW-004`, organization/currency decisions, data governance.
 - Proposed scope: discovery and calculation contract; no implementation commitment yet.
 - Success measures: finance-approved semantics and reconciled example scenarios.
 - Status: explore.
@@ -164,5 +164,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-18 | Completed `NOW-001`: no-plan portfolio initializer zeroes are no longer presented as an operating report. |
 | 2026-07-18 | Completed `NOW-002`: imported daily forecast replacement now validates and previews one exact version, names dependent plan states, persists atomically, and never refreshes plan snapshots automatically. |
 | 2026-07-18 | Promoted `NOW-003` partial portfolio coverage to Ready after the forecast-replacement dependency and workflow slice completed. |
+| 2026-07-18 | Completed `NOW-003`: partial portfolio reports now name excluded groups, scope plan-derived outputs, and withhold cross-scope variance. |
+| 2026-07-18 | Promoted side-by-side plan scenario comparison from `NEXT-001` to ready `NOW-004`; stable plan snapshots now support the work. |
 | 2026-07-18 | Kept employee scheduling and intraday management out of Now despite high Need scores because data/integration prerequisites and product-boundary decisions are unresolved. |
 | 2026-07-18 | Declined phone-specific planning work; desktop/laptop workflow quality is the supported UX target. |

@@ -36,6 +36,9 @@ Prevent reports from presenting incomplete or incompatible information as trustw
 - Summary metrics may be omitted when coverage is too incomplete to be decision-useful.
 - When no applicable plan contributes, plan-derived KPI strips, monthly rows, charts, and exports shall be withheld rather than initialized to zero.
 - A no-plan state shall identify selected year, current plan role, plan coverage, and a direct action into a call center that needs setup.
+- A partial-plan state shall name every excluded staffing group, its call center, and whether the selected-year plan is absent or only other planning years are available.
+- Every visible plan-derived KPI, table, chart, and export shall state or carry its `planned groups / total groups` scope when coverage is partial.
+- Actual-versus-plan variances shall be withheld when actuals include staffing groups outside the plan-derived scope.
 - Groups without plans shall be counted separately from zero-demand groups.
 - Actuals-only groups shall not imply requirement coverage.
 - Unknown headcount shall remain unknown rather than zero.
@@ -54,8 +57,10 @@ Prevent reports from presenting incomplete or incompatible information as trustw
 
 **Given** 7 of 10 groups have plans  
 **When** coverage is displayed  
-**Then** it states 7 of 10  
-**And** totals identify that only planned groups contribute.
+**Then** it states 7 of 10
+**And** names the three excluded staffing groups and their call centers
+**And** plan-derived totals identify that only seven planned groups contribute
+**And** actual-versus-plan variances remain unavailable if actuals contain an excluded group.
 
 ## Withhold an Unmodeled Portfolio Report
 

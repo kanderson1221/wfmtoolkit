@@ -55,6 +55,52 @@ const comparePlanFreshness = (left, right) =>
   new Date(right?.updatedAt || right?.createdAt || 0).getTime() -
   new Date(left?.updatedAt || left?.createdAt || 0).getTime()
 
+const buildPlanCoverageEntry = ({ center, group, plan, planningYear, planRole, hasActuals }) => {
+  const availablePlanYears = [...new Set(
+    getGroupPlans(group)
+      .map((candidate) => Number(candidate?.planningYear))
+      .filter((year) => Number.isInteger(year) && year > 0)
+  )].sort((left, right) => right - left)
+  const hasSelectedYearPlan = availablePlanYears.includes(planningYear)
+
+  return {
+    centerId: center.id || center.name,
+    centerName: center.name || 'Call Center',
+    groupId: group.id || group.name,
+    groupName: group.name || 'Staffing Group',
+    included: Boolean(plan),
+    hasActuals,
+    missingReason: plan
+      ? null
+      : !availablePlanYears.length
+        ? 'no_plans'
+        : hasSelectedYearPlan && planRole === 'budget'
+          ? 'missing_plan_role'
+          : 'out_of_year',
+    availablePlanYears
+  }
+}
+
+const finalizePlanCoverage = ({ groups, planningYear, planRole }) => {
+  const sortedGroups = [...groups].sort((left, right) =>
+    left.centerName.localeCompare(right.centerName) || left.groupName.localeCompare(right.groupName)
+  )
+  const plannedGroups = sortedGroups.filter((group) => group.included)
+  const missingGroups = sortedGroups.filter((group) => !group.included)
+
+  return {
+    planningYear,
+    planRole,
+    groupCount: sortedGroups.length,
+    plannedGroupCount: plannedGroups.length,
+    isComplete: sortedGroups.length > 0 && missingGroups.length === 0,
+    isPartial: plannedGroups.length > 0 && missingGroups.length > 0,
+    groups: sortedGroups,
+    plannedGroups,
+    missingGroups
+  }
+}
+
 export const selectPlanningRollupPlan = (group, planningYear, planRole = 'current') => {
   const resolvedYear = resolvePlanningYear(planningYear)
   const yearPlans = getGroupPlans(group).filter((plan) => Number(plan?.planningYear) === resolvedYear)
@@ -358,6 +404,7 @@ export const buildAnnualPlanningRollup = ({
   )
   const plannedGroupIds = new Set()
   const groupsWithActualsIds = new Set()
+  const planCoverageGroups = []
 
   resolvedCenters.forEach((center) => {
     getCenterGroups(center).forEach((group) => {
@@ -375,14 +422,24 @@ export const buildAnnualPlanningRollup = ({
         staffingRecords,
         planningYear: resolvedYear
       })
+      const hasActuals = groupActualRows.some((row) => row.isLoaded)
 
       if (plan) {
         plannedGroupIds.add(groupKey)
       }
 
-      if (groupActualRows.some((row) => row.isLoaded)) {
+      if (hasActuals) {
         groupsWithActualsIds.add(groupKey)
       }
+
+      planCoverageGroups.push(buildPlanCoverageEntry({
+        center,
+        group,
+        plan,
+        planningYear: resolvedYear,
+        planRole,
+        hasActuals
+      }))
 
       monthlyRows.forEach((row, monthIndex) => {
         const groupActualRow = groupActualRows[monthIndex]
@@ -450,6 +507,11 @@ export const buildAnnualPlanningRollup = ({
     planningYear: resolvedYear,
     monthlyRows: finalizedMonthlyRows,
     annualTotalRow: buildAnnualTotalRow(finalizedMonthlyRows, summary),
-    summary
+    summary,
+    coverage: finalizePlanCoverage({
+      groups: planCoverageGroups,
+      planningYear: resolvedYear,
+      planRole
+    })
   }
 }

@@ -21,6 +21,7 @@ import AppMenu from './ui/AppMenu.vue'
 import AppPageHeader from './ui/AppPageHeader.vue'
 import AppPanel from './ui/AppPanel.vue'
 import AppSelect from './ui/AppSelect.vue'
+import AppStatusMessage from './ui/AppStatusMessage.vue'
 import { buildPlanningCenterHash, navigateToHash } from '../appRoutes'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { downloadCsv } from '../csvExport'
@@ -185,8 +186,60 @@ const portfolioAnnualPlan = computed(() =>
 
 const portfolioMonthlyRows = computed(() => portfolioAnnualPlan.value.monthlyRows)
 const dashboardSummary = computed(() => portfolioAnnualPlan.value.summary)
+const planCoverage = computed(() => portfolioAnnualPlan.value.coverage)
 const hasApplicablePlan = computed(() => dashboardSummary.value.plannedGroupCount > 0)
+const hasPartialPlanCoverage = computed(() => planCoverage.value.isPartial)
+const hasCompletePlanCoverage = computed(() => planCoverage.value.isComplete)
 const canDownloadPortfolioCsv = computed(() => hasApplicablePlan.value)
+
+const portfolioPlanScopeLabel = computed(() =>
+  `${formatWhole(planCoverage.value.plannedGroupCount)} of ${formatWhole(planCoverage.value.groupCount)} staffing groups`
+)
+
+const portfolioReportDescription = computed(() => {
+  if (hasPartialPlanCoverage.value) {
+    return `Current-plan totals include ${portfolioPlanScopeLabel.value} in ${selectedPlanningYear.value}. Actual columns include every group with loaded actuals; actual-versus-plan variance is withheld until plan coverage is complete.`
+  }
+
+  return `Current-plan rollup for all call centers in ${selectedPlanningYear.value}. Missing actuals remain unavailable.`
+})
+
+const portfolioChartScopeDescription = computed(() =>
+  hasPartialPlanCoverage.value
+    ? `Current-plan staffing totals include ${portfolioPlanScopeLabel.value} in ${selectedPlanningYear.value}.`
+    : `Opening frontline headcount, additions, attrition, and ending frontline headcount for ${selectedPlanningYear.value}.`
+)
+
+const missingPlanCenters = computed(() => {
+  const centers = new Map()
+
+  planCoverage.value.missingGroups.forEach((group) => {
+    if (!centers.has(group.centerId)) {
+      centers.set(group.centerId, {
+        id: group.centerId,
+        name: group.centerName,
+        groups: []
+      })
+    }
+
+    centers.get(group.centerId).groups.push(group)
+  })
+
+  return [...centers.values()]
+})
+
+const missingPlanReasonLabel = (group) => {
+  if (group.missingReason === 'out_of_year') {
+    const years = group.availablePlanYears.join(', ')
+    return `${years ? `Only ${years} plan${group.availablePlanYears.length === 1 ? '' : 's'} available` : 'No selected-year plan'}`
+  }
+
+  if (group.missingReason === 'missing_plan_role') {
+    return `No ${selectedPlanningYear.value} budget plan`
+  }
+
+  return `No plans saved for ${selectedPlanningYear.value}`
+}
 
 const modeledCenterCount = computed(() =>
   centerCommandRows.value.filter((center) => center.plannedGroupCount > 0).length
@@ -264,6 +317,7 @@ const centerCommandRows = computed(() =>
         expectedContacts,
         hasStaffingRisk,
         hasActualsGap,
+        hasCompletePlanCoverage: rollup.coverage.isComplete,
         planCoverageLabel: `${formatWhole(plannedGroupCount)}/${formatWhole(groupCount)}`,
         actualsCoverageLabel: `${formatWhole(groupsWithActualsCount)}/${formatWhole(groupCount)}`,
         actualsCoverageMeta: `${formatWhole(summary.monthsWithActualsCount)} of 12 months`,
@@ -343,13 +397,15 @@ const portfolioCommandStats = computed(() => {
     {
       label: 'Staffing Groups',
       value: formatWhole(summary.groupCount),
-      meta: `${formatWhole(summary.plannedGroupCount)} planned`,
+      meta: `${formatWhole(summary.plannedGroupCount)} included in plan totals`,
       icon: mdiAccountGroupOutline
     },
     {
       label: 'Plan Coverage',
       value: `${formatWhole(summary.plannedGroupCount)}/${formatWhole(summary.groupCount)}`,
-      meta: `${formatNumber(summary.planCoveragePercent, 0)}% of groups`,
+      meta: hasPartialPlanCoverage.value
+        ? 'Partial current-plan scope'
+        : 'Complete current-plan scope',
       icon: mdiTarget
     },
     {
@@ -361,26 +417,28 @@ const portfolioCommandStats = computed(() => {
     {
       label: 'Expected Contacts',
       value: formatWhole(summary.expectedContacts),
-      meta: `${selectedPlanningYear.value} plan`,
+      meta: `Current plans · ${portfolioPlanScopeLabel.value}`,
       icon: mdiGauge
     },
     {
       label: 'Actual Contacts',
       value: hasActuals ? formatWhole(summary.actualContacts) : '-',
-      meta: hasActuals ? 'Loaded actuals' : 'Waiting for actuals',
+      meta: hasActuals
+        ? `Loaded actuals · ${formatWhole(summary.groupsWithActualsCount)} group${summary.groupsWithActualsCount === 1 ? '' : 's'}`
+        : 'Waiting for actuals',
       icon: mdiChartLineVariant
     },
     {
       label: 'Staffing Gap',
       value: formatOptionalSignedNumber(summary.averageGapToRequirement, 1),
-      meta: `${formatWhole(summary.monthsBelowRequirement)} months below requirement`,
+      meta: `${formatWhole(summary.monthsBelowRequirement)} months below · ${portfolioPlanScopeLabel.value}`,
       icon: mdiTarget,
       valueClass: signedValueClass(summary.averageGapToRequirement)
     },
     {
       label: 'Peak Required HC',
       value: formatNumber(summary.peakRequiredHeadcount, 1),
-      meta: `Avg ${formatNumber(summary.averageRequiredHeadcount, 1)}`,
+      meta: `Avg ${formatNumber(summary.averageRequiredHeadcount, 1)} · ${portfolioPlanScopeLabel.value}`,
       icon: mdiAccountGroupOutline
     }
   ]
@@ -571,13 +629,53 @@ const handleCenterMenuSelect = (center, item) => {
           </article>
         </section>
 
+        <AppStatusMessage v-if="hasPartialPlanCoverage">
+          <div class="grid gap-3">
+            <div class="grid gap-1">
+              <strong class="font-semibold text-[#102f4f]">
+                Partial current-plan coverage: {{ portfolioPlanScopeLabel }}
+              </strong>
+              <p class="font-normal leading-5 text-[#335878]">
+                Plan-derived demand, requirement, and staffing totals include only the groups listed as planned. Actual-versus-plan variance is withheld until every staffing group has a {{ selectedPlanningYear }} plan.
+              </p>
+            </div>
+
+            <details open class="rounded-2xl border border-[#c4d4e2] bg-white/70">
+              <summary class="cursor-pointer px-3 py-2 font-semibold text-[#15395f] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#15395f]">
+                Review {{ planCoverage.missingGroups.length }} excluded staffing group{{ planCoverage.missingGroups.length === 1 ? '' : 's' }}
+              </summary>
+              <ul class="max-h-64 divide-y divide-[#d5e0ea] overflow-y-auto border-t border-[#d5e0ea]">
+                <li
+                  v-for="center in missingPlanCenters"
+                  :key="center.id"
+                  class="grid gap-3 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+                >
+                  <div class="grid gap-1.5">
+                    <strong class="text-sm text-slate-900">{{ center.name }}</strong>
+                    <ul class="grid gap-1 text-xs font-normal text-slate-600">
+                      <li v-for="group in center.groups" :key="group.groupId">
+                        <span class="font-semibold text-slate-800">{{ group.groupName }}</span>
+                        <span> — {{ missingPlanReasonLabel(group) }}</span>
+                        <span v-if="group.hasActuals"> · Actuals loaded; requirement unavailable</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <AppButton size="xs" variant="quiet" @click="openCenter(center.id)">
+                    Open Center
+                  </AppButton>
+                </li>
+              </ul>
+            </details>
+          </div>
+        </AppStatusMessage>
+
         <div v-if="hasApplicablePlan" class="grid gap-4">
           <AppPanel :padded="false">
             <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div class="grid gap-1">
                 <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">Portfolio Monthly Operating Plan</h2>
                 <p class="text-sm text-slate-500">
-                  Current-plan rollup for all call centers in {{ selectedPlanningYear }}. Missing actuals remain unavailable.
+                  {{ portfolioReportDescription }}
                 </p>
               </div>
 
@@ -622,8 +720,9 @@ const handleCenterMenuSelect = (center, item) => {
                     <td
                       class="px-4 py-3 text-right font-semibold tabular-nums"
                       :class="signedValueClass(row.contactVariance, false)"
+                      :data-testid="`portfolio-contact-variance-${row.monthIndex}`"
                     >
-                      {{ formatOptionalSignedNumber(row.contactVariance, 0) }}
+                      {{ hasCompletePlanCoverage ? formatOptionalSignedNumber(row.contactVariance, 0) : '-' }}
                     </td>
                     <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">{{ formatAht(row.expectedAhtSeconds) }}</td>
                     <td class="px-4 py-3 text-right font-medium tabular-nums text-slate-700">{{ formatAht(row.actualAhtSeconds) }}</td>
@@ -655,6 +754,7 @@ const handleCenterMenuSelect = (center, item) => {
           :total-headcount-totals="portfolioHeadcountChart.totalHeadcountTotals"
           :hire-totals="portfolioHeadcountChart.hireTotals"
           :attrition-totals="portfolioHeadcountChart.attritionTotals"
+          :scope-description="portfolioChartScopeDescription"
           :format-number="formatNumber"
         />
 
@@ -751,9 +851,9 @@ const handleCenterMenuSelect = (center, item) => {
                     :class="signedValueClass(center.summary.contactVariance, false)"
                   >
                     <div class="grid gap-0.5">
-                      <span>{{ center.plannedGroupCount > 0 ? formatOptionalSignedNumber(center.summary.contactVariance, 0) : '-' }}</span>
+                      <span>{{ center.hasCompletePlanCoverage ? formatOptionalSignedNumber(center.summary.contactVariance, 0) : '-' }}</span>
                       <span class="text-xs font-medium text-slate-500">
-                        {{ center.plannedGroupCount > 0 ? formatOptionalPercent(center.summary.contactVariancePercent, 1) : 'Plan required' }}
+                        {{ center.hasCompletePlanCoverage ? formatOptionalPercent(center.summary.contactVariancePercent, 1) : center.plannedGroupCount > 0 ? 'Full plan coverage required' : 'Plan required' }}
                       </span>
                     </div>
                   </td>

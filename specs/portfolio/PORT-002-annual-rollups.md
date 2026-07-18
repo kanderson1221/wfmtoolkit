@@ -4,7 +4,7 @@ title: Call-Center and Staffing-Group Annual Rollups
 status: draft
 owners: []
 depends_on: [PORT-001, PLAN-008, ACT-003]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-18
 ---
 
 # Purpose
@@ -33,6 +33,8 @@ Define deterministic aggregation from staffing-group plans and actuals to call-c
 - Headcount requirements and supply are summed for independent staffing groups.
 - Variances are derived from aggregate values where possible.
 - Coverage counts shall identify numerator and denominator.
+- Rollups shall expose selected-year inclusion evidence for every staffing group, including center and group identity, whether actuals exist, available plan years, and why a group is excluded.
+- Actual-versus-plan variance shall be presented only when the actual and plan group scopes are comparable; otherwise the variance shall remain unavailable.
 - Annual averages shall state that they are monthly averages.
 
 # Functional Requirements
@@ -73,4 +75,3 @@ Define deterministic aggregation from staffing-group plans and actuals to call-c
 - `src/planner/annualPlanningRollup.js`
 - `src/planningSummary.js`
 - `src/components/PlanningHome.vue`
-

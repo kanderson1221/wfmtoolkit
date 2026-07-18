@@ -84,6 +84,14 @@ describe('PlanningPortfolioHeadcountChart', () => {
     expect(tooltip).toContain('Hires started: 9.0')
   })
 
+  it('carries partial portfolio scope into the chart description and accessible name', () => {
+    const scopeDescription = 'Current-plan staffing totals include 2 of 3 staffing groups in 2026.'
+    const wrapper = mountChart({ scopeDescription })
+
+    expect(wrapper.getComponent(AppSectionHeaderStub).props('description')).toBe(scopeDescription)
+    expect(wrapper.getComponent(AppChartStub).props('ariaLabel')).toContain(scopeDescription)
+  })
+
   it('shows an empty state when no movement data exists', () => {
     const wrapper = mountChart({
       neededTotals: [],

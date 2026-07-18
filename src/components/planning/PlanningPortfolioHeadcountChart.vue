@@ -39,6 +39,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  scopeDescription: {
+    type: String,
+    default: ''
+  },
   formatNumber: {
     type: Function,
     required: true
@@ -86,6 +90,11 @@ const hasData = computed(() =>
 )
 
 const formatHeadcount = (value) => props.formatNumber(value, 1)
+
+const chartDescription = computed(() =>
+  props.scopeDescription ||
+  `Opening frontline headcount, additions, attrition, and ending frontline headcount for ${props.planningYear}.`
+)
 
 const waterfallSteps = computed(() =>
   monthlyMovementRows.value.flatMap((row) => [
@@ -373,7 +382,7 @@ const chartOption = computed(() => {
   <section class="grid gap-4">
     <AppSectionHeader
       title="Monthly Staffing Waterfall"
-      :description="`Opening frontline headcount, additions, attrition, and ending frontline headcount for ${props.planningYear}.`"
+      :description="chartDescription"
     />
 
     <AppEmptyState
@@ -387,7 +396,7 @@ const chartOption = computed(() => {
       :option="chartOption"
       height-class="h-[25rem]"
       min-width-class="min-w-[1540px]"
-      :aria-label="`Monthly staffing waterfall for ${props.planningYear}, showing opening frontline headcount, additions, attrition, ending frontline, required headcount, and roster headcount`"
+      :aria-label="`Monthly staffing waterfall for ${props.planningYear}, showing opening frontline headcount, additions, attrition, ending frontline, required headcount, and roster headcount. ${chartDescription}`"
       fallback-text="Monthly staffing waterfall chart could not be loaded."
     />
   </section>
