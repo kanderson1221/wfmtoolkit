@@ -58,25 +58,29 @@ export const minIsoValue = (left, right) => {
   return left < right ? left : right
 }
 
-export const countMatchingIsoDatesInRange = (startIso, endIso, matcher) => {
+export const buildMatchingIsoDatesInRange = (startIso, endIso, matcher) => {
   const startDate = buildDateFromIso(startIso)
   const endDate = buildDateFromIso(endIso)
 
   if (!startDate || !endDate || startDate.getTime() > endDate.getTime()) {
-    return 0
+    return []
   }
 
-  let matchingDateCount = 0
+  const matchingDates = []
 
   for (
     let cursor = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 12);
     cursor.getTime() <= endDate.getTime();
     cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 12)
   ) {
-    if (matcher(dateToIsoValue(cursor))) {
-      matchingDateCount += 1
+    const isoDate = dateToIsoValue(cursor)
+    if (matcher(isoDate)) {
+      matchingDates.push(isoDate)
     }
   }
 
-  return matchingDateCount
+  return matchingDates
 }
+
+export const countMatchingIsoDatesInRange = (startIso, endIso, matcher) =>
+  buildMatchingIsoDatesInRange(startIso, endIso, matcher).length

@@ -47,9 +47,10 @@ If every included day has zero contacts, monthly AHT may use the simple mean of 
 # Completeness
 
 - Loaded-day count shall be shown per month.
-- Completeness shall evaluate the loaded span against expected open dates.
+- Completeness shall evaluate every expected open date in each loaded calendar month.
 - Closed dates shall not count as missing.
-- Missing open dates inside the loaded span shall produce partial coverage.
+- Missing open dates anywhere in the calendar month shall produce partial coverage.
+- The actuals management view shall identify the exact missing open dates and provide a CSV gap template that can be completed and re-imported.
 - The system shall not imply a full month merely because one row exists.
 
 # Acceptance Scenarios
@@ -72,15 +73,20 @@ If every included day has zero contacts, monthly AHT may use the simple mean of 
 **When** month completeness is evaluated  
 **Then** absence of an actuals row for that date does not reduce completeness.
 
+## Repair Missing Open Dates
+
+**Given** a loaded month is missing one or more expected open dates
+**When** the planner reviews its coverage gaps
+**Then** every missing date is listed
+**And** a CSV template containing those dates is available for download and re-import.
+
 # Open Questions
 
-1. Should completeness evaluate the whole calendar month or only the loaded date span?
-2. Is a restore-after-delete window required?
-3. Should imported actuals become immutable after use in an update?
+1. Is a restore-after-delete window required?
+2. Should imported actuals become immutable after use in an update?
 
 # Implementation Traceability
 
 - `src/planner/groupActuals.js`
 - `src/planner/groupActualsDataSummary.js`
 - `src/components/planning/PlanningGroupActualsView.vue`
-

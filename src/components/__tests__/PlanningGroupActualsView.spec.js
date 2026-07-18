@@ -40,6 +40,19 @@ const AppEmptyStateStub = {
   `
 }
 
+const AppDialogStub = {
+  props: ['visible', 'title', 'description'],
+  emits: ['update:visible', 'close'],
+  template: `
+    <section v-if="visible" role="dialog" :aria-label="title">
+      <h2>{{ title }}</h2>
+      <p>{{ description }}</p>
+      <slot />
+      <slot name="footer" />
+    </section>
+  `
+}
+
 const buildWrapper = (props = {}) =>
   mount(PlanningGroupActualsView, {
     props: {
@@ -80,6 +93,7 @@ const buildWrapper = (props = {}) =>
     },
     global: {
       stubs: {
+        AppDialog: AppDialogStub,
         AppEmptyState: AppEmptyStateStub,
         PlanningGroupActualsImportModal: PlanningGroupActualsImportModalStub
       }
@@ -105,8 +119,8 @@ describe('PlanningGroupActualsView', () => {
     expect(wrapper.text()).not.toContain('Dec 2025')
     expect(wrapper.text()).toContain('200')
     expect(wrapper.text()).toContain('291.0 sec')
-    expect(wrapper.text()).toContain('66.7%')
-    expect(wrapper.text()).toContain('2 / 3')
+    expect(wrapper.text()).toContain('9.1%')
+    expect(wrapper.text()).toContain('2 / 22')
     expect(wrapper.text()).toContain('Jan 1, 2026')
     expect(wrapper.text()).toContain('Jan 5, 2026')
     expect(wrapper.text()).toContain('Dec 31, 2025')
@@ -123,6 +137,50 @@ describe('PlanningGroupActualsView', () => {
     await priorYearToggle.trigger('click')
 
     expect(wrapper.text()).toContain('Dec 2025')
+  })
+
+  it('reviews and downloads exact missing open dates for an incomplete month', async () => {
+    const csvBlobs = []
+    vi.stubGlobal('Blob', vi.fn((parts, options) => ({ parts, options })))
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn((blob) => {
+        csvBlobs.push(blob)
+        return 'blob:actuals-gaps'
+      })
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(() => {})
+    })
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const wrapper = buildWrapper()
+
+    const currentYearToggle = wrapper.findAll('button').find((node) => node.text().includes('2026'))
+    await currentYearToggle.trigger('click')
+    const reviewButton = wrapper.findAll('button').find((node) => node.text().includes('Review 20 gaps'))
+
+    expect(reviewButton).toBeTruthy()
+    await reviewButton.trigger('click')
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Missing Open Dates — Jan 2026')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Jan 2, 2026')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Jan 30, 2026')
+    expect(wrapper.get('[role="dialog"]').text()).not.toContain('Jan 1, 2026')
+    expect(wrapper.get('[role="dialog"]').text()).not.toContain('Jan 5, 2026')
+
+    const downloadButton = wrapper.findAll('button').find((node) => node.text().includes('Download Gap Template'))
+    await downloadButton.trigger('click')
+
+    expect(csvBlobs).toHaveLength(1)
+    expect(csvBlobs[0].options.type).toBe('text/csv;charset=utf-8')
+    expect(csvBlobs[0].parts[0]).toContain('service_date,contacts,average_handle_time_seconds')
+    expect(csvBlobs[0].parts[0]).toContain('2026-01-02,,')
+    expect(csvBlobs[0].parts[0]).not.toContain('2026-01-01,,')
+    expect(clickSpy).toHaveBeenCalled()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:actuals-gaps')
+
+    clickSpy.mockRestore()
   })
 
   it('shows an empty state when no shared data has been loaded', () => {

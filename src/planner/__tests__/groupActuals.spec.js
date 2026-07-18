@@ -135,7 +135,7 @@ describe('groupActuals', () => {
     expect(summary.latestServiceDate).toBe('2026-01-01')
   })
 
-  it('scores each month inside its own loaded date span while the year uses the full yearly span', () => {
+  it('scores loaded months against every expected open date in the calendar month', () => {
     const summary = summarizePlanningGroupActualsDataset({
       actuals: {
         dailyRows: [
@@ -165,28 +165,40 @@ describe('groupActuals', () => {
         maxServiceDate: '2026-02-02',
         contacts: 310,
         loadedOpenDays: 3,
-        expectedOpenDays: 21,
-        coveragePercent: (3 / 21) * 100,
+        expectedOpenDays: 42,
+        coveragePercent: (3 / 42) * 100,
         months: [
           {
             monthLabel: 'Feb 2026',
             minServiceDate: '2026-02-02',
             maxServiceDate: '2026-02-02',
             loadedOpenDays: 1,
-            expectedOpenDays: 1,
-            coveragePercent: 100
+            expectedOpenDays: 20,
+            coveragePercent: 5,
+            missingOpenDates: expect.arrayContaining([
+              '2026-02-03',
+              '2026-02-27'
+            ])
           },
           {
             monthLabel: 'Jan 2026',
             minServiceDate: '2026-01-05',
             maxServiceDate: '2026-01-06',
             loadedOpenDays: 2,
-            expectedOpenDays: 2,
-            coveragePercent: 100
+            expectedOpenDays: 22,
+            coveragePercent: (2 / 22) * 100,
+            missingOpenDates: expect.arrayContaining([
+              '2026-01-01',
+              '2026-01-30'
+            ])
           }
         ]
       }
     ])
+
+    expect(summary.annualRows[0].missingOpenDates).toHaveLength(39)
+    expect(summary.annualRows[0].months[0].missingOpenDates).toHaveLength(19)
+    expect(summary.annualRows[0].months[1].missingOpenDates).toHaveLength(20)
   })
 
   it('excludes configured closed holidays from completeness coverage', () => {
@@ -217,23 +229,26 @@ describe('groupActuals', () => {
         minServiceDate: '2026-01-01',
         maxServiceDate: '2026-01-02',
         loadedOpenDays: 1,
-        expectedOpenDays: 1,
-        coveragePercent: 100,
+        expectedOpenDays: 20,
+        coveragePercent: 5,
         months: [
           {
             monthLabel: 'Jan 2026',
             minServiceDate: '2026-01-01',
             maxServiceDate: '2026-01-02',
             loadedOpenDays: 1,
-            expectedOpenDays: 1,
-            coveragePercent: 100
+            expectedOpenDays: 20,
+            coveragePercent: 5,
+            missingOpenDates: expect.not.arrayContaining(['2026-01-01'])
           }
         ]
       }
     ])
+
+    expect(summary.annualRows[0].months[0].missingOpenDates).toHaveLength(19)
   })
 
-  it('shows partial coverage when open days are missing inside a loaded month span', () => {
+  it('shows partial coverage when open days are missing anywhere in a loaded month', () => {
     const summary = summarizePlanningGroupActualsDataset({
       actuals: {
         dailyRows: [
@@ -263,19 +278,51 @@ describe('groupActuals', () => {
         minServiceDate: '2026-02-02',
         maxServiceDate: '2026-02-06',
         loadedOpenDays: 4,
-        expectedOpenDays: 5,
-        coveragePercent: 80,
+        expectedOpenDays: 20,
+        coveragePercent: 20,
         months: [
           {
             monthLabel: 'Feb 2026',
             minServiceDate: '2026-02-02',
             maxServiceDate: '2026-02-06',
             loadedOpenDays: 4,
-            expectedOpenDays: 5,
-            coveragePercent: 80
+            expectedOpenDays: 20,
+            coveragePercent: 20,
+            missingOpenDates: expect.arrayContaining([
+              '2026-02-04',
+              '2026-02-27'
+            ])
           }
         ]
       }
     ])
+
+    expect(summary.annualRows[0].months[0].missingOpenDates).toHaveLength(16)
+  })
+
+  it('marks a month complete when every expected open date is loaded', () => {
+    const summary = summarizePlanningGroupActualsDataset({
+      actuals: {
+        dailyRows: [
+          { serviceDate: '2026-01-01', contacts: 100, ahtSeconds: 300 },
+          { serviceDate: '2026-01-08', contacts: 110, ahtSeconds: 305 },
+          { serviceDate: '2026-01-15', contacts: 120, ahtSeconds: 310 },
+          { serviceDate: '2026-01-22', contacts: 130, ahtSeconds: 315 },
+          { serviceDate: '2026-01-29', contacts: 140, ahtSeconds: 320 }
+        ]
+      },
+      group: {
+        operatingWeekdays: [4],
+        holidayCalendarId: 'none'
+      },
+      center: {}
+    })
+
+    expect(summary.annualRows[0].months[0]).toMatchObject({
+      loadedOpenDays: 5,
+      expectedOpenDays: 5,
+      coveragePercent: 100,
+      missingOpenDates: []
+    })
   })
 })

@@ -3,10 +3,7 @@ import {
   buildMonthEndFromDate,
   buildMonthStart,
   buildMonthStartFromDate,
-  buildYearEnd,
-  buildYearStart,
-  countMatchingIsoDatesInRange,
-  dateToIsoValue,
+  buildMatchingIsoDatesInRange,
   maxIsoValue,
   minIsoValue
 } from './dateValues'
@@ -80,11 +77,10 @@ export const summarizePlanningGroupActualsDataset = ({
   }
 
   const isExpectedOpenDay = createPlanningGroupOpenDayChecker(group, center)
+  const loadedDates = new Set(dailyRows.map((row) => row.serviceDate))
   const actualsByMonth = new Map(
     buildPlanningGroupMonthlyActualRecords(dailyRows).map((record) => [record.monthStart, record])
   )
-  const overallStartIso = dateToIsoValue(startDate)
-  const overallEndIso = dateToIsoValue(endDate)
   const monthSummaries = new Map()
 
   for (
@@ -127,11 +123,14 @@ export const summarizePlanningGroupActualsDataset = ({
     .map((summary) => {
       const actualsRecord = actualsByMonth.get(summary.monthStart)
       const monthStartDate = buildDateFromIso(summary.monthStart)
-      const periodStartIso = summary.minServiceDate || maxIsoValue(summary.monthStart, overallStartIso)
-      const periodEndIso =
-        summary.maxServiceDate ||
-        minIsoValue(monthStartDate ? buildMonthEndFromDate(monthStartDate) : null, overallEndIso)
-      const expectedOpenDays = countMatchingIsoDatesInRange(periodStartIso, periodEndIso, isExpectedOpenDay)
+      const monthEnd = monthStartDate ? buildMonthEndFromDate(monthStartDate) : null
+      const expectedOpenDates = buildMatchingIsoDatesInRange(
+        summary.monthStart,
+        monthEnd,
+        isExpectedOpenDay
+      )
+      const missingOpenDates = expectedOpenDates.filter((serviceDate) => !loadedDates.has(serviceDate))
+      const expectedOpenDays = expectedOpenDates.length
       const coveragePercent =
         expectedOpenDays > 0 ? (summary.loadedOpenDays / expectedOpenDays) * 100 : null
 
@@ -144,7 +143,8 @@ export const summarizePlanningGroupActualsDataset = ({
         weightedAhtSeconds: actualsRecord?.actualAhtSeconds ?? null,
         loadedOpenDays: summary.loadedOpenDays,
         expectedOpenDays,
-        coveragePercent
+        coveragePercent,
+        missingOpenDates
       }
     })
     .filter((summary) => summary.expectedOpenDays > 0 || summary.loadedOpenDays > 0)
@@ -159,6 +159,8 @@ export const summarizePlanningGroupActualsDataset = ({
       loadedOpenDays: 0,
       minServiceDate: null,
       maxServiceDate: null,
+      expectedOpenDays: 0,
+      missingOpenDates: [],
       months: []
     }
 
@@ -166,17 +168,18 @@ export const summarizePlanningGroupActualsDataset = ({
     existingYear.loadedOpenDays += row.loadedOpenDays
     existingYear.minServiceDate = minIsoValue(existingYear.minServiceDate, row.minServiceDate)
     existingYear.maxServiceDate = maxIsoValue(existingYear.maxServiceDate, row.maxServiceDate)
+    existingYear.expectedOpenDays += row.expectedOpenDays
+    existingYear.missingOpenDates.push(...row.missingOpenDates)
     existingYear.months.push(row)
 
     years.set(year, existingYear)
     return years
   }, new Map()).values()]
     .map((yearSummary) => {
-      const yearStartIso = yearSummary.minServiceDate || maxIsoValue(buildYearStart(yearSummary.year), overallStartIso)
-      const yearEndIso = yearSummary.maxServiceDate || minIsoValue(buildYearEnd(yearSummary.year), overallEndIso)
-      const expectedOpenDays = countMatchingIsoDatesInRange(yearStartIso, yearEndIso, isExpectedOpenDay)
       const coveragePercent =
-        expectedOpenDays > 0 ? (yearSummary.loadedOpenDays / expectedOpenDays) * 100 : null
+        yearSummary.expectedOpenDays > 0
+          ? (yearSummary.loadedOpenDays / yearSummary.expectedOpenDays) * 100
+          : null
 
       return {
         year: yearSummary.year,
@@ -186,8 +189,9 @@ export const summarizePlanningGroupActualsDataset = ({
         contacts: Number.isFinite(yearSummary.contacts) ? yearSummary.contacts : null,
         weightedAhtSeconds: summarizeWeightedAht(yearSummary.months),
         loadedOpenDays: yearSummary.loadedOpenDays,
-        expectedOpenDays,
+        expectedOpenDays: yearSummary.expectedOpenDays,
         coveragePercent,
+        missingOpenDates: yearSummary.missingOpenDates,
         months: yearSummary.months
       }
     })

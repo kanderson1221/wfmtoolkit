@@ -1,7 +1,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { mdiDownload } from '@mdi/js'
 
 import PlanningGroupActualsImportModal from './PlanningGroupActualsImportModal.vue'
+import AppButton from '../ui/AppButton.vue'
+import AppDialog from '../ui/AppDialog.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import {
   clearPlanningGroupActualsData,
@@ -36,6 +39,7 @@ const emit = defineEmits(['save-actuals', 'selection-change'])
 const importModalVisible = ref(false)
 const actualsDraft = ref(resolvePlanningGroupActuals(props.group))
 const selectedScope = ref(null)
+const activeGapScope = ref(null)
 
 const clonePlain = (value) => JSON.parse(JSON.stringify(value))
 
@@ -92,6 +96,7 @@ const formatCoveragePercent = (value) =>
   value == null ? '—' : `${props.formatNumber(value, 1)}%`
 const formatLoadedExpectedDays = (loaded, expected) =>
   `${props.formatWhole(loaded)} / ${props.formatWhole(expected)}`
+const formatGapCount = (count) => `${props.formatWhole(count)} ${count === 1 ? 'gap' : 'gaps'}`
 const formatDate = (value) => {
   if (!value) {
     return '—'
@@ -158,6 +163,56 @@ const selectMonthScope = (row) => {
 
 const clearSelection = () => {
   setSelectedScope(null)
+}
+
+const openGapDetails = (row) => {
+  if (!row?.missingOpenDates?.length) {
+    return
+  }
+
+  activeGapScope.value = {
+    label: row.monthLabel,
+    monthStart: row.monthStart,
+    missingOpenDates: [...row.missingOpenDates]
+  }
+}
+
+const closeGapDetails = () => {
+  activeGapScope.value = null
+}
+
+const sanitizeFileNamePart = (value) => {
+  const sanitized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return sanitized || 'staffing-group'
+}
+
+const downloadGapTemplate = () => {
+  if (!activeGapScope.value?.missingOpenDates?.length) {
+    return
+  }
+
+  const csvText = [
+    'service_date,contacts,average_handle_time_seconds',
+    ...activeGapScope.value.missingOpenDates.map((serviceDate) => `${serviceDate},,`)
+  ].join('\r\n')
+  const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' })
+  const downloadUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = downloadUrl
+  link.download = [
+    'wfmtoolkit',
+    sanitizeFileNamePart(props.group.name),
+    activeGapScope.value.monthStart.slice(0, 7),
+    'actuals-gaps.csv'
+  ].join('-')
+  link.click()
+  URL.revokeObjectURL(downloadUrl)
 }
 
 const applyActualsUpdate = (nextActuals) => {
@@ -232,7 +287,7 @@ defineExpose({
   <div class="h-full" @click="clearSelection">
     <template v-if="actualsDraft.dailyRows.length">
       <div class="overflow-x-auto">
-        <table class="min-w-[1120px] w-full border-collapse text-sm text-slate-700" @click.stop>
+        <table class="min-w-[1240px] w-full border-collapse text-sm text-slate-700" @click.stop>
           <thead class="border-b border-slate-200 bg-white/80">
             <tr>
               <th class="px-5 py-3 text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">
@@ -255,6 +310,9 @@ defineExpose({
               </th>
               <th class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">
                 Loaded / Expected Days
+              </th>
+              <th class="px-5 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">
+                Readiness
               </th>
             </tr>
           </thead>
@@ -302,6 +360,9 @@ defineExpose({
                 <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums text-slate-500">
                   {{ formatLoadedExpectedDays(row.loadedOpenDays, row.expectedOpenDays) }}
                 </td>
+                <td class="px-5 py-3 text-right whitespace-nowrap text-slate-500">
+                  {{ row.missingOpenDates.length ? `${formatGapCount(row.missingOpenDates.length)} missing` : 'Complete' }}
+                </td>
               </tr>
               <tr
                 v-for="month in isYearExpanded(row.year) ? row.months : []"
@@ -336,12 +397,24 @@ defineExpose({
                 <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums text-slate-500">
                   {{ formatLoadedExpectedDays(month.loadedOpenDays, month.expectedOpenDays) }}
                 </td>
+                <td class="px-5 py-2 text-right whitespace-nowrap">
+                  <AppButton
+                    v-if="month.missingOpenDates.length"
+                    variant="quiet"
+                    size="xs"
+                    :aria-label="`Review ${formatGapCount(month.missingOpenDates.length)} for ${month.monthLabel}`"
+                    @click.stop="openGapDetails(month)"
+                  >
+                    Review {{ formatGapCount(month.missingOpenDates.length) }}
+                  </AppButton>
+                  <span v-else class="text-sm font-medium text-emerald-700">Complete</span>
+                </td>
               </tr>
             </template>
           </tbody>
           <tbody v-else class="divide-y divide-slate-200">
             <tr class="bg-white">
-              <td colspan="7" class="px-5 py-6 text-sm text-slate-500">
+              <td colspan="8" class="px-5 py-6 text-sm text-slate-500">
                 No scheduled open days are available in the loaded range to score yet.
               </td>
             </tr>
@@ -364,5 +437,41 @@ defineExpose({
       :format-number="props.formatNumber"
       @apply="handleImportApply"
     />
+
+    <AppDialog
+      :visible="Boolean(activeGapScope)"
+      :title="`Missing Open Dates — ${activeGapScope?.label || ''}`"
+      :description="activeGapScope ? `${formatGapCount(activeGapScope.missingOpenDates.length)} must be loaded before this month can be used in an updated plan. Configured closed dates are excluded.` : ''"
+      max-width="max-w-2xl"
+      allow-backdrop-close
+      @update:visible="(visible) => { if (!visible) closeGapDetails() }"
+      @close="closeGapDetails"
+    >
+      <div v-if="activeGapScope" class="grid gap-4">
+        <p class="text-sm leading-6 text-slate-600">
+          Download the gap template, add contacts and average handle time for each date, then import it with Add Data. Existing dates will remain unchanged.
+        </p>
+        <ol class="grid max-h-[22rem] gap-x-6 gap-y-1 overflow-y-auto border-y border-slate-200 py-3 sm:grid-cols-2">
+          <li
+            v-for="serviceDate in activeGapScope.missingOpenDates"
+            :key="serviceDate"
+            class="px-3 py-1.5 text-sm font-medium tabular-nums text-slate-700"
+          >
+            {{ formatDate(serviceDate) }}
+          </li>
+        </ol>
+      </div>
+
+      <template #footer>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <AppButton variant="secondary" @click="closeGapDetails">
+            Close
+          </AppButton>
+          <AppButton variant="primary" :icon="mdiDownload" @click="downloadGapTemplate">
+            Download Gap Template
+          </AppButton>
+        </div>
+      </template>
+    </AppDialog>
   </div>
 </template>

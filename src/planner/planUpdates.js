@@ -1,5 +1,9 @@
 import { buildActualsMonthsFromDailyRows } from './actualsModel'
-import { buildDateFromIso, dateToIsoValue } from './dateValues'
+import {
+  buildDateFromIso,
+  buildMatchingIsoDatesInRange,
+  buildMonthEndFromDate
+} from './dateValues'
 import { createPlanningGroupActuals } from './groupActuals'
 import { createPlanningGroupOpenDayChecker } from './groupOpenDays'
 import { createPlanDemandSource } from './demandSources'
@@ -48,20 +52,12 @@ const buildExpectedOpenDatesByMonth = (planningYear, group = {}, center = {}) =>
   const isExpectedOpenDay = createPlanningGroupOpenDayChecker(group, center)
 
   return MONTH_LABELS.map((label, monthIndex) => {
-    const expectedOpenDates = []
     const monthStartDate = new Date(planningYear, monthIndex, 1, 12)
-    const monthEndDate = new Date(planningYear, monthIndex + 1, 0, 12)
-
-    for (
-      let cursor = monthStartDate;
-      cursor.getTime() <= monthEndDate.getTime();
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 12)
-    ) {
-      const serviceDate = dateToIsoValue(cursor)
-      if (isExpectedOpenDay(serviceDate)) {
-        expectedOpenDates.push(serviceDate)
-      }
-    }
+    const expectedOpenDates = buildMatchingIsoDatesInRange(
+      monthStartForIndex(planningYear, monthIndex),
+      buildMonthEndFromDate(monthStartDate),
+      isExpectedOpenDay
+    )
 
     return {
       monthIndex,
