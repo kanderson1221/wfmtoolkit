@@ -211,6 +211,7 @@ onBeforeUnmount(() => {
 
     <LocalDataStorageDialog
       v-model:visible="localDataDialogOpen"
+      @cleared="reloadLocalAppData"
       @imported="reloadLocalAppData"
     />
 

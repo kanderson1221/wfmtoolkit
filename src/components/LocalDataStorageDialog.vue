@@ -9,12 +9,13 @@ import AppStatStrip from './ui/AppStatStrip.vue'
 import AppStatusMessage from './ui/AppStatusMessage.vue'
 import {
   analyzeLocalDataBackup,
+  clearLocalDataStore,
   downloadLocalDataBackup,
   getLocalDataStorageSummary,
   importLocalDataBackup
 } from '../storage/localDataStore'
 
-const emit = defineEmits(['imported'])
+const emit = defineEmits(['cleared', 'imported'])
 
 const visible = defineModel('visible', {
   type: Boolean,
@@ -27,6 +28,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const summary = ref(null)
 const importConfirmOpen = ref(false)
+const clearConfirmOpen = ref(false)
 const pendingImportEnvelope = ref(null)
 const pendingImportSummary = ref(null)
 
@@ -76,6 +78,18 @@ const importSummaryItems = computed(() => {
     { label: 'Saved Forecasts', value: String(pendingImportSummary.value.savedForecastCount || 0) },
     { label: 'Planner Drafts', value: String(pendingImportSummary.value.plannerDraftCount || 0) }
   ]
+})
+
+const clearScopeDescription = computed(() => {
+  const counts = [
+    `${summary.value?.callCenterCount || 0} call centers`,
+    `${summary.value?.staffingGroupCount || 0} staffing groups`,
+    `${summary.value?.annualPlanCount || 0} annual plans`,
+    `${summary.value?.savedForecastCount || 0} saved forecasts`,
+    `${summary.value?.plannerDraftCount || 0} planner drafts`
+  ]
+
+  return `${counts.slice(0, -1).join(', ')}, and ${counts.at(-1)}`
 })
 
 const refreshSummary = async () => {
@@ -164,6 +178,24 @@ const confirmImport = async () => {
   } catch (error) {
     console.error('Unable to import the selected backup file.', error)
     errorMessage.value = error instanceof Error ? error.message : 'Unable to import the selected backup file.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const confirmClear = async () => {
+  loading.value = true
+
+  try {
+    await clearLocalDataStore()
+    successMessage.value = 'All local planning data was cleared.'
+    errorMessage.value = ''
+    clearConfirmOpen.value = false
+    await refreshSummary()
+    emit('cleared')
+  } catch (error) {
+    console.error('Unable to clear local planning data.', error)
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to clear local planning data.'
   } finally {
     loading.value = false
   }
@@ -264,6 +296,26 @@ watch(
           </div>
         </AppPanel>
       </div>
+
+      <AppPanel subtle>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="grid max-w-2xl gap-1">
+            <span class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Data Removal
+            </span>
+            <h3 class="text-lg font-semibold tracking-[-0.03em] text-slate-950">
+              Clear this browser's planning data
+            </h3>
+            <p class="text-sm leading-6 text-slate-600">
+              Permanently remove call centers, staffing groups, annual plans, saved forecasts, and recoverable drafts from this browser.
+            </p>
+          </div>
+
+          <AppButton variant="danger" @click="clearConfirmOpen = true">
+            Clear All Local Data
+          </AppButton>
+        </div>
+      </AppPanel>
     </div>
 
     <template #footer>
@@ -299,6 +351,26 @@ watch(
           This backup will restore the following records into this browser.
         </AppStatusMessage>
         <AppStatStrip :items="importSummaryItems" columns="md:grid-cols-3 xl:grid-cols-5" />
+      </div>
+    </AppConfirmDialog>
+
+    <AppConfirmDialog
+      v-model:visible="clearConfirmOpen"
+      title="Clear All Local Data?"
+      description="Permanently delete all WFM Toolkit planning data stored in this browser. This cannot be undone."
+      kicker="Data Removal"
+      confirm-label="Clear All Local Data"
+      cancel-label="Cancel"
+      confirm-variant="danger"
+      @confirm="confirmClear"
+    >
+      <div class="grid gap-3">
+        <AppStatusMessage tone="error">
+          This will delete {{ clearScopeDescription }}. Saved plans and recoverable drafts are not protected from this action.
+        </AppStatusMessage>
+        <AppStatusMessage>
+          Download a backup first if you may need to restore this workspace later.
+        </AppStatusMessage>
       </div>
     </AppConfirmDialog>
   </AppDialog>
