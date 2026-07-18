@@ -975,7 +975,7 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('Unable to read saved forecasts from this device.')
   })
 
-  it('shows which saved plan is using a forecast on the staffing-group summary list', async () => {
+  it('shows forecast usage and dependent plan protection before deletion', async () => {
     const forecastScope = buildForecastStorageScope('default', 'center-1', 'group-1')
 
     vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
@@ -1046,6 +1046,13 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('2026 Budget')
     expect(wrapper.text()).not.toContain('Not used')
     expect(forecastingRepository.loadWorkspaceResult).toHaveBeenCalledWith(forecastScope)
+
+    const deleteButtons = wrapper.findAll('button').filter((node) => node.text().trim() === 'Delete')
+    await deleteButtons.at(-1).trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('This forecast is used by 1 saved plan: 2026 Budget (finalized).')
+    expect(wrapper.text()).toContain('does not delete this plan or change its saved demand values and snapshot')
   })
 
   it('lets forecast rows be selected and double-clicked to open the saved forecast workspace', async () => {

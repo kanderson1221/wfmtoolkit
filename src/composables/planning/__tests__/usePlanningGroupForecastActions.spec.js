@@ -24,6 +24,7 @@ const createArgs = ({
   selectedYear = 2026,
   forecasts = [],
   actualRows = [],
+  plans = [{ planningYear: 2026 }, { planningYear: 2027 }],
   requestConfirmation = vi.fn(),
   deleteForecast = vi.fn(),
   onMissingHistory = vi.fn()
@@ -36,7 +37,7 @@ const createArgs = ({
       sourceMode: 'daily_upload',
       dailyRows: actualRows
     },
-    plans: [{ planningYear: 2026 }, { planningYear: 2027 }]
+    plans
   }),
   selectedYearModel: ref(selectedYear),
   forecastRows: ref(forecasts),
@@ -200,11 +201,71 @@ describe('usePlanningGroupForecastActions', () => {
     expect(requestConfirmation).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Delete Forecast?',
+        description: expect.stringContaining('No saved plans use this forecast.'),
         confirmLabel: 'Delete Forecast'
       })
     )
 
     requestConfirmation.mock.calls.at(-1)[0].onConfirm()
     expect(deleteForecast).toHaveBeenCalledWith(forecast)
+  })
+
+  it('identifies dependent plan names and states before deleting a referenced forecast', () => {
+    const requestConfirmation = vi.fn()
+    const forecast = {
+      id: 'forecast-1',
+      name: 'Voice Support 2027 Forecast',
+      planningYear: 2027
+    }
+    const actions = usePlanningGroupForecastActions(
+      createArgs({
+        forecasts: [forecast],
+        requestConfirmation,
+        plans: [
+          {
+            id: 'budget-2027',
+            name: '2027 Budget',
+            planType: 'budget',
+            status: 'draft',
+            planningYear: 2027,
+            demandSource: {
+              mode: 'forecast',
+              forecastProjectId: 'forecast-1'
+            }
+          },
+          {
+            id: 'update-2027',
+            name: 'Summer Update',
+            planType: 'update',
+            planningYear: 2027,
+            demandSource: {
+              mode: 'forecast',
+              forecastProjectId: 'forecast-1'
+            }
+          },
+          {
+            id: 'other-budget',
+            name: 'Other Budget',
+            planType: 'budget',
+            status: 'finalized',
+            planningYear: 2028,
+            demandSource: {
+              mode: 'forecast',
+              forecastProjectId: 'forecast-2'
+            }
+          }
+        ]
+      })
+    )
+
+    actions.handleForecastMenuSelect(forecast, { id: 'delete-forecast' })
+
+    expect(requestConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: expect.stringMatching(
+          /used by 2 saved plans: 2027 Budget \(draft\); Summer Update \(finalized\).*does not delete these plans or change their saved demand values and snapshots/
+        )
+      })
+    )
   })
 })
