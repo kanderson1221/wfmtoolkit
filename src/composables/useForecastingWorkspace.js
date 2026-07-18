@@ -165,6 +165,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     loadProjectsForScope,
     createNewProject,
     openProjectById,
+    saveProjectSnapshot,
     saveCurrentProject,
     duplicateCurrentProject
   } = useForecastProjectLibrary(storageScope, {
@@ -551,6 +552,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     applyHistoryImport,
     createNewProject,
     openProjectById,
+    saveProjectSnapshot,
     saveCurrentProject,
     duplicateCurrentProject,
     addCustomSeasonality,

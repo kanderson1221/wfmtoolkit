@@ -6,6 +6,7 @@ import ForecastImportDailyModal from '../forecasting/ForecastImportDailyModal.vu
 import ForecastMonthlyEntryModal from '../forecasting/ForecastMonthlyEntryModal.vue'
 import ForecastDailyChart from '../forecasting/ForecastDailyChart.vue'
 import ForecastingWorkbench from '../forecasting/ForecastingWorkbench.vue'
+import AppFileDropzone from '../ui/AppFileDropzone.vue'
 import AppNumberField from '../ui/AppNumberField.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
 import { buildForecastRunInputSignature } from '../../composables/forecasting/forecastWorkspaceHelpers'
@@ -197,6 +198,85 @@ const createForecastRunResults = () => ({
     }
   }
 })
+
+const buildImportedDailyProject = (overrides = {}) => {
+  const dailyForecast = Array.from({ length: 31 }, (_, index) => ({
+    ds: `2025-01-${String(index + 1).padStart(2, '0')}`,
+    yhat: 100 + index,
+    yhatLower: 100 + index,
+    yhatUpper: 100 + index,
+    ahtSeconds: 300,
+    actualValue: null,
+    isHistory: false
+  }))
+
+  return createForecastProject({
+    id: 'forecast-imported-1',
+    name: 'Consumer Voice January Forecast',
+    sourceKind: 'imported_daily',
+    centerId: 'center-1',
+    groupId: 'group-1',
+    planningYear: 2025,
+    coverageStartDate: '2025-01-01',
+    coverageEndDate: '2025-01-31',
+    planningContext: {
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planningYear: 2025,
+      groupName: 'Consumer Voice'
+    },
+    sourceData: {
+      fileName: 'accepted-january.csv',
+      headers: ['date', 'forecast', 'aht_seconds'],
+      rows: dailyForecast.map((row, index) => ({
+        rowIndex: index + 2,
+        date: row.ds,
+        forecast: String(row.yhat),
+        aht_seconds: String(row.ahtSeconds)
+      })),
+      mapping: {
+        dateColumn: 'date',
+        forecastColumn: 'forecast',
+        ahtColumn: 'aht_seconds'
+      },
+      issues: []
+    },
+    modelConfig: {
+      ahtMonthOverrides: [{ monthStart: '2025-01-01', ahtSeconds: 300 }]
+    },
+    lastRun: {
+      ...createForecastRunResults(),
+      dailyForecast,
+      monthlyRollup: [],
+      summary: {
+        ...createForecastRunResults().summary,
+        planningYear: 2025,
+        coverageStartDate: '2025-01-01',
+        coverageEndDate: '2025-01-31',
+        projectedTotalContacts: dailyForecast.reduce((sum, row) => sum + row.yhat, 0),
+        planningReady: true
+      }
+    },
+    createdAt: '2026-04-05T14:00:00.000Z',
+    updatedAt: '2026-04-05T14:00:00.000Z',
+    ...overrides
+  })
+}
+
+const buildReplacementCsvFile = (fileName = 'replacement-january.csv') => {
+  const text = [
+    'date,forecast,aht_seconds',
+    ...Array.from({ length: 31 }, (_, index) =>
+      `2025-01-${String(index + 1).padStart(2, '0')},${200 + index},315`
+    )
+  ].join('\n')
+
+  return {
+    name: fileName,
+    type: 'text/csv',
+    text: async () => text
+  }
+}
 
 const buildHistoryImportState = (project) => ({
   uploadedFileName: project.uploadedFileName,
@@ -434,6 +514,101 @@ describe('ForecastingWorkspace', () => {
         ahtSeconds: 315.1485148514852
       }
     ])
+  })
+
+  it('previews dependent plan safety and atomically replaces one exact imported forecast', async () => {
+    const scope = 'forecast-imported-replacement-spec'
+    const originalProject = buildImportedDailyProject()
+    await forecastingRepository.persistWorkspace([originalProject], scope)
+    const persistWorkspace = vi.spyOn(forecastingRepository, 'persistWorkspace')
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: scope,
+        initialProjectId: originalProject.id,
+        showSourceActionButton: true,
+        replacementDependenciesByProjectId: {
+          [originalProject.id]: [
+            { id: 'budget-2025', label: '2025 Budget', state: 'draft', isDraft: true },
+            { id: 'update-2025', label: 'Spring Update', state: 'finalized', isDraft: false }
+          ]
+        }
+      }
+    })
+    mountedWrappers.push(wrapper)
+    await flushUi()
+    await flushUi()
+
+    await findButtonByText(wrapper, 'Replace Data').trigger('click')
+    await flushUi()
+
+    const modal = wrapper.findComponent(ForecastImportDailyModal)
+    expect(modal.findComponent(AppFileDropzone).props('autofocus')).toBe(true)
+    expect(document.body.textContent || '').toContain('Replace Daily Forecast')
+    expect(document.body.textContent || '').toContain('accepted-january.csv')
+    expect(document.body.textContent || '').toContain('2025 Budget (draft)')
+    expect(document.body.textContent || '').toContain('Spring Update (finalized)')
+    expect(document.body.textContent || '').toContain('Saved demand values and snapshots remain unchanged')
+
+    await modal.findComponent(AppFileDropzone).vm.$emit('file-select', {
+      target: { files: [buildReplacementCsvFile()] }
+    })
+    await flushUi()
+
+    expect(document.body.textContent || '').toContain('replacement-january.csv')
+    expect(document.body.textContent || '').toContain('6,665')
+    expect(findBodyButtonByText('Replace Forecast').disabled).toBe(false)
+
+    await clickBodyButton('Replace Forecast')
+    await vi.waitFor(() => {
+      expect(wrapper.emitted('save-complete')).toHaveLength(1)
+    })
+
+    expect(persistWorkspace).toHaveBeenCalledTimes(1)
+    const persistedProjects = persistWorkspace.mock.calls[0][0]
+    expect(persistedProjects).toHaveLength(1)
+    expect(persistedProjects[0].id).toBe(originalProject.id)
+    expect(persistedProjects[0].sourceData.fileName).toBe('replacement-january.csv')
+  })
+
+  it('keeps the accepted forecast and parsed replacement available when atomic persistence fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const scope = 'forecast-imported-replacement-failure-spec'
+    const originalProject = buildImportedDailyProject()
+    await forecastingRepository.persistWorkspace([originalProject], scope)
+    vi.spyOn(forecastingRepository, 'persistWorkspace').mockRejectedValue(
+      new BrowserStorageError('Local storage is full.', {
+        code: 'storage_quota_exceeded',
+        storageKey: scope
+      })
+    )
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: scope,
+        initialProjectId: originalProject.id,
+        showSourceActionButton: true
+      }
+    })
+    mountedWrappers.push(wrapper)
+    await flushUi()
+    await flushUi()
+
+    await findButtonByText(wrapper, 'Replace Data').trigger('click')
+    const modal = wrapper.findComponent(ForecastImportDailyModal)
+    await modal.findComponent(AppFileDropzone).vm.$emit('file-select', {
+      target: { files: [buildReplacementCsvFile('retry-replacement.csv')] }
+    })
+    await flushUi()
+    await clickBodyButton('Replace Forecast')
+    await flushUi()
+
+    expect(wrapper.vm.currentProject.sourceData.fileName).toBe('accepted-january.csv')
+    expect(document.body.textContent || '').toContain('retry-replacement.csv')
+    expect(document.body.textContent || '').toContain('Unable to save the forecast.')
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+    const storedProjects = await forecastingRepository.loadWorkspace(scope)
+    expect(storedProjects).toHaveLength(1)
+    expect(storedProjects[0].sourceData.fileName).toBe('accepted-january.csv')
+    expect(wrapper.emitted('save-complete')).toBeUndefined()
   })
 
   it('emits cancel-create when a new manual monthly forecast is cancelled before save', async () => {

@@ -6,6 +6,7 @@ import {
   buildPlanningGroupHash
 } from '../../appRoutes'
 import ForecastingWorkspace from '../ForecastingWorkspace.vue'
+import { buildForecastPlanDependencyIndex } from '../../planner/forecastDependencies'
 
 const props = defineProps({
   center: {
@@ -81,6 +82,10 @@ const returnToForecastsHash = computed(() =>
   })
 )
 
+const replacementDependenciesByProjectId = computed(() =>
+  buildForecastPlanDependencyIndex(props.group?.plans)
+)
+
 const handleSaveComplete = () => {
   window.location.hash = returnToForecastsHash.value
 }
@@ -100,8 +105,9 @@ const handleCancelCreate = () => {
     :fallback-scopes="fallbackScopes"
     :breadcrumbs="breadcrumbs"
     :show-library-actions="false"
-    :show-source-action-button="false"
+    :show-source-action-button="true"
     :show-duplicate-action="false"
+    :replacement-dependencies-by-project-id="replacementDependenciesByProjectId"
     project-dialog-description="Open a saved forecast for this staffing group. Older center-level forecasts still appear here until they are resaved into the staffing-group workspace."
     @save-complete="handleSaveComplete"
     @cancel-create="handleCancelCreate"

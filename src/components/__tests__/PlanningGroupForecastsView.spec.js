@@ -4,13 +4,19 @@ import PlanningGroupForecastsView from '../planning/PlanningGroupForecastsView.v
 
 const ForecastingWorkspaceStub = {
   name: 'ForecastingWorkspace',
-  props: ['showLibraryActions', 'showDuplicateAction', 'showSourceActionButton'],
+  props: [
+    'showLibraryActions',
+    'showDuplicateAction',
+    'showSourceActionButton',
+    'replacementDependenciesByProjectId'
+  ],
   emits: ['save-complete', 'cancel-create'],
   template: `
     <div>
       <span data-testid="show-library-actions">{{ String(showLibraryActions) }}</span>
       <span data-testid="show-duplicate-action">{{ String(showDuplicateAction) }}</span>
       <span data-testid="show-source-action-button">{{ String(showSourceActionButton) }}</span>
+      <span data-testid="replacement-dependencies">{{ JSON.stringify(replacementDependenciesByProjectId) }}</span>
       <button type="button" @click="$emit('save-complete')">Save Complete</button>
       <button type="button" @click="$emit('cancel-create')">Cancel Create</button>
     </div>
@@ -78,7 +84,7 @@ describe('PlanningGroupForecastsView', () => {
     window.location.hash = originalHash
   })
 
-  it('hides forecast-library and source actions inside the staffing-group forecast workspace', () => {
+  it('keeps library actions compact but exposes source replacement with dependent plan context', () => {
     const wrapper = mount(PlanningGroupForecastsView, {
       props: {
         center: {
@@ -87,7 +93,30 @@ describe('PlanningGroupForecastsView', () => {
         },
         group: {
           id: 'group-1',
-          name: 'Consumer Voice'
+          name: 'Consumer Voice',
+          plans: [
+            {
+              id: 'budget-2026',
+              name: '2026 Budget',
+              planType: 'budget',
+              status: 'draft',
+              planningYear: 2026,
+              demandSource: {
+                mode: 'forecast',
+                forecastProjectId: 'forecast-1'
+              }
+            },
+            {
+              id: 'update-2026',
+              name: 'Spring Update',
+              planType: 'update',
+              planningYear: 2026,
+              demandSource: {
+                mode: 'forecast',
+                forecastProjectId: 'forecast-1'
+              }
+            }
+          ]
         },
         planningYear: 2026
       },
@@ -100,6 +129,12 @@ describe('PlanningGroupForecastsView', () => {
 
     expect(wrapper.get('[data-testid="show-library-actions"]').text()).toBe('false')
     expect(wrapper.get('[data-testid="show-duplicate-action"]').text()).toBe('false')
-    expect(wrapper.get('[data-testid="show-source-action-button"]').text()).toBe('false')
+    expect(wrapper.get('[data-testid="show-source-action-button"]').text()).toBe('true')
+    expect(JSON.parse(wrapper.get('[data-testid="replacement-dependencies"]').text())).toEqual({
+      'forecast-1': [
+        expect.objectContaining({ label: '2026 Budget', state: 'draft', isDraft: true }),
+        expect.objectContaining({ label: 'Spring Update', state: 'finalized', isDraft: false })
+      ]
+    })
   })
 })

@@ -12,13 +12,8 @@ import {
   FORECAST_TYPE_BUDGET,
   buildMonthEndDate
 } from '../../forecasting/shared'
-import { DEMAND_SOURCE_FORECAST } from '../../planner/demandSources'
+import { findForecastPlanDependencies } from '../../planner/forecastDependencies'
 import { resolvePlanningGroupActuals } from '../../planner/groupActuals'
-import {
-  PLAN_STATUS_DRAFT,
-  PLAN_TYPE_UPDATE,
-  normalizePlanStatus
-} from '../../planningStorage'
 import { currentYear } from '../monthlyPlanBuilder/shared'
 
 const FORECAST_PERIOD_FULL_YEAR = 'full_year'
@@ -105,32 +100,6 @@ const formatMonthOptionLabel = (monthStart) => {
     month: 'short',
     year: 'numeric'
   }).format(new Date(year, monthIndex, 1))
-}
-
-const buildPlanDependencyLabel = (plan = {}) => {
-  const explicitName = String(plan.name || '').trim()
-  const planningYear = Number(plan.planningYear) || 0
-  const planType = String(plan.planType || '').trim().toLowerCase()
-  const fallbackType = planType === PLAN_TYPE_UPDATE ? 'Update' : 'Budget'
-  const planName = explicitName || (planningYear ? `${planningYear} ${fallbackType}` : fallbackType)
-  const planState = normalizePlanStatus(plan.status, planType) === PLAN_STATUS_DRAFT
-    ? 'draft'
-    : 'finalized'
-
-  return `${planName} (${planState})`
-}
-
-const findForecastDependentPlans = (plans = [], forecastId = '') => {
-  const normalizedForecastId = String(forecastId || '').trim()
-
-  if (!normalizedForecastId) {
-    return []
-  }
-
-  return (Array.isArray(plans) ? plans : []).filter((plan) =>
-    plan?.demandSource?.mode === DEMAND_SOURCE_FORECAST &&
-    String(plan?.demandSource?.forecastProjectId || '').trim() === normalizedForecastId
-  )
 }
 
 export function usePlanningGroupForecastActions({
@@ -377,12 +346,12 @@ export function usePlanningGroupForecastActions({
   ]
 
   const confirmDeleteForecast = (forecast) => {
-    const dependentPlans = findForecastDependentPlans(selectedGroup.value?.plans, forecast?.id)
+    const dependentPlans = findForecastPlanDependencies(selectedGroup.value?.plans, forecast?.id)
     const savedPlanProtection = dependentPlans.length === 1
       ? 'does not delete this plan or change its saved demand values and snapshot'
       : 'does not delete these plans or change their saved demand values and snapshots'
     const dependencyDescription = dependentPlans.length
-      ? `This forecast is used by ${dependentPlans.length} saved ${dependentPlans.length === 1 ? 'plan' : 'plans'}: ${dependentPlans.map(buildPlanDependencyLabel).join('; ')}. Deleting it removes the source from future selection and access, but ${savedPlanProtection}.`
+      ? `This forecast is used by ${dependentPlans.length} saved ${dependentPlans.length === 1 ? 'plan' : 'plans'}: ${dependentPlans.map((plan) => `${plan.label} (${plan.state})`).join('; ')}. Deleting it removes the source from future selection and access, but ${savedPlanProtection}.`
       : 'No saved plans use this forecast. Deleting it removes the source from future selection and access on this device.'
 
     requestConfirmation({

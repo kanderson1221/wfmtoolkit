@@ -17,6 +17,14 @@ const props = defineProps({
   project: {
     type: Object,
     required: true
+  },
+  replacementDependencies: {
+    type: Array,
+    default: () => []
+  },
+  saveError: {
+    type: String,
+    default: ''
   }
 })
 
@@ -31,6 +39,16 @@ const draftProject = ref(createForecastProject())
 const importedDailyRows = ref([])
 const ahtMonthOverrides = ref([])
 
+const acceptedDailyRows = computed(() =>
+  Array.isArray(props.project?.lastRun?.dailyForecast)
+    ? props.project.lastRun.dailyForecast
+    : []
+)
+
+const isReplacement = computed(() =>
+  Boolean(String(props.project?.id || '').trim()) && acceptedDailyRows.value.length > 0
+)
+
 const resetDraftProject = () => {
   draftProject.value = createForecastProject({
     ...props.project,
@@ -38,18 +56,24 @@ const resetDraftProject = () => {
     coverageStartMonthIndex: 0
   })
   draftProject.value.sourceData = {
-    fileName: props.project?.sourceData?.fileName || '',
-    headers: Array.isArray(props.project?.sourceData?.headers) ? [...props.project.sourceData.headers] : [],
-    rows: Array.isArray(props.project?.sourceData?.rows) ? props.project.sourceData.rows.map((row) => ({ ...row })) : [],
+    fileName: isReplacement.value ? '' : props.project?.sourceData?.fileName || '',
+    headers: isReplacement.value
+      ? []
+      : Array.isArray(props.project?.sourceData?.headers) ? [...props.project.sourceData.headers] : [],
+    rows: isReplacement.value
+      ? []
+      : Array.isArray(props.project?.sourceData?.rows) ? props.project.sourceData.rows.map((row) => ({ ...row })) : [],
     mapping: props.project?.sourceData?.mapping && typeof props.project.sourceData.mapping === 'object'
       ? { ...props.project.sourceData.mapping }
       : {},
-    issues: Array.isArray(props.project?.sourceData?.issues) ? [...props.project.sourceData.issues] : []
+    issues: isReplacement.value
+      ? []
+      : Array.isArray(props.project?.sourceData?.issues) ? [...props.project.sourceData.issues] : []
   }
-  importedDailyRows.value = Array.isArray(props.project?.lastRun?.dailyForecast)
+  importedDailyRows.value = !isReplacement.value && Array.isArray(props.project?.lastRun?.dailyForecast)
     ? props.project.lastRun.dailyForecast.map((row) => ({ ...row }))
     : []
-  ahtMonthOverrides.value = Array.isArray(props.project?.modelConfig?.ahtMonthOverrides)
+  ahtMonthOverrides.value = !isReplacement.value && Array.isArray(props.project?.modelConfig?.ahtMonthOverrides)
     ? props.project.modelConfig.ahtMonthOverrides.map((row) => ({ ...row }))
     : []
 }
@@ -80,6 +104,57 @@ const canApply = computed(() =>
   importedDailyRows.value.length > 0 &&
   ahtMonthOverrides.value.length > 0 &&
   sourceIssues.value.length === 0
+)
+
+const formatWhole = (value) => new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0
+}).format(Number(value) || 0)
+
+const summarizeRows = (rows = [], fileName = '') => {
+  const normalizedRows = Array.isArray(rows) ? rows : []
+  const firstDate = normalizedRows[0]?.ds || ''
+  const lastDate = normalizedRows.at(-1)?.ds || ''
+
+  return {
+    fileName: fileName || '—',
+    rowCountLabel: normalizedRows.length ? formatWhole(normalizedRows.length) : '—',
+    coverageLabel: firstDate && lastDate ? `${firstDate} to ${lastDate}` : '—',
+    contactsLabel: normalizedRows.length
+      ? formatWhole(normalizedRows.reduce((sum, row) => sum + Number(row?.yhat || 0), 0))
+      : '—'
+  }
+}
+
+const acceptedSummary = computed(() =>
+  summarizeRows(acceptedDailyRows.value, props.project?.sourceData?.fileName)
+)
+
+const candidateSummary = computed(() =>
+  canApply.value
+    ? summarizeRows(importedDailyRows.value, draftProject.value.sourceData?.fileName)
+    : {
+        fileName: draftProject.value.sourceData?.fileName || 'Choose a valid CSV',
+        rowCountLabel: 'Not validated',
+        coverageLabel: 'Not validated',
+        contactsLabel: 'Not validated'
+      }
+)
+
+const replacementReviewRows = computed(() => [
+  { label: 'Source file', current: acceptedSummary.value.fileName, candidate: candidateSummary.value.fileName },
+  { label: 'Daily rows', current: acceptedSummary.value.rowCountLabel, candidate: candidateSummary.value.rowCountLabel },
+  { label: 'Coverage', current: acceptedSummary.value.coverageLabel, candidate: candidateSummary.value.coverageLabel },
+  { label: 'Total contacts', current: acceptedSummary.value.contactsLabel, candidate: candidateSummary.value.contactsLabel }
+])
+
+const replacementDialogTitle = computed(() =>
+  isReplacement.value ? 'Replace Daily Forecast' : 'Load Daily Forecast'
+)
+
+const replacementDialogDescription = computed(() =>
+  isReplacement.value
+    ? 'Validate a new daily source, review its scope and dependent plans, then replace this exact forecast version in one save.'
+    : 'Upload daily contacts and average handle time for this staffing group. Imported daily forecasts are saved as read-only demand sources.'
 )
 
 const definitionRows = computed(() => [
@@ -186,7 +261,6 @@ const handleApply = () => {
     importedDailyRows: importedDailyRows.value,
     ahtMonthOverrides: ahtMonthOverrides.value
   })
-  visible.value = false
 }
 </script>
 
@@ -194,8 +268,8 @@ const handleApply = () => {
   <AppDialog
     v-model:visible="visible"
     kicker="Imported Daily Forecast"
-    title="Load Daily Forecast"
-    description="Upload daily contacts and average handle time for this staffing group. Imported daily forecasts are saved as read-only demand sources."
+    :title="replacementDialogTitle"
+    :description="replacementDialogDescription"
     allow-backdrop-close
     max-width="max-w-5xl"
     @close="emit('close')"
@@ -203,13 +277,14 @@ const handleApply = () => {
     <div class="grid gap-4">
       <AppFileDropzone
         input-id="forecast-imported-daily-upload"
-        title="Upload Daily Forecast"
+        :title="isReplacement ? 'Choose Replacement CSV' : 'Upload Daily Forecast'"
         button-label="Choose CSV"
         description="Drag and drop a CSV here."
         hint-text=""
         :format-badges="['.CSV']"
         compact
         centered
+        autofocus
         class="w-full"
         accept=".csv,text/csv"
         @file-select="handleFileSelect"
@@ -276,6 +351,55 @@ const handleApply = () => {
           {{ issue }}
         </AppStatusMessage>
       </div>
+
+      <AppTableShell v-if="isReplacement">
+        <div class="border-b border-slate-200 px-5 py-4">
+          <p class="text-sm font-semibold text-slate-950">Replacement Review</p>
+          <p class="mt-0.5 text-sm text-slate-600">
+            The accepted source remains active until the validated candidate saves successfully.
+          </p>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[720px] border-collapse text-sm text-slate-700">
+            <thead class="border-b border-slate-200 bg-[#edf3f8]">
+              <tr>
+                <th scope="col" class="px-5 py-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#15395f]">Measure</th>
+                <th scope="col" class="px-4 py-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#15395f]">Current Accepted</th>
+                <th scope="col" class="px-5 py-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[#15395f]">Replacement Candidate</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 bg-white">
+              <tr v-for="row in replacementReviewRows" :key="row.label">
+                <th scope="row" class="px-5 py-2.5 text-left font-medium text-slate-950">{{ row.label }}</th>
+                <td class="px-4 py-2.5 tabular-nums">{{ row.current }}</td>
+                <td class="px-5 py-2.5 font-medium tabular-nums" :class="canApply ? 'text-slate-950' : 'text-slate-500'">{{ row.candidate }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </AppTableShell>
+
+      <div v-if="isReplacement" class="grid gap-3 rounded-[20px] border border-slate-200 bg-slate-50/80 p-4">
+        <div>
+          <p class="text-sm font-semibold text-slate-950">Dependent Plan Impact</p>
+          <p class="mt-1 text-sm leading-5 text-slate-600">
+            Saved demand values and snapshots remain unchanged. Drafts can adopt the replacement only through their explicit Replace Forecast action; finalized plans remain immutable.
+          </p>
+        </div>
+
+        <ul v-if="props.replacementDependencies.length" class="grid gap-2 text-sm text-slate-700">
+          <li v-for="plan in props.replacementDependencies" :key="plan.id || `${plan.label}-${plan.state}`" class="flex items-start justify-between gap-4 border-t border-slate-200 pt-2 first:border-t-0 first:pt-0">
+            <span class="font-medium text-slate-950">{{ plan.label }} ({{ plan.state }})</span>
+            <span class="text-right text-slate-600">{{ plan.isDraft ? 'No automatic refresh' : 'Snapshot protected' }}</span>
+          </li>
+        </ul>
+        <p v-else class="text-sm text-slate-600">No saved plan currently uses this forecast version.</p>
+      </div>
+
+      <AppStatusMessage v-if="props.saveError" tone="error">
+        {{ props.saveError }} The replacement candidate is still available for retry.
+      </AppStatusMessage>
     </div>
 
     <template #footer>
@@ -286,7 +410,7 @@ const handleApply = () => {
           :disabled="!canApply"
           @click="handleApply"
         >
-          Load
+          {{ isReplacement ? 'Replace Forecast' : 'Load Forecast' }}
         </AppButton>
       </div>
     </template>

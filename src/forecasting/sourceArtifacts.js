@@ -231,8 +231,8 @@ const normalizeImportedDailyRows = ({ rows = [], mapping = {} } = {}) => {
       return
     }
 
-    if (ahtSeconds == null || ahtSeconds < 0) {
-      issues.push(`Row ${row.rowIndex}: enter numeric average handle time seconds in "${ahtColumn}".`)
+    if (ahtSeconds == null || ahtSeconds <= 0) {
+      issues.push(`Row ${row.rowIndex}: enter positive average handle time seconds in "${ahtColumn}".`)
       return
     }
 

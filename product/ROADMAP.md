@@ -16,19 +16,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-18.
 - Last reviewed: 2026-07-18.
 
-### `NOW-002` — Atomic imported-forecast replacement preview — Ready
+### `NOW-002` — Atomic imported-forecast replacement preview — Completed
 
-- Capability: `CAP-FORE-001` (Need 32), `CAP-GOV-001` (Need 26)
+- Capability: `CAP-FORE-001` (Need 20 after this run; 32 before), `CAP-GOV-001` (Need 26)
 - Planner outcome: a planner can replace an imported forecast only after seeing validation results and the exact impact on editable drafts while saved plan snapshots remain protected.
 - Problem/opportunity: version deletion warnings are strong, but replacement acceptance and dependent-draft impact are not yet one explicit atomic review workflow.
 - Rationale/evidence: `FIMP-007` and Workflow 2 require dependency review and atomic persistence; recent audit candidates repeatedly identify this gap.
 - Dependencies: forecast repository contract, plan dependency lookup, immutable saved snapshots.
 - Proposed scope: full pre-validation, version/draft impact preview, single atomic accept, failure recovery, focused persistence and UI tests; remove obsolete replacement branches exposed by the consolidation.
 - Success measures: invalid imports write nothing; every affected draft is named; final plans remain unchanged; success replaces exactly one version and returns to its selected library row.
-- Status: ready.
+- Status: completed 2026-07-18. Replacement retains the selected forecast ID, names all dependent saved plans and states, preserves every plan snapshot, and keeps a failed candidate available for retry.
 - Last reviewed: 2026-07-18.
 
-### `NOW-003` — Portfolio partial-coverage decision state — Candidate
+### `NOW-003` — Portfolio partial-coverage decision state — Ready
 
 - Capability: `CAP-REP-002` (Need 45), `CAP-REP-001` (Need 28)
 - Planner outcome: leaders see which totals are partial, which groups are missing, and whether a metric is safe to use.
@@ -37,7 +37,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Dependencies: contributor identity from annual rollups and plan-role semantics.
 - Proposed scope: explicit partial badge/message, missing-group review, scoped metric labels, and tests for actuals-only and out-of-year groups.
 - Success measures: users can name every excluded group from the report; no total implies full coverage; keyboard access and wide-table flow remain intact.
-- Status: candidate; execute only after `NOW-002` unless a reporting-risk override is recorded.
+- Status: ready; `NOW-002` is complete and this is the next executable reporting-integrity slice.
 - Last reviewed: 2026-07-18.
 
 ## Next
@@ -162,5 +162,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 |---|---|
 | 2026-07-18 | Established the first capability baseline and roadmap because the required strategy artifacts were absent. |
 | 2026-07-18 | Completed `NOW-001`: no-plan portfolio initializer zeroes are no longer presented as an operating report. |
+| 2026-07-18 | Completed `NOW-002`: imported daily forecast replacement now validates and previews one exact version, names dependent plan states, persists atomically, and never refreshes plan snapshots automatically. |
+| 2026-07-18 | Promoted `NOW-003` partial portfolio coverage to Ready after the forecast-replacement dependency and workflow slice completed. |
 | 2026-07-18 | Kept employee scheduling and intraday management out of Now despite high Need scores because data/integration prerequisites and product-boundary decisions are unresolved. |
 | 2026-07-18 | Declined phone-specific planning work; desktop/laptop workflow quality is the supported UX target. |

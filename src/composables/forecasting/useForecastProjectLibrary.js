@@ -113,15 +113,15 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
     replaceCurrentProject(selectedProject)
   }
 
-  const saveCurrentProject = async (successMessage = 'Forecast saved.') => {
+  const saveProjectSnapshot = async (projectSnapshot, successMessage = 'Forecast saved.') => {
     saveError.value = ''
     saveStatusMessage.value = ''
 
     try {
       const projectToSave = {
-        ...clonePlain(currentProject.value),
-        name: createSavedForecastName(savedProjects.value, currentProject.value, {
-          excludeId: currentProject.value.id || ''
+        ...clonePlain(projectSnapshot),
+        name: createSavedForecastName(savedProjects.value, projectSnapshot, {
+          excludeId: projectSnapshot?.id || ''
         })
       }
       const nextProjects = forecastingRepository.saveProject(workspaceProjects.value, projectToSave)
@@ -141,6 +141,9 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
       return false
     }
   }
+
+  const saveCurrentProject = async (successMessage = 'Forecast saved.') =>
+    saveProjectSnapshot(currentProject.value, successMessage)
 
   const duplicateCurrentProject = async () => {
     const duplicateProject = normalizeProjectForEditor(savedProjects.value, {
@@ -187,6 +190,7 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
     loadProjectsForScope,
     createNewProject,
     openProjectById,
+    saveProjectSnapshot,
     saveCurrentProject,
     duplicateCurrentProject
   }

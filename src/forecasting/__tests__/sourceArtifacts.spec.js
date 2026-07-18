@@ -143,6 +143,28 @@ describe('forecast source artifacts', () => {
     expect(state.issues).toContain('Choose the average handle time column before loading an imported forecast.')
   })
 
+  it('rejects zero average handle time because imported workload inputs must be positive', () => {
+    const state = buildImportedDailySourceStateFromText({
+      fileName: 'consumer-voice-jan-2025.csv',
+      text: [
+        'date,forecast,aht_seconds',
+        '2025-01-01,100,0'
+      ].join('\n'),
+      currentMapping: {
+        dateColumn: 'date',
+        forecastColumn: 'forecast',
+        ahtColumn: 'aht_seconds'
+      },
+      planningYear: 2025,
+      forecastType: 'budget',
+      coverageStartDate: '2025-01-01',
+      coverageEndDate: '2025-01-01'
+    })
+
+    expect(state.importedDailyRows).toHaveLength(0)
+    expect(state.issues).toContain('Row 2: enter positive average handle time seconds in "aht_seconds".')
+  })
+
   it('builds monthly weighted AHT overrides from imported daily rows', () => {
     const overrides = buildMonthlyAhtOverridesFromImportedDailyRows([
       { ds: '2025-01-01', yhat: 100, ahtSeconds: 300 },

@@ -81,6 +81,10 @@ const props = defineProps({
   embedded: {
     type: Boolean,
     default: false
+  },
+  replacementDependenciesByProjectId: {
+    type: Object,
+    default: () => ({})
   }
 })
 
@@ -106,6 +110,7 @@ const {
   currentProjectMeta,
   createNewProject,
   openProjectById,
+  saveProjectSnapshot,
   saveCurrentProject,
   duplicateCurrentProject,
   applyHistoryImport,
@@ -125,6 +130,21 @@ const breadcrumbItems = computed(() => [
 ])
 
 const projectDialogCurrentId = computed(() => currentProject.value?.id || '')
+
+const isReplacingSavedImportedProject = computed(() =>
+  getForecastProjectSourceKind(currentProject.value) === FORECAST_SOURCE_IMPORTED_DAILY &&
+  Boolean(String(currentProject.value?.id || '').trim()) &&
+  Boolean(currentProject.value?.lastRun?.dailyForecast?.length)
+)
+
+const importedDailyReplacementDependencies = computed(() => {
+  if (!isReplacingSavedImportedProject.value) {
+    return []
+  }
+
+  const dependencies = props.replacementDependenciesByProjectId?.[currentProject.value.id]
+  return Array.isArray(dependencies) ? dependencies : []
+})
 
 const projectDialogDescription = computed(() =>
   props.projectDialogDescription || 'Open a saved forecast for this workspace and keep its monthly rollup ready for downstream planning.'
@@ -240,11 +260,8 @@ const handleMonthlyForecastClose = () => {
   }
 }
 
-const saveReadOnlyProject = async (nextProject, successMessage = 'Forecast saved.') => {
-  currentProject.value = createForecastProject(nextProject)
-  await nextTick()
-  return saveCurrentProject(successMessage)
-}
+const saveReadOnlyProject = async (nextProject, successMessage = 'Forecast saved.') =>
+  saveProjectSnapshot(createForecastProject(nextProject), successMessage)
 
 const handleApplyImportedDaily = async ({ sourceData, importedDailyRows, ahtMonthOverrides } = {}) => {
   const isReplacingCurrentProject = getForecastProjectSourceKind(currentProject.value) === FORECAST_SOURCE_IMPORTED_DAILY
@@ -283,9 +300,12 @@ const handleApplyImportedDaily = async ({ sourceData, importedDailyRows, ahtMont
     lastRun
   })
 
-  importedDailyModalOpen.value = false
-  const didSave = await saveReadOnlyProject(nextProject, isReplacingCurrentProject ? 'Forecast updated.' : 'Forecast saved.')
+  const didSave = await saveReadOnlyProject(
+    nextProject,
+    isReplacingSavedImportedProject.value ? 'Forecast replaced.' : 'Forecast saved.'
+  )
   if (didSave) {
+    importedDailyModalOpen.value = false
     emit('save-complete')
   }
 }
@@ -510,6 +530,8 @@ watch(
     <ForecastImportDailyModal
       v-model:visible="importedDailyModalOpen"
       :project="getForecastProjectSourceKind(currentProject) === FORECAST_SOURCE_IMPORTED_DAILY ? currentProject : buildProjectSeedForSourceKind(FORECAST_SOURCE_IMPORTED_DAILY)"
+      :replacement-dependencies="importedDailyReplacementDependencies"
+      :save-error="saveError"
       @apply="handleApplyImportedDaily"
       @close="handleImportedDailyClose"
     />

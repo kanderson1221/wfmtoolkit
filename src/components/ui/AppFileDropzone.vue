@@ -47,6 +47,10 @@ const props = defineProps({
   centered: {
     type: Boolean,
     default: false
+  },
+  autofocus: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -167,7 +171,12 @@ const handleChange = (event) => {
       </div>
 
       <div :class="props.centered ? 'flex flex-wrap items-center justify-center gap-2.5' : 'flex flex-wrap items-center gap-3'">
-        <AppButton size="sm" variant="secondary" @click="openPicker">
+        <AppButton
+          size="sm"
+          variant="secondary"
+          :autofocus="props.autofocus"
+          @click="openPicker"
+        >
           {{ props.buttonLabel }}
         </AppButton>
         <span v-if="props.hintText" :class="isCompactCentered ? 'text-[0.82rem] text-slate-500' : 'text-sm text-slate-500'">{{ props.hintText }}</span>
