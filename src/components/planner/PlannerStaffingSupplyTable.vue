@@ -69,10 +69,19 @@ const setSelectedMonth = (monthIndex) => {
 }
 
 const formatSignedNumber = (value, digits = 1) => {
-  const numericValue = Number(value) || 0
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return '—'
+  }
+
+  const numericValue = value
   const prefix = numericValue > 0 ? '+' : ''
   return `${prefix}${props.formatNumber(numericValue, digits)}`
 }
+
+const formatOptionalNumber = (value, digits = 1) =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? props.formatNumber(value, digits)
+    : '—'
 
 const gapClass = (value) => ({
   'variance-positive': value > 0.05,
@@ -199,8 +208,8 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
                 {{ record.label }}
               </button>
             </td>
-              <td>{{ props.formatNumber(record.requiredHeadcount, 1) }}</td>
-              <td>{{ props.formatNumber(isIntradayErlang ? record.peakIntervalRequiredHeadcount : record.peakDayRequiredHeadcount, 1) }}</td>
+              <td>{{ formatOptionalNumber(record.requiredHeadcount, 1) }}</td>
+              <td>{{ formatOptionalNumber(isIntradayErlang ? record.peakIntervalRequiredHeadcount : record.peakDayRequiredHeadcount, 1) }}</td>
               <td>
                 <AppTableNumberField
                   v-if="record.monthIndex === 0 && !props.startingPositionInherited && !props.readOnly"

@@ -86,6 +86,7 @@ const buildMonthlyWarnings = ({
   operatingWeekdays,
   openDays,
   paidHoursPerMonth,
+  presentHours,
   totalLossHours,
   otherLossHoursPerDay,
   paidHoursPerDay,
@@ -93,6 +94,8 @@ const buildMonthlyWarnings = ({
   utilizationPercentRaw,
   randomLossPercent,
   scheduledPercent,
+  occupancyPercent,
+  adherencePercent,
   contacts,
   ahtSeconds
 }) => {
@@ -120,19 +123,31 @@ const buildMonthlyWarnings = ({
   }
 
   if (presencePercentRaw <= 0 && paidHoursPerMonth > 0) {
-    presenceWarnings.push('Absence losses total 100% or more of paid hours. The planner is clamping presence to avoid impossible staffing math.')
+    presenceWarnings.push('Absence losses consume all monthly paid capacity. Reduce the losses before finalizing the plan.')
   }
 
-  if (utilizationPercentRaw <= 0) {
-    utilizationWarnings.push('Scheduled and other utilization losses fully consume the present time in the month. Utilization is clamped to keep the plan calculable.')
+  if (utilizationPercentRaw <= 0 && presentHours > 0) {
+    utilizationWarnings.push('Scheduled and other utilization losses consume all present capacity. Reduce the losses before finalizing the plan.')
   }
 
   if (randomLossPercent >= scheduledPercent && scheduledPercent > 0) {
     randomWarnings.push('Total scheduled random loss is consuming all scheduled capacity. Recheck the adherence and occupancy assumptions.')
   }
 
+  if (occupancyPercent <= 0) {
+    randomWarnings.push('Occupancy must be greater than 0% before this month can produce a staffing requirement.')
+  }
+
+  if (adherencePercent <= 0) {
+    randomWarnings.push('Adherence must be greater than 0% before this month can produce a staffing requirement.')
+  }
+
   if (contacts > 0 && paidHoursPerMonth === 0) {
-    planWarnings.push('Contacts are forecasted, but paid hours per FTE are zero. The final staffing result will stay at zero until presence inputs are fixed.')
+    planWarnings.push('Contacts are forecasted, but paid hours per FTE are zero. The staffing requirement is unavailable until presence inputs are fixed.')
+  } else if (contacts > 0 && (presencePercentRaw <= 0 || utilizationPercentRaw <= 0)) {
+    planWarnings.push('Contacts are forecasted, but monthly losses consume all available capacity. The staffing requirement is unavailable until availability inputs are fixed.')
+  } else if (contacts > 0 && (occupancyPercent <= 0 || adherencePercent <= 0)) {
+    planWarnings.push('Contacts are forecasted, but occupancy or adherence is invalid. The staffing requirement is unavailable until random-loss inputs are fixed.')
   }
 
   if (contacts === 0 && ahtSeconds > 0) {
@@ -229,10 +244,10 @@ export const computeMonthlyRecords = ({
     const absenceLossPercent = paidHoursPerMonth > 0 ? (absenceLossHours / paidHoursPerMonth) * 100 : 0
 
     const presencePercentRaw = 100 - absenceLossPercent
-    const presencePercent = paidHoursPerMonth > 0 ? clamp(presencePercentRaw, 1, 100) : 0
-    const presenceShare = paidHoursPerMonth > 0 ? clamp(presencePercentRaw, 1, 100) / 100 : 1
+    const presencePercent = paidHoursPerMonth > 0 ? clamp(presencePercentRaw, 0, 100) : 0
+    const presenceShare = paidHoursPerMonth > 0 ? presencePercent / 100 : 0
     const presentHours = paidHoursPerMonth * presenceShare
-    const presenceFactor = paidHoursPerMonth > 0 ? 1 / presenceShare : 1
+    const presenceFactor = presenceShare > 0 ? 1 / presenceShare : null
 
     const paidBreaksHours = rawPaidBreaksHours * presenceShare
     const otherAwayHours = rawOtherAwayHours * presenceShare
@@ -241,14 +256,14 @@ export const computeMonthlyRecords = ({
     const totalLossHours = absenceLossHours + scheduledLossHours + otherLossHours
 
     const utilizationPercentRaw = presentHours > 0 ? 100 - (utilizationLossHours / presentHours) * 100 : 0
-    const utilizationPercent = presentHours > 0 ? clamp(utilizationPercentRaw, 1, 100) : 0
-    const utilizationShare = presentHours > 0 ? clamp(utilizationPercentRaw, 1, 100) / 100 : 1
-    const utilizationFactor = 1 / utilizationShare
+    const utilizationPercent = presentHours > 0 ? clamp(utilizationPercentRaw, 0, 100) : 0
+    const utilizationShare = presentHours > 0 ? utilizationPercent / 100 : 0
+    const utilizationFactor = utilizationShare > 0 ? 1 / utilizationShare : null
     const scheduledPercent = paidHoursPerMonth > 0 ? presenceShare * utilizationShare * 100 : 0
     const scheduledHours = paidHoursPerMonth * presenceShare * utilizationShare
 
-    const occupancyPercent = clamp(toNumber(randomInput.occupancyPercent, 90), 1, 100)
-    const adherencePercent = clamp(toNumber(randomInput.adherencePercent, 95), 1, 100)
+    const occupancyPercent = clamp(toNumber(randomInput.occupancyPercent, 90), 0, 100)
+    const adherencePercent = clamp(toNumber(randomInput.adherencePercent, 95), 0, 100)
     const occupancyShare = occupancyPercent / 100
     const adherenceShare = adherencePercent / 100
     const adherenceLossPercent = (1 - adherenceShare) * scheduledPercent
@@ -257,7 +272,7 @@ export const computeMonthlyRecords = ({
     const randomLossPercent = adherenceLossPercent + occupancyLossPercent
     const designFactorPercent = scheduledPercent - randomLossPercent
     const designFactorShare = designFactorPercent / 100
-    const workloadStaffingRatio = designFactorShare > 0 ? 1 / designFactorShare : 0
+    const workloadStaffingRatio = designFactorShare > 0 ? 1 / designFactorShare : null
 
     const contacts = hasForecastDailyDemand
       ? Math.max(toNumber(filteredForecastDemand?.contacts, 0), 0)
@@ -281,11 +296,19 @@ export const computeMonthlyRecords = ({
       : averageDailyContacts * (1 + peakDayUpliftPercent / 100)
     const workloadHours = (contacts * ahtSeconds) / 3600
     const peakDayWorkloadHours = (peakDayContacts * ahtSeconds) / 3600
-    const requiredStaffHours = workloadHours * workloadStaffingRatio
-    const peakDayRequiredStaffHours = peakDayWorkloadHours * workloadStaffingRatio
-    const requiredHeadcount = paidHoursPerMonth > 0 ? requiredStaffHours / paidHoursPerMonth : 0
-    const peakDayRequiredHeadcount = paidHoursPerDay > 0 ? peakDayRequiredStaffHours / paidHoursPerDay : 0
-    const roundedHeadcount = requiredHeadcount > 0 ? Math.ceil(requiredHeadcount) : 0
+    const requiredStaffHours = workloadStaffingRatio == null ? null : workloadHours * workloadStaffingRatio
+    const peakDayRequiredStaffHours = workloadStaffingRatio == null ? null : peakDayWorkloadHours * workloadStaffingRatio
+    const requiredHeadcount = requiredStaffHours != null && paidHoursPerMonth > 0
+      ? requiredStaffHours / paidHoursPerMonth
+      : null
+    const peakDayRequiredHeadcount = peakDayRequiredStaffHours != null && paidHoursPerDay > 0
+      ? peakDayRequiredStaffHours / paidHoursPerDay
+      : null
+    const roundedHeadcount = requiredHeadcount == null
+      ? null
+      : requiredHeadcount > 0
+        ? Math.ceil(requiredHeadcount)
+        : 0
     const avgDailyContacts = openDays > 0 ? contacts / openDays : 0
     const isIntradayErlang = resolvedRequirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
 
@@ -293,6 +316,7 @@ export const computeMonthlyRecords = ({
       operatingWeekdays,
       openDays,
       paidHoursPerMonth,
+      presentHours,
       totalLossHours,
       otherLossHoursPerDay,
       paidHoursPerDay,
@@ -300,6 +324,8 @@ export const computeMonthlyRecords = ({
       utilizationPercentRaw,
       randomLossPercent,
       scheduledPercent,
+      occupancyPercent,
+      adherencePercent,
       contacts,
       ahtSeconds
     })
@@ -393,10 +419,26 @@ export const summarizeRandomRecords = (monthlyRecords, randomDefaults, useMonthl
 
 export const summarizePlanRecords = (monthlyRecords) => {
   const resolvedRequirementMethod = normalizePlanRequirementMethod(monthlyRecords[0]?.requirementMethod)
-  const peakMonth = monthlyRecords.reduce((peak, row) => (row.requiredHeadcount > peak.requiredHeadcount ? row : peak))
-  const peakDayMonth = monthlyRecords.reduce((peak, row) =>
-    row.peakDayRequiredHeadcount > peak.peakDayRequiredHeadcount ? row : peak
+  const requirementsAvailable = monthlyRecords.length > 0 && monthlyRecords.every(
+    (row) => typeof row.requiredHeadcount === 'number' && Number.isFinite(row.requiredHeadcount)
   )
+  const peakRequirementsAvailable = monthlyRecords.length > 0 && monthlyRecords.every(
+    (row) => typeof row.peakDayRequiredHeadcount === 'number' && Number.isFinite(row.peakDayRequiredHeadcount)
+  )
+  const unavailableRequirementMonth = monthlyRecords.find(
+    (row) => typeof row.requiredHeadcount !== 'number' || !Number.isFinite(row.requiredHeadcount)
+  ) || monthlyRecords[0] || null
+  const unavailablePeakMonth = monthlyRecords.find(
+    (row) => typeof row.peakDayRequiredHeadcount !== 'number' || !Number.isFinite(row.peakDayRequiredHeadcount)
+  ) || monthlyRecords[0] || null
+  const peakMonth = requirementsAvailable
+    ? monthlyRecords.reduce((peak, row) => (row.requiredHeadcount > peak.requiredHeadcount ? row : peak))
+    : unavailableRequirementMonth
+  const peakDayMonth = peakRequirementsAvailable
+    ? monthlyRecords.reduce((peak, row) =>
+        row.peakDayRequiredHeadcount > peak.peakDayRequiredHeadcount ? row : peak
+      )
+    : unavailablePeakMonth
   const peakIntervalMonth = monthlyRecords.reduce((peak, row) =>
     (row.peakIntervalRequiredHeadcount || 0) > (peak.peakIntervalRequiredHeadcount || 0) ? row : peak
   )
@@ -406,17 +448,22 @@ export const summarizePlanRecords = (monthlyRecords) => {
   const annualContacts = monthlyRecords.reduce((sum, row) => sum + row.contacts, 0)
   const annualWorkloadHours = monthlyRecords.reduce((sum, row) => sum + row.workloadHours, 0)
   const annualErlangStaffedHours = monthlyRecords.reduce((sum, row) => sum + (row.erlangStaffedHours || 0), 0)
-  const annualRequiredStaffHours = monthlyRecords.reduce((sum, row) => sum + row.requiredStaffHours, 0)
+  const requiredStaffHoursAvailable = monthlyRecords.length > 0 && monthlyRecords.every(
+    (row) => typeof row.requiredStaffHours === 'number' && Number.isFinite(row.requiredStaffHours)
+  )
+  const annualRequiredStaffHours = requirementsAvailable && requiredStaffHoursAvailable
+    ? monthlyRecords.reduce((sum, row) => sum + row.requiredStaffHours, 0)
+    : null
   const averageAhtSeconds =
     annualContacts > 0
       ? (annualWorkloadHours * 3600) / annualContacts
       : average(monthlyRecords.map((row) => row.ahtSeconds))
-  const minimumRequiredHeadcount = monthlyRecords.length
+  const minimumRequiredHeadcount = requirementsAvailable
     ? monthlyRecords.reduce(
         (minimum, row) => Math.min(minimum, row.requiredHeadcount),
         monthlyRecords[0].requiredHeadcount
       )
-    : 0
+    : null
 
   return {
     requirementMethod: resolvedRequirementMethod,
@@ -440,9 +487,15 @@ export const summarizePlanRecords = (monthlyRecords) => {
         .map((row) => row.weightedServiceLevelPercent)
         .filter((value) => typeof value === 'number' && Number.isFinite(value))
     ),
-    averageRequiredStaffHours: average(monthlyRecords.map((row) => row.requiredStaffHours)),
-    averageRequiredHeadcount: average(monthlyRecords.map((row) => row.requiredHeadcount)),
-    averagePeakRequiredHeadcount: average(monthlyRecords.map((row) => row.peakDayRequiredHeadcount)),
+    averageRequiredStaffHours: requirementsAvailable && requiredStaffHoursAvailable
+      ? average(monthlyRecords.map((row) => row.requiredStaffHours))
+      : null,
+    averageRequiredHeadcount: requirementsAvailable
+      ? average(monthlyRecords.map((row) => row.requiredHeadcount))
+      : null,
+    averagePeakRequiredHeadcount: peakRequirementsAvailable
+      ? average(monthlyRecords.map((row) => row.peakDayRequiredHeadcount))
+      : null,
     averagePeakIntervalRequiredHeadcount: average(
       monthlyRecords
         .map((row) => row.peakIntervalRequiredHeadcount)

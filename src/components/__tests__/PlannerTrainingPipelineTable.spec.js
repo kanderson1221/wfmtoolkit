@@ -3,6 +3,53 @@ import { mount } from '@vue/test-utils'
 import PlannerTrainingPipelineTable from '../planner/PlannerTrainingPipelineTable.vue'
 
 describe('PlannerTrainingPipelineTable', () => {
+  it('marks invalid calendar hire dates without displaying normalized derived dates', async () => {
+    const wrapper = mount(PlannerTrainingPipelineTable, {
+      props: {
+        planningYear: 2026,
+        trainingSettings: {
+          trainingDurationWorkdays: 5,
+          postTrainingNestingDays: 0,
+          graduationYieldPercent: 100,
+          availableTrainers: 1,
+          maxClassSize: 10,
+          startOnFirstBusinessDayOfWeek: true
+        },
+        trainingClasses: [
+          {
+            id: 'invalid-date-class',
+            hireDate: '2026-02-30',
+            hireCount: 10,
+            source: 'manual'
+          }
+        ],
+        selectedMonthIndex: 2,
+        formatNumber: (value) => Number(value ?? 0).toFixed(1)
+      },
+      global: {
+        stubs: {
+          AppButton: true,
+          AppIcon: true,
+          AppMenu: true,
+          AppTableDateField: {
+            props: ['modelValue'],
+            template: '<input type="date" :value="modelValue" />'
+          },
+          AppTableNumberField: {
+            props: ['modelValue', 'min', 'step'],
+            template: '<input :value="modelValue" />'
+          }
+        }
+      }
+    })
+
+    await wrapper.find('button.training-pipeline-toggle').trigger('click')
+
+    expect(wrapper.text()).toContain('Invalid Dates')
+    expect(wrapper.text()).not.toContain('Mar 2')
+    expect(wrapper.find('input[type="date"]').element.value).toBe('')
+  })
+
   it('renders inherited carry-in rows as read-only while keeping current-plan rows editable', async () => {
     const wrapper = mount(PlannerTrainingPipelineTable, {
       props: {

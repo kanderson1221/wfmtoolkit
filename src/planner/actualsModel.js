@@ -98,20 +98,33 @@ export const computeActualsRecords = (
       ? Math.max(toNumber(actualErlangOutput.erlangStaffedHours, 0), 0)
       : null
     const usesActualErlangOutputs = actualErlangOutputsByMonthIndex instanceof Map
+    const workloadStaffingRatio = typeof record.workloadStaffingRatio === 'number' &&
+      Number.isFinite(record.workloadStaffingRatio) &&
+      record.workloadStaffingRatio > 0
+      ? record.workloadStaffingRatio
+      : null
 
     const actualRequiredStaffHours =
-      actualErlangStaffedHours != null
-        ? actualErlangStaffedHours * toNumber(record.workloadStaffingRatio, 0)
+      actualErlangStaffedHours != null && workloadStaffingRatio != null
+        ? actualErlangStaffedHours * workloadStaffingRatio
         : usesActualErlangOutputs
           ? null
-          : actualWorkloadHours != null
-            ? actualWorkloadHours * toNumber(record.workloadStaffingRatio, 0)
+          : actualWorkloadHours != null && workloadStaffingRatio != null
+            ? actualWorkloadHours * workloadStaffingRatio
             : null
 
     const actualRequiredHeadcount =
       actualRequiredStaffHours != null && toNumber(record.paidHoursPerMonth, 0) > 0
         ? actualRequiredStaffHours / record.paidHoursPerMonth
         : null
+    const plannedRequiredHeadcount = typeof record.requiredHeadcount === 'number' &&
+      Number.isFinite(record.requiredHeadcount)
+      ? record.requiredHeadcount
+      : null
+    const plannedGapToRequirement = typeof staffingRecord.gapToRequirement === 'number' &&
+      Number.isFinite(staffingRecord.gapToRequirement)
+      ? staffingRecord.gapToRequirement
+      : null
 
     const contactsVariance =
       actualContacts != null ? actualContacts - toNumber(record.contacts, 0) : null
@@ -120,8 +133,8 @@ export const computeActualsRecords = (
       actualAhtSeconds != null ? actualAhtSeconds - toNumber(record.ahtSeconds, 0) : null
 
     const requiredHeadcountVariance =
-      actualRequiredHeadcount != null
-        ? actualRequiredHeadcount - toNumber(record.requiredHeadcount, 0)
+      actualRequiredHeadcount != null && plannedRequiredHeadcount != null
+        ? actualRequiredHeadcount - plannedRequiredHeadcount
         : null
 
     return {
@@ -132,12 +145,12 @@ export const computeActualsRecords = (
       plannedContacts: toNumber(record.contacts, 0),
       plannedAhtSeconds: toNumber(record.ahtSeconds, 0),
       plannedWorkloadHours: toNumber(record.workloadHours, 0),
-      plannedRequiredHeadcount: toNumber(record.requiredHeadcount, 0),
+      plannedRequiredHeadcount,
       plannedStartingTotalHeadcount: toNumber(staffingRecord.startingRosterHeadcount, 0),
       plannedStartingFrontlineHeadcount: toNumber(staffingRecord.startingFrontlineHeadcount, 0),
       plannedEndingTotalHeadcount: toNumber(staffingRecord.endingRosterHeadcount, 0),
       plannedEndingFrontlineHeadcount: toNumber(staffingRecord.endingFrontlineHeadcount, 0),
-      plannedGapToRequirement: toNumber(staffingRecord.gapToRequirement, 0),
+      plannedGapToRequirement,
       actualWorkloadHours,
       actualErlangStaffedHours,
       actualRequiredStaffHours,

@@ -160,6 +160,37 @@ describe('actualsModel', () => {
     })
   })
 
+  it('leaves actual requirements unavailable when planned capacity is invalid', () => {
+    const records = computeActualsRecords(
+      [
+        {
+          monthIndex: 0,
+          contacts: 1000,
+          ahtSeconds: 300,
+          workloadHours: 83.333,
+          paidHoursPerMonth: 160,
+          requiredHeadcount: null,
+          workloadStaffingRatio: null
+        }
+      ],
+      [],
+      [
+        {
+          actualContacts: 1200,
+          actualAhtSeconds: 300,
+          loadedDaysCount: 20
+        }
+      ]
+    )
+
+    expect(records[0]).toMatchObject({
+      actualWorkloadHours: 100,
+      actualRequiredStaffHours: null,
+      actualRequiredHeadcount: null,
+      requiredHeadcountVariance: null
+    })
+  })
+
   it('summarizes loaded actual months, average variances, and peak requirement values', () => {
     const summary = summarizeActualsRecords([
       {

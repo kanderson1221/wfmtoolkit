@@ -84,6 +84,45 @@ describe('intraday Erlang planner payloads', () => {
     ])
   })
 
+  it('blocks interval calculations when a monthly occupancy or adherence assumption is zero', () => {
+    const payload = buildPlannerIntradayErlangPayload({
+      planningYear: 2026,
+      demandSource: {
+        forecastDailySnapshot: [
+          { serviceDate: '2026-01-02', monthIndex: 0, contacts: 100 }
+        ],
+        forecastMonthSnapshot: [
+          { monthIndex: 0, monthLabel: 'Jan 2026', ahtSeconds: 300 }
+        ]
+      },
+      monthlyRecords: [
+        {
+          monthIndex: 0,
+          occupancyPercent: 0,
+          adherencePercent: 95
+        }
+      ],
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      operatingOpenTime: '08:00',
+      operatingCloseTime: '09:00',
+      serviceLevelPercent: 80,
+      serviceLevelThresholdSeconds: 20,
+      intraday: {
+        intervalLengthMinutes: 30,
+        intervalRatios: [
+          { startTime: '08:00', ratioPercent: 50 },
+          { startTime: '08:30', ratioPercent: 50 }
+        ]
+      }
+    })
+
+    expect(payload).toMatchObject({
+      status: 'random_assumptions_required',
+      rows: [],
+      message: expect.stringContaining('Jan')
+    })
+  })
+
   it('builds actuals Erlang payload rows from Data tab daily actual contacts and AHT', () => {
     const payload = buildPlannerActualsIntradayErlangPayload({
       planningYear: 2026,
@@ -341,5 +380,39 @@ describe('intraday Erlang planner payloads', () => {
     expect(merged[1].requiredHeadcount).toBeCloseTo(1.81422375, 6)
     expect(merged[1].peakDayRequiredHeadcount).toBeGreaterThan(merged[1].requiredHeadcount)
     expect(merged[1].peakDayRequiredHeadcount).toBeCloseTo(2.5853, 3)
+  })
+
+  it('keeps merged Erlang requirements unavailable when stored occupancy is zero', () => {
+    const [merged] = mergeIntradayErlangMonthlyRecords(
+      [
+        {
+          monthIndex: 0,
+          occupancyPercent: 0,
+          paidHoursPerDay: 8,
+          paidHoursPerMonth: 160,
+          scheduledPercent: 72.5,
+          adherenceLossPercent: 3.6,
+          workloadHours: 80
+        }
+      ],
+      new Map([
+        [
+          0,
+          {
+            workloadHours: 88,
+            erlangStaffedHours: 200,
+            peakIntervalRequiredHeadcount: 12
+          }
+        ]
+      ])
+    )
+
+    expect(merged).toMatchObject({
+      occupancyLossPercent: 0,
+      workloadStaffingRatio: null,
+      requiredStaffHours: null,
+      requiredHeadcount: null,
+      peakDayRequiredHeadcount: null
+    })
   })
 })

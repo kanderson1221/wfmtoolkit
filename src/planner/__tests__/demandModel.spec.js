@@ -162,3 +162,109 @@ describe('computeMonthlyRecords peak planning', () => {
     expect(januaryMonth.workloadHours).toBeCloseTo((500 * 420) / 3600, 5)
   })
 })
+
+describe('computeMonthlyRecords invalid capacity', () => {
+  const basePayload = {
+    planningYear: 2026,
+    operatingWeekdays: [1, 2, 3, 4, 5],
+    holidayCalendarId: 'none',
+    customHolidays: [],
+    presenceMonths: Array.from({ length: 12 }, () => ({ paidHoursPerDay: 8 })),
+    randomDefaults: {
+      occupancyPercent: 90,
+      adherencePercent: 95
+    },
+    useMonthlyRandomOverrides: false,
+    randomMonths: [],
+    planMonths: Array.from({ length: 12 }, () => ({
+      contacts: 22000,
+      ahtSeconds: 300,
+      peakDayUpliftPercent: 0
+    }))
+  }
+
+  it('keeps zero capacity unavailable instead of silently clamping it positive', () => {
+    const records = computeMonthlyRecords({
+      ...basePayload,
+      presenceMonths: basePayload.presenceMonths.map((month, monthIndex) => ({
+        ...month,
+        plannedTimeOffHours: monthIndex === 0 ? 1000 : 0,
+        meetingsHours: monthIndex === 1 ? 1000 : 0
+      }))
+    })
+    const summary = summarizePlanRecords(records)
+
+    expect(records[0]).toMatchObject({
+      presencePercent: 0,
+      presentHours: 0,
+      scheduledPercent: 0,
+      designFactorPercent: 0,
+      workloadStaffingRatio: null,
+      requiredStaffHours: null,
+      requiredHeadcount: null,
+      roundedHeadcount: null
+    })
+    expect(records[0].presenceWarnings.join(' ')).toContain('all monthly paid capacity')
+    expect(records[0].planWarnings.join(' ')).toContain('staffing requirement is unavailable')
+
+    expect(records[1]).toMatchObject({
+      presencePercent: 100,
+      utilizationPercent: 0,
+      scheduledPercent: 0,
+      designFactorPercent: 0,
+      workloadStaffingRatio: null,
+      requiredStaffHours: null,
+      requiredHeadcount: null,
+      roundedHeadcount: null
+    })
+    expect(records[1].utilizationWarnings.join(' ')).toContain('all present capacity')
+    expect([
+      records[0].workloadStaffingRatio,
+      records[0].requiredHeadcount,
+      records[1].workloadStaffingRatio,
+      records[1].requiredHeadcount
+    ]).not.toContainEqual(expect.any(Number))
+    expect(summary).toMatchObject({
+      annualRequiredStaffHours: null,
+      minimumRequiredHeadcount: null,
+      averageRequiredStaffHours: null,
+      averageRequiredHeadcount: null,
+      averagePeakRequiredHeadcount: null
+    })
+  })
+
+  it('keeps zero occupancy and adherence invalid instead of silently clamping them positive', () => {
+    const records = computeMonthlyRecords({
+      ...basePayload,
+      useMonthlyRandomOverrides: true,
+      randomMonths: Array.from({ length: 12 }, (_, monthIndex) => ({
+        occupancyPercent: monthIndex === 0 ? 0 : 90,
+        adherencePercent: monthIndex === 1 ? 0 : 95
+      }))
+    })
+    const summary = summarizePlanRecords(records)
+
+    expect(records[0]).toMatchObject({
+      occupancyPercent: 0,
+      designFactorPercent: 0,
+      workloadStaffingRatio: null,
+      requiredStaffHours: null,
+      requiredHeadcount: null,
+      roundedHeadcount: null
+    })
+    expect(records[0].randomWarnings.join(' ')).toContain('Occupancy must be greater than 0%')
+    expect(records[1]).toMatchObject({
+      adherencePercent: 0,
+      designFactorPercent: 0,
+      workloadStaffingRatio: null,
+      requiredStaffHours: null,
+      requiredHeadcount: null,
+      roundedHeadcount: null
+    })
+    expect(records[1].randomWarnings.join(' ')).toContain('Adherence must be greater than 0%')
+    expect(summary).toMatchObject({
+      annualRequiredStaffHours: null,
+      averageRequiredHeadcount: null
+    })
+  })
+})

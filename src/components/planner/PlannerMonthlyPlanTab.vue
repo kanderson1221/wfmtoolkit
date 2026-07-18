@@ -111,6 +111,10 @@ const appliedDailyForecastRowCount = computed(() =>
 )
 
 const parseFiniteNumber = (value) => {
+  if (value == null || value === '') {
+    return null
+  }
+
   const number = Number(value)
   return Number.isFinite(number) ? number : null
 }
@@ -506,7 +510,7 @@ const summaryItems = computed(() => {
       },
       {
         label: 'Avg Total Req HC',
-        value: props.formatNumber(props.planSummary?.averageRequiredHeadcount, 1)
+        value: formatOptionalNumber(props.planSummary?.averageRequiredHeadcount, 1)
       }
     ]
   }
@@ -522,19 +526,19 @@ const summaryItems = computed(() => {
     },
     {
       label: 'Avg Required Staff Hours',
-      value: props.formatNumber(props.planSummary?.averageRequiredStaffHours, 1)
+      value: formatOptionalNumber(props.planSummary?.averageRequiredStaffHours, 1)
     },
     {
       label: 'Avg Required Headcount',
-      value: props.formatNumber(props.planSummary?.averageRequiredHeadcount, 1)
+      value: formatOptionalNumber(props.planSummary?.averageRequiredHeadcount, 1)
     },
     {
       label: 'Peak Required Headcount',
-      value: props.formatNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1)
+      value: formatOptionalNumber(props.planSummary?.peakMonth?.requiredHeadcount, 1)
     },
     {
       label: 'Peak Day Required Headcount',
-      value: props.formatNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1)
+      value: formatOptionalNumber(props.planSummary?.peakDayMonth?.peakDayRequiredHeadcount, 1)
     }
   ]
 })
@@ -924,16 +928,16 @@ const erlangRunButtonLabel = computed(() => {
             <td>{{ props.formatPercent(record.scheduledPercent, 1) }}</td>
             <td>{{ props.formatPercent(record.randomLossPercent, 1) }}</td>
             <td>{{ props.formatPercent(record.designFactorPercent, 1) }}</td>
-            <td>{{ props.formatFactor(record.workloadStaffingRatio) }}</td>
+            <td>{{ record.workloadStaffingRatio == null ? '—' : props.formatFactor(record.workloadStaffingRatio) }}</td>
             <td v-if="!isIntradayErlang">{{ props.formatNumber(record.workloadHours, 1) }}</td>
-            <td v-if="!isIntradayErlang">{{ props.formatNumber(record.requiredStaffHours, 1) }}</td>
-            <td v-if="isIntradayErlang" class="plan-output-cell">{{ props.formatNumber(record.requiredStaffHours, 1) }}</td>
-            <td :class="{ 'plan-output-cell': isIntradayErlang }">{{ props.formatNumber(record.requiredHeadcount, 1) }}</td>
+            <td v-if="!isIntradayErlang">{{ formatOptionalNumber(record.requiredStaffHours, 1) }}</td>
+            <td v-if="isIntradayErlang" class="plan-output-cell">{{ formatOptionalNumber(record.requiredStaffHours, 1) }}</td>
+            <td :class="{ 'plan-output-cell': isIntradayErlang }">{{ formatOptionalNumber(record.requiredHeadcount, 1) }}</td>
             <td v-if="isIntradayErlang" class="plan-output-cell">
               {{ formatOptionalNumber(resolveSelectedIntervalPressureHeadcount(record), 1) }}
             </td>
             <td v-if="!isIntradayErlang">
-              {{ props.formatNumber(record.peakDayRequiredHeadcount, 1) }}
+              {{ formatOptionalNumber(record.peakDayRequiredHeadcount, 1) }}
             </td>
           </tr>
         </tbody>

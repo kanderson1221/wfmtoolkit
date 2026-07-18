@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { mdiChevronDown, mdiChevronRight, mdiDotsVertical } from '@mdi/js'
 
 import { createTrainingClass, createTrainingSettings, deriveTrainingClassMetrics } from '../../plannerModel'
+import { buildDateFromIso } from '../../planner/dateValues'
 import AppButton from '../ui/AppButton.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import AppMenu from '../ui/AppMenu.vue'
@@ -62,8 +63,7 @@ const resolveHireDate = (trainingClass) => createTrainingClass(trainingClass).hi
 const parseSortableDate = (value) => {
   if (!value) return null
 
-  const parsed = new Date(`${value}T00:00:00`)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return buildDateFromIso(value)
 }
 
 const selectedMonthLabel = computed(

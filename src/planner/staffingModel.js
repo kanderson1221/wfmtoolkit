@@ -8,6 +8,7 @@ import {
   toNumber
 } from './shared'
 import { buildHolidayEntriesForYear } from './holidayCalendars'
+import { buildDateFromIso } from './dateValues'
 
 const parseDate = (value) => {
   if (!value) {
@@ -18,8 +19,7 @@ const parseDate = (value) => {
     return Number.isNaN(value.getTime()) ? null : new Date(value)
   }
 
-  const parsed = new Date(`${value}T00:00:00`)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return buildDateFromIso(value)
 }
 
 const monthStart = (year, monthIndex) => new Date(year, monthIndex, 1)
@@ -359,10 +359,20 @@ export const computeStaffingRecords = (
       Math.max(runningFrontlineHeadcount + frontlineReadyHeadcount - frontlineAttritionHeadcount, 0),
       endingHeadcount
     )
-    const startingGapToRequirement = openingFrontlineHeadcount - planned.requiredHeadcount
-    const startingGapToRoundedRequirement = openingFrontlineHeadcount - planned.roundedHeadcount
-    const endingGapToRequirement = endingFrontlineHeadcount - planned.requiredHeadcount
-    const endingGapToRoundedRequirement = endingFrontlineHeadcount - planned.roundedHeadcount
+    const hasRequiredHeadcount = typeof planned.requiredHeadcount === 'number' && Number.isFinite(planned.requiredHeadcount)
+    const hasRoundedHeadcount = typeof planned.roundedHeadcount === 'number' && Number.isFinite(planned.roundedHeadcount)
+    const startingGapToRequirement = hasRequiredHeadcount
+      ? openingFrontlineHeadcount - planned.requiredHeadcount
+      : null
+    const startingGapToRoundedRequirement = hasRoundedHeadcount
+      ? openingFrontlineHeadcount - planned.roundedHeadcount
+      : null
+    const endingGapToRequirement = hasRequiredHeadcount
+      ? endingFrontlineHeadcount - planned.requiredHeadcount
+      : null
+    const endingGapToRoundedRequirement = hasRoundedHeadcount
+      ? endingFrontlineHeadcount - planned.roundedHeadcount
+      : null
 
     const record = {
       monthIndex,
@@ -388,7 +398,7 @@ export const computeStaffingRecords = (
       startingGapToRoundedRequirement,
       endingGapToRequirement,
       endingGapToRoundedRequirement,
-      isBelowRequirement: startingGapToRequirement < 0,
+      isBelowRequirement: startingGapToRequirement != null && startingGapToRequirement < 0,
       activeTrainingClasses: trainingMonth?.activeClassesCount || 0,
       startingInTrainingHeadcount: trainingMonth?.startingInTrainingHeadcount || 0,
       inTrainingHeadcount: trainingMonth?.inTrainingHeadcount || 0,
@@ -413,10 +423,13 @@ export const computeStaffingRecords = (
 export const summarizeStaffingRecords = (staffingRecords) => {
   const firstRecord = staffingRecords[0] || null
   const endingRecord = staffingRecords[staffingRecords.length - 1] || null
-  const peakShortageMonth =
-    staffingRecords.length > 0
-      ? staffingRecords.reduce((shortest, row) => (row.gapToRequirement < shortest.gapToRequirement ? row : shortest))
-      : null
+  const gapRecords = staffingRecords.filter(
+    (row) => typeof row.gapToRequirement === 'number' && Number.isFinite(row.gapToRequirement)
+  )
+  const hasCompleteRequirementGaps = staffingRecords.length > 0 && gapRecords.length === staffingRecords.length
+  const peakShortageMonth = hasCompleteRequirementGaps
+    ? gapRecords.reduce((shortest, row) => (row.gapToRequirement < shortest.gapToRequirement ? row : shortest))
+    : null
 
   return {
     startingRosterHeadcount: firstRecord?.startingRosterHeadcount || 0,
@@ -428,7 +441,9 @@ export const summarizeStaffingRecords = (staffingRecords) => {
     totalGraduatingHeadcount: staffingRecords.reduce((sum, row) => sum + row.graduatingHeadcount, 0),
     averageEndingRosterHeadcount: average(staffingRecords.map((row) => row.endingRosterHeadcount)),
     averageEndingFrontlineHeadcount: average(staffingRecords.map((row) => row.endingFrontlineHeadcount)),
-    averageGapToRequirement: average(staffingRecords.map((row) => row.gapToRequirement)),
+    averageGapToRequirement: hasCompleteRequirementGaps
+      ? average(gapRecords.map((row) => row.gapToRequirement))
+      : null,
     monthsBelowRequirement: staffingRecords.filter((row) => row.isBelowRequirement).length,
     peakShortageMonth,
     peakInTrainingHeadcount: staffingRecords.reduce((peak, row) => Math.max(peak, row.inTrainingHeadcount), 0),
@@ -496,6 +511,10 @@ export const recommendTrainingClasses = ({
 
   monthlyRecords.forEach((monthlyRecord, monthIndex) => {
     if (monthIndex === 0 && !includeFirstMonth) {
+      return
+    }
+
+    if (typeof monthlyRecord.requiredHeadcount !== 'number' || !Number.isFinite(monthlyRecord.requiredHeadcount)) {
       return
     }
 

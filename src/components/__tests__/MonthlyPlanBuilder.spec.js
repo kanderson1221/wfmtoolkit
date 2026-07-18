@@ -340,6 +340,135 @@ describe('MonthlyPlanBuilder', () => {
     expect(savedPlan.finalizedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
 
+  it('blocks Budget finalization when a training class has an invalid calendar date', async () => {
+    const forecastMonthSnapshot = Array.from({ length: 12 }, (_, monthIndex) => ({
+      monthIndex,
+      monthLabel: String(monthIndex + 1),
+      monthStart: `2026-${String(monthIndex + 1).padStart(2, '0')}-01`,
+      contacts: 1000,
+      ahtSeconds: 300
+    }))
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'budget-2026',
+        name: '2026 Budget',
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        planningYear: 2026,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-1',
+          forecastProjectName: '2026 Demand Forecast',
+          forecastMonthSnapshot
+        }),
+        planMonths: Array.from({ length: 12 }, () => ({
+          contacts: 1000,
+          ahtSeconds: 300,
+          peakDayUpliftPercent: 0
+        })),
+        trainingClasses: [
+          {
+            id: 'invalid-date-class',
+            hireDate: '2026-02-30',
+            hireCount: 10,
+            source: 'manual'
+          }
+        ],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }
+    })
+
+    expect(findButtonByText(wrapper, 'Finalize Budget').attributes('disabled')).toBeDefined()
+    expect(wrapper.vm.builder.staffingRecords[2]).toMatchObject({
+      hireHeadcount: 0,
+      endingRosterHeadcount: 18,
+      endingFrontlineHeadcount: 16
+    })
+    expect(wrapper.text()).toContain('Training class 1 has an invalid hire date.')
+  })
+
+  it('blocks Budget finalization when monthly losses consume all capacity', async () => {
+    const forecastMonthSnapshot = Array.from({ length: 12 }, (_, monthIndex) => ({
+      monthIndex,
+      monthLabel: String(monthIndex + 1),
+      monthStart: `2026-${String(monthIndex + 1).padStart(2, '0')}-01`,
+      contacts: 1000,
+      ahtSeconds: 300
+    }))
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'budget-2026',
+        name: '2026 Budget',
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        planningYear: 2026,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-1',
+          forecastProjectName: '2026 Demand Forecast',
+          forecastMonthSnapshot
+        }),
+        presenceMonths: Array.from({ length: 12 }, (_, monthIndex) => ({
+          paidHoursPerDay: 8,
+          plannedTimeOffHours: monthIndex === 0 ? 1000 : 0
+        })),
+        planMonths: Array.from({ length: 12 }, () => ({
+          contacts: 1000,
+          ahtSeconds: 300,
+          peakDayUpliftPercent: 0
+        })),
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }
+    })
+
+    expect(findButtonByText(wrapper, 'Finalize Budget').attributes('disabled')).toBeDefined()
+    expect(wrapper.vm.builder.monthlyRecords[0].scheduledPercent).toBe(0)
+    expect(wrapper.text()).toContain('Open days or scheduled capacity drop to zero in January.')
+  })
+
+  it('blocks Budget finalization when occupancy is zero and leaves the requirement unavailable', async () => {
+    const forecastMonthSnapshot = Array.from({ length: 12 }, (_, monthIndex) => ({
+      monthIndex,
+      monthLabel: String(monthIndex + 1),
+      monthStart: `2026-${String(monthIndex + 1).padStart(2, '0')}-01`,
+      contacts: 1000,
+      ahtSeconds: 300
+    }))
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'budget-2026',
+        name: '2026 Budget',
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        planningYear: 2026,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-1',
+          forecastProjectName: '2026 Demand Forecast',
+          forecastMonthSnapshot
+        }),
+        randomDefaults: {
+          occupancyPercent: 0,
+          adherencePercent: 95
+        },
+        planMonths: Array.from({ length: 12 }, () => ({
+          contacts: 1000,
+          ahtSeconds: 300,
+          peakDayUpliftPercent: 0
+        })),
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }
+    })
+
+    expect(findButtonByText(wrapper, 'Finalize Budget').attributes('disabled')).toBeDefined()
+    expect(wrapper.vm.builder.monthlyRecords[0]).toMatchObject({
+      occupancyPercent: 0,
+      workloadStaffingRatio: null,
+      requiredHeadcount: null
+    })
+    expect(wrapper.text()).toContain('Set occupancy and adherence defaults before finalizing requirement.')
+  })
+
   it('keeps saved Budget staffing plan details expandable while preserving read-only editing', async () => {
     const wrapper = await mountBuilder({
       initialPlan: {

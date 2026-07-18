@@ -111,6 +111,25 @@ export const buildPlannerIntradayErlangPayload = ({
     (Array.isArray(monthlyRecords) ? monthlyRecords : [])
       .map((row, fallbackMonthIndex) => [normalizeMonthIndex(row?.monthIndex, fallbackMonthIndex), row])
   )
+  const firstInvalidRandomRecord = [...monthlyRecordByMonthIndex.values()].find((record) =>
+    (
+      Object.prototype.hasOwnProperty.call(record || {}, 'occupancyPercent') &&
+      toNumber(record?.occupancyPercent, 0) <= 0
+    ) || (
+      Object.prototype.hasOwnProperty.call(record || {}, 'adherencePercent') &&
+      toNumber(record?.adherencePercent, 0) <= 0
+    )
+  )
+
+  if (firstInvalidRandomRecord) {
+    const monthIndex = normalizeMonthIndex(firstInvalidRandomRecord.monthIndex)
+    return {
+      rows: [],
+      status: 'random_assumptions_required',
+      message: `Set occupancy and adherence above 0% for ${MONTH_LABELS[monthIndex]} before running intraday Erlang.`
+    }
+  }
+
   const monthlyAhtByMonthIndex = buildForecastAhtByMonthIndex(demandSource, monthlyRecords)
   const firstMissingAhtRow = dailyForecastRows.find((row) => {
     const rowAhtSeconds = Math.max(toNumber(row?.ahtSeconds, 0), 0)
@@ -218,7 +237,10 @@ const buildIntradayOverhead = (record = {}) => {
   const randomLossPercent = Math.min(adherenceLossPercent, scheduledPercent)
   const designFactorPercent = Math.max(scheduledPercent - randomLossPercent, 0)
   const designFactorShare = designFactorPercent / 100
-  const workloadStaffingRatio = designFactorShare > 0 ? 1 / designFactorShare : 0
+  const occupancyPercent = toNumber(record.occupancyPercent, 90)
+  const workloadStaffingRatio = occupancyPercent > 0 && designFactorShare > 0
+    ? 1 / designFactorShare
+    : null
 
   return {
     occupancyLossPercent: 0,
@@ -277,25 +299,36 @@ export const mergeIntradayErlangMonthlyRecords = (
     const monthlyOutput = monthlyOutputsByMonthIndex.get(record.monthIndex)
 
     if (!monthlyOutput) {
+      const hasValidCapacity = typeof overhead.workloadStaffingRatio === 'number' &&
+        Number.isFinite(overhead.workloadStaffingRatio) &&
+        record.paidHoursPerMonth > 0
+
       return {
         ...record,
         ...overhead,
         erlangStaffedHours: null,
         weightedOccupancyPercent: null,
         weightedServiceLevelPercent: null,
-        requiredStaffHours: 0,
-        requiredHeadcount: 0,
-        peakDayRequiredHeadcount: 0,
+        requiredStaffHours: hasValidCapacity ? 0 : null,
+        requiredHeadcount: hasValidCapacity ? 0 : null,
+        peakDayRequiredHeadcount: hasValidCapacity ? 0 : null,
         peakIntervalRequiredHeadcount: null
       }
     }
 
     const erlangStaffedHours = Math.max(toNumber(monthlyOutput.erlangStaffedHours, 0), 0)
-    const requiredStaffHours = erlangStaffedHours * overhead.workloadStaffingRatio
-    const requiredHeadcount = record.paidHoursPerMonth > 0
+    const hasValidCapacity = typeof overhead.workloadStaffingRatio === 'number' &&
+      Number.isFinite(overhead.workloadStaffingRatio) &&
+      record.paidHoursPerMonth > 0
+    const requiredStaffHours = hasValidCapacity
+      ? erlangStaffedHours * overhead.workloadStaffingRatio
+      : null
+    const requiredHeadcount = requiredStaffHours != null
       ? requiredStaffHours / record.paidHoursPerMonth
-      : 0
-    const peakDayRequiredHeadcount = peakDayRequiredHeadcountByMonthIndex.get(record.monthIndex) ?? 0
+      : null
+    const peakDayRequiredHeadcount = hasValidCapacity
+      ? peakDayRequiredHeadcountByMonthIndex.get(record.monthIndex) ?? 0
+      : null
 
     return {
       ...record,
@@ -313,9 +346,9 @@ export const mergeIntradayErlangMonthlyRecords = (
       requiredStaffHours,
       requiredHeadcount,
       peakDayRequiredHeadcount,
-      peakDayRequiredStaffHours: record.paidHoursPerDay > 0
+      peakDayRequiredStaffHours: peakDayRequiredHeadcount != null && record.paidHoursPerDay > 0
         ? peakDayRequiredHeadcount * record.paidHoursPerDay
-        : 0,
+        : null,
       peakIntervalRequiredHeadcount: Math.max(toNumber(monthlyOutput.peakIntervalRequiredHeadcount, 0), 0)
     }
   })

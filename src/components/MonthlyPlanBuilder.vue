@@ -3,6 +3,7 @@ import { computed, reactive } from 'vue'
 import {
   FULL_MONTH_LABELS,
   PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+  deriveTrainingClassMetrics,
   toNumber
 } from '../plannerModel'
 
@@ -500,21 +501,33 @@ const staffingProgress = computed(() => {
   const startingFrontlineSet =
     toNumber(builder.startingFrontlineHeadcount, 0) > 0 &&
     toNumber(builder.startingFrontlineHeadcount, 0) <= toNumber(builder.startingHeadcount, 0)
+  const invalidTrainingClassIndex = builder.trainingClasses.findIndex(
+    (trainingClass) => !deriveTrainingClassMetrics(
+      trainingClass,
+      builder.trainingSettings,
+      builder.trainingCalendar
+    ).isValid
+  )
+  const invalidTrainingClassBlocker = invalidTrainingClassIndex === -1
+    ? ''
+    : `Training class ${invalidTrainingClassIndex + 1} has an invalid hire date.`
   const movementStarted =
     builder.effectiveTrainingClasses.length > 0 ||
     builder.staffingMonths.some((month) => toNumber(month.frontlineAttritionHeadcount, 0) > 0)
   const requiredInputsComplete = [startingRosterSet, startingFrontlineSet].filter(Boolean).length
-  const isReady = startingRosterSet && startingFrontlineSet
+  const isReady = startingRosterSet && startingFrontlineSet && invalidTrainingClassIndex === -1
 
   return {
     id: 'staffing',
     title: 'Staffing Plan',
     description: 'Layer in starting position, hiring, training, and attrition against the requirement.',
-    statusLabel: `${requiredInputsComplete}/2 required`,
+    statusLabel: invalidTrainingClassBlocker ? 'Invalid class' : `${requiredInputsComplete}/2 required`,
     detail: !startingRosterSet
       ? 'Starting roster headcount is still missing.'
       : !startingFrontlineSet
         ? 'Starting frontline headcount is still missing.'
+        : invalidTrainingClassBlocker
+          ? invalidTrainingClassBlocker
         : builder.hasNextYearStartingFrontlineTarget && movementStarted
           ? 'Opening position is set, staffing movement is in progress, and a next January opening frontline target is active.'
           : builder.hasNextYearStartingFrontlineTarget
@@ -526,7 +539,7 @@ const staffingProgress = computed(() => {
       ? 'Set starting roster headcount for January.'
       : !startingFrontlineSet
         ? 'Set starting frontline headcount for January.'
-        : '',
+        : invalidTrainingClassBlocker,
     tone: isReady ? 'ready' : requiredInputsComplete > 0 || movementStarted ? 'attention' : 'default',
     isReady,
     isStarted: requiredInputsComplete > 0 || movementStarted,

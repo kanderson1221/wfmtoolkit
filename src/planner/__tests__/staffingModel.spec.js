@@ -1,5 +1,10 @@
 import { FULL_MONTH_LABELS, MONTH_LABELS, buildStaffingMonths, createTrainingSettings } from '../shared'
-import { computeStaffingRecords, deriveTrainingClassMetrics, recommendTrainingClasses } from '../staffingModel'
+import {
+  computeStaffingRecords,
+  deriveTrainingClassMetrics,
+  recommendTrainingClasses,
+  summarizeStaffingRecords
+} from '../staffingModel'
 
 const buildMonthlyRecords = (requirements = {}) =>
   MONTH_LABELS.map((label, monthIndex) => ({
@@ -12,6 +17,47 @@ const buildMonthlyRecords = (requirements = {}) =>
   }))
 
 describe('staffingModel', () => {
+  it('rejects invalid ISO hire dates instead of rolling them into another month', () => {
+    const invalidTrainingClass = {
+      id: 'invalid-date-class',
+      hireDate: '2026-02-30',
+      hireCount: 10
+    }
+    const metrics = deriveTrainingClassMetrics(
+      invalidTrainingClass,
+      createTrainingSettings({
+        trainingDurationWorkdays: 5,
+        postTrainingNestingDays: 0
+      })
+    )
+    const staffingRecords = computeStaffingRecords(
+      buildMonthlyRecords(),
+      2026,
+      20,
+      20,
+      buildStaffingMonths(),
+      [invalidTrainingClass],
+      createTrainingSettings({
+        trainingDurationWorkdays: 5,
+        postTrainingNestingDays: 0
+      })
+    )
+
+    expect(metrics).toMatchObject({
+      hireDate: null,
+      graduationDate: null,
+      frontlineReadyDate: null,
+      isValid: false
+    })
+    expect(staffingRecords[2]).toMatchObject({
+      hireHeadcount: 0,
+      graduatingHeadcount: 0,
+      frontlineReadyHeadcount: 0,
+      endingRosterHeadcount: 20,
+      endingFrontlineHeadcount: 20
+    })
+  })
+
   it('extends training over weekday holidays while keeping a Monday-Friday calendar', () => {
     const metrics = deriveTrainingClassMetrics(
       {
@@ -192,5 +238,48 @@ describe('staffingModel', () => {
     })
 
     expect(recommendations).toHaveLength(0)
+  })
+
+  it('preserves unavailable requirement gaps and skips hiring recommendations for them', () => {
+    const monthlyRecords = buildMonthlyRecords()
+    monthlyRecords[0] = {
+      ...monthlyRecords[0],
+      requiredHeadcount: null,
+      roundedHeadcount: null,
+      peakDayRequiredHeadcount: null
+    }
+
+    const staffingRecords = computeStaffingRecords(
+      monthlyRecords,
+      2026,
+      10,
+      10,
+      buildStaffingMonths(),
+      [],
+      createTrainingSettings()
+    )
+    const recommendations = recommendTrainingClasses({
+      monthlyRecords,
+      planningYear: 2026,
+      startingHeadcount: 10,
+      startingFrontlineHeadcount: 10,
+      staffingMonths: buildStaffingMonths(),
+      trainingClasses: [],
+      trainingSettings: createTrainingSettings()
+    })
+    const summary = summarizeStaffingRecords(staffingRecords)
+
+    expect(staffingRecords[0]).toMatchObject({
+      requiredHeadcount: null,
+      roundedRequiredHeadcount: null,
+      gapToRequirement: null,
+      gapToRoundedRequirement: null,
+      isBelowRequirement: false
+    })
+    expect(recommendations).toHaveLength(0)
+    expect(summary).toMatchObject({
+      averageGapToRequirement: null,
+      peakShortageMonth: null
+    })
   })
 })
