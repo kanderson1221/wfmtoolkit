@@ -3,6 +3,55 @@ import { mount } from '@vue/test-utils'
 import PlannerTrainingPipelineTable from '../planner/PlannerTrainingPipelineTable.vue'
 
 describe('PlannerTrainingPipelineTable', () => {
+  it('accepts one-decimal manual training-class headcount', async () => {
+    const wrapper = mount(PlannerTrainingPipelineTable, {
+      props: {
+        planningYear: 2026,
+        trainingSettings: {
+          trainingDurationWorkdays: 5,
+          postTrainingNestingDays: 0,
+          graduationYieldPercent: 80,
+          availableTrainers: 1,
+          maxClassSize: 10,
+          startOnFirstBusinessDayOfWeek: true
+        },
+        trainingClasses: [
+          {
+            id: 'fractional-class',
+            hireDate: '2026-01-05',
+            hireCount: 10.5,
+            source: 'manual'
+          }
+        ],
+        selectedMonthIndex: 0,
+        formatNumber: (value) => Number(value ?? 0).toFixed(1)
+      },
+      global: {
+        stubs: {
+          AppButton: true,
+          AppIcon: true,
+          AppMenu: true,
+          AppTableDateField: {
+            props: ['modelValue'],
+            template: '<input type="date" :value="modelValue" />'
+          },
+          AppTableNumberField: {
+            props: ['modelValue', 'step', 'minFractionDigits', 'maxFractionDigits'],
+            template: '<input data-training-count :value="modelValue" :step="step" :data-min-fraction-digits="minFractionDigits" :data-max-fraction-digits="maxFractionDigits" />'
+          }
+        }
+      }
+    })
+
+    await wrapper.find('button.training-pipeline-toggle').trigger('click')
+
+    const countInput = wrapper.find('[data-training-count]')
+    expect(countInput.element.value).toBe('10.5')
+    expect(countInput.attributes('step')).toBe('0.1')
+    expect(countInput.attributes('data-min-fraction-digits')).toBe('0')
+    expect(countInput.attributes('data-max-fraction-digits')).toBe('1')
+  })
+
   it('marks invalid calendar hire dates without displaying normalized derived dates', async () => {
     const wrapper = mount(PlannerTrainingPipelineTable, {
       props: {

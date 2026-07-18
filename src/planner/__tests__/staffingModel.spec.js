@@ -17,6 +17,54 @@ const buildMonthlyRecords = (requirements = {}) =>
   }))
 
 describe('staffingModel', () => {
+  it('carries decimal training headcount through yield and the staffing roll-forward', () => {
+    const metrics = deriveTrainingClassMetrics(
+      {
+        id: 'fractional-class',
+        hireDate: '2026-01-05',
+        hireCount: 10.5
+      },
+      createTrainingSettings({
+        trainingDurationWorkdays: 5,
+        postTrainingNestingDays: 0,
+        graduationYieldPercent: 80
+      })
+    )
+    const staffingRecords = computeStaffingRecords(
+      buildMonthlyRecords(),
+      2026,
+      0,
+      0,
+      buildStaffingMonths(),
+      [
+        {
+          id: 'fractional-class',
+          hireDate: '2026-01-05',
+          hireCount: 10.5
+        }
+      ],
+      createTrainingSettings({
+        trainingDurationWorkdays: 5,
+        postTrainingNestingDays: 0,
+        graduationYieldPercent: 80
+      })
+    )
+
+    expect(metrics).toMatchObject({
+      graduatingHeadcount: 10.5,
+      projectedGraduatingHeadcount: 8.4,
+      trainingFalloutHeadcount: 2.1
+    })
+    expect(staffingRecords[0]).toMatchObject({
+      hireHeadcount: 10.5,
+      graduatingHeadcount: 10.5,
+      frontlineReadyHeadcount: 8.4,
+      trainingFalloutHeadcount: 2.1,
+      endingRosterHeadcount: 8.4,
+      endingFrontlineHeadcount: 8.4
+    })
+  })
+
   it('rejects invalid ISO hire dates instead of rolling them into another month', () => {
     const invalidTrainingClass = {
       id: 'invalid-date-class',

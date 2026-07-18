@@ -306,7 +306,9 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
                   v-else
                   v-model.number="trainingClass.hireCount"
                   min="0"
-                  step="1"
+                  :step="0.1"
+                  :min-fraction-digits="0"
+                  :max-fraction-digits="1"
                   aria-label="Training class hire count"
                 />
               </td>

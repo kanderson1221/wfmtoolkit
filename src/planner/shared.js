@@ -148,7 +148,7 @@ export const createTrainingClass = (overrides = {}) => {
   return {
     id,
     hireDate: hireDate ?? startDate ?? '',
-    hireCount: Math.max(Math.round(toNumber(hireCount ?? targetGraduationHeadcount, 0)), 0),
+    hireCount: Math.max(toNumber(hireCount ?? targetGraduationHeadcount, 0), 0),
     source,
     ...rest
   }

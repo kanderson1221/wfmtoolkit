@@ -1,4 +1,9 @@
-import { buildPlanningYearRange, getCurrentCalendarYear, resolvePlanningYear } from '../shared'
+import {
+  buildPlanningYearRange,
+  createTrainingClass,
+  getCurrentCalendarYear,
+  resolvePlanningYear
+} from '../shared'
 
 describe('planner shared year helpers', () => {
   it('resolves valid planning years and honors explicit fallbacks', () => {
@@ -14,5 +19,10 @@ describe('planner shared year helpers', () => {
 
   it('builds a planning-year range around the normalized anchor year', () => {
     expect(buildPlanningYearRange('2027', 1, 2)).toEqual([2026, 2027, 2028, 2029])
+  })
+
+  it('preserves decimal training-class headcount', () => {
+    expect(createTrainingClass({ hireCount: 10.5 }).hireCount).toBe(10.5)
+    expect(createTrainingClass({ hireCount: -2.5 }).hireCount).toBe(0)
   })
 })
