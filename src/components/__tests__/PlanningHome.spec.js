@@ -118,6 +118,11 @@ const buildWrapper = (props = {}) =>
   })
 
 describe('PlanningHome', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
   it('renders the planning portfolio with portfolio stats', () => {
     const wrapper = buildWrapper()
     const text = wrapper.text()
@@ -145,6 +150,62 @@ describe('PlanningHome', () => {
     expect(text).toContain('Jan 2026')
     expect(text).toContain('Monthly Staffing Waterfall')
     expect(text.indexOf('Portfolio Monthly Operating Plan')).toBeLessThan(text.indexOf('Call Center Command List'))
+  })
+
+  it('downloads a selected-year current-plan portfolio CSV with monthly staffing measures', async () => {
+    const csvBlobs = []
+    vi.stubGlobal('Blob', vi.fn((parts, options) => ({ parts, options })))
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn((blob) => {
+        csvBlobs.push(blob)
+        return 'blob:portfolio-csv'
+      })
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(() => {})
+    })
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const wrapper = buildWrapper()
+    const downloadButton = wrapper.findAll('button').find((button) => button.text().includes('Download Portfolio CSV'))
+
+    expect(downloadButton).toBeTruthy()
+    expect(downloadButton.attributes('disabled')).toBeUndefined()
+    await downloadButton.trigger('click')
+
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+    expect(csvBlobs).toHaveLength(1)
+    expect(csvBlobs[0].options.type).toBe('text/csv;charset=utf-8')
+    const csv = csvBlobs[0].parts.join('')
+    expect(csv.split('\r\n')).toHaveLength(13)
+    expect(csv).toContain('planning_year,plan_role,month_start,month')
+    expect(csv).toContain('required_headcount,peak_required_headcount,actual_required_headcount')
+    expect(csv).toContain('starting_frontline_headcount')
+    expect(csv).toContain('ending_frontline_headcount,ending_roster_headcount')
+    expect(csv).toContain('2026,current,2026-01-01,Jan 2026')
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:portfolio-csv')
+  })
+
+  it('keeps portfolio export unavailable when the selected year has no applicable plan', () => {
+    const wrapper = buildWrapper({
+      centers: [
+        buildCenter({
+          groups: [
+            {
+              id: 'group-1',
+              name: 'Voice Support',
+              actuals: { sourceMode: 'daily_upload', dailyRows: [] },
+              plans: []
+            }
+          ]
+        })
+      ]
+    })
+    const downloadButton = wrapper.findAll('button').find((button) => button.text().includes('Download Portfolio CSV'))
+
+    expect(downloadButton).toBeTruthy()
+    expect(downloadButton.attributes('disabled')).toBeDefined()
   })
 
   it('passes staffing movement totals to the portfolio chart', () => {

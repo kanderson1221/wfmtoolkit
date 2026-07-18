@@ -4,7 +4,7 @@ title: Monthly Required, Roster, and Frontline Headcount Reporting
 status: draft
 owners: []
 depends_on: [PORT-002, PLAN-008]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-18
 ---
 
 # Purpose
@@ -40,6 +40,9 @@ Define the monthly operating-plan table and comparable headcount measures used f
 - Detail shall name call center, staffing group, and plan.
 - Detail totals shall reconcile to the parent row within display rounding.
 - Mixed requirement methods may be aggregated only when headcount definitions are compatible.
+- The selected-year monthly report shall be downloadable as CSV when at least one staffing group has an applicable plan.
+- The CSV shall identify the planning year, current-plan role, planned-group coverage, monthly demand, requirement, staffing supply and movements, gaps, loaded actuals, and unavailable actual values as blank cells.
+- CSV rows shall retain calculation precision beyond the rounded screen display and remain chronological.
 
 # Acceptance Scenarios
 
@@ -62,15 +65,23 @@ Define the monthly operating-plan table and comparable headcount measures used f
 **When** the table is shown  
 **Then** actual contacts and variance are unavailable.
 
+## Export the Selected-Year Operating Plan
+
+**Given** at least one staffing group has an applicable current plan for 2027
+**When** the planner downloads the portfolio monthly CSV
+**Then** the file contains twelve chronological 2027 rows
+**And** identifies the plan role and plan coverage
+**And** includes required, starting frontline, ending frontline, and ending roster headcount
+**And** leaves missing actuals blank rather than reporting zero.
+
 # Open Questions
 
 1. Should the default gap use starting or ending frontline?
 2. Are rounded operational requirements needed beside decimal values?
-3. Should users export the monthly report?
+3. Should a future detail export include one row per contributing staffing group?
 
 # Implementation Traceability
 
 - `src/components/PlanningHome.vue`
 - `src/components/planning/PlanningCenterView.vue`
 - `src/planner/annualPlanningRollup.js`
-

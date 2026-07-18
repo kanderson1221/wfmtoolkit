@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import {
   mdiAccountGroupOutline,
   mdiChartLineVariant,
+  mdiDownload,
   mdiDotsVertical,
   mdiGauge,
   mdiOfficeBuildingOutline,
@@ -22,10 +23,12 @@ import AppPanel from './ui/AppPanel.vue'
 import AppSelect from './ui/AppSelect.vue'
 import { buildPlanningCenterHash, navigateToHash } from '../appRoutes'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { downloadCsv } from '../csvExport'
 import { createPlanningCenterDraft } from '../planningStorage'
 import { getCenterGroups, getGroupPlans } from '../planningSummary'
 import { buildAnnualPlanningRollup } from '../planner/annualPlanningRollup'
 import { resolvePlanningGroupActuals } from '../planner/groupActuals'
+import { buildPortfolioMonthlyCsv } from '../planner/portfolioCsv'
 import { getCurrentCalendarYear } from '../planner/shared'
 
 const props = defineProps({
@@ -182,6 +185,7 @@ const portfolioAnnualPlan = computed(() =>
 
 const portfolioMonthlyRows = computed(() => portfolioAnnualPlan.value.monthlyRows)
 const dashboardSummary = computed(() => portfolioAnnualPlan.value.summary)
+const canDownloadPortfolioCsv = computed(() => dashboardSummary.value.plannedGroupCount > 0)
 
 const modeledCenterCount = computed(() =>
   centerCommandRows.value.filter((center) => center.plannedGroupCount > 0).length
@@ -434,6 +438,22 @@ const openCenter = (centerId) => {
   navigateToHash(buildPlanningCenterHash(centerId))
 }
 
+const downloadPortfolioCsv = () => {
+  if (!canDownloadPortfolioCsv.value) {
+    return
+  }
+
+  downloadCsv(
+    `wfm-portfolio-current-plan-${selectedPlanningYear.value}.csv`,
+    buildPortfolioMonthlyCsv({
+      planningYear: selectedPlanningYear.value,
+      planRole: 'current',
+      groupCount: dashboardSummary.value.groupCount,
+      monthlyRows: portfolioMonthlyRows.value
+    })
+  )
+}
+
 const requestDeleteCenter = (center) => {
   requestDeleteCenterConfirmation({
     title: 'Delete Call Center?',
@@ -529,13 +549,23 @@ const handleCenterMenuSelect = (center, item) => {
 
         <div class="grid gap-4">
           <AppPanel :padded="false">
-            <div class="border-b border-slate-200 px-5 py-4">
+            <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div class="grid gap-1">
                 <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">Portfolio Monthly Operating Plan</h2>
                 <p class="text-sm text-slate-500">
-                  All call centers combined for {{ selectedPlanningYear }}.
+                  Current-plan rollup for all call centers in {{ selectedPlanningYear }}. Missing actuals remain unavailable.
                 </p>
               </div>
+
+              <AppButton
+                variant="secondary"
+                size="sm"
+                :icon="mdiDownload"
+                :disabled="!canDownloadPortfolioCsv"
+                @click="downloadPortfolioCsv"
+              >
+                Download Portfolio CSV
+              </AppButton>
             </div>
 
             <div class="overflow-x-auto">

@@ -8,6 +8,7 @@ import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
+import { buildCsv, downloadCsv, formatCsvNumber, sanitizeFileNamePart } from '../../csvExport'
 import { DEMAND_SOURCE_FORECAST, derivePeakDayUpliftPercent } from '../../planner/demandSources'
 import {
   PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
@@ -77,8 +78,6 @@ const props = defineProps({
 
 const emit = defineEmits(['previous', 'continue', 'run-erlang'])
 
-const CSV_MIME_TYPE = 'text/csv;charset=utf-8'
-
 const intervalPressureMetricOptions = [
   { label: 'Peak Day HC', value: 'peak_day_total' },
   { label: 'P80 Total HC', value: 'p80_interval_total' },
@@ -119,54 +118,9 @@ const parseFiniteNumber = (value) => {
   return Number.isFinite(number) ? number : null
 }
 
-const formatCsvNumber = (value, digits = null) => {
-  const number = parseFiniteNumber(value)
-
-  if (number == null) {
-    return ''
-  }
-
-  return digits == null ? String(number) : String(Number(number.toFixed(digits)))
-}
-
 const formatCsvRatioAsPercent = (value, digits = 4) => {
   const number = parseFiniteNumber(value)
   return number == null ? '' : formatCsvNumber(number * 100, digits)
-}
-
-const escapeCsvValue = (value) => {
-  if (value == null) {
-    return ''
-  }
-
-  const text = String(value)
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-}
-
-const buildCsv = (columns, rows) => [
-  columns.map((column) => escapeCsvValue(column.header)).join(','),
-  ...rows.map((row) => columns.map((column) => escapeCsvValue(column.value(row))).join(','))
-].join('\r\n')
-
-const downloadCsv = (fileName, csvText) => {
-  const blob = new Blob([csvText], { type: CSV_MIME_TYPE })
-  const downloadUrl = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-
-  link.href = downloadUrl
-  link.download = fileName
-  link.click()
-  URL.revokeObjectURL(downloadUrl)
-}
-
-const sanitizeFileNamePart = (value) => {
-  const sanitized = String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-
-  return sanitized || 'intraday-erlang'
 }
 
 const setSelectedMonth = (monthIndex) => {
@@ -371,7 +325,7 @@ const exportFilePrefix = computed(() => {
     defaultExportName
   const yearSuffix = exportYear.value == null ? '' : `-${exportYear.value}`
 
-  return `${sanitizeFileNamePart(sourceName)}${yearSuffix}`
+  return `${sanitizeFileNamePart(sourceName, 'intraday-erlang')}${yearSuffix}`
 })
 
 const monthlyExportRows = computed(() =>
