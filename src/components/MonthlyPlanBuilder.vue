@@ -4,6 +4,7 @@ import {
   FULL_MONTH_LABELS,
   PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
   deriveTrainingClassMetrics,
+  isValidTrainingClassHireCount,
   toNumber
 } from '../plannerModel'
 
@@ -501,21 +502,26 @@ const staffingProgress = computed(() => {
   const startingFrontlineSet =
     toNumber(builder.startingFrontlineHeadcount, 0) > 0 &&
     toNumber(builder.startingFrontlineHeadcount, 0) <= toNumber(builder.startingHeadcount, 0)
-  const invalidTrainingClassIndex = builder.trainingClasses.findIndex(
-    (trainingClass) => !deriveTrainingClassMetrics(
+  const invalidTrainingClassCountIndex = builder.trainingClasses.findIndex(
+    (trainingClass) => !isValidTrainingClassHireCount(trainingClass?.hireCount)
+  )
+  const invalidTrainingClassDateIndex = builder.trainingClasses.findIndex(
+    (trainingClass) => isValidTrainingClassHireCount(trainingClass?.hireCount) && !deriveTrainingClassMetrics(
       trainingClass,
       builder.trainingSettings,
       builder.trainingCalendar
     ).isValid
   )
-  const invalidTrainingClassBlocker = invalidTrainingClassIndex === -1
-    ? ''
-    : `Training class ${invalidTrainingClassIndex + 1} has an invalid hire date.`
+  const invalidTrainingClassBlocker = invalidTrainingClassCountIndex !== -1
+    ? `Training class ${invalidTrainingClassCountIndex + 1} must have a hire count greater than zero.`
+    : invalidTrainingClassDateIndex !== -1
+      ? `Training class ${invalidTrainingClassDateIndex + 1} has an invalid hire date.`
+      : ''
   const movementStarted =
     builder.effectiveTrainingClasses.length > 0 ||
     builder.staffingMonths.some((month) => toNumber(month.frontlineAttritionHeadcount, 0) > 0)
   const requiredInputsComplete = [startingRosterSet, startingFrontlineSet].filter(Boolean).length
-  const isReady = startingRosterSet && startingFrontlineSet && invalidTrainingClassIndex === -1
+  const isReady = startingRosterSet && startingFrontlineSet && !invalidTrainingClassBlocker
 
   return {
     id: 'staffing',

@@ -5,6 +5,7 @@ import {
   createStaffingMonth,
   createTrainingClass,
   createTrainingSettings,
+  isValidTrainingClassHireCount,
   toNumber
 } from './shared'
 import { buildHolidayEntriesForYear } from './holidayCalendars'
@@ -132,6 +133,7 @@ export const deriveTrainingClassMetrics = (trainingClass, trainingSettings, trai
   const normalizedSettings = createTrainingSettings(trainingSettings)
   const trainingCalendar = resolveTrainingCalendar(trainingCalendarOptions)
   const hireDate = parseDate(normalizedClass.hireDate)
+  const isValidHireCount = isValidTrainingClassHireCount(normalizedClass.hireCount)
   const graduatingHeadcount = resolveHeadcount(normalizedClass.graduatingHeadcount, normalizedClass.hireCount)
   const projectedGraduatingHeadcount = resolveHeadcount(
     normalizedClass.projectedGraduatingHeadcount,
@@ -148,6 +150,7 @@ export const deriveTrainingClassMetrics = (trainingClass, trainingSettings, trai
       graduationDate: null,
       frontlineReadyDate: null,
       isValid: false,
+      isValidHireCount,
       trainingDurationWorkdays: normalizedSettings.trainingDurationWorkdays,
       postTrainingNestingDays: normalizedSettings.postTrainingNestingDays,
       graduatingHeadcount,
@@ -173,7 +176,8 @@ export const deriveTrainingClassMetrics = (trainingClass, trainingSettings, trai
     hireDate,
     graduationDate,
     frontlineReadyDate,
-    isValid: true,
+    isValid: isValidHireCount,
+    isValidHireCount,
     trainingDurationWorkdays: normalizedSettings.trainingDurationWorkdays,
     postTrainingNestingDays: normalizedSettings.postTrainingNestingDays,
     graduatingHeadcount,

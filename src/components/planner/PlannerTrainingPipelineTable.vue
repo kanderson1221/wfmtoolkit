@@ -2,7 +2,12 @@
 import { computed, ref } from 'vue'
 import { mdiChevronDown, mdiChevronRight, mdiDotsVertical } from '@mdi/js'
 
-import { createTrainingClass, createTrainingSettings, deriveTrainingClassMetrics } from '../../plannerModel'
+import {
+  createTrainingClass,
+  createTrainingSettings,
+  deriveTrainingClassMetrics,
+  isValidTrainingClassHireCount
+} from '../../plannerModel'
 import { buildDateFromIso } from '../../planner/dateValues'
 import AppButton from '../ui/AppButton.vue'
 import AppIcon from '../ui/AppIcon.vue'
@@ -111,6 +116,10 @@ const formatHireDate = (value) => {
 
 const getTrainingStatus = (trainingClass) => {
   const metrics = getTrainingMetrics(trainingClass)
+
+  if (!isValidTrainingClassHireCount(trainingClass?.hireCount)) {
+    return { label: 'Invalid Count', tone: 'invalid' }
+  }
 
   if (!metrics.isValid) {
     return { label: 'Invalid Dates', tone: 'invalid' }
@@ -305,11 +314,14 @@ const handleTrainingClassMenuSelect = (trainingClass, item) => {
                 <AppTableNumberField
                   v-else
                   v-model.number="trainingClass.hireCount"
-                  min="0"
+                  :min="0.1"
                   :step="0.1"
                   :min-fraction-digits="0"
                   :max-fraction-digits="1"
-                  aria-label="Training class hire count"
+                  :aria-invalid="isValidTrainingClassHireCount(trainingClass.hireCount) ? undefined : 'true'"
+                  :aria-label="isValidTrainingClassHireCount(trainingClass.hireCount)
+                    ? 'Training class hire count'
+                    : 'Training class hire count; must be greater than zero'"
                 />
               </td>
               <td>{{ formatDerivedDate(getTrainingMetrics(trainingClass).graduationDate) }}</td>

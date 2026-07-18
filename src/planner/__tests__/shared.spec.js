@@ -2,6 +2,7 @@ import {
   buildPlanningYearRange,
   createTrainingClass,
   getCurrentCalendarYear,
+  isValidTrainingClassHireCount,
   resolvePlanningYear
 } from '../shared'
 
@@ -24,5 +25,13 @@ describe('planner shared year helpers', () => {
   it('preserves decimal training-class headcount', () => {
     expect(createTrainingClass({ hireCount: 10.5 }).hireCount).toBe(10.5)
     expect(createTrainingClass({ hireCount: -2.5 }).hireCount).toBe(0)
+  })
+
+  it('requires a finite positive training-class hire count', () => {
+    expect(isValidTrainingClassHireCount(10.5)).toBe(true)
+    expect(isValidTrainingClassHireCount(0)).toBe(false)
+    expect(isValidTrainingClassHireCount('')).toBe(false)
+    expect(isValidTrainingClassHireCount(null)).toBe(false)
+    expect(isValidTrainingClassHireCount(Number.NaN)).toBe(false)
   })
 })

@@ -154,6 +154,9 @@ export const createTrainingClass = (overrides = {}) => {
   }
 }
 
+export const isValidTrainingClassHireCount = (value) =>
+  value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) > 0
+
 const toNullableHeadcount = (value) => {
   if (value == null || value === '') {
     return null

@@ -387,6 +387,52 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.text()).toContain('Training class 1 has an invalid hire date.')
   })
 
+  it('blocks Budget finalization when a training class has a zero hire count', async () => {
+    const forecastMonthSnapshot = Array.from({ length: 12 }, (_, monthIndex) => ({
+      monthIndex,
+      monthLabel: String(monthIndex + 1),
+      monthStart: `2026-${String(monthIndex + 1).padStart(2, '0')}-01`,
+      contacts: 1000,
+      ahtSeconds: 300
+    }))
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'budget-2026',
+        name: '2026 Budget',
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        planningYear: 2026,
+        demandSource: createPlanDemandSource({
+          mode: 'forecast',
+          forecastProjectId: 'forecast-1',
+          forecastProjectName: '2026 Demand Forecast',
+          forecastMonthSnapshot
+        }),
+        planMonths: Array.from({ length: 12 }, () => ({
+          contacts: 1000,
+          ahtSeconds: 300,
+          peakDayUpliftPercent: 0
+        })),
+        trainingClasses: [
+          {
+            id: 'zero-count-class',
+            hireDate: '2026-02-02',
+            hireCount: 0,
+            source: 'manual'
+          }
+        ],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }
+    })
+
+    expect(findButtonByText(wrapper, 'Finalize Budget').attributes('disabled')).toBeDefined()
+    expect(wrapper.vm.builder.staffingRecords[1]).toMatchObject({
+      classesStartingCount: 0,
+      hireHeadcount: 0
+    })
+    expect(wrapper.text()).toContain('Training class 1 must have a hire count greater than zero.')
+  })
+
   it('blocks Budget finalization when monthly losses consume all capacity', async () => {
     const forecastMonthSnapshot = Array.from({ length: 12 }, (_, monthIndex) => ({
       monthIndex,

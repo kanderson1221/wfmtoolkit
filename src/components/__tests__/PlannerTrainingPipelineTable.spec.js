@@ -99,6 +99,55 @@ describe('PlannerTrainingPipelineTable', () => {
     expect(wrapper.find('input[type="date"]').element.value).toBe('')
   })
 
+  it('identifies a zero-person class on its row and input', async () => {
+    const wrapper = mount(PlannerTrainingPipelineTable, {
+      props: {
+        planningYear: 2026,
+        trainingSettings: {
+          trainingDurationWorkdays: 5,
+          postTrainingNestingDays: 0,
+          graduationYieldPercent: 100,
+          availableTrainers: 1,
+          maxClassSize: 10,
+          startOnFirstBusinessDayOfWeek: true
+        },
+        trainingClasses: [
+          {
+            id: 'zero-count-class',
+            hireDate: '2026-02-02',
+            hireCount: 0,
+            source: 'manual'
+          }
+        ],
+        selectedMonthIndex: 1,
+        formatNumber: (value) => Number(value ?? 0).toFixed(1)
+      },
+      global: {
+        stubs: {
+          AppButton: true,
+          AppIcon: true,
+          AppMenu: true,
+          AppTableDateField: {
+            props: ['modelValue'],
+            template: '<input type="date" :value="modelValue" />'
+          },
+          AppTableNumberField: {
+            props: ['modelValue', 'min'],
+            template: '<input data-training-count :value="modelValue" :min="min" />'
+          }
+        }
+      }
+    })
+
+    await wrapper.find('button.training-pipeline-toggle').trigger('click')
+
+    const countInput = wrapper.get('[data-training-count]')
+    expect(wrapper.text()).toContain('Invalid Count')
+    expect(countInput.attributes('min')).toBe('0.1')
+    expect(countInput.attributes('aria-invalid')).toBe('true')
+    expect(countInput.attributes('aria-label')).toBe('Training class hire count; must be greater than zero')
+  })
+
   it('renders inherited carry-in rows as read-only while keeping current-plan rows editable', async () => {
     const wrapper = mount(PlannerTrainingPipelineTable, {
       props: {
