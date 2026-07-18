@@ -49,6 +49,28 @@ describe('usePlanningWorkspace', () => {
       }
     })
 
+  const buildCompleteWeekdayActuals = (year, monthIndex, overridesByDate = {}) => {
+    const rows = []
+    const lastDay = new Date(year, monthIndex + 1, 0, 12).getDate()
+
+    for (let day = 1; day <= lastDay; day += 1) {
+      const date = new Date(year, monthIndex, day, 12)
+      if (date.getDay() === 0 || date.getDay() === 6) {
+        continue
+      }
+
+      const serviceDate = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      rows.push({
+        serviceDate,
+        contacts: 0,
+        ahtSeconds: 0,
+        ...overridesByDate[serviceDate]
+      })
+    }
+
+    return rows
+  }
+
   const centers = [
     {
       id: 'center-1',
@@ -475,10 +497,10 @@ describe('usePlanningWorkspace', () => {
             ...centers[0].groups[0],
             actuals: {
               sourceMode: 'daily_upload',
-              dailyRows: [
-                { serviceDate: '2026-01-02', contacts: 100, ahtSeconds: 300 },
-                { serviceDate: '2026-01-03', contacts: 200, ahtSeconds: 360 }
-              ]
+              dailyRows: buildCompleteWeekdayActuals(2026, 0, {
+                '2026-01-02': { contacts: 100, ahtSeconds: 300 },
+                '2026-01-05': { contacts: 200, ahtSeconds: 360 }
+              })
             },
             plans: [
               {
@@ -557,11 +579,69 @@ describe('usePlanningWorkspace', () => {
       contacts: 1100,
       ahtSeconds: 301
     })
-    expect(workspace.plannerSeed.value.updateDraftPlan.demandSource.forecastDailySnapshot.map((row) => row.serviceDate)).toEqual([
-      '2026-01-02',
-      '2026-01-03',
-      '2026-02-02'
+    expect(workspace.plannerSeed.value.updateDraftPlan.demandSource.forecastDailySnapshot).toHaveLength(23)
+    expect(workspace.plannerSeed.value.updateDraftPlan.demandSource.forecastDailySnapshot[0].serviceDate).toBe('2026-01-01')
+    expect(workspace.plannerSeed.value.updateDraftPlan.demandSource.forecastDailySnapshot.at(-1)).toMatchObject({
+      serviceDate: '2026-02-02',
+      contacts: 120
+    })
+  })
+
+  it('surfaces a blocked update route when the cutoff month is missing open dates', async () => {
+    planningRepository.loadWorkspace.mockResolvedValue([
+      {
+        ...centers[0],
+        groups: [
+          {
+            ...centers[0].groups[0],
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: [
+                { serviceDate: '2026-01-02', contacts: 100, ahtSeconds: 300 }
+              ]
+            },
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planType: 'budget',
+                planningYear: 2026,
+                planMonths: Array.from({ length: 12 }, () => ({
+                  contacts: 1000,
+                  ahtSeconds: 300
+                }))
+              }
+            ]
+          }
+        ]
+      }
     ])
+    const currentRoute = ref({
+      app: 'planning',
+      page: 'editor',
+      centerId: 'center-1',
+      groupId: 'group-1',
+      planId: 'new',
+      year: 2026,
+      updateSourcePlanId: 'budget-2026',
+      actualsThroughMonth: '2026-01-01',
+      updatePlanName: '2026 Feb Update'
+    })
+    const workspace = usePlanningWorkspace({
+      currentRoute,
+      currentUser: ref({ id: 'user-1' }),
+      storageScope: computed(() => 'user-1')
+    })
+
+    await workspace.loadCentersForScope()
+    await nextTick()
+
+    expect(workspace.plannerSeed.value.updateDraftPlan).toBeNull()
+    expect(workspace.plannerSeed.value.updateDraftError).toBe(
+      'Jan 2026 actuals are missing 21 expected open days, starting with Jan 1, 2026. ' +
+      'Import daily actuals for every open date before creating an updated plan through Jan or later. ' +
+      'Configured closed dates are excluded.'
+    )
   })
 
   it('surfaces a blocked update route instead of seeding a plan from zero-AHT actuals', async () => {
@@ -573,9 +653,9 @@ describe('usePlanningWorkspace', () => {
             ...centers[0].groups[0],
             actuals: {
               sourceMode: 'daily_upload',
-              dailyRows: [
-                { serviceDate: '2026-01-02', contacts: 100, ahtSeconds: 0 }
-              ]
+              dailyRows: buildCompleteWeekdayActuals(2026, 0, {
+                '2026-01-02': { contacts: 100, ahtSeconds: 0 }
+              })
             },
             plans: [
               {

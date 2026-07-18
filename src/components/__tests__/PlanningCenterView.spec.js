@@ -161,6 +161,28 @@ const buildActualsRows = (count = 21, startDay = 1) =>
     }
   })
 
+const buildCompleteWeekdayActuals = (year, monthIndex, overridesByDate = {}) => {
+  const rows = []
+  const lastDay = new Date(year, monthIndex + 1, 0, 12).getDate()
+
+  for (let day = 1; day <= lastDay; day += 1) {
+    const date = new Date(year, monthIndex, day, 12)
+    if (date.getDay() === 0 || date.getDay() === 6) {
+      continue
+    }
+
+    const serviceDate = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    rows.push({
+      serviceDate,
+      contacts: 0,
+      ahtSeconds: 0,
+      ...overridesByDate[serviceDate]
+    })
+  }
+
+  return rows
+}
+
 const buildWrapper = (props = {}) =>
   mount(PlanningCenterView, {
     props: {
@@ -515,9 +537,9 @@ describe('PlanningCenterView', () => {
             serviceLevelThresholdSeconds: 20,
             actuals: {
               sourceMode: 'daily_upload',
-              dailyRows: [
-                { serviceDate: '2026-01-02', contacts: 900, ahtSeconds: 300 }
-              ]
+              dailyRows: buildCompleteWeekdayActuals(2026, 0, {
+                '2026-01-02': { contacts: 900, ahtSeconds: 300 }
+              })
             },
             plans: [
               {
@@ -606,6 +628,52 @@ describe('PlanningCenterView', () => {
     expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Actuals Options: 1')
   })
 
+  it('blocks updated-plan creation when a loaded month is missing expected open dates', async () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            actuals: {
+              sourceMode: 'daily_upload',
+              dailyRows: [
+                { serviceDate: '2026-01-02', contacts: 900, ahtSeconds: 300 }
+              ]
+            },
+            plans: [
+              {
+                id: 'budget-2026',
+                name: '2026 Budget',
+                planningYear: 2026,
+                planType: 'budget',
+                isCurrent: true,
+                status: 'finalized'
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    await openTab(wrapper, 'Plans')
+
+    const blocker = 'Jan 2026 actuals are missing 21 expected open days, starting with Jan 1, 2026.'
+    expect(wrapper.text()).toContain(blocker)
+
+    const createUpdateButton = wrapper
+      .findAll('button')
+      .find((node) => node.text().trim() === 'Create Updated Plan')
+    expect(createUpdateButton.attributes('disabled')).toBeDefined()
+    expect(createUpdateButton.attributes('title')).toContain(blocker)
+  })
+
   it('limits updated-plan cutoffs before the first positive-contact month with zero AHT', async () => {
     const wrapper = buildWrapper({
       center: {
@@ -621,9 +689,15 @@ describe('PlanningCenterView', () => {
             actuals: {
               sourceMode: 'daily_upload',
               dailyRows: [
-                { serviceDate: '2026-01-02', contacts: 900, ahtSeconds: 300 },
-                { serviceDate: '2026-02-02', contacts: 850, ahtSeconds: 0 },
-                { serviceDate: '2026-03-02', contacts: 920, ahtSeconds: 310 }
+                ...buildCompleteWeekdayActuals(2026, 0, {
+                  '2026-01-02': { contacts: 900, ahtSeconds: 300 }
+                }),
+                ...buildCompleteWeekdayActuals(2026, 1, {
+                  '2026-02-02': { contacts: 850, ahtSeconds: 0 }
+                }),
+                ...buildCompleteWeekdayActuals(2026, 2, {
+                  '2026-03-02': { contacts: 920, ahtSeconds: 310 }
+                })
               ]
             },
             plans: [

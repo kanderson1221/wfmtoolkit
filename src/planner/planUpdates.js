@@ -1,5 +1,7 @@
 import { buildActualsMonthsFromDailyRows } from './actualsModel'
+import { buildDateFromIso, dateToIsoValue } from './dateValues'
 import { createPlanningGroupActuals } from './groupActuals'
+import { createPlanningGroupOpenDayChecker } from './groupOpenDays'
 import { createPlanDemandSource } from './demandSources'
 import { MONTH_LABELS, createPlanMonth, toNumber } from './shared'
 import { PLAN_TYPE_UPDATE } from '../planningStorage'
@@ -36,38 +38,158 @@ const buildZeroAhtActualizationBlocker = (month, planningYear) =>
   `${month.label} ${planningYear} actuals have positive contacts but zero weighted AHT. ` +
   `Import corrected daily actuals with positive AHT before creating an updated plan through ${month.label} or later.`
 
-export const buildPlanUpdateActualsState = (actuals = {}, planningYear) => {
+const missingDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric'
+})
+
+const buildExpectedOpenDatesByMonth = (planningYear, group = {}, center = {}) => {
+  const isExpectedOpenDay = createPlanningGroupOpenDayChecker(group, center)
+
+  return MONTH_LABELS.map((label, monthIndex) => {
+    const expectedOpenDates = []
+    const monthStartDate = new Date(planningYear, monthIndex, 1, 12)
+    const monthEndDate = new Date(planningYear, monthIndex + 1, 0, 12)
+
+    for (
+      let cursor = monthStartDate;
+      cursor.getTime() <= monthEndDate.getTime();
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 12)
+    ) {
+      const serviceDate = dateToIsoValue(cursor)
+      if (isExpectedOpenDay(serviceDate)) {
+        expectedOpenDates.push(serviceDate)
+      }
+    }
+
+    return {
+      monthIndex,
+      label,
+      expectedOpenDates
+    }
+  })
+}
+
+const buildActualsCompletenessByMonth = ({
+  dailyRows,
+  planningYear,
+  group,
+  center
+}) => {
+  const loadedDates = new Set(
+    dailyRows
+      .filter((row) => Number(row.serviceDate.slice(0, 4)) === Number(planningYear))
+      .map((row) => row.serviceDate)
+  )
+
+  return buildExpectedOpenDatesByMonth(planningYear, group, center).map((month) => ({
+    ...month,
+    missingOpenDates: month.expectedOpenDates.filter((serviceDate) => !loadedDates.has(serviceDate))
+  }))
+}
+
+const buildIncompleteActualsBlocker = (month, planningYear) => {
+  const missingCount = month.missingOpenDates.length
+  const firstMissingDate = buildDateFromIso(month.missingOpenDates[0])
+  const missingDayLabel = missingCount === 1 ? 'expected open day' : 'expected open days'
+  const firstMissingLabel = firstMissingDate
+    ? missingDateFormatter.format(firstMissingDate)
+    : month.missingOpenDates[0]
+
+  return `${month.label} ${planningYear} actuals are missing ${missingCount} ${missingDayLabel}, ` +
+    `starting with ${firstMissingLabel}. Import daily actuals for every open date before creating ` +
+    `an updated plan through ${month.label} or later. Configured closed dates are excluded.`
+}
+
+const findFirstActualizationBlocker = ({
+  monthlyActuals,
+  completenessByMonth,
+  planningYear,
+  throughMonthIndex
+}) => {
+  for (let monthIndex = 0; monthIndex <= throughMonthIndex; monthIndex += 1) {
+    const month = monthlyActuals[monthIndex]
+    const completeness = completenessByMonth[monthIndex]
+
+    if (completeness?.missingOpenDates.length) {
+      return {
+        monthIndex,
+        message: buildIncompleteActualsBlocker(completeness, planningYear)
+      }
+    }
+
+    if (isPositiveContactsWithZeroAht(month)) {
+      return {
+        monthIndex,
+        message: buildZeroAhtActualizationBlocker(month, planningYear)
+      }
+    }
+  }
+
+  return null
+}
+
+export const buildPlanUpdateActualsState = (
+  actuals = {},
+  planningYear,
+  { group = {}, center = {} } = {}
+) => {
+  const dailyRows = createPlanningGroupActuals(actuals).dailyRows
   const monthlyActuals = buildActualsMonthsFromDailyRows(
-    createPlanningGroupActuals(actuals).dailyRows,
+    dailyRows,
     planningYear
   )
-  const firstZeroAhtMonth = monthlyActuals.find(isPositiveContactsWithZeroAht)
+  const lastLoadedMonthIndex = monthlyActuals.reduce(
+    (lastIndex, month) => month.loadedDaysCount > 0 ? month.monthIndex : lastIndex,
+    -1
+  )
+  const completenessByMonth = buildActualsCompletenessByMonth({
+    dailyRows,
+    planningYear,
+    group,
+    center
+  })
+  const firstBlocker = lastLoadedMonthIndex >= 0
+    ? findFirstActualizationBlocker({
+        monthlyActuals,
+        completenessByMonth,
+        planningYear,
+        throughMonthIndex: lastLoadedMonthIndex
+      })
+    : null
 
   return {
     options: monthlyActuals
       .filter((month) => month.actualContacts != null || month.actualAhtSeconds != null)
-      .filter((month) => !firstZeroAhtMonth || month.monthIndex < firstZeroAhtMonth.monthIndex)
+      .filter((month) => !firstBlocker || month.monthIndex < firstBlocker.monthIndex)
       .map((month) => ({
         label: `Actuals through ${month.label} ${planningYear}`,
         value: monthStartForIndex(planningYear, month.monthIndex),
         monthIndex: month.monthIndex
       })),
-    blocker: firstZeroAhtMonth
-      ? buildZeroAhtActualizationBlocker(firstZeroAhtMonth, planningYear)
-      : ''
+    blocker: firstBlocker?.message || ''
   }
 }
 
-export const buildActualsThroughMonthOptions = (actuals = {}, planningYear) =>
-  buildPlanUpdateActualsState(actuals, planningYear).options
+export const buildActualsThroughMonthOptions = (actuals = {}, planningYear, calendarContext = {}) =>
+  buildPlanUpdateActualsState(actuals, planningYear, calendarContext).options
 
-const assertActualsSupportCutoff = (monthlyActuals, planningYear, cutoffMonthIndex) => {
-  const zeroAhtMonth = monthlyActuals.find(
-    (month) => month.monthIndex <= cutoffMonthIndex && isPositiveContactsWithZeroAht(month)
-  )
+const assertActualsSupportCutoff = ({
+  monthlyActuals,
+  completenessByMonth,
+  planningYear,
+  cutoffMonthIndex
+}) => {
+  const blocker = findFirstActualizationBlocker({
+    monthlyActuals,
+    completenessByMonth,
+    planningYear,
+    throughMonthIndex: cutoffMonthIndex
+  })
 
-  if (zeroAhtMonth) {
-    throw new Error(buildZeroAhtActualizationBlocker(zeroAhtMonth, planningYear))
+  if (blocker) {
+    throw new Error(blocker.message)
   }
 }
 
@@ -104,6 +226,8 @@ export const createUpdatedPlanDraft = ({
   sourcePlan,
   budgetPlan,
   actuals,
+  group,
+  center,
   actualsThroughMonth,
   name,
   timestamp = new Date().toISOString()
@@ -111,9 +235,21 @@ export const createUpdatedPlanDraft = ({
   const basePlan = clonePlain(sourcePlan || {})
   const planningYear = toNumber(basePlan.planningYear, new Date().getFullYear())
   const cutoffMonthIndex = parseActualsThroughMonthIndex(actualsThroughMonth, planningYear)
-  const monthlyActuals = buildActualsMonthsFromDailyRows(createPlanningGroupActuals(actuals).dailyRows, planningYear)
-  assertActualsSupportCutoff(monthlyActuals, planningYear, cutoffMonthIndex)
-  const dailyActualRows = createPlanningGroupActuals(actuals).dailyRows
+  const normalizedDailyRows = createPlanningGroupActuals(actuals).dailyRows
+  const monthlyActuals = buildActualsMonthsFromDailyRows(normalizedDailyRows, planningYear)
+  const completenessByMonth = buildActualsCompletenessByMonth({
+    dailyRows: normalizedDailyRows,
+    planningYear,
+    group,
+    center
+  })
+  assertActualsSupportCutoff({
+    monthlyActuals,
+    completenessByMonth,
+    planningYear,
+    cutoffMonthIndex
+  })
+  const dailyActualRows = normalizedDailyRows
     .filter((row) => Number(row.serviceDate.slice(0, 4)) === planningYear)
     .filter((row) => {
       const monthIndex = Number(row.serviceDate.slice(5, 7)) - 1

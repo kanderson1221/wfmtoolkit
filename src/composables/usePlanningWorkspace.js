@@ -211,6 +211,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
           sourcePlan: updateSourcePlan,
           budgetPlan: updateBudgetPlan,
           actuals: currentGroup.value.actuals,
+          group: currentGroup.value,
+          center: currentCenter.value,
           actualsThroughMonth: currentRoute.value.actualsThroughMonth,
           name: currentRoute.value.updatePlanName
         })

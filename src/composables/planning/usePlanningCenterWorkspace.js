@@ -568,7 +568,14 @@ export function usePlanningCenterWorkspace({
               new Date(left.updatedAt || left.createdAt || 0).getTime()
           })
 
-        const actualsState = buildPlanUpdateActualsState(selectedGroup.value?.actuals, planningYear)
+        const actualsState = buildPlanUpdateActualsState(
+          selectedGroup.value?.actuals,
+          planningYear,
+          {
+            group: selectedGroup.value,
+            center: center.value
+          }
+        )
         const actualsThroughOptions = actualsState.options
         const defaultActualsThroughMonth = actualsThroughOptions[actualsThroughOptions.length - 1]?.value || ''
 
