@@ -185,7 +185,8 @@ const portfolioAnnualPlan = computed(() =>
 
 const portfolioMonthlyRows = computed(() => portfolioAnnualPlan.value.monthlyRows)
 const dashboardSummary = computed(() => portfolioAnnualPlan.value.summary)
-const canDownloadPortfolioCsv = computed(() => dashboardSummary.value.plannedGroupCount > 0)
+const hasApplicablePlan = computed(() => dashboardSummary.value.plannedGroupCount > 0)
+const canDownloadPortfolioCsv = computed(() => hasApplicablePlan.value)
 
 const modeledCenterCount = computed(() =>
   centerCommandRows.value.filter((center) => center.plannedGroupCount > 0).length
@@ -294,6 +295,29 @@ const centerCommandRows = computed(() =>
       return left.name.localeCompare(right.name)
     })
 )
+
+const nextPlanSetupCenter = computed(() =>
+  centerCommandRows.value.find((center) => center.missingPlanCount > 0 || center.groupCount === 0) ||
+  centerCommandRows.value[0] ||
+  null
+)
+
+const unmodeledPortfolioDescription = computed(() => {
+  const summary = dashboardSummary.value
+  const groupCount = toFiniteNumber(summary.groupCount)
+  const groupsWithActualsCount = toFiniteNumber(summary.groupsWithActualsCount)
+  const nextCenterName = nextPlanSetupCenter.value?.name || 'a call center'
+
+  if (groupCount === 0) {
+    return `None of the ${formatWhole(summary.centerCount)} call centers has a staffing group. Open ${nextCenterName} to add a group, import a forecast, and create a ${selectedPlanningYear.value} plan.`
+  }
+
+  const actualsContext = groupsWithActualsCount > 0
+    ? ` Actuals exist for ${formatWhole(groupsWithActualsCount)} group${groupsWithActualsCount === 1 ? '' : 's'}, but staffing requirements remain unavailable without a plan.`
+    : ''
+
+  return `Plan coverage is 0 of ${formatWhole(groupCount)} staffing groups.${actualsContext} Open ${nextCenterName} to import a forecast and create a ${selectedPlanningYear.value} plan.`
+})
 
 const portfolioHeadcountChart = computed(() => ({
   neededTotals: portfolioMonthlyRows.value.map((row) => row.requiredHeadcount),
@@ -521,7 +545,7 @@ const handleCenterMenuSelect = (center, item) => {
       </AppPanel>
 
       <template v-else>
-        <section class="grid overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+        <section v-if="hasApplicablePlan" class="grid overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm sm:grid-cols-2 xl:grid-cols-4">
           <article
             v-for="item in portfolioCommandStats"
             :key="item.label"
@@ -547,7 +571,7 @@ const handleCenterMenuSelect = (center, item) => {
           </article>
         </section>
 
-        <div class="grid gap-4">
+        <div v-if="hasApplicablePlan" class="grid gap-4">
           <AppPanel :padded="false">
             <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div class="grid gap-1">
@@ -622,6 +646,7 @@ const handleCenterMenuSelect = (center, item) => {
         </div>
 
         <PlanningPortfolioHeadcountChart
+          v-if="hasApplicablePlan"
           :planning-year="selectedPlanningYear"
           :needed-totals="portfolioHeadcountChart.neededTotals"
           :starting-frontline-totals="portfolioHeadcountChart.startingFrontlineTotals"
@@ -632,6 +657,26 @@ const handleCenterMenuSelect = (center, item) => {
           :attrition-totals="portfolioHeadcountChart.attritionTotals"
           :format-number="formatNumber"
         />
+
+        <AppPanel v-if="!hasApplicablePlan">
+          <AppEmptyState
+            :title="`${selectedPlanningYear} operating report needs plans`"
+            :description="unmodeledPortfolioDescription"
+          >
+            <div v-if="nextPlanSetupCenter" class="mt-2 flex items-center gap-3">
+              <AppButton
+                size="sm"
+                variant="primary"
+                @click="openCenter(nextPlanSetupCenter.id)"
+              >
+                Open {{ nextPlanSetupCenter.name }}
+              </AppButton>
+              <span class="text-xs text-slate-500">
+                Current-plan scope · {{ selectedPlanningYear }}
+              </span>
+            </div>
+          </AppEmptyState>
+        </AppPanel>
 
         <AppPanel :padded="false">
           <div class="border-b border-slate-200 px-5 py-4">
@@ -706,8 +751,10 @@ const handleCenterMenuSelect = (center, item) => {
                     :class="signedValueClass(center.summary.contactVariance, false)"
                   >
                     <div class="grid gap-0.5">
-                      <span>{{ formatOptionalSignedNumber(center.summary.contactVariance, 0) }}</span>
-                      <span class="text-xs font-medium text-slate-500">{{ formatOptionalPercent(center.summary.contactVariancePercent, 1) }}</span>
+                      <span>{{ center.plannedGroupCount > 0 ? formatOptionalSignedNumber(center.summary.contactVariance, 0) : '-' }}</span>
+                      <span class="text-xs font-medium text-slate-500">
+                        {{ center.plannedGroupCount > 0 ? formatOptionalPercent(center.summary.contactVariancePercent, 1) : 'Plan required' }}
+                      </span>
                     </div>
                   </td>
                   <td class="px-4 py-4 text-right align-middle tabular-nums">
@@ -722,7 +769,9 @@ const handleCenterMenuSelect = (center, item) => {
                   >
                     <div class="grid gap-0.5">
                       <span>{{ center.plannedGroupCount > 0 ? formatOptionalSignedNumber(center.summary.averageGapToRequirement, 1) : '-' }}</span>
-                      <span class="text-xs font-medium text-slate-500">{{ formatWhole(center.summary.monthsBelowRequirement) }} months below</span>
+                      <span class="text-xs font-medium text-slate-500">
+                        {{ center.plannedGroupCount > 0 ? `${formatWhole(center.summary.monthsBelowRequirement)} months below` : 'Plan required' }}
+                      </span>
                     </div>
                   </td>
                   <td class="px-5 py-4 align-middle">

@@ -187,7 +187,7 @@ describe('PlanningHome', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:portfolio-csv')
   })
 
-  it('keeps portfolio export unavailable when the selected year has no applicable plan', () => {
+  it('replaces an unmodeled portfolio report with an actionable plan-coverage state', async () => {
     const wrapper = buildWrapper({
       centers: [
         buildCenter({
@@ -195,7 +195,12 @@ describe('PlanningHome', () => {
             {
               id: 'group-1',
               name: 'Voice Support',
-              actuals: { sourceMode: 'daily_upload', dailyRows: [] },
+              actuals: {
+                sourceMode: 'daily_upload',
+                dailyRows: [
+                  { serviceDate: '2026-01-02', contacts: 1200, ahtSeconds: 300 }
+                ]
+              },
               plans: []
             }
           ]
@@ -203,9 +208,26 @@ describe('PlanningHome', () => {
       ]
     })
     const downloadButton = wrapper.findAll('button').find((button) => button.text().includes('Download Portfolio CSV'))
+    const setupButton = wrapper.findAll('button').find((button) => button.text().includes('Open North America Support'))
+    const text = wrapper.text()
 
-    expect(downloadButton).toBeTruthy()
-    expect(downloadButton.attributes('disabled')).toBeDefined()
+    expect(text).toContain('2026 operating report needs plans')
+    expect(text).toContain('Plan coverage is 0 of 1 staffing groups')
+    expect(text).toContain('Actuals exist for 1 group')
+    expect(text).toContain('staffing requirements remain unavailable without a plan')
+    expect(text).toContain('Call Center Command List')
+    expect(text).toContain('Plan required')
+    expect(text).not.toContain('Expected Contacts')
+    expect(text).not.toContain('Peak Required HC')
+    expect(text).not.toContain('Portfolio Monthly Operating Plan')
+    expect(text).not.toContain('Jan 2026')
+    expect(text).not.toContain('Monthly Staffing Waterfall')
+    expect(downloadButton).toBeUndefined()
+    expect(setupButton).toBeTruthy()
+
+    window.location.hash = ''
+    await setupButton.trigger('click')
+    expect(window.location.hash).toBe('#planning/center/center-1')
   })
 
   it('passes staffing movement totals to the portfolio chart', () => {
@@ -246,7 +268,7 @@ describe('PlanningHome', () => {
     expect(text).toContain('Plan Gap')
     expect(text).toContain('1/1')
     expect(text).toContain('0/1')
-    expect(text).toContain('Waiting for actuals')
+    expect(text).toContain('Plan required')
     expect(wrapper.findAll('button').some((button) => button.text().trim() === 'Open')).toBe(true)
   })
 
