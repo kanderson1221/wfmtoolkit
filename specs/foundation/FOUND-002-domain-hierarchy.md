@@ -18,7 +18,7 @@ This specification covers record identity and relationships. It does not define 
 # Domain Hierarchy
 
 ```text
-Planning Portfolio
+Planning Workspace
   Call Center
     Staffing Group
       Imported Forecast Version
@@ -95,7 +95,7 @@ Planning Portfolio
 
 ## Create a Hierarchy
 
-**Given** an empty portfolio  
+**Given** an empty planning workspace
 **When** a planner creates a call center and staffing group  
 **Then** both receive stable identifiers  
 **And** the staffing group belongs only to that call center.
@@ -125,4 +125,3 @@ Planning Portfolio
 - `src/planningStorage.js`
 - `src/storage/localDataStore.js`
 - `src/storage/wfmDexie.js`
-

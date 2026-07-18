@@ -79,11 +79,10 @@ ending gap = ending frontline - required headcount
 
 1. Should attrition be entered as headcount, percent, or either?
 2. Are transfers and non-frontline exits required?
-3. Which gap should drive portfolio risk: opening, ending, or both?
+3. Which gap should drive call-center risk: opening, ending, or both?
 
 # Implementation Traceability
 
 - `src/planner/staffingModel.js`
 - `src/components/planner/PlannerStaffingSupplyTable.vue`
 - `src/components/planner/PlannerStaffingPlanTab.vue`
-

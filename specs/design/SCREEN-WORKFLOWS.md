@@ -20,7 +20,7 @@ It is product-neutral and implementation-independent. Feature specifications rem
 
 The artifact covers:
 
-- planning portfolio
+- call-center directory
 - call-center and staffing-group setup
 - daily actuals import and review
 - imported forecast library and import workflow
@@ -42,8 +42,8 @@ It does not include:
 
 | ID | Screen or surface | Primary purpose | Primary specifications |
 |---|---|---|---|
-| `S-01` | Planning Portfolio | Select year, review portfolio risk, open or create call centers | `PORT-001` through `PORT-005`, `ORG-001` |
-| `S-02` | Call-Center Workspace | Select staffing groups and review selected-year center results | `ORG-001`, `ORG-003`, `PORT-002`, `PORT-003` |
+| `S-01` | Call-Center Directory | Open, create, edit, or delete call centers | `ORG-001`, `PLAN-012` |
+| `S-02` | Call-Center Workspace | Select staffing groups and review selected-year center results | `ORG-001`, `ORG-003`, `PLAN-012` |
 | `S-03` | Call-Center Settings | Create or edit center calendar and defaults | `ORG-001`, `ORG-002` |
 | `S-04` | Staffing-Group Settings | Create or edit group identity and service goals | `ORG-003` |
 | `S-05` | Staffing-Group Data | Review and manage daily actuals | `ACT-001`, `ACT-002` |
@@ -63,7 +63,7 @@ It does not include:
 
 ```mermaid
 flowchart TD
-    Portfolio["S-01 Planning Portfolio"]
+    Portfolio["S-01 Call-Center Directory"]
     Center["S-02 Call-Center Workspace"]
     CenterSettings["S-03 Call-Center Settings"]
     GroupSettings["S-04 Staffing-Group Settings"]
@@ -130,7 +130,7 @@ Global requirements:
 
 ```mermaid
 flowchart TD
-    Start["Open Planning Portfolio"]
+    Start["Open Call-Center Directory"]
     HasCenter{"Call center exists?"}
     CreateCenter["Create call center"]
     ConfigureCalendar["Configure operating days, hours, and closures"]
@@ -150,7 +150,7 @@ flowchart TD
     Complete{"Finalization gates pass?"}
     FixBlocker["Open first blocking section"]
     Finalize["Finalize budget baseline"]
-    ReviewPortfolio["Review selected-year portfolio"]
+    ReviewPortfolio["Review selected-year call-center summary"]
 
     Start --> HasCenter
     HasCenter -- No --> CreateCenter --> ConfigureCalendar --> OpenCenter
@@ -256,7 +256,7 @@ flowchart TD
     Coverage{"Future coverage complete?"}
     Preview["Review actualized and forecast month split"]
     SaveUpdate["Save finalized update and make current"]
-    Portfolio["Review current-plan portfolio"]
+    Portfolio["Review current-plan call-center summary"]
 
     Data --> Import --> Validate
     Validate -- No --> Import
@@ -303,46 +303,33 @@ flowchart TD
     Cleared -- Yes --> Done
 ```
 
-# Wireframe S-01: Planning Portfolio
+# Wireframe S-01: Call-Center Directory
 
 ```text
 +----------------------------------------------------------------------------------+
-| Home > Planning Portfolio                                                        |
-| Planning Portfolio                   [Planning Year v] [New Center]               |
-| Demand, actuals, staffing coverage, and risk for the selected year.               |
+| Home > Call Centers                                                               |
+| Call Centers                                                   [New Center]       |
+| Open a call center to manage its staffing groups and planning data.               |
 +----------------------------------------------------------------------------------+
-| [Groups Planned] [Actuals Coverage] [Annual Contacts] [Average Staffing Gap]      |
-+----------------------------------------------------------------------------------+
-| Portfolio Monthly Operating Plan                                                  |
+| Call Center Directory                                                             |
 |----------------------------------------------------------------------------------|
-| Month | Plan Contacts | Actual Contacts | Var | Plan AHT | Actual AHT | Req HC   |
-| Jan   |               |                 |     |          |            |          |
-| ...                                                                              |
-| Dec   |               |                 |     |          |            |          |
-+----------------------------------------------------------------------------------+
-| Monthly Staffing Waterfall                                                        |
-| [Opening] [+ Frontline Ready] [- Attrition] [Ending] [Requirement] [Roster]       |
-+----------------------------------------------------------------------------------+
-| Call Center Command List                                                          |
-|----------------------------------------------------------------------------------|
-| Center | Status | Plan Coverage | Actuals | Peak Req HC | Gap | [Open] [...]     |
+| Center | Staffing Groups | Operating Days | Operating Hours | [Open] [...]       |
 +----------------------------------------------------------------------------------+
 ```
 
 Key interactions:
 
-- Changing year refreshes all metrics, tables, and charts together.
 - `New Center` opens `S-03`.
 - `Open` navigates to `S-02`.
 - Row action menu contains edit and delete.
-- Empty state replaces metrics and reports when no call centers exist.
-- Partial plan coverage is stated as a fraction and not hidden inside totals.
+- Empty state provides a direct create action when no call centers exist.
+- Reporting remains inside `S-02`; the directory does not duplicate or rank report results.
 
 # Wireframe S-02: Call-Center Workspace
 
 ```text
 +----------------------------------------------------------------------------------+
-| Planning Portfolio > North America Operations                                    |
+| Call Centers > North America Operations                                          |
 | North America Operations                         [Year v] [Center Settings]       |
 +-----------------------------+----------------------------------------------------+
 | Staffing Groups             | Selected Group: Consumer Voice       [Edit Group] |
@@ -908,7 +895,7 @@ The screen IDs map to the feature specifications in the Screen Inventory. The fo
 
 # Review Questions
 
-1. Should the call-center workspace include a center-wide actuals rollup above the staffing-group master/detail area, or should all reporting remain in the portfolio?
+1. Which call-center aggregate measures should remain visible above the staffing-group master/detail workspace?
 2. Should forecast import use one adaptive dialog or separate dialogs for monthly, daily, and interval files?
 3. Should the annual plan workflow permit free navigation immediately, or require first-time sequential completion?
 4. Should finalization happen directly from the workspace or through the review dialog shown above?

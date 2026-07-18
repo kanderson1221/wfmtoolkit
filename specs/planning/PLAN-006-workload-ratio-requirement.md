@@ -73,7 +73,7 @@ peak-day required headcount =
 ## Preserve Decimal Requirement
 
 **Given** calculated requirement is 28.125  
-**When** portfolio averages are calculated  
+**When** call-center averages are calculated
 **Then** the decimal value is used unless the metric explicitly states rounded headcount.
 
 # Open Questions
@@ -86,4 +86,3 @@ peak-day required headcount =
 
 - `src/planner/demandModel.js`
 - `src/components/planner/PlannerMonthlyPlanTab.vue`
-

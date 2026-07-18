@@ -66,7 +66,7 @@ test('opens the terms page from the public footer', async ({ page }) => {
 test('opens the planning workspace directly and creates a call center', async ({ page }) => {
   await page.goto('/#planning')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Planning Portfolio' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Call Centers' })).toBeVisible()
   await page.getByRole('button', { name: 'New Center' }).first().click()
 
   await expect(page.getByRole('heading', { name: 'Create Call Center' })).toBeVisible()
@@ -157,7 +157,7 @@ test('opens the local data storage dialog from the app header', async ({ page })
   await expect(page.getByRole('button', { name: 'Import Backup' })).toBeVisible()
 })
 
-test('opens and edits an existing call center from the portfolio list', async ({ page }) => {
+test('opens and edits an existing call center from the call-center list', async ({ page }) => {
   await page.goto('/#planning')
 
   await page.getByRole('button', { name: 'New Center' }).first().click()
@@ -185,7 +185,7 @@ test('opens and edits an existing call center from the portfolio list', async ({
   await expect(page.getByRole('heading', { level: 1, name: 'United States Operations' })).toBeVisible()
 })
 
-test('confirms before deleting a call center from the portfolio list', async ({ page }) => {
+test('confirms before deleting a call center from the call-center list', async ({ page }) => {
   await page.goto('/#planning')
 
   await page.getByRole('button', { name: 'New Center' }).first().click()

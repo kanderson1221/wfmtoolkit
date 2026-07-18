@@ -34,7 +34,7 @@ The Planning Workspace shall enable a user to complete this end-to-end planning 
 8. Import actual demand and handle-time results.
 9. Compare actual results with the plan.
 10. Create an updated plan using actuals through a selected month.
-11. Review staffing requirements, supply, gaps, and risk across the planning portfolio.
+11. Review staffing requirements, supply, gaps, and risk within the owning call center.
 
 # Scope
 
@@ -56,7 +56,7 @@ The Planning Workspace includes:
 - daily actuals import and monthly aggregation
 - planned-versus-actual demand, workload, requirement, and staffing comparisons
 - cross-year headcount and training-pipeline handoff
-- annual call-center and portfolio rollups
+- annual call-center and staffing-group rollups
 - PostgreSQL relational persistence, draft recovery, backup, restore, and data
   clearing
 - planning-specific navigation, validation, accessibility, and error recovery
@@ -92,7 +92,7 @@ The workforce planner owns the planning workflow. This actor:
 - builds hiring and training plans
 - saves drafts and finalizes annual plans
 - creates updated plans
-- reviews portfolio staffing risk
+- reviews staffing risk within a call center
 - exports and restores local backups
 
 The product shall not require the planner to understand the application's internal storage schema or implementation details.
@@ -128,7 +128,7 @@ Planning Workspace
   - requirement calculation
   - staffing supply planning
   - actuals comparison
-  - portfolio reporting
+  - call-center reporting
         |
         | transactional relational records and backups
         v
@@ -198,7 +198,7 @@ The system shall organize planning data into call centers and staffing groups.
 
 ## FR-2: Planning Period
 
-The system shall organize forecasts, plans, actuals, and portfolio reporting by a clearly identified planning period, normally a calendar year.
+The system shall organize forecasts, plans, actuals, and call-center reporting by a clearly identified planning period, normally a calendar year.
 
 ## FR-3: Forecast Import
 
@@ -220,9 +220,9 @@ The system shall support draft annual budget plans, finalized budget plans, and 
 
 The system shall allow a planner to import actual demand and handle-time data and compare aggregated actuals with the applicable plan.
 
-## FR-8: Portfolio Review
+## FR-8: Call-Center Review
 
-The system shall summarize plan coverage, demand, requirement, staffing supply, actuals, and staffing gaps across staffing groups and call centers for a selected planning year.
+The system shall summarize plan coverage, demand, requirement, staffing supply, actuals, and staffing gaps across the staffing groups within one call center for a selected planning year. The planning home shall remain a call-center directory rather than a cross-center report.
 
 ## FR-9: Persistence and Recovery
 
@@ -258,9 +258,9 @@ Changes to organization defaults, imported forecasts, or actuals shall not silen
 
 An updated plan shall retain a reference to the budget plan or prior update from which it was created and the actuals-through period used to create it.
 
-## BI-7: Portfolio Consistency
+## BI-7: Report Consistency
 
-Portfolio values shall be aggregated only from records applicable to the selected planning year and identified plan role.
+Call-center report values shall be aggregated only from records applicable to the selected planning year and identified plan role.
 
 ## BI-8: Failure Atomicity
 
@@ -270,7 +270,7 @@ An import or destructive replacement operation shall not leave the workspace in 
 
 | Term | Definition |
 |---|---|
-| Planning Workspace | The scoped product used to import demand, calculate requirements, build annual staffing plans, compare actuals, and review portfolio results. |
+| Planning Workspace | The scoped product used to import demand, calculate requirements, build annual staffing plans, compare actuals, and review call-center results. |
 | Call Center | The parent organizational unit that owns operating-calendar defaults and one or more staffing groups. It may represent a physical site, virtual operation, business unit, or other planning boundary. |
 | Staffing Group | A demand and staffing population planned together under shared service goals and operating assumptions. |
 | Planning Year | The calendar year to which an annual plan and its monthly records apply. |
@@ -297,7 +297,6 @@ An import or destructive replacement operation shall not leave the workspace in 
 | Actuals | Observed contact volume and AHT imported after service dates have occurred. |
 | Actuals-Through Month | The final month whose actual data is incorporated into an updated plan. |
 | Staffing Gap | Planned staffing supply minus required headcount. A negative value indicates a shortage. |
-| Portfolio | The selected-year rollup of applicable staffing groups and call centers. |
 | Planning Data | Relational records stored in PostgreSQL as the system of record. |
 | Backup | A user-downloadable representation of supported planning data that can be validated and restored. |
 
@@ -337,10 +336,10 @@ An import or destructive replacement operation shall not leave the workspace in 
 **And** identifies the actuals-through month  
 **And** preserves a traceable relationship to the planning baseline.
 
-## Scenario 5: Review the Portfolio
+## Scenario 5: Review a Call Center
 
-**Given** multiple staffing groups have plans for the selected year  
-**When** the planner opens the portfolio  
+**Given** multiple staffing groups in one call center have plans for the selected year
+**When** the planner opens the call-center summary
 **Then** the workspace presents comparable selected-year demand, requirement, staffing supply, actuals, and gap measures  
 **And** does not combine records from incompatible planning years.
 
@@ -361,7 +360,7 @@ The Planning Workspace meets this foundational specification when:
 - imported forecasts are clearly represented as external inputs
 - saved and finalized plans are protected from silent upstream mutation
 - actuals and updated plans preserve meaningful lineage
-- portfolio reporting uses a consistent selected-year scope
+- call-center reporting uses a consistent selected-year scope
 - planning work can be recovered or transferred through supported backup
   behavior
 - users receive clear validation and persistence feedback when an operation fails
@@ -374,9 +373,8 @@ This specification is intentionally broad. Detailed behavior shall be defined by
 - `FOUND-003`: Units, dates, time zones, rounding, and numeric conventions
 - `ORG-001` through `ORG-004`: Organization setup
 - `FIMP-001` through `FIMP-008`: Forecast import and plan handoff
-- `PLAN-001` through `PLAN-011`: Annual requirement and staffing planning
+- `PLAN-001` through `PLAN-012`: Annual requirement, staffing planning, and call-center reporting
 - `ACT-001` through `ACT-006`: Actuals and updated plans
-- `PORT-001` through `PORT-005`: Portfolio reporting
 - `DATA-001` through `DATA-005`: Local persistence and recovery
 
 # Open Questions
@@ -396,7 +394,7 @@ The existing application contains planning behavior that informed this scope, in
 
 - planning routes and hierarchy in `src/appRoutes.js`
 - call-center, staffing-group, and plan persistence in `src/planningStorage.js`
-- annual portfolio rollups in `src/planner/annualPlanningRollup.js`
+- annual call-center rollups in `src/planner/annualPlanningRollup.js`
 - plan workflow orchestration in `src/components/MonthlyPlanBuilder.vue`
 - legacy local IndexedDB storage in `src/storage/localDataStore.js`
 

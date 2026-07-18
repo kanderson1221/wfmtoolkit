@@ -32,10 +32,10 @@ Every update shall retain:
 
 The system shall be able to show update order and ancestry even when an intermediate plan is not current.
 
-# Portfolio Integration
+# Reporting Integration
 
-- Current-plan portfolio mode shall use the current plan.
-- Budget portfolio mode shall use the budget baseline.
+- Current-plan call-center reports shall use the current plan.
+- Budget comparisons shall use the budget baseline.
 - Reports shall name the plan role used.
 - Missing current selection shall fall back deterministically and report the fallback.
 
@@ -77,4 +77,3 @@ The system shall be able to show update order and ancestry even when an intermed
 - `src/planningStorage.js`
 - `src/planner/annualPlanningRollup.js`
 - `src/components/planning/PlanningCenterView.vue`
-

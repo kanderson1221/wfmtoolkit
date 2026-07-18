@@ -65,7 +65,7 @@ Every destructive confirmation shall:
 **Given** the planner confirms clear-all  
 **When** the transaction succeeds  
 **Then** planning records, imported forecasts, and drafts are removed  
-**And** the portfolio shows its empty state.
+**And** the call-center directory shows its empty state.
 
 ## Preserve Data on Failure
 

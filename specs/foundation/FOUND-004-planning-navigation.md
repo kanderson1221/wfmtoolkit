@@ -15,7 +15,7 @@ Define how users enter, navigate, bookmark, and recover planning contexts.
 
 The navigation model shall support:
 
-- planning portfolio
+- call-center directory
 - call-center workspace
 - staffing-group workspace and selected year
 - staffing-group data, forecast import, intraday, and plan collections
@@ -35,8 +35,8 @@ The navigation model shall support:
 
 # Route Recovery
 
-- An unknown top-level planning route shall return to the portfolio.
-- A missing call-center identifier shall return to the portfolio with an explanatory status.
+- An unknown top-level planning route shall return to the call-center directory.
+- A missing call-center identifier shall return to the call-center directory with an explanatory status.
 - A missing staffing-group identifier shall return to its owning call center when that context is valid.
 - A missing forecast or plan identifier shall return to the applicable staffing-group collection.
 - An invalid year shall fall back to a supported year without creating data.
@@ -91,4 +91,3 @@ The navigation model shall support:
 - `src/App.vue`
 - `src/components/planning/PlanningCenterView.vue`
 - `src/components/MonthlyPlanBuilder.vue`
-

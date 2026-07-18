@@ -13,7 +13,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Dependencies: organization hierarchy and plan-role selection.
 - Proposed scope: withhold report-only surfaces when zero plans contribute, state coverage and actuals context, retain the command list, and provide a direct center action.
 - Success measures: no report KPI/table/chart or export appears at 0-plan coverage; state says `0 of N`; one action opens the next setup center; populated report behavior is unchanged.
-- Status: completed 2026-07-18.
+- Status: completed 2026-07-18, then superseded by sponsor direction `INT-001`; the portfolio report was removed under `RET-002`.
 - Last reviewed: 2026-07-18.
 
 ### `NOW-002` — Atomic imported-forecast replacement preview — Completed
@@ -37,7 +37,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Dependencies: contributor identity from annual rollups and plan-role semantics.
 - Delivered scope: centralized group-level inclusion evidence; open missing-group review with center actions and exclusion reasons; scoped KPI/table/chart language; invalid cross-scope variance withholding; actuals-only and out-of-year regressions.
 - Success measures: users can name every excluded group from the report; no total implies full coverage; incomparable variance is unavailable; keyboard access and wide-table flow remain intact.
-- Status: completed 2026-07-18. `INT-001` remains open to determine whether a future minimum-coverage threshold should withhold even explicitly scoped totals.
+- Status: completed 2026-07-18, then superseded by `INT-001`; the portfolio report was removed under `RET-002` rather than extended with a threshold.
 - Last reviewed: 2026-07-18.
 
 ### `NOW-004` — Side-by-side plan scenario comparison — Ready
@@ -134,8 +134,8 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 
 - Capability: `CAP-ORG-001` (Need 20), `CAP-REQ-002` (Need 24)
 - Planner outcome: understand when staffing groups can be added independently and when shared capacity requires a network model.
-- Problem/opportunity: portfolio rollups assume independent additive groups.
-- Rationale/evidence: `PORT-002` carries this as an open question; changing it affects organization, Erlang, reporting, and scenarios.
+- Problem/opportunity: call-center rollups assume independent additive groups.
+- Rationale/evidence: `PLAN-012` carries this as an open question; changing it affects organization, Erlang, reporting, and scenarios.
 - Dependencies: practitioner evidence and real routing examples.
 - Proposed scope: domain research and reference cases only.
 - Success measures: explicit supported/unsupported pooling rules and validated calculation direction.
@@ -156,6 +156,18 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: declined by product direction.
 - Last reviewed: 2026-07-18.
 
+### `RET-002` — Cross-center portfolio reporting on planning home — Retired
+
+- Capability: `CAP-REP-001` (Need 20), `CAP-REP-002` (Need 30), `CAP-UX-001` (Need 32)
+- Planner outcome: reach and manage call centers without an unrelated cross-center report competing for attention; review aggregate results inside the owning call-center/staffing-group workflow.
+- Problem/opportunity: the planning home accumulated a year selector, KPIs, incomplete-scope policy, monthly table, CSV, chart, and risk-ranked center rows even though the sponsor does not use this surface for portfolio reporting.
+- Rationale/evidence: sponsor answer `INT-001` explicitly directs deletion and identifies existing staffing-group aggregate reporting as the right reporting location. `PlanningCenterView.vue` already provides selected-year aggregate reporting.
+- Dependencies: retained call-center reporting contract `PLAN-012`.
+- Retired scope: cross-center KPIs, selected-year home filter, partial-coverage disclosure, monthly operating report, portfolio CSV, staffing waterfall chart, report-derived center ranking/status/columns, and obsolete `PORT-001`–`PORT-005` specifications.
+- Success measures: home contains only call-center identity, staffing-group count, operating schedule, and management actions; no cross-center report logic or orphaned report code remains; call-center aggregates are unchanged.
+- Status: retired 2026-07-18 and implemented in response to `INT-001`.
+- Last reviewed: 2026-07-18.
+
 ## Decision log
 
 | Date | Decision |
@@ -168,3 +180,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-18 | Promoted side-by-side plan scenario comparison from `NEXT-001` to ready `NOW-004`; stable plan snapshots now support the work. |
 | 2026-07-18 | Kept employee scheduling and intraday management out of Now despite high Need scores because data/integration prerequisites and product-boundary decisions are unresolved. |
 | 2026-07-18 | Declined phone-specific planning work; desktop/laptop workflow quality is the supported UX target. |
+| 2026-07-18 | Applied `INT-001` and retired cross-center portfolio reporting from the planning home. Earlier `NOW-001`/`NOW-003` integrity work remains preserved as completed history but its product surface was superseded; aggregate reporting stays inside call centers under `PLAN-012`. |

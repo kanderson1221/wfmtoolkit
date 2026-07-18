@@ -40,5 +40,5 @@ test('legacy forecasting calculator hash redirects to planning home', async ({ p
   await expect(page.getByRole('heading', { level: 1, name: 'Erlang Calculators' })).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 3, name: 'Erlang Calculators' })).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 2, name: 'Untitled Forecast' })).toHaveCount(0)
-  await expect(page.getByRole('heading', { level: 1, name: 'Planning Portfolio' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Call Centers' })).toBeVisible()
 })

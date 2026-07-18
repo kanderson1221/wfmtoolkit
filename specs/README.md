@@ -147,7 +147,7 @@ The implementation covers:
 - workload-ratio and plan-integrated intraday Erlang staffing requirements
 - annual budget plans, staffing supply, hiring, training, and cross-year handoff
 - daily actuals import, variance reporting, and updated plans
-- selected-year portfolio reporting
+- selected-year call-center reporting
 - PostgreSQL relational persistence, transactional drafts, backup, restore,
   migration, and destructive-data workflows
 
@@ -350,11 +350,11 @@ of those two `depends_on` lists.
 - actuals lifecycle, variances, actualization, update creation, and current-plan
   lineage
 
-## Phase 7: Portfolio And Recovery
+## Phase 7: Call-Center Reporting And Recovery
 
-- `PORT-001` through `PORT-005`
+- `PLAN-012`
 - `DATA-003` through `DATA-005`
-- portfolio reporting, transactional autosave, backup, restore, clear, and
+- call-center reporting, transactional autosave, backup, restore, clear, and
   migration
 
 # Required Supporting Artifacts
@@ -462,13 +462,9 @@ and the unverified risk.
 - `ACT-005` Actualization through a selected month
 - `ACT-006` Current-plan selection and update-plan lineage
 
-## Portfolio And Reporting
+## Call-Center Reporting
 
-- `PORT-001` Planning portfolio and year selection
-- `PORT-002` Call-center and staffing-group annual rollups
-- `PORT-003` Monthly required, roster, and frontline headcount reporting
-- `PORT-004` Staffing waterfall and variance presentation
-- `PORT-005` Empty, incomplete, stale, and mixed-scope states
+- `PLAN-012` Call-center annual rollup and reporting
 
 ## Data Persistence
 

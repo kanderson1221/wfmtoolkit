@@ -107,56 +107,7 @@ describe('annualPlanningRollup', () => {
     expect(selectPlanningRollupPlan(group, 2026, 'budget')).toBe(budgetPlan)
   })
 
-  it('identifies actuals-only and out-of-year groups excluded from selected-year totals', () => {
-    const plannedCenter = buildCenter()
-    const actualsOnlyGroup = {
-      id: 'group-actuals-only',
-      name: 'Email',
-      actuals: {
-        sourceMode: 'daily_upload',
-        dailyRows: [{ serviceDate: '2026-01-05', contacts: 500, ahtSeconds: 420 }]
-      },
-      plans: []
-    }
-    const outOfYearGroup = {
-      id: 'group-out-of-year',
-      name: 'Chat',
-      actuals: { sourceMode: 'daily_upload', dailyRows: [] },
-      plans: [{ id: 'budget-2025', planningYear: 2025, planType: 'budget', isCurrent: true }]
-    }
-    plannedCenter.groups.push(actualsOnlyGroup, outOfYearGroup)
-
-    const rollup = buildAnnualPlanningRollup({
-      centers: [plannedCenter],
-      planningYear: 2026
-    })
-
-    expect(rollup.coverage).toMatchObject({
-      planningYear: 2026,
-      planRole: 'current',
-      groupCount: 3,
-      plannedGroupCount: 1,
-      isComplete: false,
-      isPartial: true
-    })
-    expect(rollup.coverage.plannedGroups.map((group) => group.groupName)).toEqual(['Voice'])
-    expect(rollup.coverage.missingGroups).toEqual([
-      expect.objectContaining({
-        groupName: 'Chat',
-        hasActuals: false,
-        missingReason: 'out_of_year',
-        availablePlanYears: [2025]
-      }),
-      expect.objectContaining({
-        groupName: 'Email',
-        hasActuals: true,
-        missingReason: 'no_plans',
-        availablePlanYears: []
-      })
-    ])
-  })
-
-  it('rolls staffing movement fields for portfolio bridge charts', () => {
+  it('rolls staffing movement fields for call-center reporting', () => {
     const rollup = buildAnnualPlanningRollup({
       centers: [
         buildCenter({

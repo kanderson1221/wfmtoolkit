@@ -13,7 +13,7 @@ Define creation, editing, display, and deletion of the top-level planning unit.
 
 # Actors and Preconditions
 
-The workforce planner manages call centers from the planning portfolio. No prior organization data is required to create the first call center.
+The workforce planner manages call centers from the call-center directory. No prior organization data is required to create the first call center.
 
 # Call-Center Data
 
@@ -31,7 +31,7 @@ A call center shall include:
 
 # Functional Requirements
 
-- The portfolio shall provide a clear create action and first-record empty state.
+- The call-center directory shall provide a clear create action and first-record empty state.
 - Create shall require a non-blank name.
 - New records shall receive defined defaults without requiring hidden input.
 - Edit shall preserve the record identifier and descendants.
@@ -61,15 +61,15 @@ A call center shall include:
 - Invalid operating hours block save and preserve the dialog.
 - Storage failure displays an actionable message and keeps the draft.
 - Cancel closes the dialog without creating a record.
-- Delete requires confirmation and returns to the portfolio after success.
+- Delete requires confirmation and returns to the call-center directory after success.
 
 # Acceptance Scenarios
 
 ## Create the First Call Center
 
-**Given** the portfolio is empty  
+**Given** the call-center directory is empty
 **When** the planner creates a call center with a valid name  
-**Then** it appears in the portfolio  
+**Then** it appears in the directory
 **And** opens with default settings and no staffing groups.
 
 ## Edit Without Reparenting
@@ -96,4 +96,3 @@ A call center shall include:
 - `src/components/PlanningHome.vue`
 - `src/components/planning/CallCenterSettingsModal.vue`
 - `src/planningStorage.js`
-

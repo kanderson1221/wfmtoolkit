@@ -112,7 +112,7 @@ snapshot
 **Given** database access fails  
 **When** the workspace loads  
 **Then** an error is shown  
-**And** an empty portfolio is not substituted.
+**And** an empty call-center directory is not substituted.
 
 ## Persist Without Document Columns
 
