@@ -45,6 +45,15 @@ describe('PlannerStaffingSupplyTable', () => {
     expect(wrapper.text()).toContain('Avg Req')
     expect(wrapper.text()).toContain('Peak Req')
     expect(wrapper.text()).toContain('15.8')
+    expect(wrapper.get('[role="region"][aria-label="Monthly staffing supply worksheet"]').attributes('tabindex')).toBe('0')
+    expect(wrapper.findAll('th[scope="colgroup"]').map((heading) => heading.text())).toEqual([
+      'Requirement',
+      'Opening Supply',
+      'Pipeline & Loss',
+      'Ending Supply',
+      'Decision'
+    ])
+    expect(wrapper.find('input[aria-label="Frontline attrition headcount for January"]').exists()).toBe(true)
   })
 
   it('shows peak interval requirement in intraday Erlang mode', () => {
@@ -221,7 +230,7 @@ describe('PlannerStaffingSupplyTable', () => {
 
     expect(wrapper.find('input[aria-label="Starting roster headcount for the first month"]').exists()).toBe(false)
     expect(wrapper.find('input[aria-label="Starting frontline headcount for the first month"]').exists()).toBe(false)
-    expect(wrapper.find('input[aria-label="Frontline attrition headcount"]').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="Frontline attrition headcount for December"]').exists()).toBe(false)
     expect(wrapper.find('input[aria-label="December ending frontline headcount target"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('3.0')
   })

@@ -6,6 +6,7 @@ import AppCheckbox from '../ui/AppCheckbox.vue'
 import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
+import AppTableShell from '../ui/AppTableShell.vue'
 
 const props = defineProps({
   requirementMethod: {
@@ -138,8 +139,14 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
       </p>
     </div>
 
-    <div class="assumption-table-shell">
-      <table class="assumption-table assumption-table-staffing">
+    <AppTableShell>
+      <div
+        class="staffing-supply-scroll"
+        role="region"
+        aria-label="Monthly staffing supply worksheet"
+        tabindex="0"
+      >
+        <table class="assumption-table assumption-table-staffing">
         <colgroup>
           <col class="staffing-col-month" />
           <col class="staffing-col-requirement" />
@@ -155,39 +162,53 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
           <col class="staffing-col-gap" />
         </colgroup>
         <thead>
-          <tr>
-            <th title="Planning month. Click a month name to highlight that row.">Month</th>
-            <th title="Frontline headcount required by the demand model for this month.">
+          <tr class="staffing-super-row">
+            <th
+              rowspan="2"
+              scope="col"
+              class="staffing-sticky-month-head"
+              title="Planning month. Click a month name to highlight that row."
+            >
+              Month
+            </th>
+            <th colspan="2" scope="colgroup">Requirement</th>
+            <th colspan="2" scope="colgroup">Opening Supply</th>
+            <th colspan="4" scope="colgroup">Pipeline &amp; Loss</th>
+            <th colspan="2" scope="colgroup">Ending Supply</th>
+            <th scope="colgroup">Decision</th>
+          </tr>
+          <tr class="staffing-detail-row">
+            <th scope="col" title="Frontline headcount required by the demand model for this month.">
               <span class="plan-head-label">Avg Req<br />HC</span>
             </th>
-            <th :title="isIntradayErlang ? 'Peak interval headcount requirement from the intraday Erlang model for this month.' : 'Peak-day headcount requirement from the demand model for this month.'">
+            <th scope="col" :title="isIntradayErlang ? 'Peak interval headcount requirement from the intraday Erlang model for this month.' : 'Peak-day headcount requirement from the demand model for this month.'">
               <span class="plan-head-label">{{ isIntradayErlang ? 'Peak Interval' : 'Peak Req' }}<br />HC</span>
             </th>
-            <th title="Total headcount on the roster at the start of the month, before any monthly movement is applied.">
+            <th scope="col" title="Total headcount on the roster at the start of the month, before any monthly movement is applied.">
               <span class="plan-head-label">Start Roster<br />HC</span>
             </th>
-            <th title="Productive frontline headcount available at the start of the month before graduates and attrition are applied.">
+            <th scope="col" title="Productive frontline headcount available at the start of the month before graduates and attrition are applied.">
               <span class="plan-head-label">Start Frontline<br />HC</span>
             </th>
-            <th title="Total people hired into training during the month.">
+            <th scope="col" title="Total people hired into training during the month.">
               <span class="plan-head-label">Hire<br />HC</span>
             </th>
-            <th title="Full class headcount scheduled to finish training during the month. Graduation yield still affects how many become frontline-ready after nesting.">
+            <th scope="col" title="Full class headcount scheduled to finish training during the month. Graduation yield still affects how many become frontline-ready after nesting.">
               <span class="plan-head-label">Graduating<br />HC</span>
             </th>
-            <th title="People still in training at the end of the month and therefore not yet available as frontline supply.">
+            <th scope="col" title="People still in training at the end of the month and therefore not yet available as frontline supply.">
               <span class="plan-head-label">In-Training<br />HC</span>
             </th>
-            <th title="Planned frontline exits for the month. This reduces both total headcount and frontline headcount.">
+            <th scope="col" title="Planned frontline exits for the month. This reduces both total headcount and frontline headcount.">
               <span class="plan-head-label">Attrition<br />HC</span>
             </th>
-            <th title="Total headcount remaining on the roster at the end of the month after hires, fallout, and attrition.">
+            <th scope="col" title="Total headcount remaining on the roster at the end of the month after hires, fallout, and attrition.">
               <span class="plan-head-label">End Roster<br />HC</span>
             </th>
-            <th title="Productive frontline headcount available at the end of the month after graduates and attrition are applied.">
+            <th scope="col" title="Productive frontline headcount available at the end of the month after graduates and attrition are applied.">
               <span class="plan-head-label">End Frontline<br />HC</span>
             </th>
-            <th title="Starting frontline headcount minus required headcount from the demand model. Negative values indicate the month opens short.">
+            <th scope="col" title="Starting frontline headcount minus required headcount from the demand model. Negative values indicate the month opens short.">
               <span class="plan-head-label">Gap to<br />Req</span>
             </th>
           </tr>
@@ -244,7 +265,7 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
                   :step="0.1"
                   :max-fraction-digits="1"
                   :title="`Derived attrition: ${props.formatNumber(record.frontlineAttritionPercent, 1)}% of starting frontline headcount`"
-                  aria-label="Frontline attrition headcount"
+                  :aria-label="`Frontline attrition headcount for ${record.fullLabel}`"
                 />
                 <template v-else>{{ props.formatNumber(record.frontlineAttritionHeadcount, 1) }}</template>
             </td>
@@ -268,7 +289,8 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
             <td :class="gapClass(record.gapToRequirement)">{{ formatSignedNumber(record.gapToRequirement, 1) }}</td>
           </tr>
         </tbody>
-      </table>
-    </div>
+        </table>
+      </div>
+    </AppTableShell>
   </section>
 </template>

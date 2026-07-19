@@ -437,11 +437,27 @@
   }
 
   .assumption-table-staffing {
-    @apply w-full table-fixed;
+    @apply w-full min-w-[61rem] table-fixed;
+  }
+
+  .staffing-supply-scroll {
+    @apply relative max-h-[clamp(22rem,calc(100vh-27rem),34rem)] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
   }
 
   .assumption-table-staffing thead th {
-    @apply px-2 py-2 text-[0.68rem];
+    @apply sticky z-20 px-2 py-2 text-[0.68rem];
+  }
+
+  .assumption-table-staffing .staffing-super-row th {
+    @apply top-0 h-8 bg-[#eef3f7] text-[0.62rem] tracking-[0.08em] text-slate-600;
+  }
+
+  .assumption-table-staffing .staffing-detail-row th {
+    @apply top-8 bg-slate-50;
+  }
+
+  .assumption-table-staffing thead .staffing-sticky-month-head {
+    @apply left-0 top-0 z-30 bg-[#eef3f7] text-left;
   }
 
   .assumption-table-staffing tbody td {

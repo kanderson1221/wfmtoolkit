@@ -156,6 +156,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-013` — Persistent staffing-supply decision context — Completed
+
+- Capability: `CAP-UX-001` (Need 32), supporting `CAP-SUP-001` (Need 20) and `CAP-LRP-001` (Need 20)
+- Planner outcome: an annual capacity planner can reconcile required headcount, opening supply, training and attrition movement, ending supply, and monthly gap without losing column or month meaning.
+- Problem/opportunity: the 12-column supply roll-forward used one flat row of abbreviated headings and page scrolling, so headings disappeared during annual review and the operating stages had to be reconstructed from tooltips and column order.
+- Rationale/evidence: `PLAN-008` requires all monthly requirement and supply movements to remain visible; `CAP-UX-001` identifies uneven persistent worksheet context, and live review measured a 614 px table beginning below the first desktop viewport.
+- Dependencies: retained staffing roll-forward and shared `AppTableShell` only; no formula, route, persistence, backend, identity, or sponsor-policy dependency.
+- Delivered scope: semantic Requirement, Opening Supply, Pipeline and Loss, Ending Supply, and Decision groups; one named keyboard-focusable contained region; sticky two-tier headings and Month column; readable 61rem minimum; month-specific attrition field names; focused and Chromium regressions.
+- Removed scope: the worksheet's one-off assumption-table overflow shell. No alternate table, duplicated sticky component, mobile layout, calculation state, or migration was added.
+- Success measures: all twelve months remain in one native worksheet; headings remain pinned during vertical review; Month remains pinned when a reduced desktop window needs horizontal scroll; no page overflow at 1280, 1440, 1920, 1152, or 1024 px; edit/read-only values and calculations are unchanged.
+- Status: completed 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -313,3 +326,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Completed `NOW-010`: explicit actual-data Erlang results now survive plan save, draft restore, IndexedDB/backup round trips, and reload; matching evidence contributes to call-center actual requirement and variance while stale or incomplete results remain withheld. |
 | 2026-07-19 | Completed the fifth-run strategic portfolio review and `NOW-011`: call-center reconciliation now retains its two-tier headings, Month column, and active expanded-month aggregate inside one keyboard-scrollable table; high-Need missing domains remain sequenced behind their prerequisites, and `INT-004` targets abandoned-lock recovery for `NEXT-003`. |
 | 2026-07-19 | Completed `NOW-012`: the annual-plan workflow rail now exposes all existing section readiness labels in text; retired the unreachable speculative financial placeholder as `RET-004` while keeping labor-cost planning in `EXP-001`. |
+| 2026-07-19 | Completed `NOW-013`: the monthly staffing-supply roll-forward now groups its decision stages and retains both heading tiers and Month context inside one contained keyboard scroll region; calculations and saved data remain unchanged. |

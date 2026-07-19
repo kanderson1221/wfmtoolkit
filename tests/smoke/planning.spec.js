@@ -287,7 +287,8 @@ test('keeps annual-plan readiness visible across desktop widths', async ({ page 
     { width: 1280, height: 900 },
     { width: 1440, height: 900 },
     { width: 1920, height: 1080 },
-    { width: 1152, height: 720 }
+    { width: 1152, height: 720 },
+    { width: 1024, height: 768 }
   ]) {
     await page.setViewportSize(viewport)
 
@@ -299,6 +300,77 @@ test('keeps annual-plan readiness visible across desktop widths', async ({ page 
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth)
     await expect(page.locator('[data-section-id] span')).toHaveCount(6)
   }
+})
+
+test('keeps monthly staffing supply context visible while the worksheet scrolls', async ({ page }) => {
+  await page.goto('/#planning')
+  await importLocalBackup(page, planUpdateReviewFixturePath)
+
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByText('Customer Care', { exact: true }).click()
+  await page.getByRole('button', { name: 'Plans', exact: true }).click()
+  await page.getByRole('link', { name: 'Open 2026 Spring Outlook plan for Customer Care' }).click()
+  await page.getByRole('button', { name: 'Staffing Plan 0/2 required' }).click()
+
+  const worksheet = page.getByRole('region', { name: 'Monthly staffing supply worksheet' })
+  await expect(worksheet).toBeVisible()
+  await expect(worksheet).toHaveAttribute('tabindex', '0')
+  await expect(worksheet.getByRole('columnheader', { name: 'Requirement' })).toHaveAttribute('scope', 'colgroup')
+  await expect(worksheet.getByRole('columnheader', { name: 'Pipeline & Loss' })).toHaveAttribute('scope', 'colgroup')
+
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+    { width: 1152, height: 720 }
+  ]) {
+    await page.setViewportSize(viewport)
+
+    const geometry = await worksheet.evaluate((region) => ({
+      clientHeight: region.clientHeight,
+      clientWidth: region.clientWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      scrollHeight: region.scrollHeight,
+      scrollWidth: region.scrollWidth
+    }))
+
+    expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight)
+    expect(geometry.documentScrollWidth).toBeLessThanOrEqual(geometry.documentClientWidth)
+  }
+
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await worksheet.evaluate((region) => {
+    region.scrollTop = 240
+    region.scrollLeft = 80
+  })
+
+  const stickyPositions = await worksheet.evaluate((region) => {
+    const groupHeader = region.querySelector('.staffing-super-row th[scope="colgroup"]').getBoundingClientRect()
+    const detailHeader = region.querySelector('.staffing-detail-row th').getBoundingClientRect()
+    const monthHeader = region.querySelector('.staffing-sticky-month-head').getBoundingClientRect()
+    const monthCell = region.querySelector('tbody .month-cell').getBoundingClientRect()
+    const regionBox = region.getBoundingClientRect()
+
+    return {
+      detailHeaderTop: detailHeader.top,
+      groupHeaderBottom: groupHeader.bottom,
+      groupHeaderTop: groupHeader.top,
+      monthCellLeft: monthCell.left,
+      monthHeaderLeft: monthHeader.left,
+      regionLeft: regionBox.left,
+      regionTop: regionBox.top,
+      scrollLeft: region.scrollLeft,
+      scrollTop: region.scrollTop
+    }
+  })
+
+  expect(stickyPositions.scrollTop).toBeGreaterThan(0)
+  expect(stickyPositions.scrollLeft).toBeGreaterThan(0)
+  expect(Math.abs(stickyPositions.groupHeaderTop - stickyPositions.regionTop)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.detailHeaderTop - stickyPositions.groupHeaderBottom)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.monthHeaderLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.monthCellLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
 })
 
 test('keeps call-center reconciliation context visible while expanded months scroll', async ({ page }) => {

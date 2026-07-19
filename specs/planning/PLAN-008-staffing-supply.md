@@ -4,7 +4,7 @@ title: Staffing Supply, Opening Headcount, and Attrition
 status: draft
 owners: []
 depends_on: [PLAN-006, PLAN-007, FOUND-003]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -55,6 +55,9 @@ ending gap = ending frontline - required headcount
 - Planner shall enter opening headcount and monthly attrition.
 - Derived hiring and training movements shall be visible by month.
 - Worksheet shall show required, starting roster, starting frontline, hires, graduates, in-training, attrition, ending roster, ending frontline, and gap.
+- Worksheet columns shall be grouped as Requirement, Opening Supply, Pipeline and Loss, Ending Supply, and Decision so planners can follow the monthly roll-forward without reconstructing abbreviated headings.
+- The annual worksheet shall own a named keyboard-focusable scroll region and keep its two-tier headings and Month column visible while contained scrolling is required.
+- Editable worksheet fields shall expose the month, measure, and unit in their accessible name when table context alone is insufficient.
 - Months below requirement shall be visibly identifiable.
 - Saved plans shall preserve opening and movement inputs.
 
@@ -74,6 +77,18 @@ ending gap = ending frontline - required headcount
 **When** planned attrition is 10  
 **Then** applied attrition is capped at 4  
 **And** ending headcount is not negative.
+
+## Retain Monthly Decision Context
+
+**Given** a planner reviews all twelve staffing-supply rows in a resized desktop window
+
+**When** the worksheet scrolls vertically or horizontally
+
+**Then** the requirement, opening supply, pipeline and loss, ending supply, and decision headings remain visible
+
+**And** each visible row's Month identity remains visible during horizontal movement
+
+**And** the document does not acquire horizontal overflow.
 
 # Open Questions
 

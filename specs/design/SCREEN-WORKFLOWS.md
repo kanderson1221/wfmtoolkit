@@ -664,8 +664,10 @@ Section content:
 | Agent Availability | Monthly paid time, presence loss, utilization loss, scheduled capacity | Mark reviewed and continue |
 | Occupancy and Adherence | Defaults or monthly overrides, design factor, staffing ratio | Mark reviewed and continue |
 | Demand Requirement | Monthly contacts, AHT, workload, required hours and headcount | Calculate or rerun when required |
-| Staffing Plan | Opening position, attrition, staffing supply, training pipeline, next-year handoff | Save draft or plan |
+| Staffing Plan | Opening position, attrition, training pipeline, and a contained grouped supply worksheet with pinned headings and Month context | Save draft or plan |
 | Actuals and Variance | Plan versus actual demand, AHT, requirement, and staffing gap | Run actuals Erlang when required |
+
+The Staffing Plan supply worksheet groups the roll-forward into Requirement, Opening Supply, Pipeline and Loss, Ending Supply, and Decision. Its native table owns keyboard-focusable contained scrolling and retains both heading tiers and Month identity while planners review the year.
 
 Finalization state:
 
