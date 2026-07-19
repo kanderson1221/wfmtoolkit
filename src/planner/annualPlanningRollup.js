@@ -3,7 +3,19 @@ import { getCenterGroups, getGroupPlans } from '../planningSummary'
 import { buildActualsMonthsFromDailyRows, computeActualsRecords } from './actualsModel'
 import { computeMonthlyRecords } from './demandModel'
 import { resolvePlanningGroupActuals } from './groupActuals'
-import { MONTH_LABELS, WEEKDAY_FALLBACK, getCurrentCalendarYear, resolvePlanningYear } from './shared'
+import {
+  assessPlannerIntradayErlangResults,
+  buildPlannerIntradayErlangPayload,
+  mergeIntradayErlangMonthlyRecords
+} from './intradayErlang'
+import {
+  MONTH_LABELS,
+  PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+  WEEKDAY_FALLBACK,
+  getCurrentCalendarYear,
+  normalizePlanRequirementMethod,
+  resolvePlanningYear
+} from './shared'
 import { computeStaffingRecords } from './staffingModel'
 
 const toNumber = (value, fallback = 0) => {
@@ -45,6 +57,8 @@ const createMonthlyRollupRow = (planningYear, monthIndex) => ({
   inTrainingHeadcount: 0,
   daysLoaded: 0,
   groupsPlannedCount: 0,
+  groupsWithPlannedRequirementCount: 0,
+  groupsWithPlannedGapCount: 0,
   groupsWithActualsCount: 0,
   groupsWithActualRequirementCount: 0,
   staffingGroupRows: [],
@@ -97,6 +111,80 @@ export const buildPlanDemandRecords = (plan, center, planningYear) => {
     randomMonths: Array.isArray(plan?.randomMonths) ? plan.randomMonths : [],
     planMonths: Array.isArray(plan?.planMonths) ? plan.planMonths : []
   })
+}
+
+const withholdRequirementOutputs = (records = []) =>
+  records.map((record) => ({
+    ...record,
+    erlangStaffedHours: null,
+    requiredStaffHours: null,
+    requiredHeadcount: null,
+    peakDayRequiredStaffHours: null,
+    peakDayRequiredHeadcount: null,
+    peakIntervalRequiredHeadcount: null,
+    roundedHeadcount: null
+  }))
+
+export const resolvePlanRequirementRecords = ({ plan, center, group, planningYear }) => {
+  const baselineRecords = buildPlanDemandRecords(plan, center, planningYear)
+  const requirementMethod = normalizePlanRequirementMethod(
+    plan?.requirementMethod || plan?.summary?.requirementMethod
+  )
+
+  if (requirementMethod !== PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG) {
+    return {
+      records: baselineRecords,
+      requirementMethod,
+      status: 'ready',
+      message: '',
+      usesIntradayErlang: false
+    }
+  }
+
+  const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
+  const payloadState = buildPlannerIntradayErlangPayload({
+    planningYear,
+    demandSource: plan?.demandSource,
+    monthlyRecords: baselineRecords,
+    operatingWeekdays:
+      Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
+        ? plan.operatingWeekdays
+        : Array.isArray(center?.operatingWeekdays) && center.operatingWeekdays.length
+          ? center.operatingWeekdays
+          : WEEKDAY_FALLBACK,
+    holidayCalendarId: holidaySnapshot.holidayCalendarId,
+    disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
+    customHolidays: holidaySnapshot.customHolidays,
+    operatingOpenTime: plan?.operatingOpenTime || group?.operatingOpenTime || center?.operatingOpenTime,
+    operatingCloseTime: plan?.operatingCloseTime || group?.operatingCloseTime || center?.operatingCloseTime,
+    serviceLevelPercent: plan?.serviceLevelPercent ?? group?.serviceLevelPercent,
+    serviceLevelThresholdSeconds:
+      plan?.serviceLevelThresholdSeconds ?? group?.serviceLevelThresholdSeconds,
+    intraday: plan?.intraday || group?.intraday
+  })
+  const assessment = assessPlannerIntradayErlangResults(payloadState, plan?.intradayErlangResults)
+
+  if (assessment.status !== 'ready') {
+    return {
+      records: withholdRequirementOutputs(baselineRecords),
+      requirementMethod,
+      status: assessment.status,
+      message: assessment.message,
+      usesIntradayErlang: true
+    }
+  }
+
+  return {
+    records: mergeIntradayErlangMonthlyRecords(
+      baselineRecords,
+      new Map(assessment.results.monthlyOutputs.map((row) => [Number(row.monthIndex), row])),
+      assessment.results.dailyOutputs
+    ),
+    requirementMethod,
+    status: 'ready',
+    message: '',
+    usesIntradayErlang: true
+  }
 }
 
 export const buildPlanStaffingRecords = (plan, center, monthlyRecords, planningYear) => {
@@ -166,7 +254,15 @@ const buildActualsOnlyRows = ({ group, monthlyActuals, planningYear }) =>
     }
   })
 
-const buildGroupActualRows = ({ center, group, plan, monthlyDemandRecords, staffingRecords, planningYear }) => {
+const buildGroupActualRows = ({
+  center,
+  group,
+  plan,
+  requirementState,
+  monthlyDemandRecords,
+  staffingRecords,
+  planningYear
+}) => {
   const monthlyActuals = buildActualsMonthsFromDailyRows(
     resolvePlanningGroupActuals(group).dailyRows,
     planningYear
@@ -176,7 +272,14 @@ const buildGroupActualRows = ({ center, group, plan, monthlyDemandRecords, staff
     return buildActualsOnlyRows({ group, monthlyActuals, planningYear })
   }
 
-  return computeActualsRecords(monthlyDemandRecords, staffingRecords, monthlyActuals).map((record, monthIndex) => {
+  const actualRequirementOutputs = requirementState.usesIntradayErlang ? new Map() : null
+
+  return computeActualsRecords(
+    monthlyDemandRecords,
+    staffingRecords,
+    monthlyActuals,
+    actualRequirementOutputs
+  ).map((record, monthIndex) => {
     const plannedStartingFrontlineHeadcount = toNumber(record.plannedStartingFrontlineHeadcount)
     const actualRequiredHeadcount = record.actualRequiredHeadcount == null
       ? null
@@ -200,15 +303,18 @@ const buildGroupActualRows = ({ center, group, plan, monthlyDemandRecords, staff
       actualAhtSeconds: record.actualAhtSeconds == null ? null : toNumber(record.actualAhtSeconds),
       plannedWorkloadHours: toNumber(record.plannedWorkloadHours),
       actualWorkloadHours: record.actualWorkloadHours == null ? null : toNumber(record.actualWorkloadHours),
-      plannedRequiredHeadcount: toNumber(record.plannedRequiredHeadcount),
-      plannedRequiredStaffHours: toNumber(record.requiredStaffHours),
+      plannedRequiredHeadcount:
+        record.plannedRequiredHeadcount == null ? null : toNumber(record.plannedRequiredHeadcount),
+      plannedRequiredStaffHours:
+        record.requiredStaffHours == null ? null : toNumber(record.requiredStaffHours),
       actualRequiredHeadcount,
       requiredHeadcountVariance:
         record.requiredHeadcountVariance == null ? null : toNumber(record.requiredHeadcountVariance),
       plannedStartingFrontlineHeadcount,
       plannedEndingFrontlineHeadcount: toNumber(record.plannedEndingFrontlineHeadcount),
       plannedEndingTotalHeadcount: toNumber(record.plannedEndingTotalHeadcount),
-      plannedGapToRequirement: toNumber(record.plannedGapToRequirement),
+      plannedGapToRequirement:
+        record.plannedGapToRequirement == null ? null : toNumber(record.plannedGapToRequirement),
       gapVsActualRequiredHeadcount:
         actualRequiredHeadcount == null ? null : plannedStartingFrontlineHeadcount - actualRequiredHeadcount,
       actualLoadedDaysCount: Math.max(toNumber(record.actualLoadedDaysCount), 0)
@@ -218,14 +324,28 @@ const buildGroupActualRows = ({ center, group, plan, monthlyDemandRecords, staff
 
 const finalizeMonthlyRows = (monthlyRows) =>
   monthlyRows.map((row) => {
+    const plannedRequirementsComplete =
+      row.groupsPlannedCount > 0 &&
+      row.groupsWithPlannedRequirementCount === row.groupsPlannedCount
+    const plannedGapsComplete =
+      row.groupsPlannedCount > 0 &&
+      row.groupsWithPlannedGapCount === row.groupsPlannedCount
+    const actualRequirementsComplete =
+      row.groupsWithActualsCount > 0 &&
+      row.groupsWithActualRequirementCount === row.groupsWithActualsCount
     const actualContacts = row.groupsWithActualsCount > 0 ? row.actualContacts || 0 : null
     const actualWorkloadHours = row.groupsWithActualsCount > 0 ? row.actualWorkloadHours || 0 : null
-    const actualRequiredHeadcount =
-      row.groupsWithActualRequirementCount > 0 ? row.actualRequiredHeadcount || 0 : null
+    const actualRequiredHeadcount = actualRequirementsComplete ? row.actualRequiredHeadcount || 0 : null
     const contactVariance = actualContacts == null ? null : actualContacts - row.expectedContacts
     const workloadVariance = actualWorkloadHours == null ? null : actualWorkloadHours - row.expectedWorkloadHours
+    const requiredHeadcount = plannedRequirementsComplete ? row.requiredHeadcount : null
+    const requiredStaffHours = plannedRequirementsComplete ? row.requiredStaffHours : null
+    const peakRequiredHeadcount = plannedRequirementsComplete ? row.peakRequiredHeadcount : null
+    const gapToRequirement = plannedGapsComplete ? row.gapToRequirement : null
     const requiredHeadcountVariance =
-      actualRequiredHeadcount == null ? null : actualRequiredHeadcount - row.requiredHeadcount
+      actualRequiredHeadcount == null || requiredHeadcount == null
+        ? null
+        : actualRequiredHeadcount - requiredHeadcount
     const gapVsActualRequiredHeadcount =
       actualRequiredHeadcount == null ? null : row.startingFrontlineHeadcount - actualRequiredHeadcount
     const expectedAhtSeconds = weightedAhtSeconds(row.expectedContacts, row.expectedWorkloadHours) || 0
@@ -244,7 +364,7 @@ const finalizeMonthlyRows = (monthlyRows) =>
       actualAhtSeconds,
       plannedWorkloadHours: row.expectedWorkloadHours,
       actualWorkloadHours,
-      plannedRequiredHeadcount: row.requiredHeadcount,
+      plannedRequiredHeadcount: requiredHeadcount,
       actualRequiredHeadcount,
       plannedStartingFrontlineHeadcount: row.startingFrontlineHeadcount,
       actualLoadedDaysCount: row.daysLoaded,
@@ -255,9 +375,13 @@ const finalizeMonthlyRows = (monthlyRows) =>
           ? (contactVariance / row.expectedContacts) * 100
           : null,
       workloadVariance,
+      requiredStaffHours,
+      requiredHeadcount,
+      peakRequiredHeadcount,
+      gapToRequirement,
       requiredHeadcountVariance,
       gapVsActualRequiredHeadcount,
-      isBelowRequirement: row.gapToRequirement < 0
+      isBelowRequirement: gapToRequirement != null && gapToRequirement < 0
     }
   })
 
@@ -279,6 +403,8 @@ const summarizeAnnualRollup = ({
     : null
   const actualRequirementRows = monthlyRows.filter((row) => row.actualRequiredHeadcount != null)
   const staffingGapRows = monthlyRows.filter((row) => row.gapVsActualRequiredHeadcount != null)
+  const plannedRequirementsComplete = monthlyRows.every((row) => row.requiredHeadcount != null)
+  const plannedGapsComplete = monthlyRows.every((row) => row.gapToRequirement != null)
 
   return {
     planningYear,
@@ -307,11 +433,15 @@ const summarizeAnnualRollup = ({
       monthlyRows.some((row) => row.actualWorkloadHours != null)
         ? actualWorkloadHours - expectedWorkloadHours
         : null,
-    requiredStaffHours,
-    averageRequiredHeadcount: average(monthlyRows.map((row) => row.requiredHeadcount)),
+    requiredStaffHours: plannedRequirementsComplete ? requiredStaffHours : null,
+    averageRequiredHeadcount: plannedRequirementsComplete
+      ? average(monthlyRows.map((row) => row.requiredHeadcount))
+      : null,
     averageActualRequiredHeadcount: average(actualRequirementRows.map((row) => row.actualRequiredHeadcount)),
     averageRequiredHeadcountVariance: average(actualRequirementRows.map((row) => row.requiredHeadcountVariance)),
-    peakRequiredHeadcount: monthlyRows.reduce((peak, row) => Math.max(peak, row.peakRequiredHeadcount), 0),
+    peakRequiredHeadcount: plannedRequirementsComplete
+      ? monthlyRows.reduce((peak, row) => Math.max(peak, row.peakRequiredHeadcount), 0)
+      : null,
     peakActualRequiredHeadcount: monthlyRows.reduce(
       (peak, row) => Math.max(peak, row.actualRequiredHeadcount || 0),
       0
@@ -319,9 +449,13 @@ const summarizeAnnualRollup = ({
     averageStartingFrontlineHeadcount: average(monthlyRows.map((row) => row.startingFrontlineHeadcount)),
     averageEndingFrontlineHeadcount: average(monthlyRows.map((row) => row.endingFrontlineHeadcount)),
     averageEndingRosterHeadcount: average(monthlyRows.map((row) => row.endingRosterHeadcount)),
-    averageGapToRequirement: average(monthlyRows.map((row) => row.gapToRequirement)),
+    averageGapToRequirement: plannedGapsComplete
+      ? average(monthlyRows.map((row) => row.gapToRequirement))
+      : null,
     averageGapVsActualRequiredHeadcount: average(staffingGapRows.map((row) => row.gapVsActualRequiredHeadcount)),
-    monthsBelowRequirement: monthlyRows.filter((row) => row.isBelowRequirement).length,
+    monthsBelowRequirement: plannedGapsComplete
+      ? monthlyRows.filter((row) => row.isBelowRequirement).length
+      : null,
     totalHireHeadcount: monthlyRows.reduce((sum, row) => sum + row.hireHeadcount, 0),
     totalFrontlineAttritionHeadcount: monthlyRows.reduce((sum, row) => sum + row.frontlineAttritionHeadcount, 0)
   }
@@ -358,12 +492,21 @@ export const buildAnnualPlanningRollup = ({
   )
   const plannedGroupIds = new Set()
   const groupsWithActualsIds = new Set()
+  const integrityIssues = []
 
   resolvedCenters.forEach((center) => {
     getCenterGroups(center).forEach((group) => {
       const groupKey = `${center.id || 'center'}:${group.id || group.name}`
       const plan = selectPlanningRollupPlan(group, resolvedYear, planRole)
-      const monthlyDemandRecords = plan ? buildPlanDemandRecords(plan, center, resolvedYear) : []
+      const requirementState = plan
+        ? resolvePlanRequirementRecords({ plan, center, group, planningYear: resolvedYear })
+        : {
+            records: [],
+            status: 'not_applicable',
+            message: '',
+            usesIntradayErlang: false
+          }
+      const monthlyDemandRecords = requirementState.records
       const staffingRecords = plan
         ? buildPlanStaffingRecords(plan, center, monthlyDemandRecords, resolvedYear)
         : []
@@ -371,6 +514,7 @@ export const buildAnnualPlanningRollup = ({
         center,
         group,
         plan,
+        requirementState,
         monthlyDemandRecords,
         staffingRecords,
         planningYear: resolvedYear
@@ -379,6 +523,22 @@ export const buildAnnualPlanningRollup = ({
 
       if (plan) {
         plannedGroupIds.add(groupKey)
+      }
+
+      if (plan && requirementState.usesIntradayErlang) {
+        integrityIssues.push({
+          centerId: center.id || '',
+          groupId: group.id || '',
+          groupName: group.name || 'Staffing Group',
+          planId: plan.id || '',
+          planName: plan.name || `${resolvedYear} Plan`,
+          status: requirementState.status,
+          plannedRequirementAvailable: requirementState.status === 'ready',
+          actualRequirementAvailable: false,
+          message: requirementState.status === 'ready'
+            ? 'Planned requirement uses the saved Intraday Erlang calculation. Actual Intraday Erlang requirement is unavailable because actual calculation results are not retained outside the plan editor.'
+            : `${requirementState.message} Planned and actual requirement values are withheld from this report.`
+        })
       }
 
       if (hasActuals) {
@@ -399,16 +559,25 @@ export const buildAnnualPlanningRollup = ({
         if (groupActualRow.hasPlan) {
           row.expectedContacts += toNumber(groupActualRow.plannedContacts)
           row.expectedWorkloadHours += toNumber(groupActualRow.plannedWorkloadHours)
-          row.requiredStaffHours += toNumber(groupActualRow.plannedRequiredStaffHours)
-          row.requiredHeadcount += toNumber(groupActualRow.plannedRequiredHeadcount)
-          row.peakRequiredHeadcount += toNumber(
-            demandRecord?.peakDayRequiredHeadcount || groupActualRow.plannedRequiredHeadcount
-          )
           row.groupsPlannedCount += 1
           row.startingFrontlineHeadcount += toNumber(groupActualRow.plannedStartingFrontlineHeadcount)
           row.endingFrontlineHeadcount += toNumber(groupActualRow.plannedEndingFrontlineHeadcount)
           row.endingRosterHeadcount += toNumber(groupActualRow.plannedEndingTotalHeadcount)
-          row.gapToRequirement += toNumber(groupActualRow.plannedGapToRequirement)
+          if (
+            groupActualRow.plannedRequiredHeadcount != null &&
+            groupActualRow.plannedRequiredStaffHours != null
+          ) {
+            row.requiredStaffHours += toNumber(groupActualRow.plannedRequiredStaffHours)
+            row.requiredHeadcount += toNumber(groupActualRow.plannedRequiredHeadcount)
+            row.peakRequiredHeadcount += toNumber(
+              demandRecord?.peakDayRequiredHeadcount ?? groupActualRow.plannedRequiredHeadcount
+            )
+            row.groupsWithPlannedRequirementCount += 1
+          }
+          if (groupActualRow.plannedGapToRequirement != null) {
+            row.gapToRequirement += toNumber(groupActualRow.plannedGapToRequirement)
+            row.groupsWithPlannedGapCount += 1
+          }
           row.hireHeadcount += toNumber(staffingRecord?.hireHeadcount)
           row.graduatingHeadcount += toNumber(staffingRecord?.graduatingHeadcount)
           row.frontlineReadyHeadcount += toNumber(staffingRecord?.frontlineReadyHeadcount)
@@ -451,6 +620,7 @@ export const buildAnnualPlanningRollup = ({
     planningYear: resolvedYear,
     monthlyRows: finalizedMonthlyRows,
     annualTotalRow: buildAnnualTotalRow(finalizedMonthlyRows, summary),
+    integrityIssues,
     summary
   }
 }

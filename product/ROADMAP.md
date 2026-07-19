@@ -106,29 +106,29 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
-## Next
+### `NOW-009` — Authoritative Intraday Erlang call-center rollup — Completed
 
-### `NEXT-004` — Governed forecast acceptance decision
-
-- Capability: `CAP-FORE-002` (Need 20), supporting `CAP-GOV-001` (Need 26)
-- Planner outcome: an analyst records why a validated forecast was accepted, rejected, or returned for revision using evidence aligned to the organization's actual planning decision.
-- Problem/opportunity: the workbench now supplies current-holdout, AHT, saved-candidate, adjustment, and rolling-origin evidence but deliberately does not define a universal pass/fail threshold or approval record.
-- Rationale/evidence: metric thresholds depend on whether the sponsor governs volume, workload, peak, staffing consequence, or bias over a specific horizon. Repository evidence cannot determine that policy; `INT-002` asks for a real acceptance example.
-- Dependencies: sponsor answer `INT-002`; retained `FCAST-001`–`FCAST-005` evidence; any future identity/approval semantics remain outside this local decision record.
-- Proposed scope: decision state and reason, selected evidence snapshot, explicit warning policy, legacy fallback, export/lineage, and focused desktop workflow after the acceptance contract is established.
-- Success measures: accepted/rejected status never changes automatically; the analyst can reconstruct which evidence informed the decision; thresholds and required fields trace to `INT-002` rather than generic industry guesses.
-- Status: evidence dependency; do not implement before `INT-002` is answered.
+- Capability: `CAP-REP-002` (Need 25 after this run; 30 before), supporting `CAP-REQ-002` (Need 24) and `CAP-UX-001` (Need 32)
+- Planner outcome: a WFM lead can trust that call-center requirement and staffing-gap values use the selected plan's actual requirement method and can immediately identify every Intraday Erlang contributor that needs review.
+- Problem/opportunity: the call-center rollup recomputed every plan through workload-ratio fields, even when the saved current plan used Intraday Erlang; it also derived actual requirement through the ratio path because actual Erlang outputs are not retained.
+- Rationale/evidence: `PLAN-007` forbids silent formula substitution and requires stale outputs to be non-authoritative; `PLAN-012` requires stale, mixed-scope, and missing values to remain explicit. Repository inspection confirmed the aggregate bypassed saved Erlang outputs and their input signature.
+- Dependencies: saved plan demand/calendar/service/intraday snapshots and existing Erlang input signature; no backend, schema, identity, or sponsor-policy dependency.
+- Delivered scope: shared saved-result validation; current saved Erlang monthly output in planned rollups; missing/incomplete/stale withholding; mixed actual-requirement scope withholding; named group/plan review actions; preserved demand/workload evidence; removed unused duplicate call-center summary metrics.
+- Success measures: workload-ratio output is never substituted for an Intraday Erlang plan; stale planned requirement and unretained actual requirement render unavailable; affected contributors are named; workload-ratio-only reports remain unchanged; focused, full, build, and Chromium checks pass.
+- Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
+
+## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
 
 - Capability: `CAP-DATA-002` (Need 71), `CAP-ADMIN-001` (Need 60)
 - Planner outcome: teams can evaluate a safe path from device-local planning to governed shared work without risking current data.
 - Problem/opportunity: runtime planning is local while relational schema artifacts exist; implementing authentication first would create a shell without collaboration semantics.
-- Rationale/evidence: IndexedDB is robust for one user, but no concurrency, ownership, conflict, or tenancy model exists.
-- Dependencies: product tenancy decision, event/audit model, offline stance, and sponsor collaboration evidence from `INT-003`.
-- Proposed scope: architecture decision record, repository boundary, migration/reconciliation prototype, threat model, and explicit non-goals—not a cosmetic sign-in screen.
-- Success measures: validated migration round-trip, conflict policy, ownership model, and staged rollout plan.
+- Rationale/evidence: IndexedDB is robust for one user, but no concurrency, ownership, conflict, or tenancy model exists. Sponsor answer `INT-003` requires a plan to remain exclusively locked for other editors while one planner has it open for editing.
+- Dependencies: product tenancy/user-system decision, event/audit model, offline stance, and an exclusive-lock lifecycle covering owner identity, acquisition, renewal, timeout, crash recovery, handoff, and authorized release (`INT-003`).
+- Proposed scope: architecture decision record, repository boundary, migration/reconciliation prototype, threat model, exclusive edit-lock and recovery prototype, and explicit non-goals—not a cosmetic sign-in screen.
+- Success measures: validated migration round-trip; a second editor cannot mutate a locked plan; abandoned locks recover predictably without silent overwrite; ownership and staged rollout are documented.
 - Status: discovery.
 - Last reviewed: 2026-07-19.
 
@@ -222,6 +222,18 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: retired 2026-07-18 and implemented in response to `INT-001`.
 - Last reviewed: 2026-07-19.
 
+### `RET-003` — Governed forecast acceptance workflow — Declined
+
+- Capability: `CAP-FORE-002` (Need 20), supporting `CAP-GOV-001` (Need 26)
+- Planner outcome: retain decision-useful accuracy and stability evidence without imposing an unwanted acceptance questionnaire, universal threshold, or approval record.
+- Problem/opportunity: the completed forecast workbench supplies neutral validation evidence, but a proposed follow-on required sponsor-specific acceptance semantics that repository evidence could not establish.
+- Rationale/evidence: sponsor answer `INT-002` explicitly says to skip the acceptance question. Continuing to hold a governance workflow open would invent policy and keep an unwanted interview dependency alive.
+- Dependencies: none for retirement; any future revival requires new sponsor direction and concrete decision evidence.
+- Retired scope: `NEXT-004` decision states, required acceptance reason, selected-evidence approval snapshot, and organization-specific warning thresholds.
+- Success measures: existing WAPE, MAE, bias, interval coverage, AHT/workload evidence, candidate comparison, and rolling-origin stability remain neutral; no automatic accept/reject result is introduced.
+- Status: declined 2026-07-19 in response to `INT-002`.
+- Last reviewed: 2026-07-19.
+
 ## Decision log
 
 | Date | Decision |
@@ -245,3 +257,6 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Completed `NOW-006`: all runtime text/CSV/JSON downloads now use one tested browser lifecycle, and duplicate backup/actuals-gap mechanics and filename sanitation were removed without changing planner-visible exports. |
 | 2026-07-19 | Completed required code-review remediation `NOW-007`: destructive confirmations now focus the safe Cancel action and preserve the managed close lifecycle so both cancel and confirm restore a retained initiator. |
 | 2026-07-19 | Completed the fifth-run strategic portfolio review and `NOW-008`: newly created plan Updates now require and persist a decision reason, legacy Updates remain explicit, and modal focus is safe. High-Need missing domains remain sequenced behind their documented prerequisites; added `INT-003` for shared-work ownership/conflict evidence. |
+| 2026-07-19 | Applied `INT-002` by retiring the unwanted governed forecast-acceptance direction as `RET-003`; retained neutral forecast evidence without inventing thresholds or approval policy. |
+| 2026-07-19 | Applied `INT-003`: shared-plan discovery must implement exclusive edit locking plus explicit acquisition, renewal, recovery, handoff, and release behavior before shared persistence ships. |
+| 2026-07-19 | Completed `NOW-009`: call-center rollups now validate and use current saved Intraday Erlang results, withhold stale/missing and mixed-scope requirement values, name affected plans, and remove unused duplicate summary metrics. |

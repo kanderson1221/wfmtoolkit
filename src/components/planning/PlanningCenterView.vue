@@ -203,8 +203,8 @@ const {
   breadcrumbItems,
   callCenterAnnualMonthlyRows,
   callCenterAnnualTotalRow,
-  callCenterSummaryRows,
   callCenterPlanningYearOptions,
+  callCenterReportIssues,
   createPlanHref,
   existingPlanForDraftYear,
   existingPlanHref,
@@ -864,7 +864,36 @@ watch(
               </div>
 
               <div class="flex-1 min-h-0 overflow-y-auto p-4">
-                <div v-if="callCenterSummaryRows.length" class="grid gap-4">
+                <div v-if="groupRows.length" class="grid gap-4">
+                  <AppStatusMessage v-if="callCenterReportIssues.length">
+                    <div class="grid gap-2">
+                      <p>
+                        <strong>Intraday Erlang report scope:</strong>
+                        planned requirement is shown only from current saved calculations; actual requirement is unavailable until actual Erlang results can be retained.
+                      </p>
+                      <ul class="grid gap-2" aria-label="Intraday Erlang report issues">
+                        <li
+                          v-for="issue in callCenterReportIssues"
+                          :key="`${issue.groupId}-${issue.planId}`"
+                          class="flex flex-wrap items-center justify-between gap-2 border-t border-[#d5e0ea] pt-2"
+                        >
+                          <span class="min-w-0 leading-5">
+                            <strong>{{ issue.groupName }} · {{ issue.planName }}:</strong>
+                            {{ issue.message }}
+                          </span>
+                          <AppButton
+                            :href="issue.openHref"
+                            size="xs"
+                            variant="secondary"
+                            :aria-label="`${issue.actionLabel} for ${issue.groupName}`"
+                          >
+                            {{ issue.actionLabel }}
+                          </AppButton>
+                        </li>
+                      </ul>
+                    </div>
+                  </AppStatusMessage>
+
                   <section class="grid gap-3">
                     <div class="flex justify-end px-1">
                       <div class="flex flex-wrap items-center gap-2">

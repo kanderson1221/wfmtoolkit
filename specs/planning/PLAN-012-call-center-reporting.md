@@ -4,7 +4,7 @@ title: Call-Center Annual Rollup and Reporting
 status: draft
 owners: []
 depends_on: [PLAN-008, ACT-003, ACT-006]
-last_reviewed: 2026-07-18
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -27,6 +27,9 @@ Define selected-year aggregate reporting inside one call center. The global plan
 - Headcount requirement and supply are summed only where groups are independently additive.
 - Annual headcount measures shall state when they are monthly averages.
 - Variances are derived from aggregate values only when their planned and actual scopes are comparable.
+- Intraday Erlang plans contribute planned requirement only from complete saved results whose input signature matches the current saved inputs.
+- Missing, incomplete, or stale Intraday Erlang results shall withhold affected monthly requirement and staffing-gap totals rather than silently substituting workload-ratio outputs.
+- Actual Intraday Erlang requirement shall remain unavailable until matching actual calculation results are retained; other actual demand and workload values remain reportable.
 - Monthly rows remain chronological and expose contributing staffing-group rows for reconciliation.
 
 # Required Presentation
@@ -35,6 +38,7 @@ Define selected-year aggregate reporting inside one call center. The global plan
 - Summary values shall include plan and actuals coverage, contacts, required headcount, staffing gap, and AHT where available.
 - Monthly rows shall distinguish planned and actual contacts, AHT, workload, requirement, opening frontline, and staffing gap.
 - Shortage, missing, incomplete, stale, mixed-scope, and error states shall be communicated as text rather than color alone.
+- Requirement-integrity messages shall name each affected staffing group and plan and link to the owning plan workflow.
 - Dense monthly results shall remain a native table with contained horizontal overflow.
 - The call-center directory shall not duplicate these summary values or rank centers using report results.
 
@@ -52,6 +56,22 @@ Define selected-year aggregate reporting inside one call center. The global plan
 **When** the selected-year report is shown
 **Then** actual contacts and variance remain unavailable rather than zero.
 
+## Withhold Stale Intraday Requirement
+
+**Given** a current Intraday Erlang plan whose saved result signature no longer matches its saved inputs
+**When** the selected-year call-center report is shown
+**Then** contacts and workload remain available
+**And** the affected planned requirement and staffing-gap totals are unavailable
+**And** the staffing group and plan are named with a recalculation action
+**And** workload-ratio outputs are not substituted.
+
+## Preserve Requirement Scope Across Methods
+
+**Given** actual demand exists for both a workload-ratio group and an Intraday Erlang group
+**And** no matching actual Intraday Erlang result is retained
+**When** actual requirement is aggregated
+**Then** the partial workload-ratio requirement is not presented as the call-center total.
+
 ## Keep the Directory Non-Reporting
 
 **Given** multiple call centers contain plans and actuals
@@ -63,7 +83,6 @@ Define selected-year aggregate reporting inside one call center. The global plan
 
 1. Are any staffing groups non-additive because staff are shared?
 2. Should call-center reports support a staffing-group contribution export?
-3. Which stale calculation states should remain visible with a warning?
 
 # Implementation Traceability
 

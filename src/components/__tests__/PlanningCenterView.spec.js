@@ -371,6 +371,60 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).not.toContain('Add Data')
   })
 
+  it('names unavailable Intraday Erlang contributors and links to recalculation', () => {
+    const wrapper = buildWrapper({
+      selectedGroupId: '',
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
+            plans: [
+              {
+                id: 'plan-1',
+                name: '2026 Erlang Plan',
+                planningYear: 2026,
+                planType: 'budget',
+                isCurrent: true,
+                requirementMethod: 'intraday_erlang',
+                operatingOpenTime: '08:00',
+                operatingCloseTime: '09:00',
+                serviceLevelPercent: 80,
+                serviceLevelThresholdSeconds: 20,
+                intraday: {
+                  intervalLengthMinutes: 30,
+                  intervalRatios: [
+                    { startTime: '08:00', ratioPercent: 50 },
+                    { startTime: '08:30', ratioPercent: 50 }
+                  ]
+                },
+                presenceMonths: Array.from({ length: 12 }, () => ({ paidHoursPerDay: 8 })),
+                randomDefaults: {
+                  occupancyPercent: 90,
+                  adherencePercent: 95
+                }
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    expect(wrapper.text()).toContain('Intraday Erlang report scope')
+    expect(wrapper.text()).toContain('Voice Support · 2026 Erlang Plan')
+    expect(wrapper.text()).toContain('Planned and actual requirement values are withheld')
+    expect(wrapper.text()).toContain('Recalculate Plan')
+    expect(wrapper.get('button[aria-label="Recalculate Plan for Voice Support"]')).toBeTruthy()
+  })
+
   it('keeps call-center actuals month details collapsed by default', () => {
     const wrapper = buildWrapper({
       selectedGroupId: ''

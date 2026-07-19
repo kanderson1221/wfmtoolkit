@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildAnnualPlanningRollup, selectPlanningRollupPlan } from '../annualPlanningRollup'
+import {
+  buildAnnualPlanningRollup,
+  buildPlanDemandRecords,
+  selectPlanningRollupPlan
+} from '../annualPlanningRollup'
+import {
+  buildPlannerIntradayErlangInputSignature,
+  buildPlannerIntradayErlangPayload
+} from '../intradayErlang'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../shared'
 
 const buildPlanMonths = (contacts, ahtSeconds = 360) =>
   Array.from({ length: 12 }, () => ({
@@ -13,6 +22,80 @@ const buildPresenceMonths = () =>
   Array.from({ length: 12 }, () => ({
     paidHoursPerDay: 8
   }))
+
+const buildIntradayPlan = () => ({
+  id: 'erlang-2026',
+  name: '2026 Erlang Plan',
+  planningYear: 2026,
+  planType: 'budget',
+  isCurrent: true,
+  requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+  operatingWeekdays: [1, 2, 3, 4, 5],
+  operatingOpenTime: '08:00',
+  operatingCloseTime: '09:00',
+  serviceLevelPercent: 80,
+  serviceLevelThresholdSeconds: 20,
+  intraday: {
+    intervalLengthMinutes: 30,
+    intervalRatios: [
+      { startTime: '08:00', ratioPercent: 50 },
+      { startTime: '08:30', ratioPercent: 50 }
+    ]
+  },
+  demandSource: {
+    mode: 'forecast',
+    forecastDailySnapshot: [
+      { serviceDate: '2026-01-02', monthIndex: 0, contacts: 100 }
+    ],
+    forecastMonthSnapshot: [
+      { monthIndex: 0, monthLabel: 'Jan 2026', contacts: 100, ahtSeconds: 300 }
+    ]
+  },
+  presenceMonths: buildPresenceMonths(),
+  randomDefaults: {
+    occupancyPercent: 90,
+    adherencePercent: 95
+  },
+  startingHeadcount: 5,
+  startingFrontlineHeadcount: 5,
+  staffingMonths: []
+})
+
+const attachCurrentIntradayResults = (plan, center) => {
+  const monthlyRecords = buildPlanDemandRecords(plan, center, 2026)
+  const payload = buildPlannerIntradayErlangPayload({
+    planningYear: 2026,
+    demandSource: plan.demandSource,
+    monthlyRecords,
+    operatingWeekdays: plan.operatingWeekdays,
+    operatingOpenTime: plan.operatingOpenTime,
+    operatingCloseTime: plan.operatingCloseTime,
+    serviceLevelPercent: plan.serviceLevelPercent,
+    serviceLevelThresholdSeconds: plan.serviceLevelThresholdSeconds,
+    intraday: plan.intraday
+  })
+
+  plan.intradayErlangResults = {
+    version: 1,
+    inputSignature: buildPlannerIntradayErlangInputSignature(payload.rows),
+    rowCount: payload.rows.length,
+    monthCount: 1,
+    monthlyOutputs: [
+      {
+        monthIndex: 0,
+        workloadHours: 100 * 300 / 3600,
+        erlangStaffedHours: 160,
+        weightedOccupancyPercent: 84,
+        weightedServiceLevelPercent: 80,
+        peakIntervalRequiredHeadcount: 12
+      }
+    ],
+    intervalOutputs: [],
+    dailyOutputs: []
+  }
+
+  return plan
+}
 
 const buildCenter = (groupOverrides = {}) => ({
   id: 'center-1',
@@ -156,5 +239,72 @@ describe('annualPlanningRollup', () => {
     expect(january.frontlineReadyHeadcount).toBe(7)
     expect(january.frontlineAttritionHeadcount).toBe(3)
     expect(january.endingFrontlineHeadcount).toBe(14)
+  })
+
+  it('uses only current saved Intraday Erlang outputs and withholds unpersisted actual requirements', () => {
+    const center = buildCenter({ plans: [] })
+    const plan = attachCurrentIntradayResults(buildIntradayPlan(), center)
+    center.groups[0].plans = [plan]
+
+    const rollup = buildAnnualPlanningRollup({ centers: [center], planningYear: 2026 })
+    const january = rollup.monthlyRows[0]
+
+    expect(january.plannedContacts).toBe(100)
+    expect(january.plannedWorkloadHours).toBeCloseTo(100 * 300 / 3600, 6)
+    expect(january.plannedRequiredHeadcount).toBeCloseTo((160 / 0.95) / (22 * 8), 6)
+    expect(january.actualRequiredHeadcount).toBeNull()
+    expect(january.requiredHeadcountVariance).toBeNull()
+    expect(rollup.integrityIssues).toEqual([
+      expect.objectContaining({
+        groupName: 'Voice',
+        planName: '2026 Erlang Plan',
+        status: 'ready',
+        plannedRequirementAvailable: true,
+        actualRequirementAvailable: false
+      })
+    ])
+  })
+
+  it('withholds stale Intraday Erlang requirements without hiding demand and workload', () => {
+    const center = buildCenter({ plans: [] })
+    const plan = attachCurrentIntradayResults(buildIntradayPlan(), center)
+    plan.serviceLevelPercent = 85
+    center.groups[0].plans = [plan]
+
+    const rollup = buildAnnualPlanningRollup({ centers: [center], planningYear: 2026 })
+    const january = rollup.monthlyRows[0]
+
+    expect(january.plannedContacts).toBe(100)
+    expect(january.plannedWorkloadHours).toBeCloseTo(100 * 300 / 3600, 6)
+    expect(january.plannedRequiredHeadcount).toBeNull()
+    expect(january.gapToRequirement).toBeNull()
+    expect(rollup.annualTotalRow.plannedRequiredHeadcount).toBeNull()
+    expect(rollup.integrityIssues[0]).toMatchObject({
+      status: 'stale',
+      plannedRequirementAvailable: false,
+      actualRequirementAvailable: false,
+      message: expect.stringContaining('withheld')
+    })
+  })
+
+  it('withholds partial actual requirement across workload-ratio and Intraday Erlang groups', () => {
+    const center = buildCenter()
+    const intradayPlan = attachCurrentIntradayResults(buildIntradayPlan(), center)
+    center.groups.push({
+      ...center.groups[0],
+      id: 'group-2',
+      name: 'Chat',
+      plans: [intradayPlan]
+    })
+
+    const january = buildAnnualPlanningRollup({ centers: [center], planningYear: 2026 }).monthlyRows[0]
+    const workloadGroupRow = january.staffingGroupRows.find((row) => row.groupName === 'Voice')
+    const intradayGroupRow = january.staffingGroupRows.find((row) => row.groupName === 'Chat')
+
+    expect(workloadGroupRow.actualRequiredHeadcount).toBeGreaterThan(0)
+    expect(intradayGroupRow.actualRequiredHeadcount).toBeNull()
+    expect(january.actualRequiredHeadcount).toBeNull()
+    expect(january.requiredHeadcountVariance).toBeNull()
+    expect(january.gapVsActualRequiredHeadcount).toBeNull()
   })
 })

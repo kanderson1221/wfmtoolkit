@@ -6,6 +6,117 @@ import { createPlanningGroupActuals } from './groupActuals'
 import { createPlanOpenDayChecker } from './planOpenDays'
 import { MONTH_LABELS, toNumber } from './shared'
 
+const ERLANG_RESULTS_VERSION = 1
+
+const hashText = (text) => {
+  let hash = 2166136261
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return (hash >>> 0).toString(36)
+}
+
+const cloneRows = (rows = []) =>
+  (Array.isArray(rows) ? rows : []).map((row) => ({ ...row }))
+
+export const buildPlannerIntradayErlangInputSignature = (rows = []) => {
+  const signatureRows = (Array.isArray(rows) ? rows : []).map((row) => ({
+    monthIndex: row.monthIndex,
+    serviceDate: row.serviceDate,
+    intervalStart: row.intervalStart,
+    callsOffered: row.callsOffered,
+    averageHandleTime: row.averageHandleTime,
+    intervalLengthMinutes: row.intervalLengthMinutes,
+    serviceLevelGoal: row.serviceLevelGoal,
+    serviceLevelThreshold: row.serviceLevelThreshold,
+    maxOccupancy: row.maxOccupancy,
+    averageCustomerPatience: row.averageCustomerPatience ?? null
+  }))
+  const serialized = JSON.stringify(signatureRows)
+
+  return `v${ERLANG_RESULTS_VERSION}:${signatureRows.length}:${hashText(serialized)}`
+}
+
+export const normalizePlannerIntradayErlangResults = (results) => {
+  if (!results || typeof results !== 'object') {
+    return null
+  }
+
+  const monthlyOutputs = cloneRows(results.monthlyOutputs || results.monthlyPlans)
+  const intervalOutputs = cloneRows(results.intervalOutputs || results.intervalPlans)
+  const dailyOutputs = cloneRows(results.dailyOutputs || results.dailyPlans)
+
+  if (!monthlyOutputs.length && !intervalOutputs.length && !dailyOutputs.length) {
+    return null
+  }
+
+  return {
+    version: Number(results.version) || ERLANG_RESULTS_VERSION,
+    calculatedAt: String(results.calculatedAt || '').trim(),
+    inputSignature: String(results.inputSignature || '').trim(),
+    rowCount: Number(results.rowCount) || intervalOutputs.length,
+    monthCount: Number(results.monthCount) || monthlyOutputs.length,
+    monthlyOutputs,
+    intervalOutputs,
+    dailyOutputs
+  }
+}
+
+export const assessPlannerIntradayErlangResults = (payloadState, storedResults) => {
+  if (payloadState?.status !== 'ready') {
+    return {
+      status: payloadState?.status || 'unavailable',
+      message: payloadState?.message || 'Intraday Erlang inputs are not ready.',
+      inputSignature: '',
+      results: null
+    }
+  }
+
+  const inputSignature = buildPlannerIntradayErlangInputSignature(payloadState.rows)
+  const results = normalizePlannerIntradayErlangResults(storedResults)
+
+  if (!results) {
+    return {
+      status: 'missing',
+      message: 'Run staffing calculations to populate monthly Erlang staffing outputs.',
+      inputSignature,
+      results: null
+    }
+  }
+
+  if (results.inputSignature !== inputSignature) {
+    return {
+      status: 'stale',
+      message: 'Plan inputs changed after the last staffing calculation. Rerun staffing calculations to refresh the Erlang outputs.',
+      inputSignature,
+      results
+    }
+  }
+
+  const requiredMonthIndexes = new Set(payloadState.rows.map((row) => Number(row.monthIndex)))
+  const completedMonthIndexes = new Set(results.monthlyOutputs.map((row) => Number(row.monthIndex)))
+  const missingMonthIndexes = [...requiredMonthIndexes].filter((monthIndex) => !completedMonthIndexes.has(monthIndex))
+
+  if (missingMonthIndexes.length) {
+    return {
+      status: 'incomplete',
+      message: `Stored Intraday Erlang outputs are missing ${missingMonthIndexes.length} required month${missingMonthIndexes.length === 1 ? '' : 's'}. Rerun staffing calculations.`,
+      inputSignature,
+      results
+    }
+  }
+
+  return {
+    status: 'ready',
+    message: '',
+    inputSignature,
+    results
+  }
+}
+
 const normalizeMonthIndex = (value, fallback = 0) =>
   Math.max(0, Math.min(MONTH_LABELS.length - 1, Math.round(toNumber(value, fallback))))
 

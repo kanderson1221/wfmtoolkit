@@ -4,7 +4,7 @@ title: Intraday Erlang Staffing Requirement
 status: draft
 owners: []
 depends_on: [PLAN-003, PLAN-004, PLAN-005, ORG-004]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -109,6 +109,12 @@ version `1.0.0`.
 - Stale results shall not be treated as finalization-ready.
 - Partial backend output shall not replace the last complete result.
 - Error messages shall distinguish missing inputs, invalid rows, and service failure.
+- Saved-plan reporting shall verify the stored result input signature against the
+  current saved plan inputs before using monthly Erlang output.
+- Missing, incomplete, or stale saved results shall not fall back to the
+  workload-ratio requirement method in reports.
+- Actual Erlang requirement shall remain unavailable in aggregate reporting
+  unless matching actual calculation results are explicitly retained.
 
 # Failure And Recovery
 

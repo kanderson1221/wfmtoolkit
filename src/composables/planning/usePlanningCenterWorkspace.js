@@ -43,19 +43,6 @@ const formatNumber = (value, digits = 1) =>
     maximumFractionDigits: digits
   }).format(value || 0)
 
-const formatPercent = (value, digits = 1) => `${formatNumber(value, digits)}%`
-
-const formatAht = (seconds) => {
-  const totalSeconds = Number(seconds)
-  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
-    return '—'
-  }
-
-  const minutes = Math.floor(totalSeconds / 60)
-  const remainingSeconds = Math.round(totalSeconds % 60)
-  return `${minutes}m ${String(remainingSeconds).padStart(2, '0')}s`
-}
-
 const toFiniteNumberOrNull = (value) => {
   const number = Number(value)
   return Number.isFinite(number) ? number : null
@@ -93,16 +80,6 @@ const formatMonthStartLabel = (value) => {
     month: 'short',
     year: 'numeric'
   }).format(new Date(Number(match[1]), Number(match[2]) - 1, 1))
-}
-
-const formatVariance = (value, digits = 1) => {
-  const numericValue = Number(value)
-  if (!Number.isFinite(numericValue)) {
-    return '—'
-  }
-
-  const prefix = numericValue > 0 ? '+' : ''
-  return `${prefix}${formatNumber(numericValue, digits)}`
 }
 
 const buildComputedMonthlyRecords = (plan, center) => {
@@ -359,137 +336,15 @@ export function usePlanningCenterWorkspace({
   )
   const callCenterAnnualMonthlyRows = computed(() => callCenterAnnualPlan.value.monthlyRows)
   const callCenterAnnualTotalRow = computed(() => callCenterAnnualPlan.value.annualTotalRow)
-
-  const buildCallCenterSummaryRow = (group, planningYear) => {
-    const plans = sortedPlansForGroup(group).filter((plan) => Number(plan?.planningYear) === Number(planningYear))
-    const currentPlan = plans.find((plan) => plan.isCurrent) || plans[0] || null
-    const currentPlanType = currentPlan?.planType === PLAN_TYPE_UPDATE
-      ? PLAN_TYPE_UPDATE
-      : currentPlan
-        ? PLAN_TYPE_BUDGET
-        : ''
-    const currentPlanTypeLabel = currentPlanType === PLAN_TYPE_UPDATE
-      ? 'Update'
-      : currentPlanType === PLAN_TYPE_BUDGET
-        ? 'Budget'
-        : 'None'
-    const currentPlanYear = Number(currentPlan?.planningYear) || Number(planningYear) || currentYear
-    const budgetPlan = currentPlan
-      ? plans.find(
-        (plan) =>
-          Number(plan.planningYear) === Number(currentPlan.planningYear) &&
-          plan.planType === PLAN_TYPE_BUDGET
-      ) || null
-      : null
-    const currentMetrics = currentPlan ? buildPlanRowMetrics(currentPlan, center.value) : null
-    const budgetMetrics = budgetPlan ? buildPlanRowMetrics(budgetPlan, center.value) : null
-    const canCompareToBudget = Boolean(currentMetrics && budgetMetrics && currentPlan?.id !== budgetPlan?.id)
-    const actuals = resolvePlanningGroupActuals(group)
-    const dailyRowCount = actuals.dailyRows.length
-    const contactsVarianceToBudget = canCompareToBudget
-      ? currentMetrics.annualContacts - budgetMetrics.annualContacts
-      : null
-    const totalRequiredHoursVarianceToBudget = canCompareToBudget
-      ? currentMetrics.totalRequiredStaffHours - budgetMetrics.totalRequiredStaffHours
-      : null
-    const averageRequiredHeadcountVarianceToBudget = canCompareToBudget
-      ? currentMetrics.averageTotalRequiredHeadcount - budgetMetrics.averageTotalRequiredHeadcount
-      : null
-    const averageGapVarianceToBudget = canCompareToBudget
-      ? currentMetrics.averageGapToRequirement - budgetMetrics.averageGapToRequirement
-      : null
-    const statusItems = [
-      dailyRowCount ? '' : 'Needs data',
-      budgetPlan ? '' : 'Needs budget',
-      currentPlan ? '' : 'Needs current plan'
-    ].filter(Boolean)
-
-    return {
-      id: group.id,
-      name: group.name || 'Staffing Group',
-      selectionHref: buildPlanningGroupHash(center.value.id, group.id, currentPlanYear),
-      openPlanHref: currentPlan ? buildPlanningPlanHash(center.value.id, group.id, currentPlan.id) : '',
-      dailyRowCount,
-      dataStatusLabel: dailyRowCount ? `${formatWhole(dailyRowCount)} rows` : 'No daily data',
-      budgetPlan,
-      budgetPlanLabel: budgetPlan?.name || (budgetPlan ? `${budgetPlan.planningYear} Budget` : 'No budget'),
-      currentPlan,
-      currentPlanLabel: currentPlan?.name || (currentPlan ? `${currentPlan.planningYear} ${currentPlanTypeLabel}` : 'No current plan'),
-      currentPlanTypeLabel,
-      currentPlanYear,
-      currentPlanYearLabel: currentPlan ? String(currentPlanYear) : '—',
-      annualContacts: currentMetrics?.annualContacts || 0,
-      totalRequiredStaffHours: currentMetrics?.totalRequiredStaffHours || 0,
-      averageTotalRequiredHeadcount: currentMetrics?.averageTotalRequiredHeadcount || 0,
-      averageGapToRequirement: currentMetrics?.averageGapToRequirement || 0,
-      contactsVarianceToBudget,
-      totalRequiredHoursVarianceToBudget,
-      averageRequiredHeadcountVarianceToBudget,
-      averageGapVarianceToBudget,
-      contactsVarianceLabel: canCompareToBudget ? formatVariance(contactsVarianceToBudget, 0) : '—',
-      totalRequiredHoursVarianceLabel: canCompareToBudget ? formatVariance(totalRequiredHoursVarianceToBudget, 0) : '—',
-      averageRequiredHeadcountVarianceLabel: canCompareToBudget ? formatVariance(averageRequiredHeadcountVarianceToBudget, 1) : '—',
-      averageGapVarianceLabel: canCompareToBudget ? formatVariance(averageGapVarianceToBudget, 1) : '—',
-      statusLabel: statusItems.length ? statusItems.join(', ') : 'Ready',
-      statusTone: statusItems.length ? 'warning' : 'success'
-    }
-  }
-
-  const callCenterSummaryRows = computed(() =>
-    getCenterGroups(center.value)
-      .map((group) => buildCallCenterSummaryRow(group, selectedSummaryPlanningYear.value))
-      .sort((left, right) => left.name.localeCompare(right.name))
+  const callCenterReportIssues = computed(() =>
+    callCenterAnnualPlan.value.integrityIssues.map((issue) => ({
+      ...issue,
+      openHref: issue.planId
+        ? buildPlanningPlanHash(center.value.id, issue.groupId, issue.planId)
+        : buildPlanningGroupHash(center.value.id, issue.groupId, selectedSummaryPlanningYear.value),
+      actionLabel: issue.plannedRequirementAvailable ? 'Review Plan' : 'Recalculate Plan'
+    }))
   )
-
-  const callCenterSummaryStripItems = computed(() => {
-    const summary = callCenterAnnualPlan.value.summary
-    const hasActuals = summary.monthsWithActualsCount > 0
-
-    return [
-      {
-        label: 'Plan Coverage',
-        value: `${formatWhole(summary.plannedGroupCount)}/${formatWhole(summary.groupCount)}`,
-        meta: 'Staffing groups with plans'
-      },
-      {
-        label: 'Actuals Coverage',
-        value: `${formatWhole(summary.groupsWithActualsCount)}/${formatWhole(summary.groupCount)}`,
-        meta: `${formatWhole(summary.monthsWithActualsCount)} of 12 months loaded`
-      },
-      {
-        label: 'Expected Contacts',
-        value: formatWhole(summary.expectedContacts),
-        meta: `${selectedSummaryPlanningYear.value} plan`
-      },
-      {
-        label: 'Actual Contacts',
-        value: hasActuals ? formatWhole(summary.actualContacts) : '—',
-        meta: hasActuals ? 'Loaded actuals' : 'No actuals loaded'
-      },
-      {
-        label: 'Avg Required HC',
-        value: formatNumber(summary.averageRequiredHeadcount, 1),
-        meta: `Peak ${formatNumber(summary.peakRequiredHeadcount, 1)}`
-      },
-      {
-        label: 'Staffing Gap',
-        value: formatVariance(summary.averageGapToRequirement, 1),
-        meta: `${formatWhole(summary.monthsBelowRequirement)} months below requirement`
-      },
-      {
-        label: 'AHT',
-        value: formatAht(summary.expectedAhtSeconds),
-        meta: hasActuals ? `Actual ${formatAht(summary.actualAhtSeconds)}` : 'Expected blended'
-      },
-      {
-        label: 'Actual Vs Plan',
-        value: summary.contactVariance == null ? '—' : formatVariance(summary.contactVariance, 0),
-        meta: summary.contactVariancePercent == null
-          ? 'Waiting for actuals'
-          : `${formatPercent(summary.contactVariancePercent, 1)} contacts`
-      }
-    ]
-  })
 
   const buildPlanRow = (plan) => {
       const rowMetrics = buildPlanRowMetrics(plan, center.value)
@@ -662,13 +517,11 @@ export function usePlanningCenterWorkspace({
     callCenterAnnualPlan,
     callCenterAnnualTotalRow,
     callCenterPlanningYearOptions,
-    callCenterSummaryRows,
-    callCenterSummaryStripItems,
+    callCenterReportIssues,
     createPlanHref,
     existingPlanForDraftYear,
     existingPlanHref,
     formatNumber,
-    formatPercent,
     formatWhole,
     groupRows,
     planYearSections,
