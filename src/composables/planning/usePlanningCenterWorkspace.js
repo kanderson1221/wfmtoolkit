@@ -491,17 +491,12 @@ export function usePlanningCenterWorkspace({
     ]
   })
 
-  const buildPlanRow = (plan, budgetRow = null) => {
+  const buildPlanRow = (plan) => {
       const rowMetrics = buildPlanRowMetrics(plan, center.value)
       const planType = plan.planType === PLAN_TYPE_UPDATE ? PLAN_TYPE_UPDATE : PLAN_TYPE_BUDGET
       const planStatus = normalizePlanStatus(plan.status, planType)
       const isDraftBudget = planType === PLAN_TYPE_BUDGET && planStatus === PLAN_STATUS_DRAFT
       const actualsThroughLabel = formatMonthStartLabel(plan.actualsThroughMonth)
-      const contactsVarianceToBudget = budgetRow ? rowMetrics.annualContacts - budgetRow.annualContacts : null
-      const totalRequiredHoursVarianceToBudget = budgetRow ? rowMetrics.totalRequiredStaffHours - budgetRow.totalRequiredStaffHours : null
-      const averageRequiredHeadcountVarianceToBudget = budgetRow ? rowMetrics.averageTotalRequiredHeadcount - budgetRow.averageTotalRequiredHeadcount : null
-      const averageGapVarianceToBudget = budgetRow ? rowMetrics.averageGapToRequirement - budgetRow.averageGapToRequirement : null
-
       return {
         ...plan,
         planType,
@@ -521,14 +516,6 @@ export function usePlanningCenterWorkspace({
         peakTotalRequiredHeadcount: rowMetrics.peakTotalRequiredHeadcount,
         endingFrontlineHeadcount: rowMetrics.endingFrontlineHeadcount,
         averageGapToRequirement: rowMetrics.averageGapToRequirement,
-        contactsVarianceToBudget,
-        totalRequiredHoursVarianceToBudget,
-        averageRequiredHeadcountVarianceToBudget,
-        averageGapVarianceToBudget,
-        contactsVarianceLabel: budgetRow && planType === PLAN_TYPE_UPDATE ? formatVariance(contactsVarianceToBudget, 0) : '—',
-        totalRequiredHoursVarianceLabel: budgetRow && planType === PLAN_TYPE_UPDATE ? formatVariance(totalRequiredHoursVarianceToBudget, 0) : '—',
-        averageRequiredHeadcountVarianceLabel: budgetRow && planType === PLAN_TYPE_UPDATE ? formatVariance(averageRequiredHeadcountVarianceToBudget, 1) : '—',
-        averageGapVarianceLabel: budgetRow && planType === PLAN_TYPE_UPDATE ? formatVariance(averageGapVarianceToBudget, 1) : '—',
         openHref: buildPlanningPlanHash(center.value.id, selectedGroup.value.id, plan.id),
         isSelectedYear: Number(plan.planningYear) === Number(selectedYearModel.value)
       }
@@ -554,7 +541,7 @@ export function usePlanningCenterWorkspace({
         const budgetRow = buildPlanRow(budgetPlan)
         const rows = plans
           .filter((plan) => plan.id !== budgetPlan.id)
-          .map((plan) => buildPlanRow(plan, budgetRow))
+          .map((plan) => buildPlanRow(plan))
           .sort((left, right) => {
             if (left.isCurrent && !right.isCurrent) {
               return -1

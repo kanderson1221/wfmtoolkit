@@ -40,31 +40,31 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-18, then superseded by `INT-001`; the portfolio report was removed under `RET-002` rather than extended with a threshold.
 - Last reviewed: 2026-07-18.
 
-### `NOW-004` — Side-by-side plan scenario comparison — Ready
+### `NOW-004` — Side-by-side plan scenario comparison — Completed
 
-- Capability: `CAP-SCEN-001` (Need 32), `CAP-UX-001` (Need 32)
+- Capability: `CAP-SCEN-001` (Need 20 after this run; 32 before), `CAP-UX-001` (Need 32)
 - Planner outcome: compare Budget and Updates across assumptions, demand, requirement, supply, and gaps without opening plans serially.
 - Problem/opportunity: version lineage exists, but comparison is row-summary level rather than decision-grade.
 - Rationale/evidence: plan library and current-plan roles are implemented; comparison is the highest-leverage extension of the annual planning core.
 - Dependencies: stable plan snapshots and comparable requirement semantics.
-- Proposed scope: desktop split comparison, assumption deltas, monthly exceptions, explicit incompatible-method handling, CSV export.
+- Delivered scope: Budget-versus-current default with selectable same-year saved plans; side-by-side annual outcomes and assumptions; material monthly exceptions; explicit incompatible-method withholding; complete 12-month CSV export.
 - Success measures: two plans reconcile to their saved snapshots; changed assumptions and top staffing-gap movements are visible without tab switching.
-- Status: ready; promoted from `NEXT-001` after `NOW-003` completed.
+- Status: completed 2026-07-18. Comparison is read-only, reconciles saved Workload Ratio and Intraday Erlang snapshots, and removes the cramped repeated per-row variance block.
 - Last reviewed: 2026-07-18.
 
-## Next
-
-### `NEXT-002` — Forecast accuracy and uncertainty review
+### `NOW-005` — Forecast accuracy and uncertainty review — Ready
 
 - Capability: `CAP-FORE-002` (Need 40)
 - Planner outcome: forecast analysts can judge model fit, holdout performance, interval uncertainty, and manual overrides before saving a planning source.
 - Problem/opportunity: the workbench is capable but does not provide a compact, governed accuracy decision record.
-- Rationale/evidence: forecasting modules expose model components and validation; uncertainty and model comparison remain gaps in the assessment.
-- Dependencies: stable historical-data quality and forecast result schema.
+- Rationale/evidence: forecasting modules expose model components and validation; uncertainty and model comparison remain the highest-value executable gap after saved-plan comparison. `INT-002` asks which real acceptance decision and error measures should govern the first slice.
+- Dependencies: stable historical-data quality and forecast result schema; acceptance semantics informed by `INT-002` where practical.
 - Proposed scope: holdout metrics, bias/accuracy by period, uncertainty bands or scenarios, override reason trace, and exportable diagnostics.
 - Success measures: users can compare at least two candidate models or configurations and identify bias/coverage limitations without reading implementation details.
-- Status: sequenced.
+- Status: ready; promoted from `NEXT-002` during the strategic portfolio review.
 - Last reviewed: 2026-07-18.
+
+## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
 
@@ -181,3 +181,5 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-18 | Kept employee scheduling and intraday management out of Now despite high Need scores because data/integration prerequisites and product-boundary decisions are unresolved. |
 | 2026-07-18 | Declined phone-specific planning work; desktop/laptop workflow quality is the supported UX target. |
 | 2026-07-18 | Applied `INT-001` and retired cross-center portfolio reporting from the planning home. Earlier `NOW-001`/`NOW-003` integrity work remains preserved as completed history but its product surface was superseded; aggregate reporting stays inside call centers under `PLAN-012`. |
+| 2026-07-18 | Completed the fifth-run strategic portfolio review and `NOW-004`: saved same-year plans now compare assumptions, outcomes, monthly exceptions, and exports without mutating snapshots or comparing incompatible requirement semantics. |
+| 2026-07-18 | Promoted forecast accuracy and uncertainty review from `NEXT-002` to ready `NOW-005`; added `INT-002` to establish the sponsor's real forecast-acceptance decision before choosing metric emphasis. |

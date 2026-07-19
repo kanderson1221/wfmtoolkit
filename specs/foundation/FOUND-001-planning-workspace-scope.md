@@ -373,7 +373,7 @@ This specification is intentionally broad. Detailed behavior shall be defined by
 - `FOUND-003`: Units, dates, time zones, rounding, and numeric conventions
 - `ORG-001` through `ORG-004`: Organization setup
 - `FIMP-001` through `FIMP-008`: Forecast import and plan handoff
-- `PLAN-001` through `PLAN-012`: Annual requirement, staffing planning, and call-center reporting
+- `PLAN-001` through `PLAN-013`: Annual requirement, staffing planning, scenario comparison, and call-center reporting
 - `ACT-001` through `ACT-006`: Actuals and updated plans
 - `DATA-001` through `DATA-005`: Local persistence and recovery
 

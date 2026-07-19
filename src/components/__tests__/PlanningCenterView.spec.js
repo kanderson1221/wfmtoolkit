@@ -115,6 +115,18 @@ const PlanningPlanUpdateModalStub = {
   `
 }
 
+const PlanningPlanComparisonDialogStub = {
+  name: 'PlanningPlanComparisonDialog',
+  props: ['visible', 'groupName', 'section'],
+  emits: ['update:visible'],
+  template: `
+    <div v-if="visible" data-test="plan-comparison-dialog">
+      <p>Compare {{ groupName }} {{ section.planningYear }}</p>
+      <p>{{ section.rows.length }} saved plans</p>
+    </div>
+  `
+}
+
 const PlannerSettingsModalStub = {
   name: 'PlannerSettingsModal',
   props: [
@@ -249,6 +261,7 @@ const buildWrapper = (props = {}) =>
         CallCenterSettingsModal: true,
         PlanningGroupSettingsModal: true,
         PlanningForecastCreateModal: PlanningForecastCreateModalStub,
+        PlanningPlanComparisonDialog: PlanningPlanComparisonDialogStub,
         PlanningPlanUpdateModal: PlanningPlanUpdateModalStub,
         PlanningGroupIntradayView: PlanningGroupIntradayViewStub,
         PlannerSettingsModal: PlannerSettingsModalStub
@@ -515,7 +528,7 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).not.toContain('Utilization %')
   })
 
-  it('groups Budget and Update plans by year with current badges, budget variances, and update actions', async () => {
+  it('groups Budget and Update plans by year with current badges, comparison, and update actions', async () => {
     window.location.hash = '#planning'
 
     const wrapper = buildWrapper({
@@ -603,10 +616,12 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('Update')
     expect(wrapper.text()).toContain('Current')
     expect(wrapper.text()).toContain('Actuals through Mar 2026')
-    expect(wrapper.text()).toContain('Contacts +10,000')
-    expect(wrapper.text()).toContain('HC +0.8')
-    expect(wrapper.text()).toContain('Hrs +1,800')
-    expect(wrapper.text()).toContain('Gap -1.2')
+    expect(wrapper.text()).toContain('Compare Plans')
+    expect(wrapper.text()).not.toContain('Vs Budget')
+
+    await wrapper.findAll('button').find((node) => node.text().trim() === 'Compare Plans').trigger('click')
+    expect(wrapper.get('[data-test="plan-comparison-dialog"]').text()).toContain('Compare Voice Support 2026')
+    expect(wrapper.get('[data-test="plan-comparison-dialog"]').text()).toContain('3 saved plans')
 
     const setCurrentButton = wrapper.findAll('button').find((node) => node.text().trim() === 'Set Current')
     await setCurrentButton.trigger('click')

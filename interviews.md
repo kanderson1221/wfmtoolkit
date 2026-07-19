@@ -4,7 +4,20 @@ Type answers beneath each `Answer:` field and leave the question IDs intact. Ans
 
 ## Open questions
 
-None.
+### INT-002 — Forecast acceptance decision and error evidence
+
+- Status: Open
+- Date asked: 2026-07-18
+- Priority: High
+- Related capability IDs/roadmap items: `CAP-FORE-002`, `NOW-005`
+- Decision this answer will influence: Which holdout periods, accuracy/bias measures, comparison baseline, and warning thresholds should lead the first forecast accuracy and uncertainty review.
+- Why repository evidence cannot answer it: The forecasting implementation exposes model outputs, but no repository artifact identifies the sponsor's real accept/reject decision, planning horizon, tolerance for bias, or whether forecast misses are evaluated primarily by volume, workload, peak, or staffing consequence.
+- Question: Think of the last time you accepted or rejected a demand forecast for an annual staffing plan. What decision were you making, what comparison or error evidence did you inspect (for example bias, WAPE, peak-month miss, workload/AHT miss, or staffing impact), over what holdout period, and what result would have caused you to reject the forecast? An anonymized example or approximate range is enough.
+- Answer:
+- Date answered:
+- Agent interpretation:
+- Product/roadmap action:
+- Applied date:
 
 ## Answers awaiting application
 

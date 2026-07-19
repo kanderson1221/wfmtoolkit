@@ -251,8 +251,8 @@ These decisions are normative for the initial implementation.
 
 ## Reporting
 
-- Portfolio reporting provides explicit `Current Plan` and `Budget` modes and
-  defaults to `Current Plan`.
+- Call-center reporting uses each staffing group's selected-year current plan,
+  with the Budget as fallback when no current Update exists.
 - Staffing groups are additive; shared-pool or non-additive groups are not
   supported.
 - Contacts, workload, required hours, staffing movements, and loaded days are
@@ -350,9 +350,9 @@ of those two `depends_on` lists.
 - actuals lifecycle, variances, actualization, update creation, and current-plan
   lineage
 
-## Phase 7: Call-Center Reporting And Recovery
+## Phase 7: Scenario Comparison, Call-Center Reporting, And Recovery
 
-- `PLAN-012`
+- `PLAN-012` through `PLAN-013`
 - `DATA-003` through `DATA-005`
 - call-center reporting, transactional autosave, backup, restore, clear, and
   migration
@@ -465,6 +465,7 @@ and the unverified risk.
 ## Call-Center Reporting
 
 - `PLAN-012` Call-center annual rollup and reporting
+- `PLAN-013` Saved annual plan scenario comparison
 
 ## Data Persistence
 

@@ -14,6 +14,7 @@ import PlanningForecastCreateModal from './PlanningForecastCreateModal.vue'
 import PlanningGroupActualsView from './PlanningGroupActualsView.vue'
 import PlanningGroupIntradayView from './PlanningGroupIntradayView.vue'
 import PlanningGroupSettingsModal from './PlanningGroupSettingsModal.vue'
+import PlanningPlanComparisonDialog from './PlanningPlanComparisonDialog.vue'
 import PlanningPlanUpdateModal from './PlanningPlanUpdateModal.vue'
 import PlannerSettingsModal from '../planner/PlannerSettingsModal.vue'
 import { buildPlanningCenterHash, buildPlanningNewPlanHash, navigateToHash } from '../../appRoutes'
@@ -75,6 +76,8 @@ const emit = defineEmits(['save-group', 'delete-group', 'delete-plan', 'set-curr
 const groupSettingsOpen = ref(false)
 const planSettingsOpen = ref(false)
 const planUpdateOpen = ref(false)
+const planComparisonOpen = ref(false)
+const planComparisonSection = ref(null)
 const groupDraft = ref(createPlanningGroupDraft())
 const callCenterPlanningYear = ref(Number(props.selectedYear) || currentYear)
 const newPlanYear = ref(currentYear)
@@ -97,8 +100,8 @@ const activeGroupWorkspaceTab = ref('data')
 const actualsViewRef = ref(null)
 const expandedActualMonthIds = ref(new Set())
 
-const planComparisonGridClass =
-  'grid min-w-0 grid-cols-[minmax(12rem,1.25fr)_minmax(7rem,0.72fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7rem,0.72fr)] items-center'
+const planRowGridClass =
+  'grid min-w-0 grid-cols-[minmax(12rem,1.25fr)_minmax(7rem,0.72fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7.5rem,0.75fr)_minmax(7rem,0.72fr)] items-center'
 const forecastComparisonGridClass =
   'grid min-w-0 grid-cols-[minmax(9rem,0.95fr)_minmax(9.5rem,1fr)_minmax(7.25rem,0.8fr)_minmax(6rem,0.72fr)_minmax(6rem,0.72fr)_minmax(6.75rem,0.78fr)_minmax(6.75rem,0.8fr)_minmax(8.75rem,1fr)] items-center'
 
@@ -380,6 +383,15 @@ const openPlanUpdate = (plan, section = null) => {
 
 const closePlanUpdate = () => {
   planUpdateOpen.value = false
+}
+
+const openPlanComparison = (section) => {
+  if (!section || section.rows.length < 2) {
+    return
+  }
+
+  planComparisonSection.value = section
+  planComparisonOpen.value = true
 }
 
 const createPlanUpdate = () => {
@@ -1333,18 +1345,29 @@ watch(
                         </span>
                       </div>
 
-                      <div v-if="!section.currentPlan.isDraftBudget" class="grid max-w-md justify-items-end gap-1.5">
-                        <AppButton
-                          size="sm"
-                          variant="secondary"
-                          :disabled="!section.actualsThroughOptions.length"
-                          :title="section.actualsThroughBlocker || undefined"
-                          @click="openPlanUpdate(section.currentPlan, section)"
-                        >
-                          Create Updated Plan
-                        </AppButton>
+                      <div class="grid max-w-md justify-items-end gap-1.5">
+                        <div class="flex items-center justify-end gap-2">
+                          <AppButton
+                            v-if="section.rows.length > 1"
+                            size="sm"
+                            variant="secondary"
+                            @click="openPlanComparison(section)"
+                          >
+                            Compare Plans
+                          </AppButton>
+                          <AppButton
+                            v-if="!section.currentPlan.isDraftBudget"
+                            size="sm"
+                            variant="secondary"
+                            :disabled="!section.actualsThroughOptions.length"
+                            :title="section.actualsThroughBlocker || undefined"
+                            @click="openPlanUpdate(section.currentPlan, section)"
+                          >
+                            Create Updated Plan
+                          </AppButton>
+                        </div>
                         <p
-                          v-if="section.actualsThroughBlocker"
+                          v-if="!section.currentPlan.isDraftBudget && section.actualsThroughBlocker"
                           class="text-right text-xs font-medium leading-5 text-rose-700"
                           role="status"
                         >
@@ -1356,13 +1379,12 @@ watch(
                     <div class="border-b border-slate-200 px-3 py-2">
                       <div :class="planListRowGridClass">
                         <span class="h-8 w-1" aria-hidden="true" />
-                        <div :class="[planComparisonGridClass, 'px-2']">
+                        <div :class="[planRowGridClass, 'px-2']">
                           <span :class="planHeaderCellClass">Plan</span>
                           <span :class="planHeaderCellRightClass">Contacts</span>
                           <span :class="planHeaderCellRightClass">Total Req Hrs</span>
                           <span :class="planHeaderCellRightClass">Avg Req HC</span>
                           <span :class="planHeaderCellRightClass">Avg Gap</span>
-                          <span :class="planHeaderCellRightClass">Vs Budget</span>
                           <span :class="planHeaderCellRightClass">Saved</span>
                         </div>
                         <div class="pr-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
@@ -1390,7 +1412,7 @@ watch(
                           aria-hidden="true"
                         />
 
-                        <div :class="[planComparisonGridClass, 'rounded-[16px] px-2 py-1.5 text-sm']">
+                        <div :class="[planRowGridClass, 'rounded-[16px] px-2 py-1.5 text-sm']">
                           <div class="grid min-w-0 gap-1 px-3">
                             <div class="flex min-w-0 flex-wrap items-center gap-1.5">
                               <strong class="truncate text-slate-950">{{ plan.name || `${plan.planningYear} Plan` }}</strong>
@@ -1419,12 +1441,6 @@ watch(
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
                             {{ formatSignedNumber(plan.averageGapToRequirement, 1) }}
-                          </span>
-                          <span class="grid gap-0.5 px-3 text-right text-[0.78rem] font-medium tabular-nums text-slate-600">
-                            <span>Contacts {{ plan.contactsVarianceLabel }}</span>
-                            <span>HC {{ plan.averageRequiredHeadcountVarianceLabel }}</span>
-                            <span>Hrs {{ plan.totalRequiredHoursVarianceLabel }}</span>
-                            <span>Gap {{ plan.averageGapVarianceLabel }}</span>
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
                             {{ plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : '—' }}
@@ -1525,6 +1541,14 @@ watch(
       :actuals-through-blocker="updateActualsThroughBlocker"
       @cancel="closePlanUpdate"
       @create="createPlanUpdate"
+    />
+
+    <PlanningPlanComparisonDialog
+      v-if="planComparisonSection"
+      v-model:visible="planComparisonOpen"
+      :center="props.center"
+      :group-name="selectedGroup?.name || 'Staffing Group'"
+      :section="planComparisonSection"
     />
 
     <AppConfirmDialog

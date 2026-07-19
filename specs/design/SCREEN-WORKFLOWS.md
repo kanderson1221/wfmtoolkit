@@ -51,7 +51,7 @@ It does not include:
 | `S-07` | Imported Forecast Library | Compare, open, import, replace, and delete versions | `FIMP-001`, `FIMP-007` |
 | `S-08` | Forecast Import | Upload, map, validate, preview, and accept an external forecast | `FIMP-002` through `FIMP-006` |
 | `S-09` | Intraday Profile | Define the staffing group's reusable interval distribution | `ORG-004` |
-| `S-10` | Plan Library | Compare budget and update plans by year | `PLAN-001`, `ACT-004`, `ACT-006` |
+| `S-10` | Plan Library | Compare budget and update plans by year | `PLAN-001`, `PLAN-013`, `ACT-004`, `ACT-006` |
 | `S-11` | New Plan | Select year, requirement method, and imported forecast | `PLAN-001`, `PLAN-002`, `FIMP-008` |
 | `S-12` | Annual Plan Workspace | Review assumptions, calculate requirement, and build staffing supply | `PLAN-002` through `PLAN-011` |
 | `S-13` | Create Updated Plan | Choose source plan, cutoff month, and future forecast | `ACT-004`, `ACT-005` |
@@ -579,12 +579,12 @@ Key interactions:
 | Consumer Voice / Plans                                              [New Plan]   |
 +----------------------------------------------------------------------------------+
 | 2027                                      Current: 2027 June Update              |
-|                                              [Create Updated Plan]               |
+|                              [Compare Plans] [Create Updated Plan]               |
 |----------------------------------------------------------------------------------|
-| Plan              | Contacts | Req Hrs | Avg Req HC | Avg Gap | Vs Budget | Saved|
-| 2027 Budget       |          |         |            |         | Baseline  |       |
-| 2027 April Update |          |         |            |         |           |       |
-| 2027 June Update  |          |         |            |         |           |       |
+| Plan                    | Contacts | Req Hrs | Avg Req HC | Avg Gap | Saved       |
+| 2027 Budget             |          |         |            |         |             |
+| 2027 April Update       |          |         |            |         |             |
+| 2027 June Update        |          |         |            |         |             |
 |                                                              [Open] [...]        |
 +----------------------------------------------------------------------------------+
 | 2026                                      Current: 2026 Budget                   |
@@ -595,6 +595,7 @@ Key interactions:
 Key interactions:
 
 - `New Plan` opens `S-11`.
+- `Compare Plans` opens the read-only `PLAN-013` Budget-versus-Update review and export.
 - `Create Updated Plan` opens `S-13`.
 - Actions include open, set current, and delete where permitted.
 - Budget deletion is blocked while updates depend on it.
