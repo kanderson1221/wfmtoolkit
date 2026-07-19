@@ -107,6 +107,9 @@ describe('forecasting shared helpers', () => {
 
     expect(januaryFirstMonth).toMatchObject({
       monthLabel: 'Jan 2026',
+      baselineContacts: 2000,
+      manualAdjustmentDelta: 150,
+      adjustedDayCount: 1,
       contacts: 2150,
       lowerBoundContacts: 1950,
       upperBoundContacts: 2350
@@ -114,6 +117,9 @@ describe('forecasting shared helpers', () => {
 
     expect(februaryMonth).toMatchObject({
       monthLabel: 'Feb 2026',
+      baselineContacts: 1200,
+      manualAdjustmentDelta: -50,
+      adjustedDayCount: 1,
       contacts: 1150,
       lowerBoundContacts: 1050,
       upperBoundContacts: 1250
@@ -168,6 +174,9 @@ describe('forecasting shared helpers', () => {
 
     expect(januaryMonth).toMatchObject({
       monthLabel: 'Jan 2026',
+      baselineContacts: 3100,
+      manualAdjustmentDelta: 400,
+      adjustedDayCount: 2,
       contacts: 3500,
       lowerBoundContacts: 3200,
       upperBoundContacts: 3800

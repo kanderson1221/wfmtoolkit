@@ -415,7 +415,7 @@ watch(
               Range adjustment rules
             </h3>
             <p class="text-sm text-slate-600">
-              All rules apply to the baseline forecast.
+              All rules apply to the baseline forecast and require a recorded planning reason.
             </p>
           </div>
 

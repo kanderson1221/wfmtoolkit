@@ -74,6 +74,9 @@ const normalizeMonthlyRollupRows = (rows = [], dailyForecastRows = []) => {
 
         return {
           ...row,
+          baselineContacts: row?.baselineContacts ?? row?.contacts ?? 0,
+          manualAdjustmentDelta: row?.manualAdjustmentDelta ?? 0,
+          adjustedDayCount: row?.adjustedDayCount ?? 0,
           peakDailyDate: row?.peakDailyDate || derivedPeakRow?.ds || '',
           peakDailyVolume: row?.peakDailyVolume ?? derivedPeakRow?.yhat ?? 0
         }
@@ -168,6 +171,9 @@ export function buildMonthlyRollupFromDailyForecastRows(rows = []) {
       const existingMonth = monthlyRollupMap.get(monthStart) || {
         monthStart,
         monthLabel: resolveMonthLabel(monthStart),
+        baselineContacts: 0,
+        manualAdjustmentDelta: 0,
+        adjustedDayCount: 0,
         contacts: 0,
         averageDailyVolume: 0,
         peakDailyDate: '',
@@ -177,6 +183,11 @@ export function buildMonthlyRollupFromDailyForecastRows(rows = []) {
         _dayCount: 0
       }
       const forecastValue = toNumber(row?.yhat, 0)
+      const baselineForecast = toNumber(row?.baselineYhat, forecastValue)
+      const manualAdjustmentDelta = toNumber(
+        row?.manualAdjustmentDelta,
+        forecastValue - baselineForecast
+      )
       const lowerBound = toNumber(row?.yhatLower, 0)
       const upperBound = toNumber(row?.yhatUpper, 0)
       const nextPeakDate = forecastValue >= existingMonth.peakDailyVolume ? row.ds : existingMonth.peakDailyDate
@@ -184,6 +195,9 @@ export function buildMonthlyRollupFromDailyForecastRows(rows = []) {
 
       monthlyRollupMap.set(monthStart, {
         ...existingMonth,
+        baselineContacts: existingMonth.baselineContacts + baselineForecast,
+        manualAdjustmentDelta: existingMonth.manualAdjustmentDelta + manualAdjustmentDelta,
+        adjustedDayCount: existingMonth.adjustedDayCount + (row?.isAdjusted ? 1 : 0),
         contacts: existingMonth.contacts + forecastValue,
         lowerBoundContacts: existingMonth.lowerBoundContacts + lowerBound,
         upperBoundContacts: existingMonth.upperBoundContacts + upperBound,

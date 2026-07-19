@@ -37,7 +37,8 @@ const draftAdjustment = reactive({
   startDate: '',
   endDate: '',
   adjustmentType: 'delta',
-  value: 0
+  value: 0,
+  reason: ''
 })
 const editingAdjustmentId = ref('')
 
@@ -48,6 +49,9 @@ const forecastRows = computed(() =>
 const manualAdjustments = computed(() => getForecastProjectManualAdjustments(project.value))
 const firstForecastDate = computed(() => forecastRows.value[0]?.ds || '')
 const lastForecastDate = computed(() => forecastRows.value.at(-1)?.ds || '')
+const missingReasonCount = computed(() =>
+  manualAdjustments.value.filter((adjustment) => !adjustment.reason.trim()).length
+)
 
 const worksheetSummary = computed(() => {
   if (!hasResults.value) {
@@ -56,10 +60,6 @@ const worksheetSummary = computed(() => {
 
   if (!forecastRows.value.length) {
     return 'The last completed run did not return future daily rows, so there is nothing to adjust yet.'
-  }
-
-  if (!manualAdjustments.value.length) {
-    return ''
   }
 
   return ''
@@ -82,6 +82,10 @@ const draftValidationMessage = computed(() => {
     return 'Enter a non-zero adjustment value.'
   }
 
+  if (!draftAdjustment.reason.trim()) {
+    return 'Enter the planning reason for this adjustment.'
+  }
+
   const overlapsForecast = forecastRows.value.some(
     (row) => row.ds >= draftAdjustment.startDate && row.ds <= draftAdjustment.endDate
   )
@@ -98,6 +102,13 @@ const canSubmitAdjustment = computed(() =>
 )
 
 const isEditingAdjustment = computed(() => Boolean(editingAdjustmentId.value))
+const shouldShowDraftValidation = computed(() =>
+  Boolean(
+    isEditingAdjustment.value ||
+    Number(draftAdjustment.value || 0) !== 0 ||
+    draftAdjustment.reason.trim()
+  )
+)
 
 const adjustmentRows = computed(() =>
   manualAdjustments.value.map((adjustment) => {
@@ -105,22 +116,9 @@ const adjustmentRows = computed(() =>
       (row) => row.ds >= adjustment.startDate && row.ds <= adjustment.endDate
     )
     const impactedDays = impactedRows.length
-    const estimatedImpact = adjustment.adjustmentType === 'percent'
-      ? impactedRows.reduce(
-          (sum, row) => sum + ((Number(row.baselineYhat || 0) * Number(adjustment.value || 0)) / 100),
-          0
-        )
-      : adjustment.adjustmentType === 'set'
-        ? impactedRows.reduce(
-            (sum, row) => sum + (Number(adjustment.value || 0) - Number(row.baselineYhat || 0)),
-            0
-          )
-        : impactedDays * Number(adjustment.value || 0)
-
     return {
       ...adjustment,
-      impactedDays,
-      estimatedImpact
+      impactedDays
     }
   })
 )
@@ -150,6 +148,7 @@ const resetDraftAdjustment = () => {
   draftAdjustment.endDate = firstForecastDate.value || ''
   draftAdjustment.adjustmentType = 'delta'
   draftAdjustment.value = 0
+  draftAdjustment.reason = ''
   editingAdjustmentId.value = ''
 }
 
@@ -163,7 +162,8 @@ const submitManualAdjustment = () => {
     startDate: draftAdjustment.startDate,
     endDate: draftAdjustment.endDate,
     adjustmentType: draftAdjustment.adjustmentType,
-    value: Number(draftAdjustment.value || 0)
+    value: Number(draftAdjustment.value || 0),
+    reason: draftAdjustment.reason.trim()
   })
 
   if (editingAdjustmentId.value) {
@@ -186,6 +186,7 @@ const editManualAdjustment = (adjustment) => {
   draftAdjustment.endDate = adjustment.endDate
   draftAdjustment.adjustmentType = adjustment.adjustmentType
   draftAdjustment.value = Number(adjustment.value || 0)
+  draftAdjustment.reason = adjustment.reason
 }
 
 const removeManualAdjustment = (adjustmentId) => {
@@ -238,9 +239,13 @@ watch(
       Settings changed after the last run. Adjustment rules are still applied to the current result set until you rerun the forecast.
     </AppStatusMessage>
 
+    <AppStatusMessage v-if="missingReasonCount">
+      {{ formatWhole(missingReasonCount) }} saved {{ missingReasonCount === 1 ? 'rule has' : 'rules have' }} no recorded reason. Edit {{ missingReasonCount === 1 ? 'it' : 'them' }} before relying on the override record.
+    </AppStatusMessage>
+
     <template v-if="hasResults && forecastRows.length">
       <section class="grid gap-4">
-        <div class="grid gap-4 xl:grid-cols-[1fr_1fr_1.2fr_0.9fr_auto] xl:items-end">
+        <div class="grid gap-4 xl:grid-cols-[1fr_1fr_1.2fr_0.9fr] xl:items-end">
           <AppFieldGroup
             label="Start Date"
             input-id="forecast-adjustment-start"
@@ -297,7 +302,7 @@ watch(
             label-class="text-[0.76rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
           >
             <AppNumberField
-              id="forecast-adjustment-value"
+              input-id="forecast-adjustment-value"
               v-model="draftAdjustment.value"
               :step="1"
               :suffix="draftAdjustment.adjustmentType === 'percent' ? '%' : ''"
@@ -306,7 +311,29 @@ watch(
             />
           </AppFieldGroup>
 
-          <div class="flex items-center gap-2 xl:justify-end">
+        </div>
+
+        <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+          <AppFieldGroup
+            label="Decision Reason"
+            input-id="forecast-adjustment-reason"
+            compact
+            label-class="text-[0.76rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
+          >
+            <AppTextField
+              id="forecast-adjustment-reason"
+              v-model="draftAdjustment.reason"
+              compact
+              maxlength="200"
+              placeholder="Example: product launch volume approved by Commercial Planning"
+              class="h-10 shadow-none"
+            />
+            <template #help>
+              Enter a non-zero value and record the business event or approved assumption that justifies changing baseline demand.
+            </template>
+          </AppFieldGroup>
+
+          <div class="flex items-center gap-2 xl:justify-end xl:pb-7">
             <AppButton
               size="sm"
               variant="primary"
@@ -328,18 +355,25 @@ watch(
             </AppButton>
           </div>
         </div>
+
+        <AppStatusMessage
+          v-if="shouldShowDraftValidation && draftValidationMessage"
+          tone="error"
+        >
+          {{ draftValidationMessage }}
+        </AppStatusMessage>
       </section>
 
       <div v-if="manualAdjustments.length" class="overflow-x-auto border-t border-slate-200 pt-4">
-        <table class="w-full min-w-[760px] border-collapse text-sm text-slate-700">
+        <table class="w-full min-w-[900px] border-collapse text-sm text-slate-700">
           <thead class="border-b border-slate-200 bg-slate-50/85">
             <tr>
               <th class="px-5 py-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Start</th>
               <th class="px-5 py-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">End</th>
               <th class="px-4 py-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</th>
               <th class="px-4 py-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Value</th>
+              <th class="px-4 py-2 text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Decision Reason</th>
               <th class="px-4 py-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Days</th>
-              <th class="px-4 py-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Estimated Impact</th>
               <th class="px-5 py-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Action</th>
             </tr>
           </thead>
@@ -353,10 +387,10 @@ watch(
               <td class="px-5 py-2.5 font-medium text-slate-900">{{ formatDate(adjustment.endDate) }}</td>
               <td class="px-4 py-2.5">{{ getAdjustmentTypeLabel(adjustment.adjustmentType) }}</td>
               <td class="px-4 py-2.5 text-right tabular-nums">{{ formatAdjustmentValue(adjustment) }}</td>
-              <td class="px-4 py-2.5 text-right tabular-nums">{{ formatWhole(adjustment.impactedDays) }}</td>
-              <td class="px-4 py-2.5 text-right tabular-nums font-medium text-slate-900">
-                {{ adjustment.estimatedImpact >= 0 ? '+' : '' }}{{ formatWhole(adjustment.estimatedImpact) }}
+              <td class="max-w-[24rem] px-4 py-2.5 text-slate-700">
+                {{ adjustment.reason || 'Not recorded (legacy rule)' }}
               </td>
+              <td class="px-4 py-2.5 text-right tabular-nums">{{ formatWhole(adjustment.impactedDays) }}</td>
               <td class="px-5 py-2.5">
                 <div class="flex justify-end gap-2">
                   <AppButton

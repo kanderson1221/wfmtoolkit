@@ -20,6 +20,7 @@ import {
   formatNumber,
   formatWhole,
   getForecastProjectDailyRows,
+  getForecastProjectManualAdjustments,
   getForecastProjectMonthlyRollup,
   getForecastProjectSourceKind
 } from '../../forecasting/shared'
@@ -52,6 +53,9 @@ const sourceKind = computed(() => getForecastProjectSourceKind(project.value))
 
 const dailyRows = computed(() => getForecastProjectDailyRows(project.value))
 const monthlyRows = computed(() => getForecastProjectMonthlyRollup(project.value))
+const showContactAdjustmentTrace = computed(() =>
+  getForecastProjectManualAdjustments(project.value).length > 0
+)
 const monthlyAhtAssumptions = computed(() =>
   buildForecastMonthlyHandleTimeAssumptions(project.value)
 )
@@ -367,6 +371,7 @@ const clearAhtMonthOverrides = () => {
         :show-aht-assumptions="showAhtAssumptions"
         :monthly-aht-summary="monthlyAhtSummary"
         :monthly-rows-with-aht="monthlyRowsWithAht"
+        :show-contact-adjustment-trace="showContactAdjustmentTrace"
         :source-kind="sourceKind"
         :warning-messages="warningMessages"
         :note-messages="noteMessages"

@@ -18,6 +18,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  showContactAdjustmentTrace: {
+    type: Boolean,
+    default: false
+  },
   monthlyAhtSummary: {
     type: Object,
     default: () => ({})
@@ -51,6 +55,11 @@ const ahtAssumptionDescription = computed(() => {
 
   return `Assumed AHT comes from shared staffing-group history using ${String(props.monthlyAhtSummary.methodLabel || '').toLowerCase()}${overrideText}.`
 })
+
+const formatSignedContacts = (value) => {
+  const numericValue = Number(value || 0)
+  return `${numericValue > 0 ? '+' : ''}${formatWhole(numericValue)}`
+}
 </script>
 
 <template>
@@ -90,7 +99,21 @@ const ahtAssumptionDescription = computed(() => {
             <thead class="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95">
               <tr>
                 <th class="px-5 py-3 text-left text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Month</th>
-                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Contacts</th>
+                <th
+                  v-if="showContactAdjustmentTrace"
+                  class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
+                  Baseline Contacts
+                </th>
+                <th
+                  v-if="showContactAdjustmentTrace"
+                  class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
+                  Manual Change
+                </th>
+                <th class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {{ showContactAdjustmentTrace ? 'Final Contacts' : 'Contacts' }}
+                </th>
                 <th
                   v-if="showAhtAssumptions"
                   class="px-4 py-3 text-right text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
@@ -132,6 +155,16 @@ const ahtAssumptionDescription = computed(() => {
             <tbody class="divide-y divide-slate-200">
               <tr v-for="row in monthlyRowsWithAht" :key="row.monthStart" class="bg-white">
                 <td class="px-5 py-3 font-medium text-slate-900">{{ row.monthLabel }}</td>
+                <td v-if="showContactAdjustmentTrace" class="px-4 py-3 text-right tabular-nums">
+                  {{ formatWhole(row.baselineContacts) }}
+                </td>
+                <td
+                  v-if="showContactAdjustmentTrace"
+                  class="px-4 py-3 text-right tabular-nums font-medium"
+                  :class="Number(row.manualAdjustmentDelta || 0) === 0 ? 'text-slate-500' : 'text-slate-900'"
+                >
+                  {{ formatSignedContacts(row.manualAdjustmentDelta) }}
+                </td>
                 <td class="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{{ formatWhole(row.contacts) }}</td>
                 <td v-if="showAhtAssumptions" class="px-4 py-3 text-right tabular-nums">{{ formatForecastAhtSeconds(row.assumedAhtSeconds) }}</td>
                 <td v-if="sourceKind !== FORECAST_SOURCE_MANUAL_MONTHLY" class="px-4 py-3 text-right tabular-nums">{{ formatWhole(row.averageDailyVolume) }}</td>

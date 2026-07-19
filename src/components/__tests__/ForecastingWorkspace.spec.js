@@ -1415,17 +1415,25 @@ describe('ForecastingWorkspace', () => {
     await wrapper.findComponent(AppNumberField).vm.$emit('update:modelValue', 125)
     await flushUi()
 
+    expect(wrapper.text()).toContain('Enter the planning reason for this adjustment.')
+    expect(findButtonByText(wrapper, 'Add').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('#forecast-adjustment-reason').setValue('Approved product launch')
+    await flushUi()
+
     await findButtonByText(wrapper, 'Add').trigger('click')
     await flushUi()
 
     expect(wrapper.text()).toContain('Edit')
     expect(wrapper.text()).toContain('Remove')
     expect(wrapper.text()).toContain('+125')
+    expect(wrapper.text()).toContain('Approved product launch')
 
     await findButtonByText(wrapper, 'Edit').trigger('click')
     await flushUi()
 
     await wrapper.findComponent(AppNumberField).vm.$emit('update:modelValue', 150)
+    await wrapper.find('#forecast-adjustment-reason').setValue('Launch estimate approved by Commercial Planning')
     await flushUi()
 
     await findButtonByText(wrapper, 'Save', { last: true }).trigger('click')
@@ -1433,15 +1441,62 @@ describe('ForecastingWorkspace', () => {
 
     expect(wrapper.text()).toContain('+150')
     expect(wrapper.text()).not.toContain('+125')
+    expect(wrapper.text()).toContain('Launch estimate approved by Commercial Planning')
+    expect(wrapper.text()).not.toContain('Approved product launch')
     expect(wrapper.text()).toContain('Add')
     expect(
       [...wrapper.findAll('button')].some((button) => button.text().trim() === 'Save')
     ).toBe(false)
 
+    await findButtonByText(wrapper, 'Monthly Rollup').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Baseline Contacts')
+    expect(wrapper.text()).toContain('Manual Change')
+    expect(wrapper.text()).toContain('Final Contacts')
+    expect(wrapper.text()).toContain('2,030')
+    expect(wrapper.text()).toContain('+150')
+    expect(wrapper.text()).toContain('2,180')
+
+    await findButtonByText(wrapper, 'Contacts').trigger('click')
+    await flushUi()
+
     await findButtonByText(wrapper, 'Remove').trigger('click')
     await flushUi()
 
     expect(wrapper.text()).toContain('No adjustment rules yet')
+  })
+
+  it('preserves legacy adjustment rules without inventing a decision reason', async () => {
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: 'forecast-legacy-adjustment-reason-spec',
+        projectSeed: createProjectWithRun({
+          manualAdjustments: [
+            {
+              id: 'legacy-rule',
+              startDate: '2026-01-01',
+              endDate: '2026-01-01',
+              adjustmentType: 'delta',
+              value: 75
+            }
+          ]
+        })
+      }
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushUi()
+    await flushUi()
+
+    expect(wrapper.text()).toContain('1 saved rule has no recorded reason')
+    expect(wrapper.text()).toContain('Not recorded (legacy rule)')
+
+    await findButtonByText(wrapper, 'Edit').trigger('click')
+    await flushUi()
+
+    expect(wrapper.text()).toContain('Enter the planning reason for this adjustment.')
+    expect(findButtonByText(wrapper, 'Save', { last: true }).attributes('disabled')).toBeDefined()
   })
 
   it('moves the rerun action into the inspector drawer while settings are open', async () => {
