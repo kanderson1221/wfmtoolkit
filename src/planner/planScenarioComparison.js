@@ -123,6 +123,7 @@ export const buildPlanScenarioSnapshot = (plan, center) => {
     requirementMethodLabel: getPlanRequirementMethodLabel(requirementMethod),
     demandSourceLabel: resolveDemandSourceLabel(plan),
     actualsThroughMonth: String(plan?.actualsThroughMonth || ''),
+    decisionReason: String(plan?.decisionReason || ''),
     updatedAt: String(plan?.updatedAt || plan?.createdAt || ''),
     assumptions: {
       averagePaidHoursPerDay: average(monthlyRecords.map((row) => row.paidHoursPerDay)),

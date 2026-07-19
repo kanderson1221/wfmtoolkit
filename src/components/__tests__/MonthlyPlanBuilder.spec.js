@@ -543,7 +543,8 @@ describe('MonthlyPlanBuilder', () => {
         sourcePlanId: 'budget-2026',
         budgetPlanId: 'budget-2026',
         actualsThroughMonth: '2026-03-01',
-        actualizedAt: '2026-04-01T12:00:00.000Z'
+        actualizedAt: '2026-04-01T12:00:00.000Z',
+        decisionReason: 'Approved spring outlook'
       },
       groupPlans: [
         {
@@ -566,7 +567,8 @@ describe('MonthlyPlanBuilder', () => {
       sourcePlanId: 'budget-2026',
       budgetPlanId: 'budget-2026',
       actualsThroughMonth: '2026-03-01',
-      actualizedAt: '2026-04-01T12:00:00.000Z'
+      actualizedAt: '2026-04-01T12:00:00.000Z',
+      decisionReason: 'Approved spring outlook'
     })
   })
 

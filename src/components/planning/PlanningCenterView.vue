@@ -88,6 +88,7 @@ const updateActualsThroughOptions = ref([])
 const updateActualsThroughBlocker = ref('')
 const updateActualsThroughMonth = ref('')
 const updatePlanName = ref('')
+const updateDecisionReason = ref('')
 const {
   dialogVisible: confirmationDialogOpen,
   dialogTitle: confirmationDialogTitle,
@@ -378,6 +379,7 @@ const openPlanUpdate = (plan, section = null) => {
   updateActualsThroughBlocker.value = matchedSection?.actualsThroughBlocker || ''
   updateActualsThroughMonth.value = matchedSection?.defaultActualsThroughMonth || ''
   updatePlanName.value = matchedSection?.defaultUpdateName || `${plan.planningYear} Update`
+  updateDecisionReason.value = ''
   planUpdateOpen.value = true
 }
 
@@ -395,7 +397,13 @@ const openPlanComparison = (section) => {
 }
 
 const createPlanUpdate = () => {
-  if (!selectedGroup.value || !updateSourcePlan.value || !updateActualsThroughMonth.value || !updatePlanName.value.trim()) {
+  if (
+    !selectedGroup.value ||
+    !updateSourcePlan.value ||
+    !updateActualsThroughMonth.value ||
+    !updatePlanName.value.trim() ||
+    !updateDecisionReason.value.trim()
+  ) {
     return
   }
 
@@ -406,7 +414,8 @@ const createPlanUpdate = () => {
       requirementMethod: sourcePlan.requirementMethod,
       updateSourcePlanId: sourcePlan.id,
       actualsThroughMonth: updateActualsThroughMonth.value,
-      updatePlanName: updatePlanName.value.trim()
+      updatePlanName: updatePlanName.value.trim(),
+      updateDecisionReason: updateDecisionReason.value.trim()
     })
   )
 }
@@ -1426,8 +1435,13 @@ watch(
                                 Current
                               </span>
                             </div>
-                            <span class="truncate text-[0.78rem] text-slate-500">
-                              {{ plan.actualsThroughBadge || plan.requirementMethodLabel }}
+                            <span
+                              class="truncate text-[0.78rem] text-slate-500"
+                              :title="plan.isUpdate ? (plan.decisionReason || 'Decision reason not recorded for this legacy update.') : undefined"
+                            >
+                              {{ plan.isUpdate
+                                ? `${plan.actualsThroughBadge || 'Update'} · ${plan.decisionReason || 'Decision reason not recorded (legacy plan)'}`
+                                : plan.requirementMethodLabel }}
                             </span>
                           </div>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
@@ -1531,10 +1545,11 @@ watch(
     />
 
     <PlanningPlanUpdateModal
-      v-if="planUpdateOpen && updateSourcePlan"
+      v-if="updateSourcePlan"
       v-model:visible="planUpdateOpen"
       v-model:actuals-through-month="updateActualsThroughMonth"
       v-model:update-name="updatePlanName"
+      v-model:decision-reason="updateDecisionReason"
       :source-plan="updateSourcePlan"
       :budget-plan="updateBudgetPlan"
       :actuals-through-options="updateActualsThroughOptions"

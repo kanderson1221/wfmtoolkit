@@ -544,7 +544,8 @@ describe('usePlanningWorkspace', () => {
       requirementMethod: 'intraday_erlang',
       updateSourcePlanId: 'budget-2026',
       actualsThroughMonth: '2026-01-01',
-      updatePlanName: '2026 Feb Update'
+      updatePlanName: '2026 Feb Update',
+      updateDecisionReason: 'Approved January actualization'
     })
     const currentUser = ref({ id: 'user-1' })
     const hasWorkspaceAccess = computed(() => true)
@@ -569,7 +570,8 @@ describe('usePlanningWorkspace', () => {
       isCurrent: true,
       sourcePlanId: 'budget-2026',
       budgetPlanId: 'budget-2026',
-      actualsThroughMonth: '2026-01-01'
+      actualsThroughMonth: '2026-01-01',
+      decisionReason: 'Approved January actualization'
     })
     expect(workspace.plannerSeed.value.updateDraftPlan.planMonths[0]).toMatchObject({
       contacts: 300,

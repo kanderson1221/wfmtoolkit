@@ -19,6 +19,21 @@ Type answers beneath each `Answer:` field and leave the question IDs intact. Ans
 - Product/roadmap action:
 - Applied date:
 
+### INT-003 — Shared planning ownership and conflict handling
+
+- Status: Open
+- Date asked: 2026-07-19
+- Priority: High
+- Related capability IDs/roadmap items: `CAP-DATA-002`, `CAP-ADMIN-001`, `CAP-GOV-001`, `NEXT-003`
+- Decision this answer will influence: Whether shared planning should enforce one active owner per staffing group/plan, support concurrent edits with conflict resolution, or preserve an explicit check-out/handoff workflow; it will also shape audit events and offline expectations.
+- Why repository evidence cannot answer it: Runtime data is device-local and the relational artifacts define tables but not how real planners divide ownership, hand off work, recover competing edits, or decide which version is authoritative.
+- Question: Think of a real annual-planning cycle where two planners or teams might touch the same staffing group or plan. Who owns the plan at each stage, how is work handed off today, what should happen if two people edit it at once, and does anyone need to work offline? An anonymized example is enough.
+- Answer:
+- Date answered:
+- Agent interpretation:
+- Product/roadmap action:
+- Applied date:
+
 ## Answers awaiting application
 
 None.

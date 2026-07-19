@@ -273,7 +273,8 @@ describe('planningStorage', () => {
       planningYear: 2026,
       sourcePlanId: 'budget-2026',
       budgetPlanId: 'budget-2026',
-      actualsThroughMonth: '2026-03-01'
+      actualsThroughMonth: '2026-03-01',
+      decisionReason: '  Approved spring outlook  '
     })
     const withSecondUpdate = upsertPlanningPlan(withFirstUpdate, 'center-1', 'group-1', {
       name: '2026 Jun Update',
@@ -281,7 +282,8 @@ describe('planningStorage', () => {
       planningYear: 2026,
       sourcePlanId: 'budget-2026',
       budgetPlanId: 'budget-2026',
-      actualsThroughMonth: '2026-05-01'
+      actualsThroughMonth: '2026-05-01',
+      decisionReason: 'Approved summer outlook'
     })
 
     const nextPlans = withSecondUpdate[0].groups[0].plans
@@ -294,7 +296,8 @@ describe('planningStorage', () => {
       name: '2026 Jun Update',
       planType: PLAN_TYPE_UPDATE,
       budgetPlanId: 'budget-2026',
-      actualsThroughMonth: '2026-05-01'
+      actualsThroughMonth: '2026-05-01',
+      decisionReason: 'Approved summer outlook'
     })
   })
 

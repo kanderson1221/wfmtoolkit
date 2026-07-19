@@ -11,6 +11,7 @@ export const defaultRoute = {
   updateSourcePlanId: null,
   actualsThroughMonth: null,
   updatePlanName: null,
+  updateDecisionReason: null,
   forecastId: null,
   sourceKind: null,
   forecastType: null,
@@ -140,8 +141,9 @@ export const buildPlanningNewPlanHash = (centerId, groupId, year = null, options
   const updateSourcePlanId = String(options.updateSourcePlanId || '').trim()
   const actualsThroughMonth = String(options.actualsThroughMonth || '').trim()
   const updatePlanName = String(options.updatePlanName || '').trim()
+  const updateDecisionReason = String(options.updateDecisionReason || '').trim()
   const updateSegment = updateSourcePlanId
-    ? `/update/${encodeURIComponent(updateSourcePlanId)}${actualsThroughMonth ? `/actuals-through/${encodeURIComponent(actualsThroughMonth)}` : ''}${updatePlanName ? `/name/${encodeURIComponent(updatePlanName)}` : ''}`
+    ? `/update/${encodeURIComponent(updateSourcePlanId)}${actualsThroughMonth ? `/actuals-through/${encodeURIComponent(actualsThroughMonth)}` : ''}${updatePlanName ? `/name/${encodeURIComponent(updatePlanName)}` : ''}${updateDecisionReason ? `/reason/${encodeURIComponent(updateDecisionReason)}` : ''}`
     : ''
 
   return Number.isInteger(normalizedYear) && normalizedYear > 0
@@ -496,6 +498,7 @@ export const parseHashRoute = (hash) => {
       let updateSourcePlanId = null
       let actualsThroughMonth = null
       let updatePlanName = null
+      let updateDecisionReason = null
 
       if (parts[9] === 'method' && parts[10]) {
         requirementMethod = decodeURIComponent(parts[10])
@@ -514,6 +517,11 @@ export const parseHashRoute = (hash) => {
 
       if (parts[cursor] === 'name' && parts[cursor + 1]) {
         updatePlanName = decodeURIComponent(parts[cursor + 1])
+        cursor += 2
+      }
+
+      if (parts[cursor] === 'reason' && parts[cursor + 1]) {
+        updateDecisionReason = decodeURIComponent(parts[cursor + 1])
       }
 
       return {
@@ -528,6 +536,7 @@ export const parseHashRoute = (hash) => {
         updateSourcePlanId,
         actualsThroughMonth,
         updatePlanName,
+        updateDecisionReason,
         forecastId: null
       }
     }
@@ -537,6 +546,7 @@ export const parseHashRoute = (hash) => {
       let updateSourcePlanId = null
       let actualsThroughMonth = null
       let updatePlanName = null
+      let updateDecisionReason = null
 
       if (parts[7] === 'method' && parts[8]) {
         requirementMethod = decodeURIComponent(parts[8])
@@ -555,6 +565,11 @@ export const parseHashRoute = (hash) => {
 
       if (parts[cursor] === 'name' && parts[cursor + 1]) {
         updatePlanName = decodeURIComponent(parts[cursor + 1])
+        cursor += 2
+      }
+
+      if (parts[cursor] === 'reason' && parts[cursor + 1]) {
+        updateDecisionReason = decodeURIComponent(parts[cursor + 1])
       }
 
       return {
@@ -569,6 +584,7 @@ export const parseHashRoute = (hash) => {
         updateSourcePlanId,
         actualsThroughMonth,
         updatePlanName,
+        updateDecisionReason,
         forecastId: null
       }
     }

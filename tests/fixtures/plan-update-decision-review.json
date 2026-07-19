@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 2,
+  "backupFormat": "workspace_snapshot_v2",
+  "exportedAt": "2026-07-19T12:00:00.000Z",
+  "appVersion": "0.1.0",
+  "data": {
+    "workspaces": [
+      {
+        "scope": "default",
+        "planningCenters": [
+          {
+            "id": "review-center",
+            "name": "Decision Review Center",
+            "timezone": "America/New_York",
+            "operatingWeekdays": [1, 2, 3, 4, 5],
+            "operatingOpenTime": "08:00",
+            "operatingCloseTime": "17:00",
+            "defaultPaidHoursPerDay": 8,
+            "defaultOccupancyPercent": 85,
+            "defaultAdherencePercent": 95,
+            "groups": [
+              {
+                "id": "review-group",
+                "name": "Customer Care",
+                "operatingWeekdays": [1, 2, 3, 4, 5],
+                "defaultPaidHoursPerDay": 8,
+                "defaultOccupancyPercent": 85,
+                "defaultAdherencePercent": 95,
+                "serviceLevelPercent": 80,
+                "serviceLevelThresholdSeconds": 20,
+                "actuals": {
+                  "sourceMode": "daily_upload",
+                  "dailyRows": [
+                    { "serviceDate": "2026-01-01", "contacts": 900, "ahtSeconds": 300 },
+                    { "serviceDate": "2026-01-02", "contacts": 910, "ahtSeconds": 301 },
+                    { "serviceDate": "2026-01-05", "contacts": 920, "ahtSeconds": 302 },
+                    { "serviceDate": "2026-01-06", "contacts": 930, "ahtSeconds": 303 },
+                    { "serviceDate": "2026-01-07", "contacts": 940, "ahtSeconds": 304 },
+                    { "serviceDate": "2026-01-08", "contacts": 950, "ahtSeconds": 305 },
+                    { "serviceDate": "2026-01-09", "contacts": 960, "ahtSeconds": 306 },
+                    { "serviceDate": "2026-01-12", "contacts": 970, "ahtSeconds": 307 },
+                    { "serviceDate": "2026-01-13", "contacts": 980, "ahtSeconds": 308 },
+                    { "serviceDate": "2026-01-14", "contacts": 990, "ahtSeconds": 309 },
+                    { "serviceDate": "2026-01-15", "contacts": 1000, "ahtSeconds": 310 },
+                    { "serviceDate": "2026-01-16", "contacts": 1010, "ahtSeconds": 311 },
+                    { "serviceDate": "2026-01-19", "contacts": 1020, "ahtSeconds": 312 },
+                    { "serviceDate": "2026-01-20", "contacts": 1030, "ahtSeconds": 313 },
+                    { "serviceDate": "2026-01-21", "contacts": 1040, "ahtSeconds": 314 },
+                    { "serviceDate": "2026-01-22", "contacts": 1050, "ahtSeconds": 315 },
+                    { "serviceDate": "2026-01-23", "contacts": 1060, "ahtSeconds": 316 },
+                    { "serviceDate": "2026-01-26", "contacts": 1070, "ahtSeconds": 317 },
+                    { "serviceDate": "2026-01-27", "contacts": 1080, "ahtSeconds": 318 },
+                    { "serviceDate": "2026-01-28", "contacts": 1090, "ahtSeconds": 319 },
+                    { "serviceDate": "2026-01-29", "contacts": 1100, "ahtSeconds": 320 },
+                    { "serviceDate": "2026-01-30", "contacts": 1110, "ahtSeconds": 321 }
+                  ]
+                },
+                "plans": [
+                  {
+                    "id": "budget-2026",
+                    "name": "2026 Budget",
+                    "planType": "budget",
+                    "status": "finalized",
+                    "isCurrent": false,
+                    "planningYear": 2026,
+                    "requirementMethod": "workload_ratio",
+                    "planMonths": [
+                      { "contacts": 20000, "ahtSeconds": 310 },
+                      { "contacts": 20500, "ahtSeconds": 310 },
+                      { "contacts": 21000, "ahtSeconds": 310 },
+                      { "contacts": 21500, "ahtSeconds": 310 },
+                      { "contacts": 22000, "ahtSeconds": 310 },
+                      { "contacts": 22500, "ahtSeconds": 310 },
+                      { "contacts": 23000, "ahtSeconds": 310 },
+                      { "contacts": 23500, "ahtSeconds": 310 },
+                      { "contacts": 24000, "ahtSeconds": 310 },
+                      { "contacts": 24500, "ahtSeconds": 310 },
+                      { "contacts": 25000, "ahtSeconds": 310 },
+                      { "contacts": 25500, "ahtSeconds": 310 }
+                    ],
+                    "createdAt": "2025-12-15T12:00:00.000Z",
+                    "updatedAt": "2025-12-15T12:00:00.000Z"
+                  },
+                  {
+                    "id": "legacy-update-2026",
+                    "name": "2026 January Update",
+                    "planType": "update",
+                    "status": "finalized",
+                    "isCurrent": false,
+                    "planningYear": 2026,
+                    "budgetPlanId": "budget-2026",
+                    "sourcePlanId": "budget-2026",
+                    "actualsThroughMonth": "2026-01-01",
+                    "requirementMethod": "workload_ratio",
+                    "planMonths": [
+                      { "contacts": 22000, "ahtSeconds": 311 },
+                      { "contacts": 20500, "ahtSeconds": 310 },
+                      { "contacts": 21000, "ahtSeconds": 310 },
+                      { "contacts": 21500, "ahtSeconds": 310 },
+                      { "contacts": 22000, "ahtSeconds": 310 },
+                      { "contacts": 22500, "ahtSeconds": 310 },
+                      { "contacts": 23000, "ahtSeconds": 310 },
+                      { "contacts": 23500, "ahtSeconds": 310 },
+                      { "contacts": 24000, "ahtSeconds": 310 },
+                      { "contacts": 24500, "ahtSeconds": 310 },
+                      { "contacts": 25000, "ahtSeconds": 310 },
+                      { "contacts": 25500, "ahtSeconds": 310 }
+                    ],
+                    "createdAt": "2026-02-01T12:00:00.000Z",
+                    "updatedAt": "2026-02-01T12:00:00.000Z"
+                  },
+                  {
+                    "id": "current-update-2026",
+                    "name": "2026 Spring Outlook",
+                    "planType": "update",
+                    "status": "finalized",
+                    "isCurrent": true,
+                    "planningYear": 2026,
+                    "budgetPlanId": "budget-2026",
+                    "sourcePlanId": "legacy-update-2026",
+                    "actualsThroughMonth": "2026-01-01",
+                    "decisionReason": "Approved product launch and revised spring demand outlook",
+                    "requirementMethod": "workload_ratio",
+                    "planMonths": [
+                      { "contacts": 22000, "ahtSeconds": 311 },
+                      { "contacts": 21500, "ahtSeconds": 312 },
+                      { "contacts": 23000, "ahtSeconds": 313 },
+                      { "contacts": 23500, "ahtSeconds": 313 },
+                      { "contacts": 24000, "ahtSeconds": 313 },
+                      { "contacts": 24500, "ahtSeconds": 313 },
+                      { "contacts": 25000, "ahtSeconds": 313 },
+                      { "contacts": 25500, "ahtSeconds": 313 },
+                      { "contacts": 26000, "ahtSeconds": 313 },
+                      { "contacts": 26500, "ahtSeconds": 313 },
+                      { "contacts": 27000, "ahtSeconds": 313 },
+                      { "contacts": 27500, "ahtSeconds": 313 }
+                    ],
+                    "createdAt": "2026-03-01T12:00:00.000Z",
+                    "updatedAt": "2026-03-01T12:00:00.000Z"
+                  }
+                ],
+                "createdAt": "2025-12-01T12:00:00.000Z",
+                "updatedAt": "2026-03-01T12:00:00.000Z"
+              }
+            ],
+            "createdAt": "2025-12-01T12:00:00.000Z",
+            "updatedAt": "2026-03-01T12:00:00.000Z"
+          }
+        ],
+        "forecasts": []
+      }
+    ],
+    "plannerDrafts": [],
+    "meta": []
+  }
+}

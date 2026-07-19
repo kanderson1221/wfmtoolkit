@@ -45,6 +45,7 @@ const buildWrapper = (candidateOverrides = {}) => {
     planType: 'update',
     isCurrent: true,
     actualsThroughMonth: '2027-02-01',
+    decisionReason: 'February actuals and revised spring outlook',
     randomDefaults: { occupancyPercent: 85, adherencePercent: 95 },
     planMonths: Array.from({ length: 12 }, (_, index) => ({
       contacts: index === 2 ? 1250 : 1000,
@@ -100,6 +101,8 @@ describe('PlanningPlanComparisonDialog', () => {
     expect(wrapper.text()).toContain('Annual contacts')
     expect(wrapper.text()).toContain('+250')
     expect(wrapper.text()).toContain('Average occupancy')
+    expect(wrapper.text()).toContain('Decision reason')
+    expect(wrapper.text()).toContain('February actuals and revised spring outlook')
     expect(wrapper.text()).toContain('Changed')
     expect(wrapper.text()).toContain('Monthly exceptions')
     expect(wrapper.text()).toContain('March')

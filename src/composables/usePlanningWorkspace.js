@@ -214,7 +214,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
           group: currentGroup.value,
           center: currentCenter.value,
           actualsThroughMonth: currentRoute.value.actualsThroughMonth,
-          name: currentRoute.value.updatePlanName
+          name: currentRoute.value.updatePlanName,
+          decisionReason: currentRoute.value.updateDecisionReason
         })
       } catch (error) {
         updateDraftError = error instanceof Error

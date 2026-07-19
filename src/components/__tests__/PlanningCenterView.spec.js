@@ -99,9 +99,10 @@ const PlanningPlanUpdateModalStub = {
     'actualsThroughOptions',
     'actualsThroughBlocker',
     'actualsThroughMonth',
-    'updateName'
+    'updateName',
+    'decisionReason'
   ],
-  emits: ['cancel', 'create', 'update:visible', 'update:actualsThroughMonth', 'update:updateName'],
+  emits: ['cancel', 'create', 'update:visible', 'update:actualsThroughMonth', 'update:updateName', 'update:decisionReason'],
   template: `
     <div v-if="visible" data-test="plan-update-modal">
       <p>Update Source: {{ sourcePlan?.name }}</p>
@@ -110,6 +111,8 @@ const PlanningPlanUpdateModalStub = {
       <p v-if="actualsThroughBlocker">Actuals Blocker: {{ actualsThroughBlocker }}</p>
       <p>Actuals Through: {{ actualsThroughMonth }}</p>
       <p>Update Name: {{ updateName }}</p>
+      <p>Decision Reason: {{ decisionReason || 'empty' }}</p>
+      <button @click="$emit('update:decisionReason', 'Approved outlook revision')">Set Decision Reason</button>
       <button @click="$emit('create')">Confirm Updated Plan</button>
     </div>
   `
@@ -578,6 +581,7 @@ describe('PlanningCenterView', () => {
                 budgetPlanId: 'budget-2026',
                 sourcePlanId: 'budget-2026',
                 actualsThroughMonth: '2026-03-01',
+                decisionReason: 'Approved spring outlook',
                 summary: {
                   annualContacts: 190000,
                   annualRequiredStaffHours: 33000,
@@ -616,6 +620,8 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('Update')
     expect(wrapper.text()).toContain('Current')
     expect(wrapper.text()).toContain('Actuals through Mar 2026')
+    expect(wrapper.text()).toContain('Approved spring outlook')
+    expect(wrapper.text()).toContain('Decision reason not recorded (legacy plan)')
     expect(wrapper.text()).toContain('Compare Plans')
     expect(wrapper.text()).not.toContain('Vs Budget')
 
@@ -641,6 +647,12 @@ describe('PlanningCenterView', () => {
     expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Update Source: 2026 Apr Update')
     expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Budget Baseline: 2026 Budget')
     expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Actuals Options: 1')
+    expect(wrapper.get('[data-test="plan-update-modal"]').text()).toContain('Decision Reason: empty')
+
+    await wrapper.findAll('button').find((node) => node.text().trim() === 'Set Decision Reason').trigger('click')
+    await wrapper.findAll('button').find((node) => node.text().trim() === 'Confirm Updated Plan').trigger('click')
+
+    expect(window.location.hash).toContain('/reason/Approved%20outlook%20revision')
   })
 
   it('blocks updated-plan creation when a loaded month is missing expected open dates', async () => {

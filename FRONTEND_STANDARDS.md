@@ -79,6 +79,7 @@ Interactive primitives:
 - `AppMenu`
 - `AppDialog`
 - `AppTextField`
+- `AppTextArea`
 - `AppNumberField`
 - `AppTableNumberField`
 - `AppTableDateField`
@@ -217,6 +218,7 @@ Use `AppEmptyState` when:
 Use:
 - `AppFieldGroup`
 - `AppTextField`
+- `AppTextArea`
 - `AppNumberField`
 - `AppSelect`
 - `AppCheckbox`

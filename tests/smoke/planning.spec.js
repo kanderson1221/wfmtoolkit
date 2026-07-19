@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { fileURLToPath } from 'node:url'
+
+const planUpdateReviewFixturePath = fileURLToPath(
+  new URL('../fixtures/plan-update-decision-review.json', import.meta.url)
+)
 
 const clearBrowserData = async (page) => {
   await page.goto('/')
@@ -182,6 +187,45 @@ test('keeps destructive confirmation focus on the safe action and restores its t
   await expect(confirmationDialog).toBeHidden()
   await expect(clearButton).toBeFocused()
   await expect(storageDialog.getByText('All local planning data was cleared.')).toBeVisible()
+})
+
+test('requires and exposes updated-plan decision reasons across the desktop workflow', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'Local Data Storage' }).click()
+  const storageDialog = page.getByRole('dialog').filter({ hasText: 'Review what is stored in this browser' })
+  await storageDialog.getByLabel('Import local data backup').setInputFiles(planUpdateReviewFixturePath)
+
+  const importDialog = page.getByRole('dialog').filter({ hasText: 'Importing this backup will replace' })
+  await expect(importDialog.getByText('plan-update-decision-review.json')).toBeVisible()
+  await importDialog.getByRole('button', { name: 'Replace Local Data' }).click()
+  await expect(storageDialog.getByText('Local data backup imported.')).toBeVisible()
+  await storageDialog.getByRole('button', { name: 'Close' }).click()
+
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByText('Customer Care', { exact: true }).click()
+  await page.getByRole('button', { name: 'Plans', exact: true }).click()
+
+  await expect(page.getByText('Approved product launch and revised spring demand outlook')).toBeVisible()
+  await expect(page.getByText('Decision reason not recorded (legacy plan)')).toBeVisible()
+
+  const createUpdateTrigger = page.getByRole('button', { name: 'Create Updated Plan', exact: true })
+  await createUpdateTrigger.click()
+
+  const updateDialog = page.getByRole('dialog').filter({ hasText: 'Copy the selected plan, actualize closed months' })
+  await expect(updateDialog.getByLabel('Actuals Through')).toBeFocused()
+  await expect(updateDialog.getByRole('button', { name: 'Create Updated Plan' })).toBeDisabled()
+  await updateDialog.getByLabel('Decision Reason (required)').fill('Approved service launch and revised volume outlook')
+  await expect(updateDialog.getByRole('button', { name: 'Create Updated Plan' })).toBeEnabled()
+  await updateDialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(updateDialog).toBeHidden()
+  await expect(createUpdateTrigger).toBeFocused()
+
+  await page.getByRole('button', { name: 'Compare Plans' }).click()
+  const comparisonDialog = page.getByRole('dialog').filter({ hasText: 'Candidate minus baseline is shown' })
+  await expect(comparisonDialog.getByRole('row', { name: /Decision reason/ })).toContainText(
+    'Approved product launch and revised spring demand outlook'
+  )
 })
 
 test('opens and edits an existing call center from the call-center list', async ({ page }) => {

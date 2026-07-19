@@ -792,6 +792,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       sourcePlanId: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.sourcePlanId || '') : '',
       actualsThroughMonth: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualsThroughMonth || '') : '',
       actualizedAt: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualizedAt || '') : '',
+      decisionReason: planType.value === PLAN_TYPE_UPDATE ? String(sourcePlanReference.value?.decisionReason || '').trim() : '',
       planningYear: planningYear.value,
       requirementMethod: requirementMethod.value,
       operatingWeekdays: [...operatingWeekdays.value],

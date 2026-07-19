@@ -32,6 +32,7 @@ const buildWrapper = (props = {}) => mount(PlanningPlanUpdateModal, {
     ],
     actualsThroughMonth: '2026-01-01',
     updateName: '2026 Feb Update',
+    decisionReason: 'Approved demand revision',
     ...props
   },
   global: {
@@ -39,11 +40,13 @@ const buildWrapper = (props = {}) => mount(PlanningPlanUpdateModal, {
       AppButton: AppButtonStub,
       AppDialog: AppDialogStub,
       AppFieldGroup: {
-        template: '<div><slot /></div>'
+        props: ['label', 'helpText'],
+        template: '<div><span>{{ label }}</span><slot /><span>{{ helpText }}</span></div>'
       },
       AppSelect: {
         props: ['modelValue', 'options', 'disabled'],
-        template: '<select :disabled="disabled"><option>{{ modelValue }}</option></select>'
+        inheritAttrs: false,
+        template: '<select :disabled="disabled" v-bind="$attrs"><option>{{ modelValue }}</option></select>'
       },
       AppStatusMessage: {
         template: '<div role="status"><slot /></div>'
@@ -51,12 +54,32 @@ const buildWrapper = (props = {}) => mount(PlanningPlanUpdateModal, {
       AppTextField: {
         props: ['modelValue'],
         template: '<input :value="modelValue" />'
+      },
+      AppTextArea: {
+        props: ['modelValue'],
+        template: '<textarea :value="modelValue" />'
       }
     }
   }
 })
 
 describe('PlanningPlanUpdateModal', () => {
+  it('requires a decision reason before creating an updated plan', async () => {
+    const wrapper = buildWrapper({ decisionReason: '   ' })
+
+    expect(wrapper.text()).toContain('Decision Reason (required)')
+    expect(wrapper.text()).toContain('business event, approved assumption, or operating decision')
+    expect(wrapper.get('select').attributes()).toHaveProperty('autofocus')
+
+    const createButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Create Updated Plan')
+    expect(createButton.attributes()).toHaveProperty('disabled')
+
+    await createButton.trigger('click')
+    expect(wrapper.emitted('create')).toBeUndefined()
+  })
+
   it('explains a later blocked cutoff and refuses a stale unavailable selection', async () => {
     const blocker =
       'Feb 2026 actuals have positive contacts but zero weighted AHT. ' +

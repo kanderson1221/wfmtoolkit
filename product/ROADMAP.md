@@ -91,6 +91,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-008` — Traceable updated-plan decisions — Completed
+
+- Capability: `CAP-SCEN-001` (Need 20), supporting `CAP-GOV-001` (Need 26), `CAP-DATA-001` (Need 20), and `CAP-UX-001` (Need 32)
+- Planner outcome: a planning lead can identify why every newly created operating Update exists from the plan library and side-by-side review without reconstructing the decision from its name or cutoff.
+- Problem/opportunity: Update plans retained source, Budget lineage, cutoff, and timestamps but no business rationale; identical-looking snapshots could not be tied to the approved event or assumption that created them.
+- Rationale/evidence: the capability assessment named decision notes/formal change reasons as a saved-scenario governance gap; `ACT-004`/`ACT-006` and the modal, route seed, plan payload, local persistence, library row, and comparison path confirmed the missing field.
+- Dependencies: existing immutable plan lineage and local schema only; no identity, calculation, forecast-acceptance, or server dependency. `INT-002` remains unrelated and Open.
+- Delivered scope: required 240-character Update reason; trimmed domain validation; route-to-draft and editor-save continuity; IndexedDB/backup round trip; legacy missing-rationale fallback; plan-row and comparison evidence; autofocus and close-focus lifecycle; focused and Chromium coverage.
+- Removed scope: implicit reasonless creation and the modal visibility gate that destroyed focus restoration; no notes entity, audit abstraction, dependency, or fabricated legacy migration was added.
+- Success measures: blank reasons cannot create a new Update; saved reasons survive reload; legacy Updates remain usable; library and comparison name the evidence; Budget and WFM calculations are unchanged; the workflow remains contained at 1280–1920 px and a 125%-zoom equivalent.
+- Status: completed 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -99,11 +112,11 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Planner outcome: teams can evaluate a safe path from device-local planning to governed shared work without risking current data.
 - Problem/opportunity: runtime planning is local while relational schema artifacts exist; implementing authentication first would create a shell without collaboration semantics.
 - Rationale/evidence: IndexedDB is robust for one user, but no concurrency, ownership, conflict, or tenancy model exists.
-- Dependencies: product tenancy decision, event/audit model, offline stance.
+- Dependencies: product tenancy decision, event/audit model, offline stance, and sponsor collaboration evidence from `INT-003`.
 - Proposed scope: architecture decision record, repository boundary, migration/reconciliation prototype, threat model, and explicit non-goals—not a cosmetic sign-in screen.
 - Success measures: validated migration round-trip, conflict policy, ownership model, and staged rollout plan.
 - Status: discovery.
-- Last reviewed: 2026-07-18.
+- Last reviewed: 2026-07-19.
 
 ## Later
 
@@ -117,7 +130,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Proposed scope: integration-boundary discovery first, then dense exception table, reforecast, recovery actions, and audit trail.
 - Success measures: agreed data latency and ownership; actionable deviations reconcile to source feeds.
 - Status: dependency-blocked, not currently executable.
-- Last reviewed: 2026-07-18.
+- Last reviewed: 2026-07-19.
 
 ### `LATER-002` — Employee scheduling product boundary
 
@@ -129,7 +142,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Proposed scope: practitioner discovery, build-versus-integrate decision, and minimum interoperable requirement export before implementation.
 - Success measures: documented decision, validated planner workflow, and scoped data model with no speculative UI.
 - Status: explore-before-build.
-- Last reviewed: 2026-07-18.
+- Last reviewed: 2026-07-19.
 
 ### `LATER-003` — Governed collaboration and administration
 
@@ -141,7 +154,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Proposed scope: identity, roles, ownership, approvals, immutable audit events, recovery administration.
 - Success measures: least-privilege policies and traceable plan changes pass security and data-recovery tests.
 - Status: dependency-blocked.
-- Last reviewed: 2026-07-18.
+- Last reviewed: 2026-07-19.
 
 ## Explore
 
@@ -155,7 +168,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Proposed scope: discovery and calculation contract; no implementation commitment yet.
 - Success measures: finance-approved semantics and reconciled example scenarios.
 - Status: explore.
-- Last reviewed: 2026-07-18.
+- Last reviewed: 2026-07-19.
 
 ### `EXP-002` — Shared-pool and multi-skill staffing semantics
 
@@ -167,7 +180,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Proposed scope: domain research and reference cases only.
 - Success measures: explicit supported/unsupported pooling rules and validated calculation direction.
 - Status: explore.
-- Last reviewed: 2026-07-18.
+- Last reviewed: 2026-07-19.
 
 ## Retired / Declined
 
@@ -181,7 +194,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Proposed scope: do not add phone planning work; remove mobile-only complexity when encountered and safe.
 - Success measures: roadmap and tests stay focused on desktop workflows; no supported desktop behavior regresses.
 - Status: declined by product direction.
-- Last reviewed: 2026-07-18.
+- Last reviewed: 2026-07-19.
 
 ### `RET-002` — Cross-center portfolio reporting on planning home — Retired
 
@@ -193,7 +206,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Retired scope: cross-center KPIs, selected-year home filter, partial-coverage disclosure, monthly operating report, portfolio CSV, staffing waterfall chart, report-derived center ranking/status/columns, and obsolete `PORT-001`–`PORT-005` specifications.
 - Success measures: home contains only call-center identity, staffing-group count, operating schedule, and management actions; no cross-center report logic or orphaned report code remains; call-center aggregates are unchanged.
 - Status: retired 2026-07-18 and implemented in response to `INT-001`.
-- Last reviewed: 2026-07-18.
+- Last reviewed: 2026-07-19.
 
 ## Decision log
 
@@ -215,3 +228,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Delivered the third `NOW-005` slice: future-volume overrides now retain a required decision reason and reconcile monthly baseline, exact manual change, and final contacts; legacy blank reasons remain visible without fabricated migration data. |
 | 2026-07-19 | Completed `NOW-006`: all runtime text/CSV/JSON downloads now use one tested browser lifecycle, and duplicate backup/actuals-gap mechanics and filename sanitation were removed without changing planner-visible exports. |
 | 2026-07-19 | Completed required code-review remediation `NOW-007`: destructive confirmations now focus the safe Cancel action and preserve the managed close lifecycle so both cancel and confirm restore a retained initiator. |
+| 2026-07-19 | Completed the fifth-run strategic portfolio review and `NOW-008`: newly created plan Updates now require and persist a decision reason, legacy Updates remain explicit, and modal focus is safe. High-Need missing domains remain sequenced behind their documented prerequisites; added `INT-003` for shared-work ownership/conflict evidence. |

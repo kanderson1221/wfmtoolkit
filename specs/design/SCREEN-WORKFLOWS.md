@@ -54,7 +54,7 @@ It does not include:
 | `S-10` | Plan Library | Compare budget and update plans by year | `PLAN-001`, `PLAN-013`, `ACT-004`, `ACT-006` |
 | `S-11` | New Plan | Select year, requirement method, and imported forecast | `PLAN-001`, `PLAN-002`, `FIMP-008` |
 | `S-12` | Annual Plan Workspace | Review assumptions, calculate requirement, and build staffing supply | `PLAN-002` through `PLAN-011` |
-| `S-13` | Create Updated Plan | Choose source plan, cutoff month, and future forecast | `ACT-004`, `ACT-005` |
+| `S-13` | Create Updated Plan | Choose source plan, cutoff month, decision reason, and future forecast | `ACT-004`, `ACT-005` |
 | `S-14` | Actuals and Variance | Compare saved plan values with observed results | `ACT-003` |
 | `S-15` | Data Management | Review persisted data, export, restore, or clear | `DATA-001` through `DATA-005` |
 | `S-16` | Confirmation Dialog | Confirm destructive or replacement operations | `DATA-004`, `FOUND-005` |
@@ -251,6 +251,7 @@ flowchart TD
     CreateUpdate["Select Create Updated Plan"]
     Source["Choose source plan"]
     Cutoff["Choose actuals-through month"]
+    Reason["Record decision reason"]
     Complete{"Actuals complete through cutoff?"}
     Future["Choose forecast for future months"]
     Coverage{"Future coverage complete?"}
@@ -263,7 +264,7 @@ flowchart TD
     Validate -- Yes --> Merge --> Save --> Compare --> Intraday
     Intraday -- Yes --> RunActuals --> CreateUpdate
     Intraday -- No --> CreateUpdate
-    CreateUpdate --> Source --> Cutoff --> Complete
+    CreateUpdate --> Source --> Cutoff --> Reason --> Complete
     Complete -- No --> Data
     Complete -- Yes --> Future --> Coverage
     Coverage -- No --> Future

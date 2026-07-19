@@ -226,6 +226,7 @@ export const createUpdatedPlanDraft = ({
   center,
   actualsThroughMonth,
   name,
+  decisionReason,
   timestamp = new Date().toISOString()
 } = {}) => {
   const basePlan = clonePlain(sourcePlan || {})
@@ -245,6 +246,13 @@ export const createUpdatedPlanDraft = ({
     planningYear,
     cutoffMonthIndex
   })
+  const normalizedDecisionReason = String(decisionReason || '').trim()
+  if (!normalizedDecisionReason) {
+    throw new Error('Enter a decision reason before creating an updated plan.')
+  }
+  if (normalizedDecisionReason.length > 240) {
+    throw new Error('Keep the updated-plan decision reason to 240 characters or fewer.')
+  }
   const dailyActualRows = normalizedDailyRows
     .filter((row) => Number(row.serviceDate.slice(0, 4)) === planningYear)
     .filter((row) => {
@@ -326,6 +334,7 @@ export const createUpdatedPlanDraft = ({
     sourcePlanId: basePlan.id || '',
     budgetPlanId: budgetPlan?.id || basePlan.budgetPlanId || basePlan.id || '',
     actualsThroughMonth: String(actualsThroughMonth || '').trim(),
+    decisionReason: normalizedDecisionReason,
     actualizedAt: timestamp,
     createdAt: null,
     updatedAt: null,

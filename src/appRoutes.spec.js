@@ -45,8 +45,9 @@ describe('appRoutes', () => {
       requirementMethod: 'intraday_erlang',
       updateSourcePlanId: 'plan-source',
       actualsThroughMonth: '2027-03-01',
-      updatePlanName: '2027 Apr Update'
-    })).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang/update/plan-source/actuals-through/2027-03-01/name/2027%20Apr%20Update')
+      updatePlanName: '2027 Apr Update',
+      updateDecisionReason: 'Approved volume outlook'
+    })).toBe('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang/update/plan-source/actuals-through/2027-03-01/name/2027%20Apr%20Update/reason/Approved%20volume%20outlook')
   })
 
   it('treats home-like hashes as public landing routes', () => {
@@ -151,7 +152,7 @@ describe('appRoutes', () => {
       year: 2027,
       requirementMethod: 'intraday_erlang'
     })
-    expect(parseHashRoute('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang/update/plan-source/actuals-through/2027-03-01/name/2027%20Apr%20Update')).toMatchObject({
+    expect(parseHashRoute('#planning/center/center-1/group/group-1/plan/new/year/2027/method/intraday_erlang/update/plan-source/actuals-through/2027-03-01/name/2027%20Apr%20Update/reason/Approved%20volume%20outlook')).toMatchObject({
       app: 'planning',
       page: 'editor',
       centerId: 'center-1',
@@ -161,7 +162,8 @@ describe('appRoutes', () => {
       requirementMethod: 'intraday_erlang',
       updateSourcePlanId: 'plan-source',
       actualsThroughMonth: '2027-03-01',
-      updatePlanName: '2027 Apr Update'
+      updatePlanName: '2027 Apr Update',
+      updateDecisionReason: 'Approved volume outlook'
     })
   })
 

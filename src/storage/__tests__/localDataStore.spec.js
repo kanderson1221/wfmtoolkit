@@ -392,6 +392,28 @@ describe('localDataStore', () => {
     })
   })
 
+  it('round-trips an updated-plan decision reason without inventing legacy text', async () => {
+    const centers = clonePlain(sampleCenters)
+    centers[0].groups[0].plans[0].planType = 'budget'
+    centers[0].groups[0].plans.push({
+      ...centers[0].groups[0].plans[0],
+      id: 'update-1',
+      name: '2026 Spring Update',
+      planType: 'update',
+      sourcePlanId: 'plan-1',
+      budgetPlanId: 'plan-1',
+      actualsThroughMonth: '2026-03-01',
+      decisionReason: 'Approved spring outlook'
+    })
+
+    await persistPlanningWorkspaceToDexie(centers, 'default')
+    const loadedCenters = await loadPlanningWorkspaceFromDexie('default')
+
+    expect(loadedCenters[0].groups[0].plans.find((plan) => plan.id === 'update-1')).toMatchObject({
+      decisionReason: 'Approved spring outlook'
+    })
+  })
+
   it('infers intraday Erlang for older stored plan rows that have Erlang results but no method', async () => {
     const centers = clonePlain(sampleCenters)
     centers[0].groups[0].plans[0] = {

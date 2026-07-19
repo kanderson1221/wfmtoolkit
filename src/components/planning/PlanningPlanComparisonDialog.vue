@@ -156,6 +156,15 @@ const assumptionRows = computed(() => {
       candidate: formatMonth(candidate.actualsThroughMonth)
     },
     {
+      label: 'Decision reason',
+      baseline: baseline.planType === 'update'
+        ? baseline.decisionReason || 'Not recorded (legacy plan)'
+        : 'Budget baseline',
+      candidate: candidate.planType === 'update'
+        ? candidate.decisionReason || 'Not recorded (legacy plan)'
+        : 'Budget baseline'
+    },
+    {
       label: 'Average paid hours / day',
       baseline: formatNumber(baseline.assumptions.averagePaidHoursPerDay, 1),
       candidate: formatNumber(candidate.assumptions.averagePaidHoursPerDay, 1)

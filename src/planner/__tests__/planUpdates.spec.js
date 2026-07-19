@@ -176,7 +176,8 @@ describe('planUpdates', () => {
         planMonths: buildPlanMonths()
       },
       actuals,
-      actualsThroughMonth: '2026-01-01'
+      actualsThroughMonth: '2026-01-01',
+      decisionReason: 'Actualize a closed zero-volume month'
     })).not.toThrow()
   })
 
@@ -226,6 +227,7 @@ describe('planUpdates', () => {
       actuals,
       actualsThroughMonth: '2026-02-01',
       name: '2026 Mar Update',
+      decisionReason: 'Approved February reforecast',
       timestamp: '2026-03-01T12:00:00.000Z'
     })
 
@@ -237,6 +239,7 @@ describe('planUpdates', () => {
       sourcePlanId: 'source-plan',
       budgetPlanId: 'budget-plan',
       actualsThroughMonth: '2026-02-01',
+      decisionReason: 'Approved February reforecast',
       actualizedAt: '2026-03-01T12:00:00.000Z'
     })
     expect(updateDraft.planMonths[0]).toMatchObject({
@@ -263,5 +266,30 @@ describe('planUpdates', () => {
     expect(updateDraft.demandSource.forecastDailySnapshot.find((row) => row.serviceDate === '2026-03-02')).toMatchObject({
       contacts: 110
     })
+  })
+
+  it('requires a bounded decision reason for a new update', () => {
+    const actuals = {
+      dailyRows: buildCompleteWeekdayActuals(2026, 0, {
+        '2026-01-02': { contacts: 150, ahtSeconds: 300 }
+      })
+    }
+    const input = {
+      sourcePlan: {
+        id: 'source-plan',
+        planningYear: 2026,
+        planMonths: buildPlanMonths()
+      },
+      actuals,
+      actualsThroughMonth: '2026-01-01'
+    }
+
+    expect(() => createUpdatedPlanDraft(input)).toThrow(
+      'Enter a decision reason before creating an updated plan.'
+    )
+    expect(() => createUpdatedPlanDraft({
+      ...input,
+      decisionReason: 'x'.repeat(241)
+    })).toThrow('Keep the updated-plan decision reason to 240 characters or fewer.')
   })
 })

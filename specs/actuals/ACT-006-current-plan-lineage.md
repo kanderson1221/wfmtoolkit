@@ -4,7 +4,7 @@ title: Current-Plan Selection and Update-Plan Lineage
 status: draft
 owners: []
 depends_on: [ACT-004, PLAN-001]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -28,9 +28,11 @@ Every update shall retain:
 - budget baseline identifier
 - actuals-through month
 - actualization timestamp
+- decision reason for every newly created update
 - created and updated timestamps
 
 The system shall be able to show update order and ancestry even when an intermediate plan is not current.
+Plan-library rows and side-by-side comparison shall expose the stored reason; legacy updates shall remain valid with an explicit missing-rationale label.
 
 # Reporting Integration
 

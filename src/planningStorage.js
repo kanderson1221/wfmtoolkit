@@ -343,6 +343,7 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
     sourcePlanId: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.sourcePlanId || '').trim() : '',
     actualsThroughMonth: planType === PLAN_TYPE_UPDATE ? normalizeMonthStart(planSnapshot.actualsThroughMonth) : '',
     actualizedAt: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.actualizedAt || '').trim() : '',
+    decisionReason: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.decisionReason || '').trim() : '',
     planningYear: resolvedYear,
     holidayCalendarId: normalizeHolidayCalendarId(planSnapshot.holidayCalendarId, HOLIDAY_CALENDAR_NONE),
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),

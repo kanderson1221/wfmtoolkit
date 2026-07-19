@@ -6,6 +6,7 @@ import AppDialog from '../ui/AppDialog.vue'
 import AppFieldGroup from '../ui/AppFieldGroup.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
+import AppTextArea from '../ui/AppTextArea.vue'
 import AppTextField from '../ui/AppTextField.vue'
 
 const props = defineProps({
@@ -41,10 +42,15 @@ const updateName = defineModel('updateName', {
   type: String,
   default: ''
 })
+const decisionReason = defineModel('decisionReason', {
+  type: String,
+  default: ''
+})
 
 const canCreate = computed(() =>
   props.actualsThroughOptions.some((option) => option.value === actualsThroughMonth.value) &&
-  Boolean(String(updateName.value || '').trim())
+  Boolean(String(updateName.value || '').trim()) &&
+  Boolean(String(decisionReason.value || '').trim())
 )
 </script>
 
@@ -85,6 +91,7 @@ const canCreate = computed(() =>
           v-model="actualsThroughMonth"
           :options="props.actualsThroughOptions"
           :disabled="!props.actualsThroughOptions.length"
+          autofocus
         />
       </AppFieldGroup>
 
@@ -93,6 +100,19 @@ const canCreate = computed(() =>
         input-id="plan-update-name"
       >
         <AppTextField id="plan-update-name" v-model.trim="updateName" />
+      </AppFieldGroup>
+
+      <AppFieldGroup
+        label="Decision Reason (required)"
+        input-id="plan-update-decision-reason"
+        help-text="Record the business event, approved assumption, or operating decision that requires this update."
+      >
+        <AppTextArea
+          id="plan-update-decision-reason"
+          v-model="decisionReason"
+          :rows="3"
+          maxlength="240"
+        />
       </AppFieldGroup>
     </div>
 

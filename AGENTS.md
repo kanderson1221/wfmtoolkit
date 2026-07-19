@@ -65,6 +65,7 @@ Before creating a new page-local control or layout pattern, check these wrappers
 - `AppMenu`
 - `AppDialog`
 - `AppTextField`
+- `AppTextArea`
 - `AppNumberField`
 - `AppTableNumberField`
 - `AppTableDateField`
@@ -184,6 +185,7 @@ Use:
 - `AppDialog`
 - `AppFieldGroup`
 - `AppTextField` / `AppNumberField` / `AppSelect`
+- `AppTextArea` for concise multi-line rationale or notes
 - `AppStatusMessage`
 
 Do not build a raw PrimeVue dialog in a feature page.
