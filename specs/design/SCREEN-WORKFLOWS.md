@@ -798,8 +798,9 @@ Confirmation rules:
 - The body identifies cascading, replacement, or dependency impact.
 - The confirm label names the destructive action.
 - Cancellation is the safe default.
+- Initial keyboard focus lands on Cancel.
 - A failed operation keeps the dialog context or returns an actionable error.
-- Focus returns to the initiating control after cancellation.
+- Focus returns to the initiating control after cancellation or confirmation when that control remains available.
 
 # Common State Patterns
 

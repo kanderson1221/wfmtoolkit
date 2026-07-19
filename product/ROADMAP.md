@@ -79,6 +79,18 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-007` — Focus-safe destructive confirmations — Completed
+
+- Capability: `CAP-UX-001` (Need 32), supporting `CAP-GOV-001` (Need 26) and `CAP-DATA-001` (Need 20)
+- Planner outcome: keyboard users enter every destructive or replacement confirmation on the safe action and return to the still-available initiating control after either close path.
+- Problem/opportunity: the shared confirmation supplied no autofocus target, leaving focus behind the modal, and its visibility gate destroyed the underlying PrimeVue dialog before the focus-restoration transition could complete.
+- Rationale/evidence: `FOUND-005`, `DATA-004`, and `SCREEN-WORKFLOWS` require keyboard-safe confirmations and focus restoration; repository inspection and a live nested clear-data workflow proved the wrapper contradicted that contract.
+- Dependencies: existing shared `AppDialog`, PrimeVue focus trap/transition lifecycle, and visible initiator semantics only; no stored data, route, or calculation dependency.
+- Delivered scope: Cancel autofocus; persistent managed dialog instance while hidden; unit coverage for the shared contract; Chromium cancel/confirm restoration coverage; clarified foundation, destructive-action, and workflow specifications.
+- Success measures: Cancel is the initial focused control; cancel and confirm both restore the retained trigger; neither path changes existing action labels or data behavior; the dialog remains contained at 1280–1920 px and a 125%-zoom-equivalent viewport.
+- Status: completed 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -202,3 +214,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-18 | Delivered the second `NOW-005` slice: AHT assumptions no longer learn from contact holdout dates, and the AHT tab now reports contact-weighted error and workload consequence against a training-only benchmark. Scores remain calibrated while governed comparison remains pending `INT-002`. |
 | 2026-07-19 | Delivered the third `NOW-005` slice: future-volume overrides now retain a required decision reason and reconcile monthly baseline, exact manual change, and final contacts; legacy blank reasons remain visible without fabricated migration data. |
 | 2026-07-19 | Completed `NOW-006`: all runtime text/CSV/JSON downloads now use one tested browser lifecycle, and duplicate backup/actuals-gap mechanics and filename sanitation were removed without changing planner-visible exports. |
+| 2026-07-19 | Completed required code-review remediation `NOW-007`: destructive confirmations now focus the safe Cancel action and preserve the managed close lifecycle so both cancel and confirm restore a retained initiator. |

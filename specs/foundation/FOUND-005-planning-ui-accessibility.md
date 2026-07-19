@@ -4,7 +4,7 @@ title: Planning UI, Accessibility, Worksheet, and Validation Standards
 status: draft
 owners: []
 depends_on: [FOUND-001]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -26,8 +26,9 @@ Planning screens shall feel operational, clear, trustworthy, dense where appropr
 
 - Every input shall have a visible label.
 - Required fields, units, defaults, and validation constraints shall be understandable before submission.
-- Dialogs shall trap focus, support keyboard dismissal where safe, and restore focus to the initiating control.
+- Dialogs shall move focus inside on open, trap it, support keyboard dismissal where safe, and restore focus to the initiating control after every close path.
 - Destructive dialogs shall name the affected record and consequence.
+- Destructive dialogs shall place initial focus on the safe cancel action unless the workflow documents a safer target.
 - Form errors shall appear as text and shall not rely on color alone.
 - Failed submission shall preserve user-entered values.
 
@@ -82,6 +83,14 @@ Planning screens shall feel operational, clear, trustworthy, dense where appropr
 **Then** focus moves to or is associated with the invalid field  
 **And** entered values in other fields remain.
 
+## Cancel a Destructive Dialog by Keyboard
+
+**Given** focus is on an action that opens a destructive confirmation
+**When** the confirmation opens
+**Then** focus moves to its safe cancel action
+**And** cancel closes the confirmation without changing data
+**And** focus returns to the action that opened it.
+
 ## Edit a Worksheet by Keyboard
 
 **Given** a monthly worksheet is open  
@@ -106,4 +115,3 @@ Planning screens shall feel operational, clear, trustworthy, dense where appropr
 - `src/components/ui/`
 - `src/components/planner/`
 - `src/components/planning/`
-

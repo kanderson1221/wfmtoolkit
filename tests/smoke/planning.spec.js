@@ -157,6 +157,33 @@ test('opens the local data storage dialog from the app header', async ({ page })
   await expect(page.getByRole('button', { name: 'Import Backup' })).toBeVisible()
 })
 
+test('keeps destructive confirmation focus on the safe action and restores its trigger', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'Local Data Storage' }).click()
+
+  const storageDialog = page.getByRole('dialog').filter({ hasText: 'Review what is stored in this browser' })
+  const clearButton = storageDialog.getByRole('button', { name: 'Clear All Local Data' })
+  await clearButton.click()
+
+  const confirmationDialog = page.getByRole('dialog').filter({ hasText: 'This cannot be undone' })
+  const cancelButton = confirmationDialog.getByRole('button', { name: 'Cancel' })
+  await expect(cancelButton).toBeFocused()
+
+  await cancelButton.click()
+
+  await expect(confirmationDialog).toBeHidden()
+  await expect(clearButton).toBeFocused()
+
+  await clearButton.click()
+  await expect(cancelButton).toBeFocused()
+  await confirmationDialog.getByRole('button', { name: 'Clear All Local Data' }).click()
+
+  await expect(confirmationDialog).toBeHidden()
+  await expect(clearButton).toBeFocused()
+  await expect(storageDialog.getByText('All local planning data was cleared.')).toBeVisible()
+})
+
 test('opens and edits an existing call center from the call-center list', async ({ page }) => {
   await page.goto('/#planning')
 

@@ -4,7 +4,7 @@ title: Planning-Data Clearing and Destructive-Action Confirmation
 status: draft
 owners: []
 depends_on: [DATA-001, DATA-003, FOUND-005]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -33,6 +33,7 @@ Every destructive confirmation shall:
 - identify whether saved plans remain protected
 - use a specific confirmation label
 - offer cancellation as the safe default
+- place initial keyboard focus on cancellation
 
 # Clear-All Requirements
 
@@ -51,6 +52,7 @@ Every destructive confirmation shall:
 - Cancellation shall perform no write.
 - Destructive operations shall not silently fall back to partial deletion.
 - Operations shall be keyboard accessible.
+- Closing through cancellation or confirmation shall restore focus to the initiating control when it remains available.
 
 # Acceptance Scenarios
 

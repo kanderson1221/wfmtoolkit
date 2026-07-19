@@ -35,6 +35,24 @@ describe('AppConfirmDialog', () => {
     expect(wrapper.text()).toContain('This removes the selected annual plan.')
     expect(wrapper.text()).toContain('Cancel')
     expect(wrapper.text()).toContain('Delete Plan')
+    expect(wrapper.get('button:first-of-type').attributes()).toHaveProperty('autofocus')
+  })
+
+  it('keeps the managed dialog mounted while hidden so focus restoration can complete', () => {
+    const wrapper = mount(AppConfirmDialog, {
+      props: {
+        visible: false,
+        title: 'Delete Plan?'
+      },
+      global: {
+        stubs: {
+          AppDialog: AppDialogStub
+        }
+      }
+    })
+
+    expect(wrapper.findComponent(AppDialogStub).exists()).toBe(true)
+    expect(wrapper.findComponent(AppDialogStub).props('visible')).toBe(false)
   })
 
   it('emits confirm and closes when the primary action is pressed', async () => {

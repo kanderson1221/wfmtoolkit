@@ -56,7 +56,6 @@ const confirmDialog = () => {
 
 <template>
   <AppDialog
-    v-if="visible"
     v-model:visible="visible"
     :title="props.title"
     :description="props.description"
@@ -70,7 +69,7 @@ const confirmDialog = () => {
 
     <template #footer>
       <div class="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-end">
-        <AppButton variant="secondary" @click="closeDialog">
+        <AppButton variant="secondary" autofocus @click="closeDialog">
           {{ props.cancelLabel }}
         </AppButton>
         <AppButton :variant="props.confirmVariant" @click="confirmDialog">
