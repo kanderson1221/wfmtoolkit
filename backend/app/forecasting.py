@@ -105,6 +105,9 @@ class CoverageWindow:
     plan_aligned: bool
 
 
+MAX_ROLLING_ORIGIN_FOLDS = 3
+
+
 def _require_prophet() -> None:
     if Prophet is None:
         raise RuntimeError(
@@ -462,34 +465,66 @@ def _build_future_frame(
     return future
 
 
-def _parse_manual_changepoints(changepoints: list[str]) -> list[pd.Timestamp] | None:
+def _parse_manual_changepoints(
+    changepoints: list[str],
+    training: pd.DataFrame | None = None,
+) -> list[pd.Timestamp] | None:
     if not changepoints:
         return None
 
-    return [_parse_date(value, "manualChangepoints") for value in changepoints]
+    parsed = [_parse_date(value, "manualChangepoints") for value in changepoints]
+    if training is None or training.empty:
+        return parsed
+
+    training_start = training["ds"].min()
+    training_end = training["ds"].max()
+    applicable = [value for value in parsed if training_start < value < training_end]
+
+    return applicable or None
 
 
-def _compute_holdout_metrics(
-    history: pd.DataFrame,
-    payload: ForecastRunRequest,
-) -> dict[str, Any] | None:
-    holdout_days = int(payload.modelConfig.holdoutDays or 0)
-    if holdout_days <= 0:
-        return None
+def _build_accuracy_metrics(
+    scored: pd.DataFrame,
+    forecast_column: str,
+) -> dict[str, float | None]:
+    absolute_error = (scored["y"] - scored[forecast_column]).abs()
+    squared_error = (scored["y"] - scored[forecast_column]) ** 2
+    signed_error = scored[forecast_column] - scored["y"]
+    safe_actual = scored["y"].replace(0, pd.NA)
+    percentage_error = ((absolute_error / safe_actual) * 100).dropna()
+    total_actual = float(scored["y"].sum())
 
-    training, holdout = _split_training_and_holdout(history, holdout_days)
-    holidays = _build_holiday_frame(training, payload.modelConfig)
+    return {
+        "mae": _safe_float(float(absolute_error.mean()), 3),
+        "rmse": _safe_float(math.sqrt(float(squared_error.mean())), 3),
+        "mape": _safe_float(float(percentage_error.mean()), 3)
+        if not percentage_error.empty
+        else None,
+        "wape": _safe_float(float((absolute_error.sum() / total_actual) * 100), 3)
+        if total_actual > 0
+        else None,
+        "bias": _safe_float(float(signed_error.mean()), 3),
+        "meanForecast": _safe_float(float(scored[forecast_column].mean()), 3),
+    }
+
+
+def _compute_holdout_fold(
+    training: pd.DataFrame,
+    holdout: pd.DataFrame,
+    config: ForecastModelConfig,
+) -> dict[str, Any]:
+    holidays = _build_holiday_frame(training, config)
     model = _build_prophet_model(
-        payload.modelConfig,
+        config,
         holidays=holidays,
-        changepoints=_parse_manual_changepoints(payload.modelConfig.manualChangepoints),
+        changepoints=_parse_manual_changepoints(config.manualChangepoints, training),
     )
-    model.fit(_build_model_frame(training, payload.modelConfig.growth))
+    model.fit(_build_model_frame(training, config.growth))
 
     holdout_future = holdout[["ds"]].copy()
-    if payload.modelConfig.growth == "logistic":
-        holdout_future["cap"] = holdout["cap"].fillna(float(payload.modelConfig.defaultCap or 0))
-        holdout_future["floor"] = holdout["floor"].fillna(float(payload.modelConfig.defaultFloor or 0))
+    if config.growth == "logistic":
+        holdout_future["cap"] = holdout["cap"].fillna(float(config.defaultCap or 0))
+        holdout_future["floor"] = holdout["floor"].fillna(float(config.defaultFloor or 0))
 
     holdout_forecast = model.predict(holdout_future)
     merged = holdout[["ds", "y"]].merge(
@@ -507,29 +542,8 @@ def _compute_holdout_metrics(
         lambda weekday: weekday_benchmarks.get(weekday, fallback_benchmark)
     )
 
-    def build_accuracy_metrics(forecast_column: str) -> dict[str, float | None]:
-        absolute_error = (merged["y"] - merged[forecast_column]).abs()
-        squared_error = (merged["y"] - merged[forecast_column]) ** 2
-        signed_error = merged[forecast_column] - merged["y"]
-        safe_actual = merged["y"].replace(0, pd.NA)
-        percentage_error = ((absolute_error / safe_actual) * 100).dropna()
-        total_actual = float(merged["y"].sum())
-
-        return {
-            "mae": _safe_float(float(absolute_error.mean()), 3),
-            "rmse": _safe_float(math.sqrt(float(squared_error.mean())), 3),
-            "mape": _safe_float(float(percentage_error.mean()), 3)
-            if not percentage_error.empty
-            else None,
-            "wape": _safe_float(float((absolute_error.sum() / total_actual) * 100), 3)
-            if total_actual > 0
-            else None,
-            "bias": _safe_float(float(signed_error.mean()), 3),
-            "meanForecast": _safe_float(float(merged[forecast_column].mean()), 3),
-        }
-
-    model_metrics = build_accuracy_metrics("yhat")
-    benchmark_metrics = build_accuracy_metrics("benchmark")
+    model_metrics = _build_accuracy_metrics(merged, "yhat")
+    benchmark_metrics = _build_accuracy_metrics(merged, "benchmark")
     absolute_error = (merged["y"] - merged["yhat"]).abs()
     signed_error = merged["yhat"] - merged["y"]
     benchmark_absolute_error = (merged["y"] - merged["benchmark"]).abs()
@@ -585,7 +599,6 @@ def _compute_holdout_metrics(
         )
 
     return {
-        "holdoutDays": holdout_days,
         "trainingRows": len(training),
         "testRows": len(holdout),
         "trainingDateRange": _date_range_label(training),
@@ -593,7 +606,7 @@ def _compute_holdout_metrics(
         **model_metrics,
         "meanActual": _safe_float(float(merged["y"].mean()), 3),
         "intervalCoverage": _safe_float(float(interval_hit.mean() * 100), 3),
-        "intervalWidthPercent": _safe_float(float(payload.modelConfig.intervalWidth * 100), 3),
+        "intervalWidthPercent": _safe_float(float(config.intervalWidth * 100), 3),
         "benchmark": {
             "id": "weekday_average_8",
             "label": "8-week weekday average",
@@ -605,6 +618,73 @@ def _compute_holdout_metrics(
             "wapeDeltaPoints": wape_delta_points,
         },
         "rows": holdout_rows,
+    }
+
+
+def _build_rolling_origin_folds(
+    history: pd.DataFrame,
+    holdout_days: int,
+) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
+    folds: list[tuple[pd.DataFrame, pd.DataFrame]] = []
+
+    for prior_window_count in range(MAX_ROLLING_ORIGIN_FOLDS - 1, -1, -1):
+        test_end = len(history) - (prior_window_count * holdout_days)
+        test_start = test_end - holdout_days
+        if test_start < 14:
+            continue
+
+        folds.append(
+            (
+                history.iloc[:test_start].copy(),
+                history.iloc[test_start:test_end].copy(),
+            )
+        )
+
+    return folds
+
+
+def _compute_holdout_metrics(
+    history: pd.DataFrame,
+    payload: ForecastRunRequest,
+) -> dict[str, Any] | None:
+    holdout_days = int(payload.modelConfig.holdoutDays or 0)
+    if holdout_days <= 0:
+        return None
+
+    folds = [
+        _compute_holdout_fold(training, holdout, payload.modelConfig)
+        for training, holdout in _build_rolling_origin_folds(history, holdout_days)
+    ]
+    latest_fold = folds[-1]
+    rolling_origin_folds = [
+        {
+            "foldNumber": index + 1,
+            "trainingRows": fold["trainingRows"],
+            "trainingDateRange": fold["trainingDateRange"],
+            "testRows": fold["testRows"],
+            "testDateRange": fold["testDateRange"],
+            "wape": fold["wape"],
+            "mae": fold["mae"],
+            "bias": fold["bias"],
+            "intervalCoverage": fold["intervalCoverage"],
+            "benchmarkWape": fold["benchmark"]["wape"],
+            "benchmarkMae": fold["benchmark"]["mae"],
+            "benchmarkBias": fold["benchmark"]["bias"],
+            "lowerWape": fold["comparison"]["lowerWape"],
+        }
+        for index, fold in enumerate(folds)
+    ]
+
+    return {
+        "holdoutDays": holdout_days,
+        **latest_fold,
+        "rollingOrigin": {
+            "maxFolds": MAX_ROLLING_ORIGIN_FOLDS,
+            "foldCount": len(rolling_origin_folds),
+            "holdoutDaysPerFold": holdout_days,
+            "totalTestRows": sum(fold["testRows"] for fold in rolling_origin_folds),
+            "folds": rolling_origin_folds,
+        },
     }
 
 

@@ -309,6 +309,55 @@ class ForecastingTests(unittest.TestCase):
         self.assertEqual(result["summary"]["testObservations"], 3)
 
     @patch("backend.app.forecasting.Prophet", FakeProphet)
+    def test_holdout_returns_three_leakage_safe_rolling_origin_windows(self) -> None:
+        base_payload = self._payload()
+        history = [row.model_dump() for row in base_payload.history]
+        history.extend(
+            {
+                "ds": timestamp.date().isoformat(),
+                "y": 120 + index,
+                "cap": 500,
+                "floor": 0,
+                "holidayLabel": "",
+            }
+            for index, timestamp in enumerate(pd.date_range("2025-01-15", periods=9, freq="D"))
+        )
+        payload = self._payload(
+            history=history,
+            modelConfig={
+                **base_payload.modelConfig.model_dump(),
+                "holdoutDays": 3,
+                "growth": "linear",
+                "manualChangepoints": ["2025-01-19"],
+            },
+        )
+
+        holdout = run_daily_volume_forecast(payload)["diagnostics"]["holdout"]
+        rolling_origin = holdout["rollingOrigin"]
+
+        self.assertEqual(rolling_origin["foldCount"], 3)
+        self.assertEqual(rolling_origin["holdoutDaysPerFold"], 3)
+        self.assertEqual(rolling_origin["totalTestRows"], 9)
+        self.assertEqual(
+            [fold["trainingRows"] for fold in rolling_origin["folds"]],
+            [14, 17, 20],
+        )
+        self.assertEqual(
+            [fold["testDateRange"] for fold in rolling_origin["folds"]],
+            [
+                "2025-01-15 to 2025-01-17",
+                "2025-01-18 to 2025-01-20",
+                "2025-01-21 to 2025-01-23",
+            ],
+        )
+        self.assertEqual(holdout["testDateRange"], "2025-01-21 to 2025-01-23")
+        self.assertIsNone(FakeProphet.instances[1].kwargs["changepoints"])
+        self.assertEqual(
+            FakeProphet.instances[-1].kwargs["changepoints"],
+            [pd.Timestamp("2025-01-19")],
+        )
+
+    @patch("backend.app.forecasting.Prophet", FakeProphet)
     def test_budget_forecast_returns_full_year_rollup_for_plan_year(self) -> None:
         payload = self._payload(
             planningYear=2025,

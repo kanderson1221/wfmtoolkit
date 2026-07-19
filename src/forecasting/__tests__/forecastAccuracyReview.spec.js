@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildForecastAccuracyCsv,
-  buildForecastAccuracyReview
+  buildForecastAccuracyReview,
+  buildForecastRollingOriginCsv
 } from '../forecastAccuracyReview'
 
 const holdout = {
@@ -41,7 +42,60 @@ const holdout = {
       benchmarkAbsoluteError: 40,
       benchmarkSignedError: -40
     }
-  ]
+  ],
+  rollingOrigin: {
+    maxFolds: 3,
+    foldCount: 3,
+    holdoutDaysPerFold: 2,
+    totalTestRows: 6,
+    folds: [
+      {
+        foldNumber: 1,
+        trainingRows: 365,
+        trainingDateRange: '2024-01-01 to 2024-12-31',
+        testRows: 2,
+        testDateRange: '2025-01-01 to 2025-01-02',
+        wape: 10.2,
+        mae: 51,
+        bias: -18,
+        intervalCoverage: 75,
+        benchmarkWape: 12.4,
+        benchmarkMae: 62,
+        benchmarkBias: 20,
+        lowerWape: 'model'
+      },
+      {
+        foldNumber: 2,
+        trainingRows: 367,
+        trainingDateRange: '2024-01-01 to 2025-01-02',
+        testRows: 2,
+        testDateRange: '2025-01-03 to 2025-01-04',
+        wape: 13.1,
+        mae: 65.5,
+        bias: 25,
+        intervalCoverage: 50,
+        benchmarkWape: 11,
+        benchmarkMae: 55,
+        benchmarkBias: 12,
+        lowerWape: 'benchmark'
+      },
+      {
+        foldNumber: 3,
+        trainingRows: 369,
+        trainingDateRange: '2024-01-01 to 2025-01-04',
+        testRows: 2,
+        testDateRange: '2025-01-05 to 2025-01-06',
+        wape: 8.4,
+        mae: 42,
+        bias: -12,
+        intervalCoverage: 80,
+        benchmarkWape: 11.9,
+        benchmarkMae: 59.5,
+        benchmarkBias: 20,
+        lowerWape: 'model'
+      }
+    ]
+  }
 }
 
 describe('forecast accuracy review', () => {
@@ -83,5 +137,40 @@ describe('forecast accuracy review', () => {
     expect(csv).toContain('actual_contacts,modeled_contacts')
     expect(csv).toContain('modeled_interval_width_percent,benchmark_method,benchmark_contacts')
     expect(csv).toContain('2026-01-01,500,480,450,520,20,-20,4,yes,80,8-week weekday average,460,40,-40')
+  })
+
+  it('summarizes non-overlapping rolling origins without inventing acceptance', () => {
+    const stability = buildForecastAccuracyReview(holdout).rollingOrigin
+
+    expect(stability.summary).toContain('lower WAPE than the weekday baseline in 2 of 3 comparable windows')
+    expect(stability.summary).toContain('8.4% to 13.1%')
+    expect(stability.folds.at(-1)).toEqual(expect.objectContaining({
+      label: 'Current window',
+      trainingThrough: '2025-01-04'
+    }))
+    expect(stability.methodNote).toContain('not an automatic acceptance decision')
+  })
+
+  it('exports one reconciled row per rolling-origin window', () => {
+    const stability = buildForecastAccuracyReview(holdout).rollingOrigin
+    const csv = buildForecastRollingOriginCsv(stability)
+
+    expect(csv).toContain('training_date_range,test_date_range,test_days')
+    expect(csv).toContain('Earlier window 1,2024-01-01 to 2024-12-31,2025-01-01 to 2025-01-02,2,10.2,12.4')
+    expect(csv).toContain('Current window,2024-01-01 to 2025-01-04,2025-01-05 to 2025-01-06,2,8.4,11.9')
+  })
+
+  it('explains when history supports only one cutoff', () => {
+    const review = buildForecastAccuracyReview({
+      ...holdout,
+      rollingOrigin: {
+        ...holdout.rollingOrigin,
+        foldCount: 1,
+        folds: [holdout.rollingOrigin.folds.at(-1)]
+      }
+    })
+
+    expect(review.rollingOrigin.summary).toContain('Only one 2-day test window')
+    expect(review.rollingOrigin.summary).toContain('Load at least 2 additional earlier daily observations')
   })
 })

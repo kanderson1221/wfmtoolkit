@@ -198,6 +198,44 @@ const createForecastRunResults = () => ({
         lowerWape: 'model',
         wapeDeltaPoints: -2.2
       },
+      rollingOrigin: {
+        maxFolds: 3,
+        foldCount: 2,
+        holdoutDaysPerFold: 3,
+        totalTestRows: 6,
+        folds: [
+          {
+            foldNumber: 1,
+            trainingRows: 8,
+            trainingDateRange: '2025-01-01 to 2025-01-08',
+            testRows: 3,
+            testDateRange: '2025-01-09 to 2025-01-11',
+            wape: 8.1,
+            mae: 61.2,
+            bias: 14.3,
+            intervalCoverage: 66.7,
+            benchmarkWape: 7.9,
+            benchmarkMae: 59.8,
+            benchmarkBias: 10.2,
+            lowerWape: 'benchmark'
+          },
+          {
+            foldNumber: 2,
+            trainingRows: 11,
+            trainingDateRange: '2025-01-01 to 2025-01-11',
+            testRows: 3,
+            testDateRange: '2025-01-12 to 2025-01-14',
+            wape: 5.2,
+            mae: 42.1,
+            bias: -4.1,
+            intervalCoverage: 66.7,
+            benchmarkWape: 7.4,
+            benchmarkMae: 57.4,
+            benchmarkBias: 18.7,
+            lowerWape: 'model'
+          }
+        ]
+      },
       rows: [
         {
           ds: '2025-01-12',
@@ -878,6 +916,8 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('8-week weekday average')
     expect(wrapper.text()).toContain('2.2 percentage points lower WAPE')
     expect(wrapper.text()).toContain('Download Accuracy CSV')
+    expect(wrapper.text()).toContain('Accuracy across historical cutoffs')
+    expect(wrapper.text()).toContain('Download Stability CSV')
     expect(wrapper.text()).not.toContain('Forecast saved.')
 
     await findButtonByText(wrapper, 'Monthly Rollup').trigger('click')

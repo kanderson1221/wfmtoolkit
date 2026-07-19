@@ -447,6 +447,7 @@ and the unverified risk.
 - `FCAST-002` Handle-time holdout accuracy and workload consequence review
 - `FCAST-003` Traceable manual demand adjustments and monthly reconciliation
 - `FCAST-004` Saved modeled-forecast candidate comparison
+- `FCAST-005` Rolling-origin forecast stability review
 
 ## Annual Planning
 

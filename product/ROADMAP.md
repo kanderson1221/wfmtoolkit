@@ -52,20 +52,21 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-18. Comparison is read-only, reconciles saved Workload Ratio and Intraday Erlang snapshots, and removes the cramped repeated per-row variance block.
 - Last reviewed: 2026-07-18.
 
-### `NOW-005` — Forecast accuracy and uncertainty review — In progress
+### `NOW-005` — Forecast accuracy and uncertainty review — Completed
 
-- Capability: `CAP-FORE-002` (Need 25 after first slice; 40 before), `CAP-UX-001` (Need 32)
+- Capability: `CAP-FORE-002` (Need 20 after completion; 40 before), `CAP-UX-001` (Need 32)
 - Planner outcome: forecast analysts can judge model fit, holdout performance, interval uncertainty, and manual overrides before saving a planning source.
-- Problem/opportunity: the workbench is capable but does not provide a compact, governed accuracy decision record.
-- Rationale/evidence: forecasting modules expose model components and validation; uncertainty and model comparison remain the highest-value executable gap after saved-plan comparison. `INT-002` asks which real acceptance decision and error measures should govern the first slice.
+- Problem/opportunity: one latest holdout could make a favorable model look stable without showing whether its advantage survived earlier historical cutoffs; saved configurations also lacked one comparable review surface.
+- Rationale/evidence: forecasting modules exposed model components but initially lacked leakage-safe contact/AHT benchmarks, adjustment traceability, comparable saved candidates, and rolling-origin evidence. `INT-002` remains necessary only for the separate organizational acceptance decision.
 - Dependencies: stable historical-data quality and forecast result schema; acceptance semantics informed by `INT-002` where practical.
 - Delivered first slice: leakage-safe contact holdout scoring; modeled forecast versus an eight-week same-weekday training benchmark; aligned WAPE, MAE, mean bias, and interval coverage; explicit no-threshold interpretation; complete scored-day CSV; backward-compatible rerun guidance for older results.
 - Delivered second slice: AHT assumptions stop at the contact training cutoff; the configured monthly method compares with a training-only weighted-average benchmark using contact-weighted AHT MAE/bias and workload error; incomplete scored-day coverage and daily CSV evidence are explicit.
 - Delivered third slice: new and edited manual contact adjustments require a planning reason; legacy blank reasons remain visible; the monthly rollup reconciles baseline contacts, exact manual change, and final contacts from the adjusted daily rows instead of showing an unreconciled final total or per-rule estimate.
 - Delivered fourth slice: two saved modeled configurations compare side by side only when their dated holdout actuals match exactly; WAPE, MAE, signed bias, interval coverage, weekday-benchmark context, and changed settings remain neutral evidence rather than an automatic decision.
-- Remaining scope: rolling-origin comparison and a governed acceptance/rejection record. `INT-002` should shape thresholds, warning policy, and the acceptance decision without blocking safe comparative evidence.
-- Success measures: achieved for saved candidate comparison; users can compare at least two configurations and identify bias/coverage limitations without reading implementation details. Full `NOW-005` completion still requires the governed decision workflow.
-- Status: in progress; first two production slices completed 2026-07-18 and the third and fourth completed 2026-07-19.
+- Delivered fifth slice: each modeled run scores the current holdout plus up to two earlier non-overlapping windows, using only training rows available at each cutoff; chronological model-versus-weekday metrics and a stability CSV reveal whether one holdout overstates reliability.
+- Removed scope: repeated single-window scorer mechanics were consolidated; organizational warning thresholds and acceptance records are separated into `NEXT-004` because `INT-002` is required to define the real decision rather than inventing policy.
+- Success measures: users can compare at least two saved configurations, identify bias/coverage limitations, and judge stability across up to three historical cutoffs without reading implementation details or receiving a fabricated acceptance result.
+- Status: completed 2026-07-19; the first two production slices completed 2026-07-18 and the remaining three completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
 ### `NOW-006` — Consolidated trusted browser downloads — Completed
@@ -106,6 +107,18 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Last reviewed: 2026-07-19.
 
 ## Next
+
+### `NEXT-004` — Governed forecast acceptance decision
+
+- Capability: `CAP-FORE-002` (Need 20), supporting `CAP-GOV-001` (Need 26)
+- Planner outcome: an analyst records why a validated forecast was accepted, rejected, or returned for revision using evidence aligned to the organization's actual planning decision.
+- Problem/opportunity: the workbench now supplies current-holdout, AHT, saved-candidate, adjustment, and rolling-origin evidence but deliberately does not define a universal pass/fail threshold or approval record.
+- Rationale/evidence: metric thresholds depend on whether the sponsor governs volume, workload, peak, staffing consequence, or bias over a specific horizon. Repository evidence cannot determine that policy; `INT-002` asks for a real acceptance example.
+- Dependencies: sponsor answer `INT-002`; retained `FCAST-001`–`FCAST-005` evidence; any future identity/approval semantics remain outside this local decision record.
+- Proposed scope: decision state and reason, selected evidence snapshot, explicit warning policy, legacy fallback, export/lineage, and focused desktop workflow after the acceptance contract is established.
+- Success measures: accepted/rejected status never changes automatically; the analyst can reconstruct which evidence informed the decision; thresholds and required fields trace to `INT-002` rather than generic industry guesses.
+- Status: evidence dependency; do not implement before `INT-002` is answered.
+- Last reviewed: 2026-07-19.
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
 
@@ -228,6 +241,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-18 | Delivered the second `NOW-005` slice: AHT assumptions no longer learn from contact holdout dates, and the AHT tab now reports contact-weighted error and workload consequence against a training-only benchmark. Scores remain calibrated while governed comparison remains pending `INT-002`. |
 | 2026-07-19 | Delivered the third `NOW-005` slice: future-volume overrides now retain a required decision reason and reconcile monthly baseline, exact manual change, and final contacts; legacy blank reasons remain visible without fabricated migration data. |
 | 2026-07-19 | Delivered the fourth `NOW-005` slice: saved modeled forecasts now compare metrics and configuration only after verifying identical dated holdout actuals; no threshold or acceptance result is invented while `INT-002` remains Open. |
+| 2026-07-19 | Completed `NOW-005` with rolling-origin stability across up to three leakage-safe historical cutoffs; moved the sponsor-specific acceptance decision to `NEXT-004` pending `INT-002` and improved `CAP-FORE-002` from Need 25 to 20. |
 | 2026-07-19 | Completed `NOW-006`: all runtime text/CSV/JSON downloads now use one tested browser lifecycle, and duplicate backup/actuals-gap mechanics and filename sanitation were removed without changing planner-visible exports. |
 | 2026-07-19 | Completed required code-review remediation `NOW-007`: destructive confirmations now focus the safe Cancel action and preserve the managed close lifecycle so both cancel and confirm restore a retained initiator. |
 | 2026-07-19 | Completed the fifth-run strategic portfolio review and `NOW-008`: newly created plan Updates now require and persist a decision reason, legacy Updates remain explicit, and modal focus is safe. High-Need missing domains remain sequenced behind their documented prerequisites; added `INT-003` for shared-work ownership/conflict evidence. |

@@ -80,7 +80,11 @@
               { "ds": "2025-01-13", "y": 124 },
               { "ds": "2025-01-14", "y": 126 },
               { "ds": "2025-01-15", "y": 128 },
-              { "ds": "2025-01-16", "y": 130 }
+              { "ds": "2025-01-16", "y": 130 },
+              { "ds": "2025-01-17", "y": 132 },
+              { "ds": "2025-01-18", "y": 134 },
+              { "ds": "2025-01-19", "y": 136 },
+              { "ds": "2025-01-20", "y": 138 }
             ],
             "modelConfig": {
               "growth": "linear",
@@ -105,19 +109,72 @@
               "diagnostics": {
                 "holdout": {
                   "holdoutDays": 2,
-                  "trainingRows": 14,
+                  "trainingRows": 18,
                   "testRows": 2,
-                  "trainingDateRange": "2025-01-01 to 2025-01-14",
-                  "testDateRange": "2025-01-15 to 2025-01-16",
+                  "trainingDateRange": "2025-01-01 to 2025-01-18",
+                  "testDateRange": "2025-01-19 to 2025-01-20",
                   "wape": 8.4,
                   "mae": 10.8,
                   "bias": -6.2,
                   "intervalCoverage": 50,
                   "intervalWidthPercent": 80,
                   "benchmark": { "label": "8-week weekday average", "wape": 11.9 },
+                  "rollingOrigin": {
+                    "maxFolds": 3,
+                    "foldCount": 3,
+                    "holdoutDaysPerFold": 2,
+                    "totalTestRows": 6,
+                    "folds": [
+                      {
+                        "foldNumber": 1,
+                        "trainingRows": 14,
+                        "trainingDateRange": "2025-01-01 to 2025-01-14",
+                        "testRows": 2,
+                        "testDateRange": "2025-01-15 to 2025-01-16",
+                        "wape": 12.8,
+                        "mae": 16.5,
+                        "bias": -14.2,
+                        "intervalCoverage": 50,
+                        "benchmarkWape": 10.4,
+                        "benchmarkMae": 13.4,
+                        "benchmarkBias": 8.2,
+                        "lowerWape": "benchmark"
+                      },
+                      {
+                        "foldNumber": 2,
+                        "trainingRows": 16,
+                        "trainingDateRange": "2025-01-01 to 2025-01-16",
+                        "testRows": 2,
+                        "testDateRange": "2025-01-17 to 2025-01-18",
+                        "wape": 9.7,
+                        "mae": 12.9,
+                        "bias": 6.5,
+                        "intervalCoverage": 100,
+                        "benchmarkWape": 11.2,
+                        "benchmarkMae": 14.9,
+                        "benchmarkBias": 11.1,
+                        "lowerWape": "model"
+                      },
+                      {
+                        "foldNumber": 3,
+                        "trainingRows": 18,
+                        "trainingDateRange": "2025-01-01 to 2025-01-18",
+                        "testRows": 2,
+                        "testDateRange": "2025-01-19 to 2025-01-20",
+                        "wape": 8.4,
+                        "mae": 10.8,
+                        "bias": -6.2,
+                        "intervalCoverage": 50,
+                        "benchmarkWape": 11.9,
+                        "benchmarkMae": 15.3,
+                        "benchmarkBias": 9.8,
+                        "lowerWape": "model"
+                      }
+                    ]
+                  },
                   "rows": [
-                    { "ds": "2025-01-15", "actualValue": 128, "forecastValue": 117, "withinInterval": true },
-                    { "ds": "2025-01-16", "actualValue": 130, "forecastValue": 113, "withinInterval": false }
+                    { "ds": "2025-01-19", "actualValue": 136, "forecastValue": 125, "withinInterval": true },
+                    { "ds": "2025-01-20", "actualValue": 138, "forecastValue": 121, "withinInterval": false }
                   ]
                 }
               }
@@ -162,7 +219,11 @@
               { "ds": "2025-01-13", "y": 124 },
               { "ds": "2025-01-14", "y": 126 },
               { "ds": "2025-01-15", "y": 128 },
-              { "ds": "2025-01-16", "y": 130 }
+              { "ds": "2025-01-16", "y": 130 },
+              { "ds": "2025-01-17", "y": 132 },
+              { "ds": "2025-01-18", "y": 134 },
+              { "ds": "2025-01-19", "y": 136 },
+              { "ds": "2025-01-20", "y": 138 }
             ],
             "modelConfig": {
               "growth": "flat",
@@ -187,10 +248,10 @@
               "diagnostics": {
                 "holdout": {
                   "holdoutDays": 2,
-                  "trainingRows": 14,
+                  "trainingRows": 18,
                   "testRows": 2,
-                  "trainingDateRange": "2025-01-01 to 2025-01-14",
-                  "testDateRange": "2025-01-15 to 2025-01-16",
+                  "trainingDateRange": "2025-01-01 to 2025-01-18",
+                  "testDateRange": "2025-01-19 to 2025-01-20",
                   "wape": 6.1,
                   "mae": 7.9,
                   "bias": 3.4,
@@ -198,8 +259,8 @@
                   "intervalWidthPercent": 90,
                   "benchmark": { "label": "8-week weekday average", "wape": 11.9 },
                   "rows": [
-                    { "ds": "2025-01-15", "actualValue": 128, "forecastValue": 121, "withinInterval": true },
-                    { "ds": "2025-01-16", "actualValue": 130, "forecastValue": 127, "withinInterval": true }
+                    { "ds": "2025-01-19", "actualValue": 136, "forecastValue": 129, "withinInterval": true },
+                    { "ds": "2025-01-20", "actualValue": 138, "forecastValue": 135, "withinInterval": true }
                   ]
                 }
               }

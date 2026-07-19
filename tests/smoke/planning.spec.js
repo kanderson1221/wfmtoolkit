@@ -133,6 +133,11 @@ test('compares saved forecast candidates on identical holdout actuals', async ({
   await page.getByRole('button', { name: 'Forecasts', exact: true }).click()
   await page.getByRole('link', { name: 'Open Reference Forecast for Consumer Voice' }).click()
 
+  await expect(page.getByRole('heading', { name: 'Accuracy across historical cutoffs' })).toBeVisible()
+  await expect(page.getByText('lower WAPE than the weekday baseline in 2 of 3 comparable windows')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download Stability CSV' })).toBeVisible()
+  await expect(page.getByRole('row', { name: /Current window/ })).toContainText('Model lower')
+
   const compareTrigger = page.getByRole('button', { name: 'Compare Forecasts' })
   await expect(compareTrigger).toBeVisible()
   await compareTrigger.click()

@@ -46,6 +46,41 @@ const buildHoldout = (overrides = {}) => ({
       benchmarkSignedError: 50
     }
   ],
+  rollingOrigin: {
+    maxFolds: 3,
+    foldCount: 2,
+    holdoutDaysPerFold: 60,
+    folds: [
+      {
+        foldNumber: 1,
+        trainingDateRange: '2023-01-01 to 2025-07-04',
+        testRows: 60,
+        testDateRange: '2025-07-05 to 2025-09-02',
+        wape: 8.2,
+        mae: 70,
+        bias: 14,
+        intervalCoverage: 78,
+        benchmarkWape: 9.8,
+        benchmarkMae: 84,
+        benchmarkBias: 21,
+        lowerWape: 'model'
+      },
+      {
+        foldNumber: 2,
+        trainingDateRange: '2023-01-01 to 2025-11-01',
+        testRows: 60,
+        testDateRange: '2025-11-02 to 2025-12-31',
+        wape: 6.8,
+        mae: 58.4,
+        bias: -12.6,
+        intervalCoverage: 81.7,
+        benchmarkWape: 9.5,
+        benchmarkMae: 81.6,
+        benchmarkBias: 24.3,
+        lowerWape: 'model'
+      }
+    ]
+  },
   ...overrides
 })
 
@@ -105,6 +140,30 @@ describe('ForecastAccuracyReview', () => {
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:forecast-accuracy')
     expect(clickSpy).toHaveBeenCalledOnce()
+  })
+
+  it('shows and exports rolling-origin stability evidence in a contained table', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:forecast-stability')
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn()
+    })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const wrapper = mountReview()
+
+    expect(wrapper.text()).toContain('Accuracy across historical cutoffs')
+    expect(wrapper.text()).toContain('2 of 2 comparable windows')
+    expect(wrapper.text()).toContain('Current window')
+    expect(wrapper.text()).toContain('Model lower')
+    expect(wrapper.findAll('table')).toHaveLength(2)
+
+    await wrapper.findAll('button').at(-1).trigger('click')
+
+    expect(URL.createObjectURL).toHaveBeenCalledOnce()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:forecast-stability')
   })
 
   it('reuses the comparison table for leakage-safe handle-time evidence', () => {
