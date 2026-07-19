@@ -198,30 +198,6 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 
 ## Later
 
-### `LATER-001` — Intraday variance and recovery workspace
-
-- Capability: `CAP-INTRA-001` (Need 80)
-- Planner outcome: intraday managers see interval demand/capacity deviation and can record recovery decisions.
-- Problem/opportunity: interval sizing exists, but same-day operational management does not.
-- Rationale/evidence: this is valuable but depends on near-real-time actuals, schedules, and shared persistence.
-- Dependencies: `NEXT-003`, employee/schedule or aggregate capacity feeds, interval actuals contract.
-- Proposed scope: integration-boundary discovery first, then dense exception table, reforecast, recovery actions, and audit trail.
-- Success measures: agreed data latency and ownership; actionable deviations reconcile to source feeds.
-- Status: dependency-blocked, not currently executable.
-- Last reviewed: 2026-07-19.
-
-### `LATER-002` — Employee scheduling product boundary
-
-- Capability: `CAP-SCHED-001` (Need 100)
-- Planner outcome: determine whether WFM Toolkit should optimize shifts or hand requirements to a scheduling platform.
-- Problem/opportunity: scheduling is strategically important but entirely absent and materially larger than an annual-planning enhancement.
-- Rationale/evidence: no employee, skill, labor-rule, activity, or optimizer model exists; blindly building schedule UI would fragment the product.
-- Dependencies: shared persistence, skills, contracts/rules, demand granularity, integration strategy.
-- Proposed scope: practitioner discovery, build-versus-integrate decision, and minimum interoperable requirement export before implementation.
-- Success measures: documented decision, validated planner workflow, and scoped data model with no speculative UI.
-- Status: explore-before-build.
-- Last reviewed: 2026-07-19.
-
 ### `LATER-003` — Governed collaboration and administration
 
 - Capability: `CAP-ADMIN-001` (Need 60), `CAP-GOV-001` (Need 26)
@@ -261,6 +237,30 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Last reviewed: 2026-07-19.
 
 ## Retired / Declined
+
+### `RET-005` — Same-day intraday management — Declined
+
+- Supersedes: `LATER-001`
+- Capability: `CAP-INTRA-001` (Need 0 because it is outside supported product scope)
+- Planner outcome: keep WFM Toolkit focused on planning requirements instead of becoming a real-time operations-management platform.
+- Product boundary: interval Erlang calculations remain supported as a staffing-requirement method; live actual-vs-plan monitoring, adherence, same-day reforecasting, recovery actions, and operational action logs are excluded.
+- Rationale/evidence: sponsor direction `INT-005` explicitly rejects intraday management.
+- Dependencies: none.
+- Success measures: roadmap and capability scoring do not treat the absent intraday workspace as a gap; no real-time operations surface is added without new explicit sponsor direction.
+- Status: declined 2026-07-19.
+- Last reviewed: 2026-07-19.
+
+### `RET-006` — Employee shift scheduling — Declined
+
+- Supersedes: `LATER-002`
+- Capability: `CAP-SCHED-001` (Need 0 because it is outside supported product scope)
+- Planner outcome: keep WFM Toolkit focused on forecasting, capacity requirements, and longer-range staffing plans rather than employee-level shift generation.
+- Product boundary: employee, activity, shift, labor-rule, schedule optimization, and schedule-management workflows are excluded. Existing staffing requirements may be exported or integrated only if a later roadmap decision supports it.
+- Rationale/evidence: sponsor direction `INT-005` explicitly rejects scheduling.
+- Dependencies: none.
+- Success measures: roadmap and capability scoring do not treat absent scheduling as a gap; no scheduling UI, optimizer, or employee-shift model is added without new explicit sponsor direction.
+- Status: declined 2026-07-19.
+- Last reviewed: 2026-07-19.
 
 ### `RET-001` — Phone planning layouts and navigation — Declined
 
@@ -339,5 +339,6 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Completed `NOW-010`: explicit actual-data Erlang results now survive plan save, draft restore, IndexedDB/backup round trips, and reload; matching evidence contributes to call-center actual requirement and variance while stale or incomplete results remain withheld. |
 | 2026-07-19 | Completed the fifth-run strategic portfolio review and `NOW-011`: call-center reconciliation now retains its two-tier headings, Month column, and active expanded-month aggregate inside one keyboard-scrollable table; high-Need missing domains remain sequenced behind their prerequisites, and `INT-004` targets abandoned-lock recovery for `NEXT-003`. |
 | 2026-07-19 | Completed `NOW-012`: the annual-plan workflow rail now exposes all existing section readiness labels in text; retired the unreachable speculative financial placeholder as `RET-004` while keeping labor-cost planning in `EXP-001`. |
+| 2026-07-19 | Applied sponsor direction `INT-005`: retired same-day intraday management as `RET-005` and employee shift scheduling as `RET-006`; interval Erlang remains a capacity-planning method, not an intraday-management commitment. |
 | 2026-07-19 | Completed `NOW-013`: the monthly staffing-supply roll-forward now groups its decision stages and retains both heading tiers and Month context inside one contained keyboard scroll region; calculations and saved data remain unchanged. |
 | 2026-07-19 | Completed `NOW-014`: saved-plan comparison now attributes monthly requirement, peak, supply, and gap movement to exact demand and capacity drivers; misleading annual-average capacity rows were removed. |

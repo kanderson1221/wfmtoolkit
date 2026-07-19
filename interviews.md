@@ -25,6 +25,21 @@ None.
 
 ## Applied/closed questions
 
+### INT-005 — Scheduling and intraday product boundary
+
+- Status: Applied
+- Date asked: Sponsor supplied direction without a pending question on 2026-07-19
+- Priority: Critical
+- Related capability IDs/roadmap items: `CAP-SCHED-001`, `CAP-INTRA-001`, retired `LATER-001`, retired `LATER-002`, `RET-005`, `RET-006`
+- Decision this answer will influence: Whether WFM Toolkit should expand into employee shift scheduling or same-day intraday operations management.
+- Why repository evidence cannot answer it: These are strategic product-boundary decisions; their absence could otherwise be mis-scored as a high-priority capability gap.
+- Question: Should WFM Toolkit provide employee scheduling or intraday management?
+- Answer: I do not want this tool to schedule or do intra day management.
+- Date answered: 2026-07-19
+- Agent interpretation: Employee-level shift scheduling and same-day operational management are explicitly outside product scope. Interval-level Erlang calculations remain in scope only as a staffing-requirement method supporting capacity and longer-range planning.
+- Product/roadmap action: Set both capability Need scores to 0 as out-of-scope, retired `LATER-001` and `LATER-002` as `RET-005` and `RET-006`, and instructed the scheduled agent not to revive them without new explicit sponsor direction.
+- Applied date: 2026-07-19
+
 ### INT-003 — Shared planning ownership and conflict handling
 
 - Status: Applied
