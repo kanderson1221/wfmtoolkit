@@ -641,16 +641,18 @@ Key interactions:
 | Budget draft is editable. Next: Review Agent Availability.                       |
 +-------------------------+--------------------------------------------------------+
 | PLAN                    | Selected section                                       |
-| Imported Forecast       |                                                        |
+| Forecasts       Applied |                                                        |
 | Agent Availability      | Section header                         Section actions |
-| Occupancy & Adherence   |                                                        |
-| Demand Requirement      | Summary metrics                                        |
-| Staffing Plan           |                                                        |
-|-------------------------| Native monthly worksheet or focused controls           |
+|          Using defaults |                                                        |
+| Occupancy & Adherence   | Summary metrics                                        |
+|          Using defaults |                                                        |
+| Demand Model 12/12 mo.  | Native monthly worksheet or focused controls           |
+| Staffing Plan 2/2 req.  |                                                        |
+|-------------------------| Warnings and calculation state                         |
 | ACTUALS                 |                                                        |
-| Actuals & Variance      | Warnings and calculation state                         |
+| Actuals & Variance      |                                                        |
+|             Not started | [Previous]                              [Continue]       |
 |                         |                                                        |
-|                         | [Previous]                              [Continue]       |
 +-------------------------+--------------------------------------------------------+
 ```
 

@@ -266,6 +266,41 @@ test('requires and exposes updated-plan decision reasons across the desktop work
   )
 })
 
+test('keeps annual-plan readiness visible across desktop widths', async ({ page }) => {
+  await page.goto('/#planning')
+  await importLocalBackup(page, planUpdateReviewFixturePath)
+
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByText('Customer Care', { exact: true }).click()
+  await page.getByRole('button', { name: 'Plans', exact: true }).click()
+  await page.getByRole('link', { name: 'Open 2026 Spring Outlook plan for Customer Care' }).click()
+
+  await expect(page.getByRole('navigation', { name: 'Staffing group workflow' })).toBeVisible()
+  await expect(page.locator('[data-section-id="forecast"] span')).toHaveText('Legacy manual')
+  await expect(page.locator('[data-section-id="availability"] span')).toHaveText('12/12 months')
+  await expect(page.locator('[data-section-id="variability"] span')).toHaveText('Defaults confirmed')
+  await expect(page.locator('[data-section-id="requirement"] span')).toHaveText('12/12 months')
+  await expect(page.locator('[data-section-id="staffing"] span')).toHaveText('0/2 required')
+  await expect(page.locator('[data-section-id="actuals"] span')).toHaveText('1 month')
+
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+    { width: 1152, height: 720 }
+  ]) {
+    await page.setViewportSize(viewport)
+
+    const geometry = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }))
+
+    expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth)
+    await expect(page.locator('[data-section-id] span')).toHaveCount(6)
+  }
+})
+
 test('keeps call-center reconciliation context visible while expanded months scroll', async ({ page }) => {
   await page.goto('/#planning')
   await importLocalBackup(page, planUpdateReviewFixturePath)

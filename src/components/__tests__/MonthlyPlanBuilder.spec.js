@@ -182,6 +182,13 @@ describe('MonthlyPlanBuilder', () => {
     expect(
       wrapper.findAll('[data-section-id]').map((node) => node.attributes('data-section-id'))
     ).toEqual(['forecast', 'availability', 'variability', 'requirement', 'staffing', 'actuals'])
+
+    expect(wrapper.get('[data-section-id="forecast"]').text()).toContain('Not applied')
+    expect(wrapper.get('[data-section-id="availability"]').text()).toContain('Using defaults')
+    expect(wrapper.get('[data-section-id="variability"]').text()).toContain('Using defaults')
+    expect(wrapper.get('[data-section-id="requirement"]').text()).toContain('0/12 months')
+    expect(wrapper.get('[data-section-id="staffing"]').text()).toContain('2/2 required')
+    expect(wrapper.get('[data-section-id="actuals"]').text()).toContain('Not started')
   })
 
   it('starts a fresh new intraday Erlang plan even when a scoped draft exists', async () => {

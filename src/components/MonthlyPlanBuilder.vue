@@ -82,6 +82,7 @@ const hasAppliedForecastDemand = computed(() =>
 )
 
 const formatMonthCoverage = (count) => `${count}/${TOTAL_PLAN_MONTHS} months`
+const formatMonthCount = (count) => `${count} ${count === 1 ? 'month' : 'months'}`
 
 const getFirstMissingMonthLabel = (items, predicate) => {
   const monthIndex = items.findIndex((item, index) => !predicate(item, index))
@@ -600,7 +601,7 @@ const workflowSections = computed(() => [
       {
         id: 'actuals',
         title: 'Actuals & Variance',
-        statusLabel: actualsStarted.value ? `${builder.actualsSummary.loadedMonthsCount} months` : 'Not started',
+        statusLabel: actualsStarted.value ? formatMonthCount(builder.actualsSummary.loadedMonthsCount) : 'Not started',
         tone: actualsStarted.value ? 'ready' : 'default'
       }
     ]

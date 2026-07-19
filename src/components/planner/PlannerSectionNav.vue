@@ -30,11 +30,31 @@ const toneClasses = (tone, isActive) => {
     return 'border-[#c3d2df] bg-[#e7eef4] text-[#15395f] shadow-sm'
   }
 
-  if (tone === 'upcoming') {
-    return 'border-slate-200 bg-slate-50/80 text-slate-600 hover:border-[#c3d2df] hover:bg-[#f4f7fa] hover:text-slate-800'
+  if (tone === 'ready') {
+    return 'border-emerald-200 bg-emerald-50/60 text-slate-900 hover:border-emerald-300 hover:bg-emerald-50'
+  }
+
+  if (tone === 'attention') {
+    return 'border-amber-200 bg-amber-50/60 text-slate-900 hover:border-amber-300 hover:bg-amber-50'
   }
 
   return 'border-slate-200 bg-white text-slate-900 hover:border-[#c3d2df] hover:bg-[#f4f7fa] hover:text-[#15395f]'
+}
+
+const statusToneClasses = (tone, isActive) => {
+  if (isActive) {
+    return 'text-[#365b7f]'
+  }
+
+  if (tone === 'ready') {
+    return 'text-emerald-700'
+  }
+
+  if (tone === 'attention') {
+    return 'text-amber-700'
+  }
+
+  return 'text-slate-500'
 }
 </script>
 
@@ -59,6 +79,7 @@ const toneClasses = (tone, isActive) => {
         :key="item.id"
         type="button"
         :data-section-id="item.id"
+        :data-status-tone="item.tone || 'default'"
         :aria-current="activeId === item.id ? 'step' : undefined"
         class="rounded-[18px] border px-3 py-2.5 text-left transition"
         :class="toneClasses(item.tone, activeId === item.id)"
@@ -67,6 +88,13 @@ const toneClasses = (tone, isActive) => {
         <strong class="block min-w-0 text-sm font-semibold leading-5 tracking-[-0.02em] text-balance">
           {{ item.title }}
         </strong>
+        <span
+          v-if="item.statusLabel"
+          class="mt-0.5 block text-[0.7rem] font-medium leading-4 tabular-nums"
+          :class="statusToneClasses(item.tone, activeId === item.id)"
+        >
+          {{ item.statusLabel }}
+        </span>
       </button>
     </div>
   </nav>

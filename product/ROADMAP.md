@@ -144,6 +144,18 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-012` — Visible annual-plan readiness — Completed
+
+- Capability: `CAP-UX-001` (Need 32), supporting `CAP-LRP-001` (Need 20) and `CAP-GOV-001` (Need 26)
+- Planner outcome: annual capacity planners can scan which plan sections are ready, inherited but unreviewed, incomplete, or not started without opening each section serially.
+- Problem/opportunity: the planner already computed decision-specific status for Forecasts, Agent Availability, Erlang/Variability, Demand Model, Staffing Plan, and Actuals, but its persistent workflow rail rendered only section titles. The finalization banner named one blocker while hiding the rest of the readiness map.
+- Rationale/evidence: `PLAN-011` requires each section to expose status, detail, and first blocker; the hidden `statusLabel` values and ignored ready/attention tones made that contract incomplete. A separate tracked financial Budget panel was unreachable and promised methodology that `EXP-001` correctly leaves undefined.
+- Dependencies: existing plan readiness calculations and workflow rail only; no persistence, route, formula, backend, identity, or sponsor-policy dependency.
+- Delivered scope: visible non-color status text for all six workflow destinations; restrained ready/attention/default treatment; preserved current-step semantics and selection; focused and Chromium regressions; deletion of the unreachable financial placeholder and unused upcoming-state styling.
+- Success measures: all workflow destinations expose their current status before selection; active section retains `aria-current`; finalization and calculations are unchanged; the workspace creates no page overflow at 1280, 1440, 1920, or 1152 px zoom-equivalent review.
+- Status: completed 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -260,6 +272,18 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: declined 2026-07-19 in response to `INT-002`.
 - Last reviewed: 2026-07-19.
 
+### `RET-004` — Speculative financial Budget workspace placeholder — Retired
+
+- Capability: `CAP-FIN-001` (Need 60), supporting `CAP-UX-001` (Need 32)
+- Planner outcome: the annual plan exposes only operational destinations that support a current decision; financial planning returns only after its accounting contract is defined.
+- Problem/opportunity: an unreachable tracked component promised a future labor-cost workspace and displayed supply metrics as “budget preparation” without rates, currency, burden, overtime, vendor, or Finance reconciliation semantics.
+- Rationale/evidence: `EXP-001` deliberately keeps labor-cost work in discovery. Retaining speculative UI would encourage a misleading partial feature and another navigation dialect.
+- Dependencies: none for removal; any future financial workflow still depends on the decisions recorded in `EXP-001`.
+- Retired scope: the unused `PlannerBudgetPanel` component and its unused upcoming-state navigation treatment. Budget plan lifecycle terminology and the financial capability itself remain intact.
+- Success measures: no route or saved data changes; operational annual planning remains unchanged; future financial work begins from a validated calculation contract rather than the retired placeholder.
+- Status: retired 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Decision log
 
 | Date | Decision |
@@ -288,3 +312,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Completed `NOW-009`: call-center rollups now validate and use current saved Intraday Erlang results, withhold stale/missing and mixed-scope requirement values, name affected plans, and remove unused duplicate summary metrics. |
 | 2026-07-19 | Completed `NOW-010`: explicit actual-data Erlang results now survive plan save, draft restore, IndexedDB/backup round trips, and reload; matching evidence contributes to call-center actual requirement and variance while stale or incomplete results remain withheld. |
 | 2026-07-19 | Completed the fifth-run strategic portfolio review and `NOW-011`: call-center reconciliation now retains its two-tier headings, Month column, and active expanded-month aggregate inside one keyboard-scrollable table; high-Need missing domains remain sequenced behind their prerequisites, and `INT-004` targets abandoned-lock recovery for `NEXT-003`. |
+| 2026-07-19 | Completed `NOW-012`: the annual-plan workflow rail now exposes all existing section readiness labels in text; retired the unreachable speculative financial placeholder as `RET-004` while keeping labor-cost planning in `EXP-001`. |

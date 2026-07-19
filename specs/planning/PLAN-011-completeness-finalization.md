@@ -4,7 +4,7 @@ title: Plan Warnings, Completeness, and Finalization Gates
 status: draft
 owners: []
 depends_on: [PLAN-002, PLAN-003, PLAN-004, PLAN-005, PLAN-006, PLAN-007, PLAN-008, PLAN-009]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -37,6 +37,8 @@ A budget shall evaluate at least:
 - Inherited defaults shall not count as reviewed merely because they are populated.
 - The planner shall explicitly review required assumption sections.
 - Each section shall expose status, detail, and first blocker.
+- The persistent workflow navigation shall show each section's current status in text so readiness can be scanned without opening sections serially.
+- Ready, attention, and incomplete states may use supporting color, but status meaning shall not depend on color alone.
 - The workspace shall identify the next incomplete section.
 - Section status shall persist in drafts.
 
@@ -89,6 +91,14 @@ Before finalization, the system shall show:
 **Then** save succeeds if persistence succeeds  
 **And** blockers remain visible.
 
+## Scan Readiness Across The Plan
+
+**Given** required plan sections are in a mix of ready, inherited-default, incomplete, and not-started states
+**When** the annual plan workspace opens
+**Then** every workflow destination shows its current status in text
+**And** the active section remains programmatically identified
+**And** the planner does not need to open each section to find the next incomplete area.
+
 # Open Questions
 
 1. Which warnings require explicit acknowledgment?
@@ -100,4 +110,3 @@ Before finalization, the system shall show:
 - `src/components/MonthlyPlanBuilder.vue`
 - `src/planner/demandModel.js`
 - `src/composables/useMonthlyPlanBuilder.js`
-
