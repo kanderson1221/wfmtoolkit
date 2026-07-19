@@ -73,6 +73,11 @@ export const buildForecastAccuracyReview = (holdout = null) => {
   }
 
   return {
+    heading: 'Forecast accuracy review',
+    candidateLabel: 'Modeled forecast',
+    benchmarkLabel: benchmark?.label || 'Weekday baseline',
+    exportLabel: 'Download Accuracy CSV',
+    exportSuffix: 'accuracy-review',
     benchmark,
     benchmarkAvailable: Boolean(benchmark),
     summary,
@@ -80,12 +85,19 @@ export const buildForecastAccuracyReview = (holdout = null) => {
     testDateRange: String(holdout.testDateRange || ''),
     trainingDateRange: String(holdout.trainingDateRange || ''),
     meanActual: finiteMetric(holdout.meanActual),
+    scoredRows: finiteMetric(holdout.testRows),
+    rows: Array.isArray(holdout.rows) ? holdout.rows : [],
+    decisionNote: benchmark
+      ? 'This comparison is evidence for review, not an automatic acceptance decision.'
+      : '',
+    methodNote: 'The weekday baseline uses the mean of up to the latest eight matching weekdays from training data only. Positive bias means over-forecasting; negative bias means under-forecasting.',
     metricRows: metricDefinitions.map((definition) => ({
       ...definition,
       interpretation: definition.id === 'intervalCoverage' && intervalWidthPercent != null
         ? `Share of actual days inside the configured ${intervalWidthPercent}% modeled prediction interval.`
         : definition.interpretation,
       modelValue: finiteMetric(holdout[definition.id]),
+      candidateValue: finiteMetric(holdout[definition.id]),
       benchmarkValue: definition.id === 'intervalCoverage'
         ? null
         : finiteMetric(benchmark?.[definition.id])

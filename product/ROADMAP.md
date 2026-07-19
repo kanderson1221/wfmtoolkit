@@ -59,10 +59,11 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Problem/opportunity: the workbench is capable but does not provide a compact, governed accuracy decision record.
 - Rationale/evidence: forecasting modules expose model components and validation; uncertainty and model comparison remain the highest-value executable gap after saved-plan comparison. `INT-002` asks which real acceptance decision and error measures should govern the first slice.
 - Dependencies: stable historical-data quality and forecast result schema; acceptance semantics informed by `INT-002` where practical.
-- Delivered first slice: leakage-safe holdout scoring; modeled forecast versus an eight-week same-weekday training benchmark; aligned WAPE, MAE, mean bias, and interval coverage; explicit no-threshold interpretation; complete scored-day CSV; backward-compatible rerun guidance for older results.
-- Remaining scope: saved configuration-to-configuration or rolling-origin comparison, governed acceptance/rejection record, override trace in diagnostics, and AHT forecast accuracy. `INT-002` should shape threshold and decision semantics rather than blocking safe comparative evidence.
+- Delivered first slice: leakage-safe contact holdout scoring; modeled forecast versus an eight-week same-weekday training benchmark; aligned WAPE, MAE, mean bias, and interval coverage; explicit no-threshold interpretation; complete scored-day CSV; backward-compatible rerun guidance for older results.
+- Delivered second slice: AHT assumptions stop at the contact training cutoff; the configured monthly method compares with a training-only weighted-average benchmark using contact-weighted AHT MAE/bias and workload error; incomplete scored-day coverage and daily CSV evidence are explicit.
+- Remaining scope: saved configuration-to-configuration or rolling-origin comparison, governed acceptance/rejection record, and override trace in diagnostics. `INT-002` should shape threshold and decision semantics rather than blocking safe comparative evidence.
 - Success measures: users can compare at least two candidate models or configurations and identify bias/coverage limitations without reading implementation details; the delivered benchmark comparison satisfies the first evidence baseline but not the full governed decision workflow.
-- Status: in progress; first production slice completed 2026-07-18.
+- Status: in progress; first two production slices completed 2026-07-18.
 - Last reviewed: 2026-07-18.
 
 ## Next
@@ -185,3 +186,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-18 | Completed the fifth-run strategic portfolio review and `NOW-004`: saved same-year plans now compare assumptions, outcomes, monthly exceptions, and exports without mutating snapshots or comparing incompatible requirement semantics. |
 | 2026-07-18 | Promoted forecast accuracy and uncertainty review from `NEXT-002` to ready `NOW-005`; added `INT-002` to establish the sponsor's real forecast-acceptance decision before choosing metric emphasis. |
 | 2026-07-18 | Delivered the first `NOW-005` slice: holdout results now compare the modeled forecast with a leakage-safe weekday benchmark using WAPE, MAE, bias, interval coverage, and complete daily export. Acceptance thresholds and multi-configuration governance remain pending `INT-002`. |
+| 2026-07-18 | Delivered the second `NOW-005` slice: AHT assumptions no longer learn from contact holdout dates, and the AHT tab now reports contact-weighted error and workload consequence against a training-only benchmark. Scores remain calibrated while governed comparison remains pending `INT-002`. |

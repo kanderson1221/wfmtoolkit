@@ -10,6 +10,10 @@ import {
   buildForecastAccuracyCsv,
   buildForecastAccuracyReview
 } from '../../forecasting/forecastAccuracyReview'
+import {
+  buildForecastAhtAccuracyCsv,
+  buildForecastAhtAccuracyReview
+} from '../../forecasting/forecastAhtAccuracyReview'
 import { formatNumber, formatPercent } from '../../forecasting/shared'
 
 const props = defineProps({
@@ -20,11 +24,22 @@ const props = defineProps({
   projectName: {
     type: String,
     default: 'forecast'
+  },
+  project: {
+    type: Object,
+    default: null
+  },
+  reviewType: {
+    type: String,
+    default: 'contacts'
   }
 })
 
-const review = computed(() => buildForecastAccuracyReview(props.holdout))
-const hasExportRows = computed(() => Array.isArray(props.holdout?.rows) && props.holdout.rows.length > 0)
+const review = computed(() => props.reviewType === 'aht'
+  ? buildForecastAhtAccuracyReview(props.project)
+  : buildForecastAccuracyReview(props.holdout)
+)
+const hasExportRows = computed(() => Array.isArray(review.value?.rows) && review.value.rows.length > 0)
 
 const formatMetric = (row, value) => {
   if (value == null) {
@@ -35,9 +50,14 @@ const formatMetric = (row, value) => {
     return formatPercent(value, 1)
   }
 
-  if (row.unit === 'signed-contacts') {
+  if (row.unit === 'signed-contacts' || row.unit === 'signed-seconds') {
     const prefix = value > 0 ? '+' : ''
-    return `${prefix}${formatNumber(value, 1)} contacts/day`
+    const suffix = row.unit === 'signed-seconds' ? ' sec' : ' contacts/day'
+    return `${prefix}${formatNumber(value, 1)}${suffix}`
+  }
+
+  if (row.unit === 'seconds') {
+    return `${formatNumber(value, 1)} sec`
   }
 
   return `${formatNumber(value, 1)} contacts/day`
@@ -49,8 +69,10 @@ const downloadReview = () => {
   }
 
   downloadCsv(
-    `${sanitizeFileNamePart(props.projectName)}-accuracy-review.csv`,
-    buildForecastAccuracyCsv(props.holdout)
+    `${sanitizeFileNamePart(props.projectName)}-${review.value.exportSuffix}.csv`,
+    props.reviewType === 'aht'
+      ? buildForecastAhtAccuracyCsv(review.value)
+      : buildForecastAccuracyCsv(props.holdout)
   )
 }
 </script>
@@ -60,9 +82,9 @@ const downloadReview = () => {
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div class="grid gap-1">
         <p class="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Holdout evidence</p>
-        <h3 id="forecast-accuracy-heading" class="text-base font-semibold text-slate-950">Forecast accuracy review</h3>
+        <h3 id="forecast-accuracy-heading" class="text-base font-semibold text-slate-950">{{ review.heading }}</h3>
         <p class="text-sm text-slate-600">
-          {{ review.testRows }} test days · {{ review.testDateRange }} · trained through {{ review.trainingDateRange.split(' to ').at(-1) }}
+          {{ review.scoredRows }} of {{ review.testRows }} test days scored · {{ review.testDateRange }} · trained through {{ review.trainingDateRange.split(' to ').at(-1) }}
         </p>
       </div>
       <AppButton
@@ -72,12 +94,12 @@ const downloadReview = () => {
         :disabled="!hasExportRows"
         @click="downloadReview"
       >
-        Download Accuracy CSV
+        {{ review.exportLabel }}
       </AppButton>
     </div>
 
     <AppStatusMessage>
-      {{ review.summary }}<template v-if="review.benchmarkAvailable"> This comparison is evidence for review, not an automatic acceptance decision.</template>
+      {{ review.summary }}<template v-if="review.decisionNote">{{ ` ${review.decisionNote}` }}</template>
     </AppStatusMessage>
 
     <AppTableShell>
@@ -86,9 +108,9 @@ const downloadReview = () => {
           <thead class="bg-slate-50 text-left text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
             <tr>
               <th scope="col" class="px-4 py-2.5">Measure</th>
-              <th scope="col" class="px-4 py-2.5 text-right">Modeled forecast</th>
+              <th scope="col" class="px-4 py-2.5 text-right">{{ review.candidateLabel }}</th>
               <th scope="col" class="px-4 py-2.5 text-right">
-                {{ review.benchmark?.label || 'Weekday baseline' }}
+                {{ review.benchmarkLabel }}
               </th>
               <th scope="col" class="px-4 py-2.5">How to read it</th>
             </tr>
@@ -97,7 +119,7 @@ const downloadReview = () => {
             <tr v-for="row in review.metricRows" :key="row.id">
               <th scope="row" class="px-4 py-2.5 text-left font-medium text-slate-800">{{ row.label }}</th>
               <td class="px-4 py-2.5 text-right font-semibold tabular-nums text-slate-950">
-                {{ formatMetric(row, row.modelValue) }}
+                {{ formatMetric(row, row.candidateValue ?? row.modelValue) }}
               </td>
               <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">
                 {{ formatMetric(row, row.benchmarkValue) }}
@@ -110,7 +132,7 @@ const downloadReview = () => {
     </AppTableShell>
 
     <p class="text-xs leading-5 text-slate-500">
-      The weekday baseline uses the mean of up to the latest eight matching weekdays from training data only. Positive bias means over-forecasting; negative bias means under-forecasting.
+      {{ review.methodNote }}
     </p>
   </section>
 </template>

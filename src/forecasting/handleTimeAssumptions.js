@@ -2,8 +2,8 @@ import {
   formatDate,
   formatNumber,
   getForecastAvailableAhtHistoryRows,
+  getForecastModelTrainingAhtHistoryRows,
   getForecastProjectMonthlyRollup,
-  getForecastTrainingAhtHistoryRows,
   getForecastTrainingWindow,
   parseForecastDateValue
 } from './shared'
@@ -89,7 +89,7 @@ const toAhtWeightedAverage = (records = []) => {
 }
 
 export const buildForecastMonthlyAhtHistory = (snapshot = {}) => {
-  const trainingRows = getForecastTrainingAhtHistoryRows(snapshot)
+  const trainingRows = getForecastModelTrainingAhtHistoryRows(snapshot)
   const monthBuckets = new Map()
 
   trainingRows.forEach((row) => {
@@ -143,7 +143,7 @@ export const buildForecastMonthlyAhtHistory = (snapshot = {}) => {
 export const summarizeForecastAhtTrainingData = (snapshot = {}) => {
   const trainingWindow = getForecastTrainingWindow(snapshot)
   const availableRows = getForecastAvailableAhtHistoryRows(snapshot)
-  const trainingRows = getForecastTrainingAhtHistoryRows(snapshot)
+  const trainingRows = getForecastModelTrainingAhtHistoryRows(snapshot)
   const monthlyHistory = buildForecastMonthlyAhtHistory(snapshot)
 
   return {

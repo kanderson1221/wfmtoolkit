@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import ForecastAccuracyReview from '../forecasting/ForecastAccuracyReview.vue'
+import { createForecastProject } from '../../forecasting/shared'
 
 const AppButtonStub = {
   props: ['disabled'],
@@ -104,5 +105,44 @@ describe('ForecastAccuracyReview', () => {
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:forecast-accuracy')
     expect(clickSpy).toHaveBeenCalledOnce()
+  })
+
+  it('reuses the comparison table for leakage-safe handle-time evidence', () => {
+    const dates = Array.from({ length: 17 }, (_, index) => {
+      const day = String(index + 1).padStart(2, '0')
+      return `2025-01-${day}`
+    })
+    const project = createForecastProject({
+      name: 'Voice AHT',
+      historyRows: dates.map((ds) => ({ ds, y: 100 })),
+      ahtHistoryRows: dates.map((ds, index) => ({
+        ds,
+        contacts: 100,
+        ahtSeconds: index < 14 ? 300 : 330
+      })),
+      modelConfig: {
+        holdoutDays: 3,
+        ahtAssumptionMethod: 'weighted_average'
+      },
+      lastRun: {
+        runAt: '2025-01-18T12:00:00.000Z',
+        monthlyRollup: [{ monthStart: '2025-02-01', monthLabel: 'Feb 2025', contacts: 10000 }]
+      }
+    })
+    const wrapper = mount(ForecastAccuracyReview, {
+      props: { project, projectName: project.name, reviewType: 'aht' },
+      global: {
+        stubs: {
+          AppButton: AppButtonStub,
+          AppStatusMessage: { template: '<div role="status"><slot /></div>' },
+          AppTableShell: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Handle time accuracy review')
+    expect(wrapper.text()).toContain('3 of 3 test days scored')
+    expect(wrapper.get('table').text()).toContain('Workload error')
+    expect(wrapper.get('table').text()).toContain('Training weighted average')
   })
 })

@@ -1,10 +1,15 @@
 <script setup>
 import ForecastMonthlyAhtChart from '../ForecastMonthlyAhtChart.vue'
+import ForecastAccuracyReview from '../ForecastAccuracyReview.vue'
 import AppButton from '../../ui/AppButton.vue'
 import AppTableNumberField from '../../ui/AppTableNumberField.vue'
 import { formatForecastAhtSeconds } from '../../../forecasting/handleTimeAssumptions'
 
 defineProps({
+  project: {
+    type: Object,
+    required: true
+  },
   ahtHighlights: {
     type: Array,
     default: () => []
@@ -89,6 +94,12 @@ defineProps({
         />
       </div>
     </div>
+
+    <ForecastAccuracyReview
+      review-type="aht"
+      :project="project"
+      :project-name="project.name"
+    />
 
     <section class="overflow-hidden border border-slate-200 bg-white">
       <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-4 py-4 xl:flex-row xl:items-start xl:justify-between">

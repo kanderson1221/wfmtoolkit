@@ -350,6 +350,7 @@ const clearAhtMonthOverrides = () => {
 
     <template v-else-if="activeResultTab === 'aht'">
       <ForecastAhtResultsView
+        :project="project"
         :aht-highlights="ahtHighlights"
         :monthly-aht-history="monthlyAhtHistory"
         :monthly-aht-assumptions="monthlyAhtAssumptions"

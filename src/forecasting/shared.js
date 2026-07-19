@@ -33,7 +33,9 @@ export {
   getForecastTrainingWindow,
   getForecastTrainingHistoryRows,
   getForecastAvailableAhtHistoryRows,
-  getForecastTrainingAhtHistoryRows
+  getForecastTrainingAhtHistoryRows,
+  getForecastHoldoutPartition,
+  getForecastModelTrainingAhtHistoryRows
 } from './forecastTrainingWindow'
 
 export {

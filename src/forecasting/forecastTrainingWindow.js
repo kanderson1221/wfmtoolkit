@@ -134,6 +134,22 @@ export const getForecastTrainingHistoryRows = (snapshot = {}) => {
   return historyRows.filter((row) => row.ds >= trainingStartDate && row.ds <= trainingEndDate)
 }
 
+export const getForecastHoldoutPartition = (snapshot = {}) => {
+  const selectedRows = getForecastTrainingHistoryRows(snapshot)
+  const requestedHoldoutDays = Math.max(0, Math.round(Number(snapshot?.modelConfig?.holdoutDays) || 0))
+  const holdoutDays = requestedHoldoutDays > 0 && selectedRows.length - requestedHoldoutDays >= 14
+    ? requestedHoldoutDays
+    : 0
+  const splitIndex = holdoutDays > 0 ? selectedRows.length - holdoutDays : selectedRows.length
+
+  return {
+    modelTrainingRows: selectedRows.slice(0, splitIndex),
+    holdoutRows: selectedRows.slice(splitIndex),
+    requestedHoldoutDays,
+    holdoutDays
+  }
+}
+
 export const getForecastAvailableAhtHistoryRows = (snapshot = {}) =>
   normalizeForecastAhtHistoryRows(snapshot?.ahtHistoryRows)
     .filter((row) => normalizeForecastTrainingDate(row?.ds))
@@ -148,4 +164,16 @@ export const getForecastTrainingAhtHistoryRows = (snapshot = {}) => {
   }
 
   return historyRows.filter((row) => row.ds >= trainingStartDate && row.ds <= trainingEndDate)
+}
+
+export const getForecastModelTrainingAhtHistoryRows = (snapshot = {}) => {
+  const ahtRows = getForecastTrainingAhtHistoryRows(snapshot)
+  const { modelTrainingRows, holdoutDays } = getForecastHoldoutPartition(snapshot)
+
+  if (!holdoutDays) {
+    return ahtRows
+  }
+
+  const trainingEndDate = modelTrainingRows.at(-1)?.ds || ''
+  return trainingEndDate ? ahtRows.filter((row) => row.ds <= trainingEndDate) : []
 }
