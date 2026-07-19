@@ -67,6 +67,18 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: in progress; first two production slices completed 2026-07-18 and the third completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-006` — Consolidated trusted browser downloads — Completed
+
+- Capability: `CAP-IO-001` (Need 20), supporting `CAP-DATA-001` (Need 20) and `CAP-UX-001` (Need 32)
+- Planner outcome: backup, actuals-repair, forecast-review, scenario-comparison, and worksheet exports behave consistently without each workflow owning fragile browser mechanics.
+- Problem/opportunity: generic CSV export already existed, but local backup and actuals-gap workflows repeated Blob, object-URL, anchor-click, cleanup, and filename-sanitizing code.
+- Rationale/evidence: all three runtime object-URL implementations performed the same browser operation; duplicated cleanup could drift, and click failure bypassed URL revocation.
+- Dependencies: existing backup and export contracts only; no persisted schema, route, or backend change.
+- Delivered scope: one tested text-file primitive; CSV delegation; shared actuals-gap filename sanitation; guaranteed cleanup on click failure; removal of duplicate feature-page browser mechanics.
+- Success measures: existing file contents, names, MIME types, and success/error states remain unchanged; all runtime browser downloads share one cleanup path; focused component and utility tests pass.
+- Status: completed 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -189,3 +201,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-18 | Delivered the first `NOW-005` slice: holdout results now compare the modeled forecast with a leakage-safe weekday benchmark using WAPE, MAE, bias, interval coverage, and complete daily export. Acceptance thresholds and multi-configuration governance remain pending `INT-002`. |
 | 2026-07-18 | Delivered the second `NOW-005` slice: AHT assumptions no longer learn from contact holdout dates, and the AHT tab now reports contact-weighted error and workload consequence against a training-only benchmark. Scores remain calibrated while governed comparison remains pending `INT-002`. |
 | 2026-07-19 | Delivered the third `NOW-005` slice: future-volume overrides now retain a required decision reason and reconcile monthly baseline, exact manual change, and final contacts; legacy blank reasons remain visible without fabricated migration data. |
+| 2026-07-19 | Completed `NOW-006`: all runtime text/CSV/JSON downloads now use one tested browser lifecycle, and duplicate backup/actuals-gap mechanics and filename sanitation were removed without changing planner-visible exports. |

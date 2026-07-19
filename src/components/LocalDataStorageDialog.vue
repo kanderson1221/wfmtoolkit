@@ -7,6 +7,7 @@ import AppDialog from './ui/AppDialog.vue'
 import AppPanel from './ui/AppPanel.vue'
 import AppStatStrip from './ui/AppStatStrip.vue'
 import AppStatusMessage from './ui/AppStatusMessage.vue'
+import { downloadTextFile } from '../fileDownload'
 import {
   analyzeLocalDataBackup,
   clearLocalDataStore,
@@ -127,13 +128,7 @@ const handleDownloadBackup = async () => {
     const backupJson = await downloadLocalDataBackup()
     const exportedAt = new Date()
     const fileName = `wfmtoolkit-backup-${exportedAt.toISOString().slice(0, 10)}.json`
-    const blob = new Blob([backupJson], { type: 'application/json' })
-    const downloadUrl = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = downloadUrl
-    link.download = fileName
-    link.click()
-    URL.revokeObjectURL(downloadUrl)
+    downloadTextFile(fileName, backupJson, 'application/json')
     successMessage.value = 'Backup downloaded.'
     errorMessage.value = ''
     await refreshSummary()

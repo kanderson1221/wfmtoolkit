@@ -90,3 +90,5 @@ If every included day has zero contacts, monthly AHT may use the simple mean of 
 - `src/planner/groupActuals.js`
 - `src/planner/groupActualsDataSummary.js`
 - `src/components/planning/PlanningGroupActualsView.vue`
+- `src/csvExport.js`
+- `src/fileDownload.js`

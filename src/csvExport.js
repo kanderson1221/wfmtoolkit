@@ -1,3 +1,5 @@
+import { downloadTextFile } from './fileDownload'
+
 export const CSV_MIME_TYPE = 'text/csv;charset=utf-8'
 
 export const formatCsvNumber = (value, digits = null) => {
@@ -27,16 +29,8 @@ export const buildCsv = (columns, rows) => [
   ...rows.map((row) => columns.map((column) => escapeCsvValue(column.value(row))).join(','))
 ].join('\r\n')
 
-export const downloadCsv = (fileName, csvText) => {
-  const blob = new Blob([csvText], { type: CSV_MIME_TYPE })
-  const downloadUrl = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-
-  link.href = downloadUrl
-  link.download = fileName
-  link.click()
-  URL.revokeObjectURL(downloadUrl)
-}
+export const downloadCsv = (fileName, csvText) =>
+  downloadTextFile(fileName, csvText, CSV_MIME_TYPE)
 
 export const sanitizeFileNamePart = (value, fallback = 'export') => {
   const sanitized = String(value || '')

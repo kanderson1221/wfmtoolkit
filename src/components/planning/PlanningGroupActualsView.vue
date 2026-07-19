@@ -6,6 +6,7 @@ import PlanningGroupActualsImportModal from './PlanningGroupActualsImportModal.v
 import AppButton from '../ui/AppButton.vue'
 import AppDialog from '../ui/AppDialog.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
+import { downloadCsv, sanitizeFileNamePart } from '../../csvExport'
 import {
   clearPlanningGroupActualsData,
   deletePlanningGroupActualsByMonth,
@@ -181,16 +182,6 @@ const closeGapDetails = () => {
   activeGapScope.value = null
 }
 
-const sanitizeFileNamePart = (value) => {
-  const sanitized = String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-
-  return sanitized || 'staffing-group'
-}
-
 const downloadGapTemplate = () => {
   if (!activeGapScope.value?.missingOpenDates?.length) {
     return
@@ -200,19 +191,14 @@ const downloadGapTemplate = () => {
     'service_date,contacts,average_handle_time_seconds',
     ...activeGapScope.value.missingOpenDates.map((serviceDate) => `${serviceDate},,`)
   ].join('\r\n')
-  const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' })
-  const downloadUrl = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-
-  link.href = downloadUrl
-  link.download = [
+  const fileName = [
     'wfmtoolkit',
-    sanitizeFileNamePart(props.group.name),
+    sanitizeFileNamePart(props.group.name, 'staffing-group'),
     activeGapScope.value.monthStart.slice(0, 7),
     'actuals-gaps.csv'
   ].join('-')
-  link.click()
-  URL.revokeObjectURL(downloadUrl)
+
+  downloadCsv(fileName, csvText)
 }
 
 const applyActualsUpdate = (nextActuals) => {
