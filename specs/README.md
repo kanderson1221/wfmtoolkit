@@ -266,8 +266,9 @@ These decisions are normative for the initial implementation.
 - Call-center Intraday Erlang requirement uses only complete saved results whose
   input signature matches the saved plan; stale or missing results never fall
   back to workload-ratio requirements.
-- Actual Intraday Erlang requirement remains unavailable in call-center rollups
-  until matching actual calculation results are retained.
+- Actual Intraday Erlang requirement contributes only from complete saved results
+  whose signature matches current saved actuals and plan inputs; stale or missing
+  actual results withhold actual requirement and dependent variance.
 - Reporting exports, image exports, and PDF exports are optional.
 
 ## Persistence And Backup

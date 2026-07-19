@@ -4,7 +4,7 @@ title: Planned-Versus-Actual Demand and Requirement Variance
 status: draft
 owners: []
 depends_on: [ACT-002, PLAN-006, PLAN-007, PLAN-008]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -50,6 +50,8 @@ staffing gap to actual requirement =
 - Intraday Erlang plans require an explicit actual-data Erlang run.
 - Until that run completes, actual intraday requirement shall remain unavailable.
 - Actual calculation shall use the saved plan's calendar, service goal, profile, and overhead basis.
+- A completed run shall persist its input signature and monthly outputs with the plan so the evidence survives reload and backup.
+- Saved actual results shall be used only while complete and signature-matched; changed actuals or plan inputs make them stale and unavailable until rerun.
 
 # Presentation Rules
 
@@ -74,6 +76,20 @@ staffing gap to actual requirement =
 **Then** actual requirement is unavailable  
 **And** the user is offered an explicit calculation action.
 
+## Retain a Completed Intraday Run
+
+**Given** an explicit actual Erlang run completed for the saved actuals and plan inputs
+**When** the plan is saved and reopened
+**Then** the matching monthly outputs populate actual requirement without another API run
+**And** call-center reporting may use the same signature-validated evidence.
+
+## Withhold a Stale Intraday Run
+
+**Given** saved actual Erlang results exist
+**When** actual daily rows or an Erlang-driving plan input changes
+**Then** actual requirement and dependent variance are unavailable
+**And** the planner is directed to rerun actual staffing calculations.
+
 ## Preserve Missing Month
 
 **Given** no July actuals exist  
@@ -91,4 +107,3 @@ staffing gap to actual requirement =
 - `src/planner/actualsModel.js`
 - `src/components/planner/PlannerActualsPanel.vue`
 - `src/components/planner/PlannerActualsComparisonChart.vue`
-

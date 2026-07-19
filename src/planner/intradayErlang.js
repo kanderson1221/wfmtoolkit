@@ -65,7 +65,9 @@ export const normalizePlannerIntradayErlangResults = (results) => {
   }
 }
 
-export const assessPlannerIntradayErlangResults = (payloadState, storedResults) => {
+export const assessPlannerIntradayErlangResults = (payloadState, storedResults, { actuals = false } = {}) => {
+  const resultLabel = actuals ? 'actual Intraday Erlang' : 'Intraday Erlang'
+
   if (payloadState?.status !== 'ready') {
     return {
       status: payloadState?.status || 'unavailable',
@@ -81,7 +83,9 @@ export const assessPlannerIntradayErlangResults = (payloadState, storedResults) 
   if (!results) {
     return {
       status: 'missing',
-      message: 'Run staffing calculations to populate monthly Erlang staffing outputs.',
+      message: actuals
+        ? 'Run actual staffing calculations to populate actual Intraday Erlang requirements.'
+        : 'Run staffing calculations to populate monthly Erlang staffing outputs.',
       inputSignature,
       results: null
     }
@@ -90,7 +94,9 @@ export const assessPlannerIntradayErlangResults = (payloadState, storedResults) 
   if (results.inputSignature !== inputSignature) {
     return {
       status: 'stale',
-      message: 'Plan inputs changed after the last staffing calculation. Rerun staffing calculations to refresh the Erlang outputs.',
+      message: actuals
+        ? 'Actuals or plan inputs changed after the last actual staffing calculation. Rerun actual staffing calculations to refresh the comparison.'
+        : 'Plan inputs changed after the last staffing calculation. Rerun staffing calculations to refresh the Erlang outputs.',
       inputSignature,
       results
     }
@@ -103,7 +109,7 @@ export const assessPlannerIntradayErlangResults = (payloadState, storedResults) 
   if (missingMonthIndexes.length) {
     return {
       status: 'incomplete',
-      message: `Stored Intraday Erlang outputs are missing ${missingMonthIndexes.length} required month${missingMonthIndexes.length === 1 ? '' : 's'}. Rerun staffing calculations.`,
+      message: `Stored ${resultLabel} outputs are missing ${missingMonthIndexes.length} required month${missingMonthIndexes.length === 1 ? '' : 's'}. Rerun ${actuals ? 'actual ' : ''}staffing calculations.`,
       inputSignature,
       results
     }

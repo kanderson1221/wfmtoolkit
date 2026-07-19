@@ -372,6 +372,21 @@ describe('localDataStore', () => {
         ],
         intervalOutputs: [],
         dailyOutputs: []
+      },
+      actualsIntradayErlangResults: {
+        version: 1,
+        calculatedAt: '2026-02-15T12:00:00.000Z',
+        inputSignature: 'v1:2:actual123',
+        rowCount: 2,
+        monthCount: 1,
+        monthlyOutputs: [
+          {
+            monthIndex: 0,
+            erlangStaffedHours: 140.2
+          }
+        ],
+        intervalOutputs: [],
+        dailyOutputs: []
       }
     }
 
@@ -387,6 +402,15 @@ describe('localDataStore', () => {
         {
           monthIndex: 0,
           erlangStaffedHours: 123.4
+        }
+      ]
+    })
+    expect(loadedPlan.actualsIntradayErlangResults).toMatchObject({
+      inputSignature: 'v1:2:actual123',
+      monthlyOutputs: [
+        {
+          monthIndex: 0,
+          erlangStaffedHours: 140.2
         }
       ]
     })

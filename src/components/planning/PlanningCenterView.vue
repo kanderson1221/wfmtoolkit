@@ -869,7 +869,7 @@ watch(
                     <div class="grid gap-2">
                       <p>
                         <strong>Intraday Erlang report scope:</strong>
-                        planned requirement is shown only from current saved calculations; actual requirement is unavailable until actual Erlang results can be retained.
+                        planned and actual requirement are shown only from complete saved calculations that still match their current inputs.
                       </p>
                       <ul class="grid gap-2" aria-label="Intraday Erlang report issues">
                         <li

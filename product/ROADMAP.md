@@ -118,6 +118,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-010` — Retained actual Intraday Erlang evidence — Completed
+
+- Capability: `CAP-REQ-002` (Need 20 after this run; 24 before), `CAP-REP-002` (Need 20 after this run; 25 before), supporting `CAP-DATA-001` (Need 20)
+- Planner outcome: a capacity planner runs actual-data Intraday Erlang once, saves the plan, and can reopen the same evidence; a WFM lead receives actual requirement and variance only while that evidence matches current inputs.
+- Problem/opportunity: the editor calculated actual requirement in memory, but discarded it on reload and left call-center actual requirement unavailable even after a successful explicit run.
+- Rationale/evidence: `ACT-003` requires an explicit actual-data run using saved plan assumptions; `PLAN-012` already withholds non-authoritative scope. The previous run documented retained actual results as the next coherent correctness and workflow gap.
+- Dependencies: existing daily actuals, saved plan calendar/service/profile/overhead inputs, explicit planner API run, and shared result-signature contract; no identity, server persistence, or new formula dependency.
+- Delivered scope: normalized saved actual result payload; draft/plan/Dexie/backup round trip; reload hydration without an API call; stale/incomplete withholding in the editor and call-center rollup; matching actual requirement and variance aggregation; focused specification and regression coverage.
+- Removed scope: actuals-only raw JSON signatures, duplicate plan result cloning, and the obsolete product limitation that successful actual calculations could never contribute outside the open editor.
+- Success measures: matching saved outputs survive reload and populate actual requirement; changed actuals or plan inputs withhold the values and request rerun; workload-ratio paths remain unchanged; focused, full, build, and Chromium checks pass.
+- Status: completed 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -186,7 +199,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 
 ### `EXP-002` — Shared-pool and multi-skill staffing semantics
 
-- Capability: `CAP-ORG-001` (Need 20), `CAP-REQ-002` (Need 24)
+- Capability: `CAP-ORG-001` (Need 20), `CAP-REQ-002` (Need 20)
 - Planner outcome: understand when staffing groups can be added independently and when shared capacity requires a network model.
 - Problem/opportunity: call-center rollups assume independent additive groups.
 - Rationale/evidence: `PLAN-012` carries this as an open question; changing it affects organization, Erlang, reporting, and scenarios.
@@ -260,3 +273,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Applied `INT-002` by retiring the unwanted governed forecast-acceptance direction as `RET-003`; retained neutral forecast evidence without inventing thresholds or approval policy. |
 | 2026-07-19 | Applied `INT-003`: shared-plan discovery must implement exclusive edit locking plus explicit acquisition, renewal, recovery, handoff, and release behavior before shared persistence ships. |
 | 2026-07-19 | Completed `NOW-009`: call-center rollups now validate and use current saved Intraday Erlang results, withhold stale/missing and mixed-scope requirement values, name affected plans, and remove unused duplicate summary metrics. |
+| 2026-07-19 | Completed `NOW-010`: explicit actual-data Erlang results now survive plan save, draft restore, IndexedDB/backup round trips, and reload; matching evidence contributes to call-center actual requirement and variance while stale or incomplete results remain withheld. |

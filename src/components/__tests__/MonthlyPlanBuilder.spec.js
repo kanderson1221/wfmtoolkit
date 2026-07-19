@@ -632,13 +632,15 @@ describe('MonthlyPlanBuilder', () => {
         planType: PLAN_TYPE_BUDGET,
         status: PLAN_STATUS_DRAFT,
         requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
-        intradayErlangResults: storedResults
+        intradayErlangResults: storedResults,
+        actualsIntradayErlangResults: storedResults
       }
     })
 
     await wrapper.vm.builder.savePlan()
 
     expect(wrapper.emitted('save')?.[0]?.[0].intradayErlangResults).toMatchObject(storedResults)
+    expect(wrapper.emitted('save')?.[0]?.[0].actualsIntradayErlangResults).toMatchObject(storedResults)
   })
 
   it('keeps workload-ratio new plans on the original planner workflow even when an Erlang draft exists for the same year', async () => {

@@ -1,6 +1,10 @@
 import { ref } from 'vue'
 
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../../planner/shared'
+import {
+  buildPlannerActualsIntradayErlangPayload,
+  buildPlannerIntradayErlangInputSignature
+} from '../../../planner/intradayErlang'
 import { usePlannerActualsIntradayErlang } from '../usePlannerActualsIntradayErlang'
 
 const flushPromises = async () => {
@@ -42,7 +46,8 @@ describe('usePlannerActualsIntradayErlang', () => {
         { startTime: '08:00', ratioPercent: 50 },
         { startTime: '08:30', ratioPercent: 50 }
       ]
-    })
+    }),
+    storedResults: ref(null)
   })
 
   it('waits for an explicit run before calculating actual Intraday Erlang requirements', async () => {
@@ -96,6 +101,48 @@ describe('usePlannerActualsIntradayErlang', () => {
     })
   })
 
+  it('hydrates matching saved actual results without another API run', async () => {
+    const args = createBaseArgs()
+    const payloadState = buildPlannerActualsIntradayErlangPayload({
+      planningYear: args.planningYear.value,
+      actualDailyRows: args.actualDailyRows.value,
+      monthlyRecords: args.monthlyRecords.value,
+      operatingWeekdays: args.operatingWeekdays.value,
+      holidayCalendarId: args.holidayCalendarId.value,
+      disabledHolidayRuleIds: args.disabledHolidayRuleIds.value,
+      customHolidays: args.customHolidays.value,
+      operatingOpenTime: args.operatingOpenTime.value,
+      operatingCloseTime: args.operatingCloseTime.value,
+      serviceLevelPercent: args.serviceLevelPercent.value,
+      serviceLevelThresholdSeconds: args.serviceLevelThresholdSeconds.value,
+      intraday: args.intraday.value
+    })
+    args.storedResults.value = {
+      version: 1,
+      calculatedAt: '2026-01-15T12:00:00.000Z',
+      inputSignature: buildPlannerIntradayErlangInputSignature(payloadState.rows),
+      rowCount: payloadState.rows.length,
+      monthCount: 1,
+      monthlyOutputs: [{ monthIndex: 0, erlangStaffedHours: 123.4 }],
+      intervalOutputs: [],
+      dailyOutputs: []
+    }
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const result = usePlannerActualsIntradayErlang(args)
+    await flushPromises()
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(result.actualsErlangStatus.value).toMatchObject({
+      status: 'ready',
+      hasResults: true
+    })
+    expect(result.monthlyOutputsByMonthIndex.value.get(0)).toMatchObject({
+      erlangStaffedHours: 123.4
+    })
+  })
+
   it('marks actual Erlang outputs stale when actuals change after a run', async () => {
     const args = createBaseArgs()
 
@@ -131,8 +178,52 @@ describe('usePlannerActualsIntradayErlang', () => {
       hasResults: true
     })
     expect(result.actualsErlangStatus.value.message).toContain('Rerun actual staffing calculations')
-    expect(result.monthlyOutputsByMonthIndex.value.get(0)).toMatchObject({
+    expect(result.monthlyOutputsByMonthIndex.value.size).toBe(0)
+  })
+
+  it('preserves saved evidence when an explicit rerun fails', async () => {
+    const args = createBaseArgs()
+    const payloadState = buildPlannerActualsIntradayErlangPayload({
+      planningYear: args.planningYear.value,
+      actualDailyRows: args.actualDailyRows.value,
+      monthlyRecords: args.monthlyRecords.value,
+      operatingWeekdays: args.operatingWeekdays.value,
+      holidayCalendarId: args.holidayCalendarId.value,
+      disabledHolidayRuleIds: args.disabledHolidayRuleIds.value,
+      customHolidays: args.customHolidays.value,
+      operatingOpenTime: args.operatingOpenTime.value,
+      operatingCloseTime: args.operatingCloseTime.value,
+      serviceLevelPercent: args.serviceLevelPercent.value,
+      serviceLevelThresholdSeconds: args.serviceLevelThresholdSeconds.value,
+      intraday: args.intraday.value
+    })
+    args.storedResults.value = {
+      version: 1,
+      inputSignature: buildPlannerIntradayErlangInputSignature(payloadState.rows),
+      rowCount: payloadState.rows.length,
+      monthCount: 1,
+      monthlyOutputs: [{ monthIndex: 0, erlangStaffedHours: 123.4 }],
+      intervalOutputs: [],
+      dailyOutputs: []
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => ''
+    }))
+
+    const result = usePlannerActualsIntradayErlang(args)
+    await flushPromises()
+    await result.runActualsErlangCalculations()
+    await flushPromises()
+
+    expect(result.actualsErlangStatus.value).toMatchObject({
+      status: 'error',
+      hasResults: true
+    })
+    expect(args.storedResults.value.monthlyOutputs[0]).toMatchObject({
       erlangStaffedHours: 123.4
     })
+    expect(result.monthlyOutputsByMonthIndex.value.size).toBe(0)
   })
 })

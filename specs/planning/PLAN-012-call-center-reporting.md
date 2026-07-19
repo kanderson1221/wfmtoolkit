@@ -29,7 +29,8 @@ Define selected-year aggregate reporting inside one call center. The global plan
 - Variances are derived from aggregate values only when their planned and actual scopes are comparable.
 - Intraday Erlang plans contribute planned requirement only from complete saved results whose input signature matches the current saved inputs.
 - Missing, incomplete, or stale Intraday Erlang results shall withhold affected monthly requirement and staffing-gap totals rather than silently substituting workload-ratio outputs.
-- Actual Intraday Erlang requirement shall remain unavailable until matching actual calculation results are retained; other actual demand and workload values remain reportable.
+- Actual Intraday Erlang requirement shall contribute only from complete saved actual results whose input signature matches the current saved actuals and plan inputs.
+- Missing, incomplete, or stale actual Intraday Erlang results shall withhold affected actual requirement and cross-method variance totals; other actual demand and workload values remain reportable.
 - Monthly rows remain chronological and expose contributing staffing-group rows for reconciliation.
 
 # Required Presentation
@@ -71,6 +72,14 @@ Define selected-year aggregate reporting inside one call center. The global plan
 **And** no matching actual Intraday Erlang result is retained
 **When** actual requirement is aggregated
 **Then** the partial workload-ratio requirement is not presented as the call-center total.
+
+## Use Retained Actual Intraday Requirement
+
+**Given** a current Intraday Erlang plan has complete saved planned and actual result sets
+**And** both signatures match their current saved inputs
+**When** actual requirement is aggregated
+**Then** actual required headcount is derived from the saved actual Erlang staffed hours and the plan's saved overhead and paid-capacity basis
+**And** planned-versus-actual requirement and staffing-gap variance may be reported.
 
 ## Keep the Directory Non-Reporting
 

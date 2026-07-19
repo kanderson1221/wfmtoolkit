@@ -5,6 +5,7 @@ import { computeMonthlyRecords } from './demandModel'
 import { resolvePlanningGroupActuals } from './groupActuals'
 import {
   assessPlannerIntradayErlangResults,
+  buildPlannerActualsIntradayErlangPayload,
   buildPlannerIntradayErlangPayload,
   mergeIntradayErlangMonthlyRecords
 } from './intradayErlang'
@@ -125,27 +126,12 @@ const withholdRequirementOutputs = (records = []) =>
     roundedHeadcount: null
   }))
 
-export const resolvePlanRequirementRecords = ({ plan, center, group, planningYear }) => {
-  const baselineRecords = buildPlanDemandRecords(plan, center, planningYear)
-  const requirementMethod = normalizePlanRequirementMethod(
-    plan?.requirementMethod || plan?.summary?.requirementMethod
-  )
-
-  if (requirementMethod !== PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG) {
-    return {
-      records: baselineRecords,
-      requirementMethod,
-      status: 'ready',
-      message: '',
-      usesIntradayErlang: false
-    }
-  }
-
+const buildPlanIntradayPayloadArgs = ({ plan, center, group, planningYear, monthlyRecords }) => {
   const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
-  const payloadState = buildPlannerIntradayErlangPayload({
+
+  return {
     planningYear,
-    demandSource: plan?.demandSource,
-    monthlyRecords: baselineRecords,
+    monthlyRecords,
     operatingWeekdays:
       Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
         ? plan.operatingWeekdays
@@ -161,6 +147,29 @@ export const resolvePlanRequirementRecords = ({ plan, center, group, planningYea
     serviceLevelThresholdSeconds:
       plan?.serviceLevelThresholdSeconds ?? group?.serviceLevelThresholdSeconds,
     intraday: plan?.intraday || group?.intraday
+  }
+}
+
+export const resolvePlanRequirementRecords = ({ plan, center, group, planningYear }) => {
+  const baselineRecords = buildPlanDemandRecords(plan, center, planningYear)
+  const requirementMethod = normalizePlanRequirementMethod(
+    plan?.requirementMethod || plan?.summary?.requirementMethod
+  )
+
+  if (requirementMethod !== PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG) {
+    return {
+      records: baselineRecords,
+      requirementMethod,
+      status: 'ready',
+      message: '',
+      usesIntradayErlang: false,
+      baselineRecords
+    }
+  }
+
+  const payloadState = buildPlannerIntradayErlangPayload({
+    demandSource: plan?.demandSource,
+    ...buildPlanIntradayPayloadArgs({ plan, center, group, planningYear, monthlyRecords: baselineRecords })
   })
   const assessment = assessPlannerIntradayErlangResults(payloadState, plan?.intradayErlangResults)
 
@@ -170,7 +179,8 @@ export const resolvePlanRequirementRecords = ({ plan, center, group, planningYea
       requirementMethod,
       status: assessment.status,
       message: assessment.message,
-      usesIntradayErlang: true
+      usesIntradayErlang: true,
+      baselineRecords
     }
   }
 
@@ -183,7 +193,42 @@ export const resolvePlanRequirementRecords = ({ plan, center, group, planningYea
     requirementMethod,
     status: 'ready',
     message: '',
-    usesIntradayErlang: true
+    usesIntradayErlang: true,
+    baselineRecords
+  }
+}
+
+const resolveActualRequirementState = ({ plan, center, group, planningYear, requirementState }) => {
+  if (!requirementState.usesIntradayErlang) {
+    return {
+      status: 'not_applicable',
+      message: '',
+      monthlyOutputsByMonthIndex: null
+    }
+  }
+
+  const payloadState = buildPlannerActualsIntradayErlangPayload({
+    actualDailyRows: resolvePlanningGroupActuals(group).dailyRows,
+    ...buildPlanIntradayPayloadArgs({
+      plan,
+      center,
+      group,
+      planningYear,
+      monthlyRecords: requirementState.baselineRecords
+    })
+  })
+  const assessment = assessPlannerIntradayErlangResults(
+    payloadState,
+    plan?.actualsIntradayErlangResults,
+    { actuals: true }
+  )
+
+  return {
+    status: assessment.status,
+    message: assessment.message,
+    monthlyOutputsByMonthIndex: assessment.status === 'ready'
+      ? new Map(assessment.results.monthlyOutputs.map((row) => [Number(row.monthIndex), row]))
+      : new Map()
   }
 }
 
@@ -259,6 +304,7 @@ const buildGroupActualRows = ({
   group,
   plan,
   requirementState,
+  actualRequirementState,
   monthlyDemandRecords,
   staffingRecords,
   planningYear
@@ -272,7 +318,9 @@ const buildGroupActualRows = ({
     return buildActualsOnlyRows({ group, monthlyActuals, planningYear })
   }
 
-  const actualRequirementOutputs = requirementState.usesIntradayErlang ? new Map() : null
+  const actualRequirementOutputs = requirementState.usesIntradayErlang
+    ? actualRequirementState.monthlyOutputsByMonthIndex
+    : null
 
   return computeActualsRecords(
     monthlyDemandRecords,
@@ -504,7 +552,21 @@ export const buildAnnualPlanningRollup = ({
             records: [],
             status: 'not_applicable',
             message: '',
-            usesIntradayErlang: false
+            usesIntradayErlang: false,
+            baselineRecords: []
+          }
+      const actualRequirementState = plan
+        ? resolveActualRequirementState({
+            plan,
+            center,
+            group,
+            planningYear: resolvedYear,
+            requirementState
+          })
+        : {
+            status: 'not_applicable',
+            message: '',
+            monthlyOutputsByMonthIndex: null
           }
       const monthlyDemandRecords = requirementState.records
       const staffingRecords = plan
@@ -515,6 +577,7 @@ export const buildAnnualPlanningRollup = ({
         group,
         plan,
         requirementState,
+        actualRequirementState,
         monthlyDemandRecords,
         staffingRecords,
         planningYear: resolvedYear
@@ -525,19 +588,31 @@ export const buildAnnualPlanningRollup = ({
         plannedGroupIds.add(groupKey)
       }
 
-      if (plan && requirementState.usesIntradayErlang) {
+      if (
+        plan &&
+        requirementState.usesIntradayErlang &&
+        (requirementState.status !== 'ready' || actualRequirementState.status !== 'ready')
+      ) {
+        const messages = []
+        if (requirementState.status !== 'ready') {
+          messages.push(`${requirementState.message} Planned requirement values are withheld.`)
+        }
+        if (actualRequirementState.status !== 'ready') {
+          messages.push(`${actualRequirementState.message} Actual requirement values are withheld.`)
+        }
+
         integrityIssues.push({
           centerId: center.id || '',
           groupId: group.id || '',
           groupName: group.name || 'Staffing Group',
           planId: plan.id || '',
           planName: plan.name || `${resolvedYear} Plan`,
-          status: requirementState.status,
+          status: requirementState.status !== 'ready'
+            ? requirementState.status
+            : actualRequirementState.status,
           plannedRequirementAvailable: requirementState.status === 'ready',
-          actualRequirementAvailable: false,
-          message: requirementState.status === 'ready'
-            ? 'Planned requirement uses the saved Intraday Erlang calculation. Actual Intraday Erlang requirement is unavailable because actual calculation results are not retained outside the plan editor.'
-            : `${requirementState.message} Planned and actual requirement values are withheld from this report.`
+          actualRequirementAvailable: actualRequirementState.status === 'ready',
+          message: messages.join(' ')
         })
       }
 

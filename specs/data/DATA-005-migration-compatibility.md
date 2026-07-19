@@ -4,7 +4,7 @@ title: Legacy Planning-Data Migration and Schema Compatibility
 status: draft
 owners: []
 depends_on: [DATA-001, FOUND-002]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-19
 ---
 
 # Purpose
@@ -73,6 +73,12 @@ Each migration shall test:
 **Given** a backup declares a newer unsupported schema  
 **When** validation runs  
 **Then** import is blocked before current data changes.
+
+## Preserve Actual Erlang Evidence
+
+**Given** a saved plan contains signature-matched actual Intraday Erlang outputs
+**When** the planning workspace is saved, reloaded, or restored from backup
+**Then** the calculation timestamp, signature, row and month counts, and monthly outputs are preserved without recomputation.
 
 # Open Questions
 

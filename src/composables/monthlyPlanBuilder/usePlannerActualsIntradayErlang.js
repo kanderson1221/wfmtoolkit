@@ -1,7 +1,14 @@
 import { computed, ref, watch } from 'vue'
 
 import { MONTH_LABELS, PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../planner/shared'
-import { buildPlannerActualsIntradayErlangPayload } from '../../planner/intradayErlang'
+import {
+  assessPlannerIntradayErlangResults,
+  buildPlannerActualsIntradayErlangPayload,
+  buildPlannerIntradayErlangInputSignature,
+  normalizePlannerIntradayErlangResults
+} from '../../planner/intradayErlang'
+
+const ERLANG_RESULTS_VERSION = 1
 
 const extractApiErrorMessage = async (response) => {
   const rawErrorText = await response.text().catch(() => '')
@@ -29,9 +36,6 @@ const extractApiErrorMessage = async (response) => {
 
 const cloneRows = (rows) =>
   Array.isArray(rows) ? rows.map((row) => ({ ...row })) : []
-
-const buildInputSignature = (rows) =>
-  JSON.stringify(Array.isArray(rows) ? rows : [])
 
 const buildMonthGroups = (rows) => {
   const groupsByMonthIndex = new Map()
@@ -76,14 +80,15 @@ export const usePlannerActualsIntradayErlang = ({
   operatingCloseTime,
   serviceLevelPercent,
   serviceLevelThresholdSeconds,
-  intraday
+  intraday,
+  storedResults
 }) => {
   const status = ref('idle')
   const message = ref('')
   const progress = ref(emptyProgress())
   const monthlyOutputsByMonthIndex = ref(new Map())
   const currentInputSignature = ref('')
-  const completedInputSignature = ref('')
+  const storedResultsRef = storedResults || ref(null)
   let requestToken = 0
 
   const payloadState = computed(() => {
@@ -115,6 +120,14 @@ export const usePlannerActualsIntradayErlang = ({
     progress.value = emptyProgress()
   }
 
+  const applyResults = (results) => {
+    const normalizedResults = normalizePlannerIntradayErlangResults(results)
+    monthlyOutputsByMonthIndex.value = new Map(
+      (normalizedResults?.monthlyOutputs || []).map((row) => [Number(row.monthIndex), row])
+    )
+    return normalizedResults
+  }
+
   const evaluatePayloadState = (nextPayloadState) => {
     requestToken += 1
     resetProgress()
@@ -123,8 +136,7 @@ export const usePlannerActualsIntradayErlang = ({
       status.value = 'idle'
       message.value = ''
       currentInputSignature.value = ''
-      completedInputSignature.value = ''
-      monthlyOutputsByMonthIndex.value = new Map()
+      applyResults(null)
       return
     }
 
@@ -132,34 +144,24 @@ export const usePlannerActualsIntradayErlang = ({
       status.value = nextPayloadState.status
       message.value = nextPayloadState.message || ''
       currentInputSignature.value = ''
-      completedInputSignature.value = ''
-      monthlyOutputsByMonthIndex.value = new Map()
+      applyResults(null)
       return
     }
 
-    const inputSignature = buildInputSignature(nextPayloadState.rows)
-    currentInputSignature.value = inputSignature
-
-    if (!completedInputSignature.value) {
-      status.value = 'ready_to_run'
-      message.value = 'Run actual staffing calculations to populate actual Intraday Erlang requirements.'
-      monthlyOutputsByMonthIndex.value = new Map()
-      return
-    }
-
-    if (completedInputSignature.value === inputSignature) {
-      status.value = 'ready'
-      message.value = ''
-      return
-    }
-
-    status.value = 'stale'
-    message.value = 'Actuals or plan inputs changed after the last actual staffing calculation. Rerun actual staffing calculations to refresh the comparison.'
+    const assessment = assessPlannerIntradayErlangResults(
+      nextPayloadState,
+      storedResultsRef.value,
+      { actuals: true }
+    )
+    currentInputSignature.value = assessment.inputSignature
+    status.value = assessment.status === 'missing' ? 'ready_to_run' : assessment.status
+    message.value = assessment.message
+    applyResults(assessment.status === 'ready' ? assessment.results : null)
   }
 
   watch(
-    payloadState,
-    (nextPayloadState) => {
+    [payloadState, () => storedResultsRef.value],
+    ([nextPayloadState]) => {
       evaluatePayloadState(nextPayloadState)
     },
     { deep: true, immediate: true }
@@ -182,8 +184,7 @@ export const usePlannerActualsIntradayErlang = ({
     if (!monthGroups.length) {
       status.value = 'no_open_days'
       message.value = 'No open actual days are available in this plan year after applying operating days and holiday closures.'
-      completedInputSignature.value = ''
-      monthlyOutputsByMonthIndex.value = new Map()
+      applyResults(null)
       resetProgress()
       return false
     }
@@ -191,7 +192,7 @@ export const usePlannerActualsIntradayErlang = ({
     requestToken += 1
     const currentToken = requestToken
     const totalRows = nextPayloadState.rows.length
-    const inputSignature = buildInputSignature(nextPayloadState.rows)
+    const inputSignature = buildPlannerIntradayErlangInputSignature(nextPayloadState.rows)
     const monthlyOutputs = []
     let completedRows = 0
 
@@ -256,11 +257,20 @@ export const usePlannerActualsIntradayErlang = ({
         return false
       }
 
-      completedInputSignature.value = inputSignature
+      const nextResults = {
+        version: ERLANG_RESULTS_VERSION,
+        calculatedAt: new Date().toISOString(),
+        inputSignature,
+        rowCount: totalRows,
+        monthCount: monthGroups.length,
+        monthlyOutputs,
+        intervalOutputs: [],
+        dailyOutputs: []
+      }
+
+      storedResultsRef.value = nextResults
       currentInputSignature.value = inputSignature
-      monthlyOutputsByMonthIndex.value = new Map(
-        monthlyOutputs.map((row) => [row.monthIndex, row])
-      )
+      applyResults(nextResults)
       status.value = 'ready'
       message.value = ''
 
@@ -270,8 +280,7 @@ export const usePlannerActualsIntradayErlang = ({
         return false
       }
 
-      completedInputSignature.value = ''
-      monthlyOutputsByMonthIndex.value = new Map()
+      applyResults(null)
       resetProgress()
 
       if (error instanceof TypeError && /fetch/i.test(error.message || '')) {
@@ -296,7 +305,7 @@ export const usePlannerActualsIntradayErlang = ({
     canRun: actualsCanRun.value,
     isRunning: status.value === 'loading',
     isStale: status.value === 'stale',
-    hasResults: Boolean(completedInputSignature.value),
+    hasResults: Boolean(normalizePlannerIntradayErlangResults(storedResultsRef.value)),
     inputSignature: currentInputSignature.value,
     progress: { ...progress.value }
   }))

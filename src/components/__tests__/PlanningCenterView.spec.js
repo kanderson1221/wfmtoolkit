@@ -420,7 +420,8 @@ describe('PlanningCenterView', () => {
 
     expect(wrapper.text()).toContain('Intraday Erlang report scope')
     expect(wrapper.text()).toContain('Voice Support · 2026 Erlang Plan')
-    expect(wrapper.text()).toContain('Planned and actual requirement values are withheld')
+    expect(wrapper.text()).toContain('Planned requirement values are withheld')
+    expect(wrapper.text()).toContain('Actual requirement values are withheld')
     expect(wrapper.text()).toContain('Recalculate Plan')
     expect(wrapper.get('button[aria-label="Recalculate Plan for Voice Support"]')).toBeTruthy()
   })

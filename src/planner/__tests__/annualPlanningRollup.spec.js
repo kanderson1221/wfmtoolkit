@@ -6,6 +6,7 @@ import {
   selectPlanningRollupPlan
 } from '../annualPlanningRollup'
 import {
+  buildPlannerActualsIntradayErlangPayload,
   buildPlannerIntradayErlangInputSignature,
   buildPlannerIntradayErlangPayload
 } from '../intradayErlang'
@@ -90,6 +91,34 @@ const attachCurrentIntradayResults = (plan, center) => {
         peakIntervalRequiredHeadcount: 12
       }
     ],
+    intervalOutputs: [],
+    dailyOutputs: []
+  }
+
+  return plan
+}
+
+const attachCurrentActualsIntradayResults = (plan, center, erlangStaffedHours = 180) => {
+  const group = center.groups[0]
+  const baselineRecords = buildPlanDemandRecords(plan, center, 2026)
+  const payload = buildPlannerActualsIntradayErlangPayload({
+    planningYear: 2026,
+    actualDailyRows: group.actuals.dailyRows,
+    monthlyRecords: baselineRecords,
+    operatingWeekdays: plan.operatingWeekdays,
+    operatingOpenTime: plan.operatingOpenTime,
+    operatingCloseTime: plan.operatingCloseTime,
+    serviceLevelPercent: plan.serviceLevelPercent,
+    serviceLevelThresholdSeconds: plan.serviceLevelThresholdSeconds,
+    intraday: plan.intraday
+  })
+
+  plan.actualsIntradayErlangResults = {
+    version: 1,
+    inputSignature: buildPlannerIntradayErlangInputSignature(payload.rows),
+    rowCount: payload.rows.length,
+    monthCount: 1,
+    monthlyOutputs: [{ monthIndex: 0, erlangStaffedHours }],
     intervalOutputs: [],
     dailyOutputs: []
   }
@@ -258,11 +287,55 @@ describe('annualPlanningRollup', () => {
       expect.objectContaining({
         groupName: 'Voice',
         planName: '2026 Erlang Plan',
-        status: 'ready',
+        status: 'missing',
         plannedRequirementAvailable: true,
         actualRequirementAvailable: false
       })
     ])
+  })
+
+  it('uses matching saved actual Intraday Erlang outputs in call-center variance', () => {
+    const center = buildCenter({ plans: [] })
+    const plan = attachCurrentActualsIntradayResults(
+      attachCurrentIntradayResults(buildIntradayPlan(), center),
+      center
+    )
+    center.groups[0].plans = [plan]
+
+    const rollup = buildAnnualPlanningRollup({ centers: [center], planningYear: 2026 })
+    const january = rollup.monthlyRows[0]
+
+    expect(january.actualRequiredHeadcount).toBeCloseTo((180 / 0.95) / (22 * 8), 6)
+    expect(january.requiredHeadcountVariance).toBeCloseTo(
+      january.actualRequiredHeadcount - january.plannedRequiredHeadcount,
+      6
+    )
+    expect(january.gapVsActualRequiredHeadcount).toBeCloseTo(
+      january.plannedStartingFrontlineHeadcount - january.actualRequiredHeadcount,
+      6
+    )
+    expect(rollup.integrityIssues).toEqual([])
+  })
+
+  it('withholds saved actual Intraday Erlang outputs after actuals or plan inputs change', () => {
+    const center = buildCenter({ plans: [] })
+    const plan = attachCurrentActualsIntradayResults(
+      attachCurrentIntradayResults(buildIntradayPlan(), center),
+      center
+    )
+    plan.actualsIntradayErlangResults.inputSignature = 'v1:stale'
+    center.groups[0].plans = [plan]
+
+    const rollup = buildAnnualPlanningRollup({ centers: [center], planningYear: 2026 })
+
+    expect(rollup.monthlyRows[0].actualRequiredHeadcount).toBeNull()
+    expect(rollup.monthlyRows[0].requiredHeadcountVariance).toBeNull()
+    expect(rollup.integrityIssues[0]).toMatchObject({
+      status: 'stale',
+      plannedRequirementAvailable: true,
+      actualRequirementAvailable: false,
+      message: expect.stringContaining('Rerun actual staffing calculations')
+    })
   })
 
   it('withholds stale Intraday Erlang requirements without hiding demand and workload', () => {
