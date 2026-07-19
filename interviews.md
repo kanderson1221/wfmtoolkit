@@ -10,7 +10,7 @@ Type answers beneath each `Answer:` field and leave the question IDs intact. Ans
 - Date asked: 2026-07-18
 - Priority: High
 - Related capability IDs/roadmap items: `CAP-FORE-002`, `NOW-005`
-- Decision this answer will influence: Which holdout periods, additional candidate configurations, acceptance record, and warning thresholds should govern the remaining `NOW-005` workflow after the leakage-safe contact/AHT evidence and manual-override trace slices.
+- Decision this answer will influence: Which holdout periods, rolling-origin evidence, acceptance record, and warning thresholds should govern the remaining `NOW-005` workflow now that leakage-safe contact/AHT evidence, traceable overrides, and neutral saved-candidate comparison are implemented.
 - Why repository evidence cannot answer it: The forecasting implementation exposes model outputs, but no repository artifact identifies the sponsor's real accept/reject decision, planning horizon, tolerance for bias, or whether forecast misses are evaluated primarily by volume, workload, peak, or staffing consequence.
 - Question: Think of the last time you accepted or rejected a demand forecast for an annual staffing plan. What decision were you making, what comparison or error evidence did you inspect (for example bias, WAPE, peak-month miss, workload/AHT miss, or staffing impact), over what holdout period, and what result would have caused you to reject the forecast? An anonymized example or approximate range is enough.
 - Answer:

@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, toRef, watch } from 'vue'
 
 import ForecastHistoryModal from './forecasting/ForecastHistoryModal.vue'
+import ForecastCandidateComparisonDialog from './forecasting/ForecastCandidateComparisonDialog.vue'
 import ForecastCreateDialog from './forecasting/ForecastCreateDialog.vue'
 import ForecastImportDailyModal from './forecasting/ForecastImportDailyModal.vue'
 import ForecastMonthlyEntryModal from './forecasting/ForecastMonthlyEntryModal.vue'
@@ -18,6 +19,7 @@ import {
   FORECAST_TYPE_BUDGET,
   getForecastProjectSourceKind
 } from '../forecasting/shared'
+import { getComparableForecastCandidates } from '../forecasting/forecastCandidateComparison'
 import {
   createImportedDailyForecastResults,
   createManualMonthlyForecastResults
@@ -89,6 +91,7 @@ const props = defineProps({
 })
 
 const projectDialogOpen = ref(false)
+const comparisonDialogOpen = ref(false)
 const createDialogOpen = ref(false)
 const historyModalOpen = ref(false)
 const importedDailyModalOpen = ref(false)
@@ -98,12 +101,12 @@ const lastAutoOpenedSourceProjectId = ref('')
 
 const {
   currentProject,
+  savedProjects,
   isLoadingProjects,
   isRunningForecast,
   loadError,
   runError,
   saveError,
-  isDirty,
   activeResultTab,
   projectSummaries,
   validationMessages,
@@ -124,6 +127,8 @@ const {
   fallbackScopes: toRef(props, 'fallbackScopes'),
   refreshToken: toRef(props, 'storageRefreshToken')
 })
+
+const comparableForecastCount = computed(() => getComparableForecastCandidates(savedProjects.value).length)
 
 const breadcrumbItems = computed(() => [
   ...(props.breadcrumbs.length ? props.breadcrumbs : [{ label: 'Home', href: '#home' }, { label: props.title }])
@@ -480,14 +485,15 @@ watch(
         :validation-messages="validationMessages"
         :run-error="runError"
         :is-running-forecast="isRunningForecast"
-        :is-dirty="isDirty"
         :project-meta="currentProjectMeta"
         :show-library-actions="props.showLibraryActions"
         :show-duplicate-action="props.showDuplicateAction"
         :show-source-action-button="props.showSourceActionButton"
+        :can-compare-forecasts="comparableForecastCount >= 2"
         @run-forecast="handleRunForecast"
         @create-new-project="handleCreateNewProject"
         @open-project-dialog="projectDialogOpen = true"
+        @open-comparison-dialog="comparisonDialogOpen = true"
         @duplicate-project="duplicateCurrentProject"
         @save-project="handleSaveProject"
         @add-custom-seasonality="addCustomSeasonality"
@@ -518,6 +524,13 @@ watch(
       :description="projectDialogDescription"
       @close="projectDialogOpen = false"
       @open="handleOpenProject"
+    />
+
+    <ForecastCandidateComparisonDialog
+      v-model:visible="comparisonDialogOpen"
+      :projects="savedProjects"
+      :current-project-id="projectDialogCurrentId"
+      @close="comparisonDialogOpen = false"
     />
 
     <ForecastHistoryModal

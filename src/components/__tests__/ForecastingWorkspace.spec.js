@@ -718,6 +718,55 @@ describe('ForecastingWorkspace', () => {
     expect(findBodyButtonByText('Close')).toBeTruthy()
   })
 
+  it('opens saved forecast comparison when two scored model candidates are available', async () => {
+    const scope = 'forecast-candidate-comparison-spec'
+    const reference = createProjectWithRun({
+      id: 'reference-forecast',
+      name: 'Reference Forecast',
+      createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z'
+    })
+    const candidate = createProjectWithRun({
+      id: 'candidate-forecast',
+      name: 'Candidate Forecast',
+      modelConfig: {
+        ...reference.modelConfig,
+        growth: 'flat'
+      },
+      lastRun: {
+        ...createForecastRunResults(),
+        diagnostics: {
+          ...createForecastRunResults().diagnostics,
+          holdout: {
+            ...createForecastRunResults().diagnostics.holdout,
+            wape: 4.1
+          }
+        }
+      },
+      createdAt: '2026-07-19T12:00:00.000Z',
+      updatedAt: '2026-07-19T12:00:00.000Z'
+    })
+    await forecastingRepository.persistWorkspace([reference, candidate], scope)
+
+    const wrapper = mount(ForecastingWorkspace, {
+      props: {
+        storageScope: scope,
+        initialProjectId: reference.id,
+        showLibraryActions: false
+      }
+    })
+    mountedWrappers.push(wrapper)
+    await flushUi()
+    await flushUi()
+
+    await findButtonByText(wrapper, 'Compare Forecasts').trigger('click')
+    await flushUi()
+
+    expect(document.body.textContent || '').toContain('Compare Saved Forecasts')
+    expect(document.body.textContent || '').toContain('Identical dated actual contacts verified.')
+    expect(document.body.textContent || '').toContain('Candidate Forecast has 1.1 percentage points lower WAPE')
+  })
+
   it('shows a device-based error message when saved forecasts cannot be read locally', async () => {
     vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockResolvedValue({
       projects: [],

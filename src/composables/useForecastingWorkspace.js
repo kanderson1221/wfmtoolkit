@@ -161,7 +161,6 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     loadError,
     saveError,
     saveStatusMessage,
-    isDirty,
     loadProjectsForScope,
     createNewProject,
     openProjectById,
@@ -289,7 +288,6 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
         forecastResults.summary?.coverageEndDate || currentProject.value.coverageEndDate
       currentProject.value.planningReady = Boolean(forecastResults.summary?.planningReady)
       activeResultTab.value = 'daily'
-      isDirty.value = true
       return true
     } catch (error) {
       if (error instanceof TypeError && /fetch/i.test(error.message || '')) {
@@ -541,7 +539,6 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
     saveError,
     saveStatusMessage,
     activeResultTab,
-    isDirty,
     lastRunAvailable,
     historySummary,
     projectSummaries,

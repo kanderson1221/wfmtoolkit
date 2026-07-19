@@ -1,4 +1,4 @@
-import { nextTick, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 
 import { forecastingRepository } from '../../forecastingRepository'
 import {
@@ -23,10 +23,7 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
   const loadError = ref('')
   const saveError = ref('')
   const saveStatusMessage = ref('')
-  const isDirty = ref(false)
   const activeScope = ref('default')
-
-  let suspendDirtyTracking = false
 
   const resolveProjectSeed = () => clonePlain(resolveMaybeRef(options.projectSeed) || {})
   const resolveFallbackScopes = () => {
@@ -44,18 +41,13 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
   }
 
   const replaceCurrentProject = (project) => {
-    suspendDirtyTracking = true
     currentProject.value = normalizeProjectForEditor(
       savedProjects.value,
       mergeProjectSeed(resolveProjectSeed(), project)
     )
-    isDirty.value = false
     saveError.value = ''
     saveStatusMessage.value = ''
     runProjectReplaced()
-    nextTick(() => {
-      suspendDirtyTracking = false
-    })
   }
 
   const loadProjectsForScope = async (scope = 'default', scopeOptions = {}) => {
@@ -159,16 +151,6 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
   }
 
   watch(
-    currentProject,
-    () => {
-      if (!suspendDirtyTracking) {
-        isDirty.value = true
-      }
-    },
-    { deep: true }
-  )
-
-  watch(
     [() => resolveMaybeRef(storageScope), () => resolveRefreshToken()],
     ([nextScope]) => {
       void loadProjectsForScope(nextScope || 'default', {
@@ -186,7 +168,6 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
     loadError,
     saveError,
     saveStatusMessage,
-    isDirty,
     loadProjectsForScope,
     createNewProject,
     openProjectById,

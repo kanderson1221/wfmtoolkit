@@ -37,10 +37,6 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  isDirty: {
-    type: Boolean,
-    default: false
-  },
   showLibraryActions: {
     type: Boolean,
     default: true
@@ -53,6 +49,10 @@ const props = defineProps({
     type: Boolean,
     default: true
   },
+  canCompareForecasts: {
+    type: Boolean,
+    default: false
+  },
   projectMeta: {
     type: Object,
     default: () => ({})
@@ -63,6 +63,7 @@ const emit = defineEmits([
   'run-forecast',
   'create-new-project',
   'open-project-dialog',
+  'open-comparison-dialog',
   'duplicate-project',
   'save-project',
   'add-custom-seasonality',
@@ -286,6 +287,14 @@ watch(
             @click="emit('open-project-dialog')"
           >
             Open Forecast
+          </AppButton>
+          <AppButton
+            v-if="props.canCompareForecasts"
+            size="sm"
+            variant="secondary"
+            @click="emit('open-comparison-dialog')"
+          >
+            Compare Forecasts
           </AppButton>
           <AppButton
             v-if="showDuplicateProjectAction"

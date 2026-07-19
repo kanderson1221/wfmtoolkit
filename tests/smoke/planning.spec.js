@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url'
 const planUpdateReviewFixturePath = fileURLToPath(
   new URL('../fixtures/plan-update-decision-review.json', import.meta.url)
 )
+const forecastCandidateComparisonFixturePath = fileURLToPath(
+  new URL('../fixtures/forecast-candidate-comparison.json', import.meta.url)
+)
 
 const clearBrowserData = async (page) => {
   await page.goto('/')
@@ -112,6 +115,38 @@ test('opens staffing-group forecasts from the call-center workspace', async ({ p
 
   await expect(page.getByRole('heading', { level: 2, name: 'Consumer Voice 2026 Demand Forecast' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'Upload Daily History' })).toBeHidden()
+})
+
+test('compares saved forecast candidates on identical holdout actuals', async ({ page }) => {
+  await page.goto('/#planning')
+
+  await page.getByRole('button', { name: 'Local Data Storage' }).click()
+  const storageDialog = page.getByRole('dialog').filter({ hasText: 'Review what is stored in this browser' })
+  await storageDialog.getByLabel('Import local data backup').setInputFiles(forecastCandidateComparisonFixturePath)
+  const importDialog = page.getByRole('dialog').filter({ hasText: 'Importing this backup will replace' })
+  await importDialog.getByRole('button', { name: 'Replace Local Data' }).click()
+  await expect(storageDialog.getByText('Local data backup imported.')).toBeVisible()
+  await storageDialog.getByRole('button', { name: 'Close' }).click()
+
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByText('Consumer Voice', { exact: true }).click()
+  await page.getByRole('button', { name: 'Forecasts', exact: true }).click()
+  await page.getByRole('link', { name: 'Open Reference Forecast for Consumer Voice' }).click()
+
+  const compareTrigger = page.getByRole('button', { name: 'Compare Forecasts' })
+  await expect(compareTrigger).toBeVisible()
+  await compareTrigger.click()
+
+  const comparisonDialog = page.getByRole('dialog').filter({ hasText: 'Compare two saved model configurations' })
+  await expect(comparisonDialog.getByLabel('Reference forecast')).toBeFocused()
+  await expect(comparisonDialog.getByText('Identical dated actual contacts verified.')).toBeVisible()
+  await expect(comparisonDialog.getByText('Candidate Forecast has 2.3 percentage points lower WAPE')).toBeVisible()
+  await expect(comparisonDialog.getByText('comparative evidence, not an automatic acceptance decision', { exact: false })).toBeVisible()
+  await expect(comparisonDialog.getByRole('cell', { name: 'Changed', exact: true })).toHaveCount(3)
+
+  await comparisonDialog.getByRole('button', { name: 'Close' }).click()
+  await expect(comparisonDialog).toBeHidden()
+  await expect(compareTrigger).toBeFocused()
 })
 
 test('opens the hamburger menu and exposes primary destinations', async ({ page }) => {

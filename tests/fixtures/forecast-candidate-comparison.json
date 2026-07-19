@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 2,
+  "backupFormat": "workspace_snapshot_v2",
+  "exportedAt": "2026-07-19T16:00:00.000Z",
+  "appVersion": "0.1.0",
+  "data": {
+    "workspaces": [
+      {
+        "scope": "default",
+        "planningCenters": [
+          {
+            "id": "comparison-center",
+            "name": "Forecast Review Center",
+            "timezone": "America/New_York",
+            "operatingWeekdays": [1, 2, 3, 4, 5],
+            "operatingOpenTime": "08:00",
+            "operatingCloseTime": "17:00",
+            "defaultPaidHoursPerDay": 8,
+            "defaultOccupancyPercent": 85,
+            "defaultAdherencePercent": 95,
+            "groups": [
+              {
+                "id": "comparison-group",
+                "name": "Consumer Voice",
+                "operatingWeekdays": [1, 2, 3, 4, 5],
+                "defaultPaidHoursPerDay": 8,
+                "defaultOccupancyPercent": 85,
+                "defaultAdherencePercent": 95,
+                "serviceLevelPercent": 80,
+                "serviceLevelThresholdSeconds": 20,
+                "plans": [],
+                "createdAt": "2026-01-01T12:00:00.000Z",
+                "updatedAt": "2026-07-19T16:00:00.000Z"
+              }
+            ],
+            "createdAt": "2026-01-01T12:00:00.000Z",
+            "updatedAt": "2026-07-19T16:00:00.000Z"
+          }
+        ],
+        "forecasts": []
+      },
+      {
+        "scope": "default:center:comparison-center:group:comparison-group:forecasts",
+        "planningCenters": [],
+        "forecasts": [
+          {
+            "id": "reference-forecast",
+            "name": "Reference Forecast",
+            "sourceKind": "modeled_daily",
+            "centerId": "comparison-center",
+            "centerName": "Forecast Review Center",
+            "groupId": "comparison-group",
+            "planningYear": 2026,
+            "forecastType": "budget",
+            "coverageStartMonthIndex": 0,
+            "coverageStartDate": "2026-01-01",
+            "coverageEndDate": "2026-12-31",
+            "seriesLabel": "Daily Call Volume",
+            "forecastHorizonDays": 365,
+            "forecastHorizonPreset": "365",
+            "planningContext": {
+              "centerId": "comparison-center",
+              "groupId": "comparison-group",
+              "planningYear": 2026,
+              "groupName": "Consumer Voice"
+            },
+            "historyRows": [
+              { "ds": "2025-01-01", "y": 100 },
+              { "ds": "2025-01-02", "y": 102 },
+              { "ds": "2025-01-03", "y": 104 },
+              { "ds": "2025-01-04", "y": 106 },
+              { "ds": "2025-01-05", "y": 108 },
+              { "ds": "2025-01-06", "y": 110 },
+              { "ds": "2025-01-07", "y": 112 },
+              { "ds": "2025-01-08", "y": 114 },
+              { "ds": "2025-01-09", "y": 116 },
+              { "ds": "2025-01-10", "y": 118 },
+              { "ds": "2025-01-11", "y": 120 },
+              { "ds": "2025-01-12", "y": 122 },
+              { "ds": "2025-01-13", "y": 124 },
+              { "ds": "2025-01-14", "y": 126 },
+              { "ds": "2025-01-15", "y": 128 },
+              { "ds": "2025-01-16", "y": 130 }
+            ],
+            "modelConfig": {
+              "growth": "linear",
+              "seasonalityMode": "additive",
+              "weeklySeasonalityEnabled": true,
+              "yearlySeasonalityEnabled": true,
+              "monthlySeasonalityEnabled": false,
+              "builtInHolidayCountry": "US",
+              "changepointPriorScale": 0.05,
+              "intervalWidth": 0.8,
+              "holdoutDays": 2
+            },
+            "lastRun": {
+              "runAt": "2026-07-18T16:00:00.000Z",
+              "inputSignature": "reference-signature",
+              "dailyForecast": [
+                { "ds": "2026-01-01", "yhat": 150, "yhatLower": 130, "yhatUpper": 170, "isHistory": false }
+              ],
+              "monthlyRollup": [
+                { "monthIndex": 0, "monthLabel": "Jan 2026", "contacts": 4650, "ahtSeconds": 300 }
+              ],
+              "diagnostics": {
+                "holdout": {
+                  "holdoutDays": 2,
+                  "trainingRows": 14,
+                  "testRows": 2,
+                  "trainingDateRange": "2025-01-01 to 2025-01-14",
+                  "testDateRange": "2025-01-15 to 2025-01-16",
+                  "wape": 8.4,
+                  "mae": 10.8,
+                  "bias": -6.2,
+                  "intervalCoverage": 50,
+                  "intervalWidthPercent": 80,
+                  "benchmark": { "label": "8-week weekday average", "wape": 11.9 },
+                  "rows": [
+                    { "ds": "2025-01-15", "actualValue": 128, "forecastValue": 117, "withinInterval": true },
+                    { "ds": "2025-01-16", "actualValue": 130, "forecastValue": 113, "withinInterval": false }
+                  ]
+                }
+              }
+            },
+            "createdAt": "2026-07-18T16:00:00.000Z",
+            "updatedAt": "2026-07-18T16:00:00.000Z"
+          },
+          {
+            "id": "candidate-forecast",
+            "name": "Candidate Forecast",
+            "sourceKind": "modeled_daily",
+            "centerId": "comparison-center",
+            "centerName": "Forecast Review Center",
+            "groupId": "comparison-group",
+            "planningYear": 2026,
+            "forecastType": "budget",
+            "coverageStartMonthIndex": 0,
+            "coverageStartDate": "2026-01-01",
+            "coverageEndDate": "2026-12-31",
+            "seriesLabel": "Daily Call Volume",
+            "forecastHorizonDays": 365,
+            "forecastHorizonPreset": "365",
+            "planningContext": {
+              "centerId": "comparison-center",
+              "groupId": "comparison-group",
+              "planningYear": 2026,
+              "groupName": "Consumer Voice"
+            },
+            "historyRows": [
+              { "ds": "2025-01-01", "y": 100 },
+              { "ds": "2025-01-02", "y": 102 },
+              { "ds": "2025-01-03", "y": 104 },
+              { "ds": "2025-01-04", "y": 106 },
+              { "ds": "2025-01-05", "y": 108 },
+              { "ds": "2025-01-06", "y": 110 },
+              { "ds": "2025-01-07", "y": 112 },
+              { "ds": "2025-01-08", "y": 114 },
+              { "ds": "2025-01-09", "y": 116 },
+              { "ds": "2025-01-10", "y": 118 },
+              { "ds": "2025-01-11", "y": 120 },
+              { "ds": "2025-01-12", "y": 122 },
+              { "ds": "2025-01-13", "y": 124 },
+              { "ds": "2025-01-14", "y": 126 },
+              { "ds": "2025-01-15", "y": 128 },
+              { "ds": "2025-01-16", "y": 130 }
+            ],
+            "modelConfig": {
+              "growth": "flat",
+              "seasonalityMode": "additive",
+              "weeklySeasonalityEnabled": true,
+              "yearlySeasonalityEnabled": true,
+              "monthlySeasonalityEnabled": false,
+              "builtInHolidayCountry": "US",
+              "changepointPriorScale": 0.1,
+              "intervalWidth": 0.9,
+              "holdoutDays": 2
+            },
+            "lastRun": {
+              "runAt": "2026-07-19T16:00:00.000Z",
+              "inputSignature": "candidate-signature",
+              "dailyForecast": [
+                { "ds": "2026-01-01", "yhat": 152, "yhatLower": 128, "yhatUpper": 176, "isHistory": false }
+              ],
+              "monthlyRollup": [
+                { "monthIndex": 0, "monthLabel": "Jan 2026", "contacts": 4712, "ahtSeconds": 300 }
+              ],
+              "diagnostics": {
+                "holdout": {
+                  "holdoutDays": 2,
+                  "trainingRows": 14,
+                  "testRows": 2,
+                  "trainingDateRange": "2025-01-01 to 2025-01-14",
+                  "testDateRange": "2025-01-15 to 2025-01-16",
+                  "wape": 6.1,
+                  "mae": 7.9,
+                  "bias": 3.4,
+                  "intervalCoverage": 100,
+                  "intervalWidthPercent": 90,
+                  "benchmark": { "label": "8-week weekday average", "wape": 11.9 },
+                  "rows": [
+                    { "ds": "2025-01-15", "actualValue": 128, "forecastValue": 121, "withinInterval": true },
+                    { "ds": "2025-01-16", "actualValue": 130, "forecastValue": 127, "withinInterval": true }
+                  ]
+                }
+              }
+            },
+            "createdAt": "2026-07-19T16:00:00.000Z",
+            "updatedAt": "2026-07-19T16:00:00.000Z"
+          }
+        ]
+      }
+    ],
+    "plannerDrafts": [],
+    "meta": []
+  }
+}

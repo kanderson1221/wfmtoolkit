@@ -444,6 +444,9 @@ and the unverified risk.
 ## Adjacent Forecasting Workbench
 
 - `FCAST-001` Modeled daily-volume holdout accuracy and baseline review
+- `FCAST-002` Handle-time holdout accuracy and workload consequence review
+- `FCAST-003` Traceable manual demand adjustments and monthly reconciliation
+- `FCAST-004` Saved modeled-forecast candidate comparison
 
 ## Annual Planning
 
