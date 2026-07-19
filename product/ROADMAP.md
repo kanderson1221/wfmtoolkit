@@ -169,6 +169,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-014` — Monthly scenario driver attribution — Completed
+
+- Capability: `CAP-SCEN-001` (Need 20), supporting `CAP-LRP-001` (Need 20) and `CAP-UX-001` (Need 32)
+- Planner outcome: a planning lead comparing Budget with an Update can identify which monthly demand, calendar, availability, or random-loss assumptions caused requirement and staffing-gap movement.
+- Problem/opportunity: annual-average paid-time, presence, occupancy, and adherence rows could hide offsetting monthly changes, while monthly exceptions showed staffing outcomes without the assumptions that caused them.
+- Rationale/evidence: `PLAN-013` requires saved capacity assumptions and monthly exceptions, but the original review flattened assumptions to annual averages; a January decrease and February increase could cancel to “No change.”
+- Dependencies: retained immutable plan snapshots and comparison calculation only; no schema, route, backend, identity, or sponsor-policy dependency.
+- Delivered scope: monthly candidate-minus-baseline deltas for contacts, AHT, open days, paid hours, presence, occupancy, adherence, and peak-day uplift; average and peak-day requirement, ending supply, and gap outcomes; complete 12-month CSV evidence; focused and Chromium regressions.
+- Removed scope: four masking annual-average capacity rows, their comparison-only averaging helper, and the duplicated contacts-only exception column. Plan-level lineage and starting positions remain.
+- Success measures: driver-only monthly changes appear even when annual averages cancel; percentage changes use points and time/calendar/headcount units are explicit; incompatible requirement deltas remain withheld; the dialog stays contained at 1280, 1440, 1920, and 1152 px; saved plans remain immutable.
+- Status: completed 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -327,3 +340,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Completed the fifth-run strategic portfolio review and `NOW-011`: call-center reconciliation now retains its two-tier headings, Month column, and active expanded-month aggregate inside one keyboard-scrollable table; high-Need missing domains remain sequenced behind their prerequisites, and `INT-004` targets abandoned-lock recovery for `NEXT-003`. |
 | 2026-07-19 | Completed `NOW-012`: the annual-plan workflow rail now exposes all existing section readiness labels in text; retired the unreachable speculative financial placeholder as `RET-004` while keeping labor-cost planning in `EXP-001`. |
 | 2026-07-19 | Completed `NOW-013`: the monthly staffing-supply roll-forward now groups its decision stages and retains both heading tiers and Month context inside one contained keyboard scroll region; calculations and saved data remain unchanged. |
+| 2026-07-19 | Completed `NOW-014`: saved-plan comparison now attributes monthly requirement, peak, supply, and gap movement to exact demand and capacity drivers; misleading annual-average capacity rows were removed. |

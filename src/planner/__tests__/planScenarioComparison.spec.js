@@ -43,9 +43,10 @@ describe('planScenarioComparison', () => {
       actualsThroughMonth: '2027-02-01',
       planMonths: Array.from({ length: 12 }, (_, index) => ({
         contacts: index === 2 ? 1250 : 1000,
-        ahtSeconds: 360,
-        peakDayUpliftPercent: 0
+        ahtSeconds: index === 2 ? 390 : 360,
+        peakDayUpliftPercent: index === 2 ? 10 : 0
       })),
+      randomDefaults: { occupancyPercent: 95, adherencePercent: 100 },
       startingHeadcount: 11,
       startingFrontlineHeadcount: 11
     })
@@ -59,8 +60,12 @@ describe('planScenarioComparison', () => {
     expect(comparison.monthlyRows[2]).toMatchObject({
       monthLabel: 'March',
       contactsDelta: 250,
+      ahtSecondsDelta: 30,
+      occupancyPercentDelta: -5,
+      peakDayUpliftPercentDelta: 10,
       endingFrontlineHeadcountDelta: 1
     })
+    expect(comparison.monthlyRows[2].peakDayRequiredHeadcountDelta).toBeGreaterThan(0)
     expect(comparison.monthlyRows[0].contactsDelta).toBe(0)
   })
 
@@ -110,9 +115,15 @@ describe('planScenarioComparison', () => {
 
     const csv = buildPlanScenarioComparisonCsv(comparison)
     const rows = csv.split('\r\n')
+    const headers = rows[0].split(',')
+    const january = rows[1].split(',')
 
     expect(rows).toHaveLength(13)
-    expect(rows[0]).toContain('required_headcount_delta')
-    expect(rows[1]).toMatch(/^January,1000,1000,0,[^,]*,[^,]*,,/)
+    expect(headers).toContain('aht_seconds_delta')
+    expect(headers).toContain('presence_percentage_point_delta')
+    expect(headers).toContain('peak_day_required_headcount_delta')
+    expect(january[headers.indexOf('contacts_delta')]).toBe('0')
+    expect(january[headers.indexOf('required_headcount_delta')]).toBe('')
+    expect(january[headers.indexOf('peak_day_required_headcount_delta')]).toBe('')
   })
 })

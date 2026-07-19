@@ -264,6 +264,10 @@ test('requires and exposes updated-plan decision reasons across the desktop work
   await expect(comparisonDialog.getByRole('row', { name: /Decision reason/ })).toContainText(
     'Approved product launch and revised spring demand outlook'
   )
+  await expect(comparisonDialog.getByRole('columnheader', { name: 'Changed demand and capacity drivers' })).toBeVisible()
+  await expect(comparisonDialog.getByRole('row', { name: /January Contacts/ })).toContainText(
+    'Contacts +2,000 contacts · AHT +1.0 sec'
+  )
 })
 
 test('keeps annual-plan readiness visible across desktop widths', async ({ page }) => {

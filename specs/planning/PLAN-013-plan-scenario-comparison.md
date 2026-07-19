@@ -24,12 +24,13 @@ Define a decision-safe comparison between two saved annual plans for the same st
 The comparison shall identify:
 
 - plan names, types, current status, planning year, actuals-through month, and demand-source lineage
-- requirement method and saved capacity assumptions, including paid hours, presence, occupancy, adherence, and starting headcount
+- requirement method, demand source, decision lineage, and starting headcount
 - annual demand, workload, required hours, required headcount, ending frontline headcount, and staffing gap
-- monthly exceptions in demand, required headcount, ending frontline supply, and staffing gap
+- monthly exceptions in contacts, AHT, open days, paid hours per day, presence, occupancy, adherence, peak-day uplift, average and peak-day required headcount, ending frontline supply, and staffing gap
 - the unit for each measure and whether a value is unavailable
 
 Monthly calculations shall reconcile to each saved snapshot, including stored intraday Erlang results where applicable. The comparison shall not silently use current staffing-group defaults in place of saved plan inputs.
+Monthly percentage changes shall be expressed in percentage points, time assumptions in seconds or hours per day, calendar changes in days, and staffing outcomes in headcount. The comparison shall not replace monthly assumptions with annual averages because offsetting month changes can mask an operationally material redistribution.
 
 # Method Compatibility
 
@@ -42,7 +43,8 @@ Monthly calculations shall reconcile to each saved snapshot, including stored in
 
 - The plan library shall provide a visible comparison action when at least two same-year plans exist.
 - Comparison shall use a keyboard-operable dialog with visible baseline and candidate labels.
-- Annual outcomes, assumptions, and monthly exceptions shall use native tables with contained horizontal overflow.
+- Annual outcomes, plan-level assumptions/lineage, and monthly exceptions shall use native tables with contained horizontal overflow.
+- Each displayed monthly exception shall name the changed demand and capacity drivers before showing requirement, supply, and gap outcomes.
 - Changed assumptions shall be named with text and shall not rely on color alone.
 - CSV export shall include all 12 monthly rows so a planner can reconcile displayed exceptions to the complete saved comparison.
 
@@ -54,7 +56,15 @@ Monthly calculations shall reconcile to each saved snapshot, including stored in
 **When** the planner opens Compare Plans  
 **Then** Budget is selected as baseline  
 **And** the current Update is selected as candidate  
-**And** annual, assumption, and material monthly changes are visible without opening either plan.
+**And** annual, plan-level, and material monthly changes are visible without opening either plan
+**And** each monthly exception names the demand or capacity drivers that changed.
+
+## Preserve Offsetting Monthly Assumption Changes
+
+**Given** one saved plan reduces paid hours in January and increases paid hours by the same amount in February
+**When** the plan is compared with its baseline
+**Then** both monthly changes are visible in hours per day
+**And** an unchanged annual average does not hide either operational assumption change.
 
 ## Withhold Incompatible Requirement Deltas
 

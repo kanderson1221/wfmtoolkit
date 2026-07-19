@@ -21,13 +21,6 @@ const finiteOrNull = (value) => {
 const preferSavedMetric = (savedValue, computedValue) =>
   finiteOrNull(savedValue) ?? finiteOrNull(computedValue)
 
-const average = (values) => {
-  const finiteValues = values.map(finiteOrNull).filter((value) => value != null)
-  return finiteValues.length
-    ? finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length
-    : null
-}
-
 const buildMonthlyRecords = (plan, center) => {
   const planningYear = Number(plan?.planningYear)
   const requirementMethod = normalizePlanRequirementMethod(
@@ -126,10 +119,6 @@ export const buildPlanScenarioSnapshot = (plan, center) => {
     decisionReason: String(plan?.decisionReason || ''),
     updatedAt: String(plan?.updatedAt || plan?.createdAt || ''),
     assumptions: {
-      averagePaidHoursPerDay: average(monthlyRecords.map((row) => row.paidHoursPerDay)),
-      averagePresencePercent: average(monthlyRecords.map((row) => row.presencePercent)),
-      averageOccupancyPercent: average(monthlyRecords.map((row) => row.occupancyPercent)),
-      averageAdherencePercent: average(monthlyRecords.map((row) => row.adherencePercent)),
       startingRosterHeadcount: finiteOrNull(plan?.startingHeadcount),
       startingFrontlineHeadcount: finiteOrNull(plan?.startingFrontlineHeadcount)
     },
@@ -146,9 +135,17 @@ export const buildPlanScenarioSnapshot = (plan, center) => {
       monthIndex: row.monthIndex,
       monthLabel: row.fullLabel,
       contacts: finiteOrNull(row.contacts),
+      ahtSeconds: finiteOrNull(row.ahtSeconds),
+      openDays: finiteOrNull(row.openDays),
+      paidHoursPerDay: finiteOrNull(row.paidHoursPerDay),
+      presencePercent: finiteOrNull(row.presencePercent),
+      occupancyPercent: finiteOrNull(row.occupancyPercent),
+      adherencePercent: finiteOrNull(row.adherencePercent),
+      peakDayUpliftPercent: finiteOrNull(row.peakDayUpliftPercent),
       workloadHours: finiteOrNull(row.workloadHours),
       requiredStaffHours: finiteOrNull(row.requiredStaffHours),
       requiredHeadcount: finiteOrNull(row.requiredHeadcount),
+      peakDayRequiredHeadcount: finiteOrNull(row.peakDayRequiredHeadcount),
       endingFrontlineHeadcount: finiteOrNull(staffingRecords[index]?.endingFrontlineHeadcount),
       gapToRequirement: finiteOrNull(staffingRecords[index]?.gapToRequirement)
     }))
@@ -203,10 +200,39 @@ export const buildPlanScenarioComparison = ({ baselinePlan, candidatePlan, cente
         baselineContacts: baselineRow.contacts,
         candidateContacts: candidateRow.contacts,
         contactsDelta: delta(baselineRow.contacts, candidateRow.contacts),
+        baselineAhtSeconds: baselineRow.ahtSeconds,
+        candidateAhtSeconds: candidateRow.ahtSeconds,
+        ahtSecondsDelta: delta(baselineRow.ahtSeconds, candidateRow.ahtSeconds),
+        baselineOpenDays: baselineRow.openDays,
+        candidateOpenDays: candidateRow.openDays,
+        openDaysDelta: delta(baselineRow.openDays, candidateRow.openDays),
+        baselinePaidHoursPerDay: baselineRow.paidHoursPerDay,
+        candidatePaidHoursPerDay: candidateRow.paidHoursPerDay,
+        paidHoursPerDayDelta: delta(baselineRow.paidHoursPerDay, candidateRow.paidHoursPerDay),
+        baselinePresencePercent: baselineRow.presencePercent,
+        candidatePresencePercent: candidateRow.presencePercent,
+        presencePercentDelta: delta(baselineRow.presencePercent, candidateRow.presencePercent),
+        baselineOccupancyPercent: baselineRow.occupancyPercent,
+        candidateOccupancyPercent: candidateRow.occupancyPercent,
+        occupancyPercentDelta: delta(baselineRow.occupancyPercent, candidateRow.occupancyPercent),
+        baselineAdherencePercent: baselineRow.adherencePercent,
+        candidateAdherencePercent: candidateRow.adherencePercent,
+        adherencePercentDelta: delta(baselineRow.adherencePercent, candidateRow.adherencePercent),
+        baselinePeakDayUpliftPercent: baselineRow.peakDayUpliftPercent,
+        candidatePeakDayUpliftPercent: candidateRow.peakDayUpliftPercent,
+        peakDayUpliftPercentDelta: delta(
+          baselineRow.peakDayUpliftPercent,
+          candidateRow.peakDayUpliftPercent
+        ),
         baselineRequiredHeadcount: baselineRow.requiredHeadcount,
         candidateRequiredHeadcount: candidateRow.requiredHeadcount,
         requiredHeadcountDelta: requirementMethodComparable
           ? delta(baselineRow.requiredHeadcount, candidateRow.requiredHeadcount)
+          : null,
+        baselinePeakDayRequiredHeadcount: baselineRow.peakDayRequiredHeadcount,
+        candidatePeakDayRequiredHeadcount: candidateRow.peakDayRequiredHeadcount,
+        peakDayRequiredHeadcountDelta: requirementMethodComparable
+          ? delta(baselineRow.peakDayRequiredHeadcount, candidateRow.peakDayRequiredHeadcount)
           : null,
         baselineEndingFrontlineHeadcount: baselineRow.endingFrontlineHeadcount,
         candidateEndingFrontlineHeadcount: candidateRow.endingFrontlineHeadcount,
@@ -229,9 +255,33 @@ export const buildPlanScenarioComparisonCsv = (comparison) => buildCsv(
     { header: 'baseline_contacts', value: (row) => formatCsvNumber(row.baselineContacts, 0) },
     { header: 'candidate_contacts', value: (row) => formatCsvNumber(row.candidateContacts, 0) },
     { header: 'contacts_delta', value: (row) => formatCsvNumber(row.contactsDelta, 0) },
+    { header: 'baseline_aht_seconds', value: (row) => formatCsvNumber(row.baselineAhtSeconds, 2) },
+    { header: 'candidate_aht_seconds', value: (row) => formatCsvNumber(row.candidateAhtSeconds, 2) },
+    { header: 'aht_seconds_delta', value: (row) => formatCsvNumber(row.ahtSecondsDelta, 2) },
+    { header: 'baseline_open_days', value: (row) => formatCsvNumber(row.baselineOpenDays, 2) },
+    { header: 'candidate_open_days', value: (row) => formatCsvNumber(row.candidateOpenDays, 2) },
+    { header: 'open_days_delta', value: (row) => formatCsvNumber(row.openDaysDelta, 2) },
+    { header: 'baseline_paid_hours_per_day', value: (row) => formatCsvNumber(row.baselinePaidHoursPerDay, 2) },
+    { header: 'candidate_paid_hours_per_day', value: (row) => formatCsvNumber(row.candidatePaidHoursPerDay, 2) },
+    { header: 'paid_hours_per_day_delta', value: (row) => formatCsvNumber(row.paidHoursPerDayDelta, 2) },
+    { header: 'baseline_presence_percent', value: (row) => formatCsvNumber(row.baselinePresencePercent, 2) },
+    { header: 'candidate_presence_percent', value: (row) => formatCsvNumber(row.candidatePresencePercent, 2) },
+    { header: 'presence_percentage_point_delta', value: (row) => formatCsvNumber(row.presencePercentDelta, 2) },
+    { header: 'baseline_occupancy_percent', value: (row) => formatCsvNumber(row.baselineOccupancyPercent, 2) },
+    { header: 'candidate_occupancy_percent', value: (row) => formatCsvNumber(row.candidateOccupancyPercent, 2) },
+    { header: 'occupancy_percentage_point_delta', value: (row) => formatCsvNumber(row.occupancyPercentDelta, 2) },
+    { header: 'baseline_adherence_percent', value: (row) => formatCsvNumber(row.baselineAdherencePercent, 2) },
+    { header: 'candidate_adherence_percent', value: (row) => formatCsvNumber(row.candidateAdherencePercent, 2) },
+    { header: 'adherence_percentage_point_delta', value: (row) => formatCsvNumber(row.adherencePercentDelta, 2) },
+    { header: 'baseline_peak_day_uplift_percent', value: (row) => formatCsvNumber(row.baselinePeakDayUpliftPercent, 2) },
+    { header: 'candidate_peak_day_uplift_percent', value: (row) => formatCsvNumber(row.candidatePeakDayUpliftPercent, 2) },
+    { header: 'peak_day_uplift_percentage_point_delta', value: (row) => formatCsvNumber(row.peakDayUpliftPercentDelta, 2) },
     { header: 'baseline_required_headcount', value: (row) => formatCsvNumber(row.baselineRequiredHeadcount, 2) },
     { header: 'candidate_required_headcount', value: (row) => formatCsvNumber(row.candidateRequiredHeadcount, 2) },
     { header: 'required_headcount_delta', value: (row) => formatCsvNumber(row.requiredHeadcountDelta, 2) },
+    { header: 'baseline_peak_day_required_headcount', value: (row) => formatCsvNumber(row.baselinePeakDayRequiredHeadcount, 2) },
+    { header: 'candidate_peak_day_required_headcount', value: (row) => formatCsvNumber(row.candidatePeakDayRequiredHeadcount, 2) },
+    { header: 'peak_day_required_headcount_delta', value: (row) => formatCsvNumber(row.peakDayRequiredHeadcountDelta, 2) },
     { header: 'baseline_ending_frontline_headcount', value: (row) => formatCsvNumber(row.baselineEndingFrontlineHeadcount, 2) },
     { header: 'candidate_ending_frontline_headcount', value: (row) => formatCsvNumber(row.candidateEndingFrontlineHeadcount, 2) },
     { header: 'ending_frontline_headcount_delta', value: (row) => formatCsvNumber(row.endingFrontlineHeadcountDelta, 2) },

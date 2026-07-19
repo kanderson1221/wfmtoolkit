@@ -100,12 +100,34 @@ describe('PlanningPlanComparisonDialog', () => {
     expect(wrapper.text()).toContain('Annual outcomes')
     expect(wrapper.text()).toContain('Annual contacts')
     expect(wrapper.text()).toContain('+250')
-    expect(wrapper.text()).toContain('Average occupancy')
+    expect(wrapper.text()).not.toContain('Average occupancy')
     expect(wrapper.text()).toContain('Decision reason')
     expect(wrapper.text()).toContain('February actuals and revised spring outlook')
     expect(wrapper.text()).toContain('Changed')
     expect(wrapper.text()).toContain('Monthly exceptions')
     expect(wrapper.text()).toContain('March')
+    expect(wrapper.text()).toContain('Contacts +250 contacts')
+    expect(wrapper.text()).toContain('Occupancy -5.0 pts')
+    expect(wrapper.text()).toContain('Peak-day required HC change')
+  })
+
+  it('surfaces offsetting monthly capacity changes that an annual average would hide', () => {
+    const wrapper = buildWrapper({
+      randomDefaults: { occupancyPercent: 90, adherencePercent: 95 },
+      presenceMonths: Array.from({ length: 12 }, (_, index) => ({
+        paidHoursPerDay: index === 0 ? 7 : index === 1 ? 9 : 8
+      })),
+      planMonths: Array.from({ length: 12 }, () => ({
+        contacts: 1000,
+        ahtSeconds: 360,
+        peakDayUpliftPercent: 0
+      }))
+    })
+
+    expect(wrapper.text()).toContain('January')
+    expect(wrapper.text()).toContain('Paid time -1.00 hr/day')
+    expect(wrapper.text()).toContain('February')
+    expect(wrapper.text()).toContain('Paid time +1.00 hr/day')
   })
 
   it('explains incompatible methods instead of presenting false requirement deltas', () => {

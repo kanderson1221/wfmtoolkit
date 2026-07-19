@@ -98,10 +98,6 @@ const formatWhole = (value) => {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(value))
 }
 
-const formatPercent = (value) => value == null || !Number.isFinite(Number(value))
-  ? '—'
-  : `${formatNumber(value, 1)}%`
-
 const formatSigned = (value, digits = 1) => {
   if (value == null || !Number.isFinite(Number(value))) {
     return '—'
@@ -165,26 +161,6 @@ const assumptionRows = computed(() => {
         : 'Budget baseline'
     },
     {
-      label: 'Average paid hours / day',
-      baseline: formatNumber(baseline.assumptions.averagePaidHoursPerDay, 1),
-      candidate: formatNumber(candidate.assumptions.averagePaidHoursPerDay, 1)
-    },
-    {
-      label: 'Average presence',
-      baseline: formatPercent(baseline.assumptions.averagePresencePercent),
-      candidate: formatPercent(candidate.assumptions.averagePresencePercent)
-    },
-    {
-      label: 'Average occupancy',
-      baseline: formatPercent(baseline.assumptions.averageOccupancyPercent),
-      candidate: formatPercent(candidate.assumptions.averageOccupancyPercent)
-    },
-    {
-      label: 'Average adherence',
-      baseline: formatPercent(baseline.assumptions.averageAdherencePercent),
-      candidate: formatPercent(candidate.assumptions.averageAdherencePercent)
-    },
-    {
       label: 'Starting roster headcount',
       baseline: formatNumber(baseline.assumptions.startingRosterHeadcount, 1),
       candidate: formatNumber(candidate.assumptions.startingRosterHeadcount, 1)
@@ -197,12 +173,33 @@ const assumptionRows = computed(() => {
   ].map((row) => ({ ...row, changed: row.baseline !== row.candidate }))
 })
 
-const monthlyExceptions = computed(() => (comparison.value?.monthlyRows || []).filter((row) =>
-  Math.abs(Number(row.contactsDelta) || 0) >= 1 ||
-  Math.abs(Number(row.requiredHeadcountDelta) || 0) >= 0.05 ||
-  Math.abs(Number(row.endingFrontlineHeadcountDelta) || 0) >= 0.05 ||
-  Math.abs(Number(row.gapToRequirementDelta) || 0) >= 0.05
-))
+const hasMaterialDelta = (value, threshold) =>
+  value != null && Number.isFinite(Number(value)) && Math.abs(Number(value)) >= threshold
+
+const monthlyDriverDefinitions = [
+  { key: 'contactsDelta', threshold: 1, label: 'Contacts', digits: 0, suffix: ' contacts' },
+  { key: 'ahtSecondsDelta', threshold: 0.1, label: 'AHT', digits: 1, suffix: ' sec' },
+  { key: 'openDaysDelta', threshold: 0.5, label: 'Open days', digits: 0, suffix: ' days' },
+  { key: 'paidHoursPerDayDelta', threshold: 0.01, label: 'Paid time', digits: 2, suffix: ' hr/day' },
+  { key: 'presencePercentDelta', threshold: 0.01, label: 'Presence', digits: 1, suffix: ' pts' },
+  { key: 'occupancyPercentDelta', threshold: 0.01, label: 'Occupancy', digits: 1, suffix: ' pts' },
+  { key: 'adherencePercentDelta', threshold: 0.01, label: 'Adherence', digits: 1, suffix: ' pts' },
+  { key: 'peakDayUpliftPercentDelta', threshold: 0.01, label: 'Peak-day uplift', digits: 1, suffix: ' pts' }
+]
+
+const getMonthlyDriverChanges = (row) => monthlyDriverDefinitions
+  .filter((driver) => hasMaterialDelta(row[driver.key], driver.threshold))
+  .map((driver) => `${driver.label} ${formatSigned(row[driver.key], driver.digits)}${driver.suffix}`)
+
+const monthlyExceptions = computed(() => (comparison.value?.monthlyRows || [])
+  .map((row) => ({ ...row, driverChanges: getMonthlyDriverChanges(row) }))
+  .filter((row) =>
+    row.driverChanges.length > 0 ||
+    hasMaterialDelta(row.requiredHeadcountDelta, 0.05) ||
+    hasMaterialDelta(row.peakDayRequiredHeadcountDelta, 0.05) ||
+    hasMaterialDelta(row.endingFrontlineHeadcountDelta, 0.05) ||
+    hasMaterialDelta(row.gapToRequirementDelta, 0.05)
+  ))
 
 const downloadComparison = () => {
   if (!comparison.value) {
@@ -280,7 +277,7 @@ const downloadComparison = () => {
         <section class="grid gap-2" aria-labelledby="comparison-assumptions-heading">
           <div>
             <h3 id="comparison-assumptions-heading" class="text-base font-semibold text-slate-950">Assumptions and lineage</h3>
-            <p class="text-sm text-slate-600">Changed rows are named explicitly; color is supplementary.</p>
+            <p class="text-sm text-slate-600">Plan-level lineage and opening positions are shown here; monthly assumption changes are named in the exception review below.</p>
           </div>
           <AppTableShell>
             <div class="overflow-x-auto">
@@ -311,16 +308,17 @@ const downloadComparison = () => {
         <section class="grid gap-2" aria-labelledby="comparison-monthly-heading">
           <div>
             <h3 id="comparison-monthly-heading" class="text-base font-semibold text-slate-950">Monthly exceptions</h3>
-            <p class="text-sm text-slate-600">Only months with a material demand, requirement, supply, or gap change are shown.</p>
+            <p class="text-sm text-slate-600">Candidate-minus-baseline changes are shown in contacts, seconds, days, hours per day, percentage points, and headcount.</p>
           </div>
           <AppTableShell v-if="monthlyExceptions.length">
             <div class="overflow-x-auto">
-              <table class="w-full min-w-[960px] border-collapse text-sm">
+              <table class="w-full min-w-[1100px] border-collapse text-sm">
               <thead class="bg-slate-50 text-left text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                 <tr>
                   <th scope="col" class="px-4 py-2.5">Month</th>
-                  <th scope="col" class="px-4 py-2.5 text-right">Contacts change</th>
-                  <th scope="col" class="px-4 py-2.5 text-right">Required HC change</th>
+                  <th scope="col" class="min-w-[320px] px-4 py-2.5">Changed demand and capacity drivers</th>
+                  <th scope="col" class="px-4 py-2.5 text-right">Average required HC change</th>
+                  <th scope="col" class="px-4 py-2.5 text-right">Peak-day required HC change</th>
                   <th scope="col" class="px-4 py-2.5 text-right">Ending frontline change</th>
                   <th scope="col" class="px-4 py-2.5 text-right">Staffing gap change</th>
                 </tr>
@@ -328,8 +326,11 @@ const downloadComparison = () => {
               <tbody class="divide-y divide-slate-200">
                 <tr v-for="row in monthlyExceptions" :key="row.monthIndex">
                   <th scope="row" class="px-4 py-2.5 text-left font-medium text-slate-800">{{ row.monthLabel }}</th>
-                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ formatSigned(row.contactsDelta, 0) }}</td>
+                  <td class="px-4 py-2.5 text-slate-700">
+                    {{ row.driverChanges.length ? row.driverChanges.join(' · ') : 'No demand or capacity driver change' }}
+                  </td>
                   <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.requiredHeadcountDelta, 1) : 'Not comparable' }}</td>
+                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.peakDayRequiredHeadcountDelta, 1) : 'Not comparable' }}</td>
                   <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.endingFrontlineHeadcountDelta, 1) : 'Not comparable' }}</td>
                   <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.gapToRequirementDelta, 1) : 'Not comparable' }}</td>
                 </tr>
