@@ -18,7 +18,6 @@ import {
   FORECAST_SOURCE_MANUAL_MONTHLY,
   formatDate,
   formatNumber,
-  formatPercent,
   formatWhole,
   getForecastProjectDailyRows,
   getForecastProjectMonthlyRollup,
@@ -251,30 +250,6 @@ const embeddedMonthlyHighlights = computed(() => {
   return highlights
 })
 
-const dailyAccuracyHighlights = computed(() => {
-  if (!holdoutMetrics.value) {
-    return []
-  }
-
-  return [
-    {
-      label: 'Test Set',
-      value: holdoutMetrics.value.testRows != null ? `${formatWhole(holdoutMetrics.value.testRows)} days` : '—',
-      meta: holdoutMetrics.value.testDateRange || ''
-    },
-    {
-      label: 'MAPE',
-      value: holdoutMetrics.value.mape != null ? formatPercent(holdoutMetrics.value.mape, 1) : '—',
-      meta: 'Held-out percent error'
-    },
-    {
-      label: 'MAE',
-      value: holdoutMetrics.value.mae != null ? formatNumber(holdoutMetrics.value.mae, 1) : '—',
-      meta: 'Average daily error'
-    }
-  ]
-})
-
 const ahtHighlights = computed(() => [
   {
     label: 'Method',
@@ -363,9 +338,10 @@ const clearAhtMonthOverrides = () => {
       <ForecastContactsResultsView
         v-model:active-contacts-subview="activeContactsSubview"
         :contact-subview-tabs="contactSubviewTabs"
-        :daily-accuracy-highlights="dailyAccuracyHighlights"
         :chart-daily-rows="chartDailyRows"
         :holdout-days="holdoutMetrics?.holdoutDays || 0"
+        :holdout-metrics="holdoutMetrics"
+        :project-name="project.name"
         :component-sections="componentSections"
         :embedded-insight-cards="embeddedInsightCards"
         :format-number="formatNumber"

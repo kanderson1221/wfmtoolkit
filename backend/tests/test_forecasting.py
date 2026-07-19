@@ -248,8 +248,44 @@ class ForecastingTests(unittest.TestCase):
         self.assertIn("wape", holdout)
         self.assertIn("bias", holdout)
         self.assertIn("intervalCoverage", holdout)
+        self.assertEqual(holdout["intervalWidthPercent"], 80.0)
+        self.assertEqual(holdout["benchmark"]["id"], "weekday_average_8")
+        self.assertEqual(holdout["benchmark"]["mae"], 13.0)
+        self.assertEqual(holdout["benchmark"]["wape"], 10.484)
+        self.assertEqual(holdout["comparison"]["lowerWape"], "benchmark")
+        self.assertEqual(holdout["comparison"]["wapeDeltaPoints"], 8.064)
+        self.assertEqual(holdout["rows"][0]["benchmarkValue"], 106.0)
+        self.assertEqual(holdout["rows"][1]["benchmarkValue"], 111.5)
+        self.assertEqual(holdout["rows"][2]["benchmarkValue"], 115.5)
         self.assertEqual(result["summary"]["trainingObservations"], 14)
         self.assertEqual(result["summary"]["testObservations"], 3)
+
+    @patch("backend.app.forecasting.Prophet", FakeProphet)
+    def test_holdout_wape_is_unavailable_when_actual_volume_is_zero(self) -> None:
+        base_payload = self._payload()
+        history = [row.model_dump() for row in base_payload.history]
+        history.extend(
+            [
+                {"ds": "2025-01-15", "y": 0, "cap": 500, "floor": 0, "holidayLabel": ""},
+                {"ds": "2025-01-16", "y": 0, "cap": 500, "floor": 0, "holidayLabel": ""},
+                {"ds": "2025-01-17", "y": 0, "cap": 500, "floor": 0, "holidayLabel": ""},
+            ]
+        )
+        payload = self._payload(
+            history=history,
+            modelConfig={**base_payload.modelConfig.model_dump(), "holdoutDays": 3, "growth": "linear"},
+        )
+
+        holdout = run_daily_volume_forecast(payload)["diagnostics"]["holdout"]
+
+        self.assertIsNone(holdout["wape"])
+        self.assertIsNone(holdout["benchmark"]["wape"])
+        self.assertEqual(holdout["comparison"]["lowerWape"], "unavailable")
+        self.assertIsNone(holdout["comparison"]["wapeDeltaPoints"])
+        self.assertEqual(
+            [row["benchmarkValue"] for row in holdout["rows"]],
+            [106.0, 111.5, 115.5],
+        )
 
     @patch("backend.app.forecasting.Prophet", FakeProphet)
     def test_holdout_allows_exactly_fourteen_training_rows(self) -> None:

@@ -136,7 +136,9 @@ When sources disagree, use this order:
 
 Host code is evidence and may be reused, but it does not override the
 specifications. Forecasting and standalone calculator features remain outside
-the target product even if a host repository contains them.
+the Planning Workspace boundary defined below. Host-repository WFM Toolkit
+capabilities may have adjacent contracts under `specs/forecasting` without
+changing that planning boundary.
 
 # Product Boundary
 
@@ -438,6 +440,10 @@ and the unverified risk.
 - `FIMP-006` Contacts and handle-time normalization and aggregation
 - `FIMP-007` Forecast replacement, selection, deletion, and dependency warnings
 - `FIMP-008` Forecast-to-plan handoff and immutable demand snapshots
+
+## Adjacent Forecasting Workbench
+
+- `FCAST-001` Modeled daily-volume holdout accuracy and baseline review
 
 ## Annual Planning
 

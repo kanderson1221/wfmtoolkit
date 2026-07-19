@@ -1,4 +1,5 @@
 <script setup>
+import ForecastAccuracyReview from '../ForecastAccuracyReview.vue'
 import ForecastComponentChart from '../ForecastComponentChart.vue'
 import ForecastDailyChart from '../ForecastDailyChart.vue'
 import AppEmptyState from '../../ui/AppEmptyState.vue'
@@ -9,10 +10,6 @@ defineProps({
     type: Array,
     default: () => []
   },
-  dailyAccuracyHighlights: {
-    type: Array,
-    default: () => []
-  },
   chartDailyRows: {
     type: Array,
     default: () => []
@@ -20,6 +17,14 @@ defineProps({
   holdoutDays: {
     type: Number,
     default: 0
+  },
+  holdoutMetrics: {
+    type: Object,
+    default: null
+  },
+  projectName: {
+    type: String,
+    default: 'forecast'
   },
   componentSections: {
     type: Array,
@@ -60,21 +65,6 @@ const activeContactsSubview = defineModel('activeContactsSubview', {
             />
           </div>
 
-          <div
-            v-if="activeContactsSubview === 'forecast' && dailyAccuracyHighlights.length"
-            class="flex flex-wrap gap-2 lg:justify-end"
-          >
-            <span
-              v-for="item in dailyAccuracyHighlights"
-              :key="item.label"
-              class="inline-flex items-baseline gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
-            >
-              <span class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                {{ item.label }}
-              </span>
-              <strong class="font-semibold text-slate-950">{{ item.value }}</strong>
-            </span>
-          </div>
         </div>
 
         <div v-if="activeContactsSubview === 'forecast'" class="grid gap-4">
@@ -107,6 +97,12 @@ const activeContactsSubview = defineModel('activeContactsSubview', {
               Test period
             </span>
           </div>
+
+          <ForecastAccuracyReview
+            v-if="holdoutMetrics"
+            :holdout="holdoutMetrics"
+            :project-name="projectName"
+          />
         </div>
 
         <AppEmptyState

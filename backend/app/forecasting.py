@@ -472,7 +472,7 @@ def _parse_manual_changepoints(changepoints: list[str]) -> list[pd.Timestamp] | 
 def _compute_holdout_metrics(
     history: pd.DataFrame,
     payload: ForecastRunRequest,
-) -> dict[str, float | int] | None:
+) -> dict[str, Any] | None:
     holdout_days = int(payload.modelConfig.holdoutDays or 0)
     if holdout_days <= 0:
         return None
@@ -497,12 +497,44 @@ def _compute_holdout_metrics(
         on="ds",
         how="left",
     )
+    training_weekdays = training.assign(weekday=training["ds"].dt.dayofweek)
+    fallback_benchmark = float(training_weekdays["y"].mean())
+    weekday_benchmarks = {
+        weekday: float(rows.tail(8)["y"].mean())
+        for weekday, rows in training_weekdays.groupby("weekday", sort=False)
+    }
+    merged["benchmark"] = merged["ds"].dt.dayofweek.map(
+        lambda weekday: weekday_benchmarks.get(weekday, fallback_benchmark)
+    )
+
+    def build_accuracy_metrics(forecast_column: str) -> dict[str, float | None]:
+        absolute_error = (merged["y"] - merged[forecast_column]).abs()
+        squared_error = (merged["y"] - merged[forecast_column]) ** 2
+        signed_error = merged[forecast_column] - merged["y"]
+        safe_actual = merged["y"].replace(0, pd.NA)
+        percentage_error = ((absolute_error / safe_actual) * 100).dropna()
+        total_actual = float(merged["y"].sum())
+
+        return {
+            "mae": _safe_float(float(absolute_error.mean()), 3),
+            "rmse": _safe_float(math.sqrt(float(squared_error.mean())), 3),
+            "mape": _safe_float(float(percentage_error.mean()), 3)
+            if not percentage_error.empty
+            else None,
+            "wape": _safe_float(float((absolute_error.sum() / total_actual) * 100), 3)
+            if total_actual > 0
+            else None,
+            "bias": _safe_float(float(signed_error.mean()), 3),
+            "meanForecast": _safe_float(float(merged[forecast_column].mean()), 3),
+        }
+
+    model_metrics = build_accuracy_metrics("yhat")
+    benchmark_metrics = build_accuracy_metrics("benchmark")
     absolute_error = (merged["y"] - merged["yhat"]).abs()
-    squared_error = (merged["y"] - merged["yhat"]) ** 2
     signed_error = merged["yhat"] - merged["y"]
+    benchmark_absolute_error = (merged["y"] - merged["benchmark"]).abs()
+    benchmark_signed_error = merged["benchmark"] - merged["y"]
     safe_actual = merged["y"].replace(0, pd.NA)
-    percentage_error = ((absolute_error / safe_actual) * 100).dropna()
-    total_actual = float(merged["y"].sum())
     interval_hit = (
         (merged["y"] >= merged["yhat_lower"]) & (merged["y"] <= merged["yhat_upper"])
     ).fillna(False)
@@ -512,6 +544,8 @@ def _compute_holdout_metrics(
         absolute_error=absolute_error,
         signed_error=signed_error,
         percent_error=((absolute_error / safe_actual) * 100),
+        benchmark_absolute_error=benchmark_absolute_error,
+        benchmark_signed_error=benchmark_signed_error,
         within_interval=interval_hit,
     )
     for _, row in merged.iterrows():
@@ -528,8 +562,26 @@ def _compute_holdout_metrics(
                 "percentError": _safe_float(percent_error_value, 3)
                 if pd.notna(percent_error_value)
                 else None,
+                "benchmarkValue": _safe_float(row["benchmark"], 3),
+                "benchmarkAbsoluteError": _safe_float(row["benchmark_absolute_error"], 3),
+                "benchmarkSignedError": _safe_float(row["benchmark_signed_error"], 3),
                 "withinInterval": bool(row["within_interval"]),
             }
+        )
+
+    model_wape = model_metrics["wape"]
+    benchmark_wape = benchmark_metrics["wape"]
+    if model_wape is None or benchmark_wape is None:
+        lower_wape = "unavailable"
+        wape_delta_points = None
+    else:
+        wape_delta_points = _safe_float(float(model_wape - benchmark_wape), 3)
+        lower_wape = (
+            "model"
+            if model_wape < benchmark_wape
+            else "benchmark"
+            if benchmark_wape < model_wape
+            else "tie"
         )
 
     return {
@@ -538,16 +590,20 @@ def _compute_holdout_metrics(
         "testRows": len(holdout),
         "trainingDateRange": _date_range_label(training),
         "testDateRange": _date_range_label(holdout),
-        "mae": _safe_float(float(absolute_error.mean()), 3),
-        "rmse": _safe_float(math.sqrt(float(squared_error.mean())), 3),
-        "mape": _safe_float(float(percentage_error.mean()), 3) if not percentage_error.empty else 0.0,
-        "wape": _safe_float(float((absolute_error.sum() / total_actual) * 100), 3)
-        if total_actual > 0
-        else 0.0,
-        "bias": _safe_float(float(signed_error.mean()), 3),
+        **model_metrics,
         "meanActual": _safe_float(float(merged["y"].mean()), 3),
-        "meanForecast": _safe_float(float(merged["yhat"].mean()), 3),
         "intervalCoverage": _safe_float(float(interval_hit.mean() * 100), 3),
+        "intervalWidthPercent": _safe_float(float(payload.modelConfig.intervalWidth * 100), 3),
+        "benchmark": {
+            "id": "weekday_average_8",
+            "label": "8-week weekday average",
+            "description": "Mean of up to the latest eight matching weekdays in the training set",
+            **benchmark_metrics,
+        },
+        "comparison": {
+            "lowerWape": lower_wape,
+            "wapeDeltaPoints": wape_delta_points,
+        },
         "rows": holdout_rows,
     }
 

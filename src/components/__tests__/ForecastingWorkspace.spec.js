@@ -182,6 +182,22 @@ const createForecastRunResults = () => ({
       meanActual: 1010.4,
       meanForecast: 1006.3,
       intervalCoverage: 66.7,
+      intervalWidthPercent: 80,
+      benchmark: {
+        id: 'weekday_average_8',
+        label: '8-week weekday average',
+        description: 'Mean of up to the latest eight matching weekdays in the training set',
+        mae: 57.4,
+        rmse: 63.2,
+        mape: 7.1,
+        wape: 7.4,
+        bias: 18.7,
+        meanForecast: 1029.1
+      },
+      comparison: {
+        lowerWape: 'model',
+        wapeDeltaPoints: -2.2
+      },
       rows: [
         {
           ds: '2025-01-12',
@@ -192,6 +208,9 @@ const createForecastRunResults = () => ({
           absoluteError: 25,
           signedError: -25,
           percentError: 2.6,
+          benchmarkValue: 1030,
+          benchmarkAbsoluteError: 50,
+          benchmarkSignedError: 50,
           withinInterval: true
         }
       ]
@@ -806,8 +825,10 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('Consumer Voice 2026 Demand Forecast')
     expect(wrapper.text()).toContain('Forecasted demand vs historical volume')
     expect(wrapper.text()).toContain('Test period')
-    expect(wrapper.text()).toContain('MAPE')
-    expect(wrapper.text()).not.toContain('Accuracy')
+    expect(wrapper.text()).toContain('Forecast accuracy review')
+    expect(wrapper.text()).toContain('8-week weekday average')
+    expect(wrapper.text()).toContain('2.2 percentage points lower WAPE')
+    expect(wrapper.text()).toContain('Download Accuracy CSV')
     expect(wrapper.text()).not.toContain('Forecast saved.')
 
     await findButtonByText(wrapper, 'Monthly Rollup').trigger('click')

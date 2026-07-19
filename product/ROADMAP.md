@@ -52,16 +52,17 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-18. Comparison is read-only, reconciles saved Workload Ratio and Intraday Erlang snapshots, and removes the cramped repeated per-row variance block.
 - Last reviewed: 2026-07-18.
 
-### `NOW-005` — Forecast accuracy and uncertainty review — Ready
+### `NOW-005` — Forecast accuracy and uncertainty review — In progress
 
-- Capability: `CAP-FORE-002` (Need 40)
+- Capability: `CAP-FORE-002` (Need 25 after first slice; 40 before), `CAP-UX-001` (Need 32)
 - Planner outcome: forecast analysts can judge model fit, holdout performance, interval uncertainty, and manual overrides before saving a planning source.
 - Problem/opportunity: the workbench is capable but does not provide a compact, governed accuracy decision record.
 - Rationale/evidence: forecasting modules expose model components and validation; uncertainty and model comparison remain the highest-value executable gap after saved-plan comparison. `INT-002` asks which real acceptance decision and error measures should govern the first slice.
 - Dependencies: stable historical-data quality and forecast result schema; acceptance semantics informed by `INT-002` where practical.
-- Proposed scope: holdout metrics, bias/accuracy by period, uncertainty bands or scenarios, override reason trace, and exportable diagnostics.
-- Success measures: users can compare at least two candidate models or configurations and identify bias/coverage limitations without reading implementation details.
-- Status: ready; promoted from `NEXT-002` during the strategic portfolio review.
+- Delivered first slice: leakage-safe holdout scoring; modeled forecast versus an eight-week same-weekday training benchmark; aligned WAPE, MAE, mean bias, and interval coverage; explicit no-threshold interpretation; complete scored-day CSV; backward-compatible rerun guidance for older results.
+- Remaining scope: saved configuration-to-configuration or rolling-origin comparison, governed acceptance/rejection record, override trace in diagnostics, and AHT forecast accuracy. `INT-002` should shape threshold and decision semantics rather than blocking safe comparative evidence.
+- Success measures: users can compare at least two candidate models or configurations and identify bias/coverage limitations without reading implementation details; the delivered benchmark comparison satisfies the first evidence baseline but not the full governed decision workflow.
+- Status: in progress; first production slice completed 2026-07-18.
 - Last reviewed: 2026-07-18.
 
 ## Next
@@ -183,3 +184,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-18 | Applied `INT-001` and retired cross-center portfolio reporting from the planning home. Earlier `NOW-001`/`NOW-003` integrity work remains preserved as completed history but its product surface was superseded; aggregate reporting stays inside call centers under `PLAN-012`. |
 | 2026-07-18 | Completed the fifth-run strategic portfolio review and `NOW-004`: saved same-year plans now compare assumptions, outcomes, monthly exceptions, and exports without mutating snapshots or comparing incompatible requirement semantics. |
 | 2026-07-18 | Promoted forecast accuracy and uncertainty review from `NEXT-002` to ready `NOW-005`; added `INT-002` to establish the sponsor's real forecast-acceptance decision before choosing metric emphasis. |
+| 2026-07-18 | Delivered the first `NOW-005` slice: holdout results now compare the modeled forecast with a leakage-safe weekday benchmark using WAPE, MAE, bias, interval coverage, and complete daily export. Acceptance thresholds and multi-configuration governance remain pending `INT-002`. |
