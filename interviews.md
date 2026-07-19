@@ -4,7 +4,20 @@ Type answers beneath each `Answer:` field and leave the question IDs intact. Ans
 
 ## Open questions
 
-None.
+### INT-004 — Abandoned plan-lock recovery and takeover
+
+- Status: Open
+- Date asked: 2026-07-19
+- Priority: High
+- Related capability IDs/roadmap items: `CAP-DATA-002`, `CAP-ADMIN-001`, `CAP-GOV-001`, `NEXT-003`
+- Decision this answer will influence: Who may recover a shared plan from an abandoned exclusive edit lock, whether a lock may expire automatically, and which warning or evidence must precede takeover.
+- Why repository evidence cannot answer it: `INT-003` established exclusive editing, but the product has no user system or operational evidence for acceptable lock duration, administrator authority, crash recovery, or the risk of taking control from a planner who is still working.
+- Question: Imagine a planner loses connection or closes their laptop while a plan is locked. How long may that plan remain unavailable, who should be allowed to release or take over the lock (the same planner, a WFM administrator, or an automatic timeout), and what warning or evidence should appear before takeover? An approximate duration and anonymized example are enough.
+- Answer:
+- Date answered:
+- Agent interpretation: Pending owner answer; no timeout or takeover policy should be invented from the current local-only implementation.
+- Product/roadmap action: Keep lock recovery and authorized release as explicit discovery gates in `NEXT-003`; continue safe local improvements without blocking on this answer.
+- Applied date:
 
 ## Answers awaiting application
 

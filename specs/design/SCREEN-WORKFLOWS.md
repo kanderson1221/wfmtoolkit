@@ -349,6 +349,7 @@ Key interactions:
 
 - Left pane owns group selection and group creation.
 - Right pane owns actions for the selected group.
+- The call-center summary owns one contained, keyboard-focusable monthly report; column groups, month identity, and the active expanded month remain visible while planners reconcile contributor rows.
 - Year remains selected when switching sections.
 - If no group exists, the right pane shows a first-group empty state.
 - The right-pane action changes by section:
@@ -860,21 +861,13 @@ Confirmation rules:
 | Actuals and Variance | Yes | Yes | Yes | Yes | Yes | Yes |
 | Data Management | Yes | Yes | Yes | No | No | No |
 
-# Responsive Behavior
+# Desktop Adaptability
 
-## Wide Screens
-
-- `S-02` uses a persistent staffing-group master pane and selected-group detail pane.
+- Supported planning work targets desktop/laptop viewports around 1280–1920 px, ordinary window resizing, and browser zoom; phone layouts are not a product requirement.
+- `S-02` uses a persistent staffing-group master pane and selected-group detail pane at full desktop widths. A stacked fallback may preserve access during reduced desktop window widths but shall not drive phone-specific navigation or card transformations.
 - `S-12` uses a persistent workflow navigation column and main worksheet.
-- Dense tables preserve native row and column alignment.
-
-## Narrow Screens
-
-- Master and detail panes stack, with selected context repeated above detail.
-- Workflow navigation becomes a horizontally scrollable step strip or compact menu.
-- Tables scroll horizontally instead of converting every row to a card.
-- Primary actions remain reachable without hover.
-- Dialogs use the available viewport and keep the action footer visible.
+- Dense native tables preserve row and column alignment and own contained scrolling with sticky decision context where useful.
+- Primary actions remain reachable without hover, and dialogs keep their action footer within the available desktop viewport.
 
 # Accessibility Notes
 

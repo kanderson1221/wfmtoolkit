@@ -27,6 +27,20 @@ const waitForCenterWorkspace = async (page) => {
   await expect(page).toHaveURL(/#planning\/center\//)
 }
 
+const importLocalBackup = async (page, fixturePath, expectedFileName = '') => {
+  await page.getByRole('button', { name: 'Local Data Storage' }).click()
+  const storageDialog = page.getByRole('dialog').filter({ hasText: 'Review what is stored in this browser' })
+  await storageDialog.getByLabel('Import local data backup').setInputFiles(fixturePath)
+
+  const importDialog = page.getByRole('dialog').filter({ hasText: 'Importing this backup will replace' })
+  if (expectedFileName) {
+    await expect(importDialog.getByText(expectedFileName)).toBeVisible()
+  }
+  await importDialog.getByRole('button', { name: 'Replace Local Data' }).click()
+  await expect(storageDialog.getByText('Local data backup imported.')).toBeVisible()
+  await storageDialog.getByRole('button', { name: 'Close' }).click()
+}
+
 const buildDailyActualsCsv = (dayCount = 14) => {
   const rows = ['service_date,contacts,average_handle_time_seconds']
 
@@ -119,14 +133,7 @@ test('opens staffing-group forecasts from the call-center workspace', async ({ p
 
 test('compares saved forecast candidates on identical holdout actuals', async ({ page }) => {
   await page.goto('/#planning')
-
-  await page.getByRole('button', { name: 'Local Data Storage' }).click()
-  const storageDialog = page.getByRole('dialog').filter({ hasText: 'Review what is stored in this browser' })
-  await storageDialog.getByLabel('Import local data backup').setInputFiles(forecastCandidateComparisonFixturePath)
-  const importDialog = page.getByRole('dialog').filter({ hasText: 'Importing this backup will replace' })
-  await importDialog.getByRole('button', { name: 'Replace Local Data' }).click()
-  await expect(storageDialog.getByText('Local data backup imported.')).toBeVisible()
-  await storageDialog.getByRole('button', { name: 'Close' }).click()
+  await importLocalBackup(page, forecastCandidateComparisonFixturePath)
 
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByText('Consumer Voice', { exact: true }).click()
@@ -231,16 +238,7 @@ test('keeps destructive confirmation focus on the safe action and restores its t
 
 test('requires and exposes updated-plan decision reasons across the desktop workflow', async ({ page }) => {
   await page.goto('/#planning')
-
-  await page.getByRole('button', { name: 'Local Data Storage' }).click()
-  const storageDialog = page.getByRole('dialog').filter({ hasText: 'Review what is stored in this browser' })
-  await storageDialog.getByLabel('Import local data backup').setInputFiles(planUpdateReviewFixturePath)
-
-  const importDialog = page.getByRole('dialog').filter({ hasText: 'Importing this backup will replace' })
-  await expect(importDialog.getByText('plan-update-decision-review.json')).toBeVisible()
-  await importDialog.getByRole('button', { name: 'Replace Local Data' }).click()
-  await expect(storageDialog.getByText('Local data backup imported.')).toBeVisible()
-  await storageDialog.getByRole('button', { name: 'Close' }).click()
+  await importLocalBackup(page, planUpdateReviewFixturePath, 'plan-update-decision-review.json')
 
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByText('Customer Care', { exact: true }).click()
@@ -266,6 +264,57 @@ test('requires and exposes updated-plan decision reasons across the desktop work
   await expect(comparisonDialog.getByRole('row', { name: /Decision reason/ })).toContainText(
     'Approved product launch and revised spring demand outlook'
   )
+})
+
+test('keeps call-center reconciliation context visible while expanded months scroll', async ({ page }) => {
+  await page.goto('/#planning')
+  await importLocalBackup(page, planUpdateReviewFixturePath)
+
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 2, name: 'Call Center Plan' })).toBeVisible()
+  await page.getByRole('button', { name: 'Expand All' }).click()
+
+  const reportRegion = page.getByRole('region', { name: 'Call center monthly plan and actuals' })
+  await expect(reportRegion).toBeVisible()
+
+  const beforeScroll = await reportRegion.evaluate((region) => ({
+    clientHeight: region.clientHeight,
+    clientWidth: region.clientWidth,
+    scrollHeight: region.scrollHeight,
+    scrollWidth: region.scrollWidth
+  }))
+  expect(beforeScroll.scrollHeight).toBeGreaterThan(beforeScroll.clientHeight)
+  expect(beforeScroll.scrollWidth).toBeGreaterThan(beforeScroll.clientWidth)
+
+  await reportRegion.evaluate((region) => {
+    const monthRow = region.querySelector('tr[data-month-start="2026-06-01"]')
+    region.scrollTop = monthRow.offsetTop + 20
+    region.scrollLeft = 160
+  })
+
+  const stickyPositions = await reportRegion.evaluate((region) => {
+    const header = region.querySelector('thead').getBoundingClientRect()
+    const monthHeader = region.querySelector('thead th[scope="col"]').getBoundingClientRect()
+    const monthRow = region.querySelector('tr[data-month-start="2026-06-01"]').getBoundingClientRect()
+    const regionBox = region.getBoundingClientRect()
+
+    return {
+      headerTop: header.top,
+      headerBottom: header.bottom,
+      monthHeaderLeft: monthHeader.left,
+      monthRowTop: monthRow.top,
+      regionLeft: regionBox.left,
+      regionTop: regionBox.top,
+      scrollLeft: region.scrollLeft,
+      scrollTop: region.scrollTop
+    }
+  })
+
+  expect(stickyPositions.scrollTop).toBeGreaterThan(0)
+  expect(stickyPositions.scrollLeft).toBeGreaterThan(0)
+  expect(Math.abs(stickyPositions.headerTop - stickyPositions.regionTop)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.monthRowTop - stickyPositions.headerBottom)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.monthHeaderLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
 })
 
 test('opens and edits an existing call center from the call-center list', async ({ page }) => {

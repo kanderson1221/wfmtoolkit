@@ -41,6 +41,7 @@ Define selected-year aggregate reporting inside one call center. The global plan
 - Shortage, missing, incomplete, stale, mixed-scope, and error states shall be communicated as text rather than color alone.
 - Requirement-integrity messages shall name each affected staffing group and plan and link to the owning plan workflow.
 - Dense monthly results shall remain a native table with contained horizontal overflow.
+- The monthly report shall own one keyboard-focusable scroll region. Its two-tier column headings shall remain visible during vertical review, the Month column shall remain visible during horizontal review, and an expanded month's aggregate row shall remain visible while its staffing-group contributors scroll.
 - The call-center directory shall not duplicate these summary values or rank centers using report results.
 
 # Acceptance Scenarios
@@ -72,6 +73,14 @@ Define selected-year aggregate reporting inside one call center. The global plan
 **And** no matching actual Intraday Erlang result is retained
 **When** actual requirement is aggregated
 **Then** the partial workload-ratio requirement is not presented as the call-center total.
+
+## Preserve Reconciliation Context
+
+**Given** multiple months are expanded to show staffing-group contributors
+**When** the planner scrolls vertically and horizontally through the monthly report
+**Then** the workload and staffing column headings remain visible
+**And** the active expanded month's aggregate row remains visible above its contributors
+**And** the Month column remains visible without creating page-level horizontal overflow.
 
 ## Use Retained Actual Intraday Requirement
 

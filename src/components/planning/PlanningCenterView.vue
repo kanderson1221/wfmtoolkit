@@ -38,6 +38,7 @@ import AppMenu from '../ui/AppMenu.vue'
 import AppPanel from '../ui/AppPanel.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
+import AppTableShell from '../ui/AppTableShell.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 const props = defineProps({
@@ -916,8 +917,14 @@ watch(
                       </div>
                     </div>
 
-                    <div class="overflow-x-auto rounded-[14px] border border-slate-200 bg-white shadow-sm">
-                        <table class="w-full min-w-[64rem] table-fixed border-collapse text-[0.82rem] xl:min-w-0">
+                    <AppTableShell>
+                      <div
+                        class="max-h-[clamp(28rem,calc(100vh-19rem),42rem)] overflow-auto bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#c3d2df]"
+                        role="region"
+                        aria-label="Call center monthly plan and actuals"
+                        tabindex="0"
+                      >
+                        <table class="w-full min-w-[70rem] table-fixed border-separate border-spacing-0 text-[0.82rem]">
                           <colgroup>
                             <col class="w-[6.75%]" />
                             <col class="w-[8.5%]" />
@@ -932,9 +939,14 @@ watch(
                             <col class="w-[9.8%]" />
                             <col class="w-[11.35%]" />
                           </colgroup>
-                          <thead class="border-b border-slate-200 bg-slate-50/80">
-                          <tr class="bg-[#eef4f8]">
-                            <th rowspan="2" scope="col" :class="callCenterActualsHeaderCellClass">
+                          <thead class="sticky top-0 z-30 bg-slate-50 shadow-[0_1px_0_#cbd5e1]">
+                          <tr class="h-7 bg-[#eef4f8]">
+                            <th
+                              rowspan="2"
+                              scope="col"
+                              class="sticky left-0 z-40 bg-[#eef4f8]"
+                              :class="callCenterActualsHeaderCellClass"
+                            >
                               Month
                             </th>
                             <th colspan="9" scope="colgroup" class="px-2 py-2 text-center text-[0.64rem] font-semibold uppercase text-[#15395f]">
@@ -944,7 +956,7 @@ watch(
                               Staffing
                             </th>
                           </tr>
-                          <tr>
+                          <tr class="h-11 bg-slate-50">
                             <th scope="col" :class="callCenterActualsHeaderCellRightClass">Plan Contacts</th>
                             <th scope="col" :class="callCenterActualsHeaderCellRightClass">Actual Contacts</th>
                             <th scope="col" :class="callCenterActualsHeaderCellRightClass">Plan AHT</th>
@@ -966,12 +978,13 @@ watch(
                           >
                             <tr
                               class="transition"
-                              :class="isActualMonthExpanded(row.monthStart) ? 'bg-[#eef4f8]' : 'bg-white hover:bg-slate-50/70'"
+                              :class="isActualMonthExpanded(row.monthStart) ? 'sticky top-[4.7rem] z-20 bg-[#eef4f8] shadow-[0_1px_0_#cbd5e1]' : 'bg-white hover:bg-slate-50/70'"
+                              :data-month-start="row.monthStart"
                             >
                               <th
                                 scope="row"
-                                class="border-l-4 px-2 py-2.5 text-left"
-                                :class="isActualMonthExpanded(row.monthStart) ? 'border-[#15395f]' : 'border-transparent'"
+                                class="sticky left-0 z-20 border-l-4 px-2 py-2.5 text-left"
+                                :class="isActualMonthExpanded(row.monthStart) ? 'border-[#15395f] bg-[#eef4f8]' : 'border-transparent bg-white'"
                               >
                                 <button
                                   type="button"
@@ -1025,7 +1038,7 @@ watch(
                               :key="`${row.monthStart}-${detailRow.groupId}`"
                               class="bg-[#f8fbfd] text-[0.78rem] transition hover:bg-[#f3f8fb]"
                             >
-                              <th scope="row" class="px-2 py-2 text-left">
+                              <th scope="row" class="sticky left-0 z-10 bg-[#f8fbfd] px-2 py-2 text-left">
                                 <div class="ml-7 grid gap-0.5 border-l-2 border-[#c3d2df] pl-3">
                                   <span class="truncate font-semibold text-[#15395f]" :title="detailRow.groupName">{{ detailRow.groupName }}</span>
                                   <span v-if="!detailRow.hasPlan" class="text-[0.72rem] text-amber-700">No plan for {{ callCenterPlanningYear }}</span>
@@ -1063,7 +1076,7 @@ watch(
 
                           <tfoot class="border-t-2 border-slate-300 bg-slate-50">
                           <tr>
-                            <th scope="row" class="px-2 py-2.5 text-left font-semibold text-slate-950">
+                            <th scope="row" class="sticky left-0 z-10 bg-slate-50 px-2 py-2.5 text-left font-semibold text-slate-950">
                               {{ callCenterAnnualTotalRow.monthLabel }}
                             </th>
                             <td :class="callCenterActualsFooterCellClass">{{ formatWhole(callCenterAnnualTotalRow.plannedContacts) }}</td>
@@ -1084,7 +1097,8 @@ watch(
                           </tr>
                           </tfoot>
                         </table>
-                    </div>
+                      </div>
+                    </AppTableShell>
                   </section>
                 </div>
 

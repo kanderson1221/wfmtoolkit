@@ -131,6 +131,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-011` — Persistent call-center reconciliation context — Completed
+
+- Capability: `CAP-UX-001` (Need 32), supporting `CAP-REP-001` (Need 20) and `CAP-REP-002` (Need 20)
+- Planner outcome: a WFM lead can reconcile plan, actual workload, requirement, and staffing gaps across expanded staffing-group rows without losing column meaning or the active month.
+- Problem/opportunity: the 12-column report used page scrolling for vertical review and a separate one-off horizontal shell, so its two-tier header and expanded-month aggregate disappeared during long contributor reviews.
+- Rationale/evidence: `PLAN-012` requires chronological contributor reconciliation and contained native-table overflow; the prior two audits repeatedly deferred sticky two-tier header and month context as the highest remaining report UX opportunity.
+- Dependencies: the retained call-center report and shared `AppTableShell`; no calculation, route, persistence, identity, or backend dependency.
+- Delivered scope: one named keyboard-focusable scroll region; sticky Workload/Staffing and measure headers; sticky Month column; active expanded-month aggregate context; legible 70rem worksheet minimum; contained desktop overflow; shared table shell; focused and Chromium geometry regressions.
+- Removed scope: the one-off report shell, duplicated backup-import setup in smoke tests, and obsolete phone-oriented screen behavior guidance. No mobile UI, new breakpoint abstraction, sticky plugin, or alternate report was added.
+- Success measures: header and active month remain pinned during a 2,000+ px expanded review; Month remains pinned during horizontal scroll; no page-level horizontal overflow at 1280, 1440, 1920, or 1152 px zoom-equivalent review; report values and expansion semantics are unchanged.
+- Status: completed 2026-07-19.
+- Last reviewed: 2026-07-19.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -139,7 +152,7 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Planner outcome: teams can evaluate a safe path from device-local planning to governed shared work without risking current data.
 - Problem/opportunity: runtime planning is local while relational schema artifacts exist; implementing authentication first would create a shell without collaboration semantics.
 - Rationale/evidence: IndexedDB is robust for one user, but no concurrency, ownership, conflict, or tenancy model exists. Sponsor answer `INT-003` requires a plan to remain exclusively locked for other editors while one planner has it open for editing.
-- Dependencies: product tenancy/user-system decision, event/audit model, offline stance, and an exclusive-lock lifecycle covering owner identity, acquisition, renewal, timeout, crash recovery, handoff, and authorized release (`INT-003`).
+- Dependencies: product tenancy/user-system decision, event/audit model, offline stance, and an exclusive-lock lifecycle covering owner identity, acquisition, renewal, timeout, crash recovery, handoff, and authorized release (`INT-003`; takeover authority and timing pending `INT-004`).
 - Proposed scope: architecture decision record, repository boundary, migration/reconciliation prototype, threat model, exclusive edit-lock and recovery prototype, and explicit non-goals—not a cosmetic sign-in screen.
 - Success measures: validated migration round-trip; a second editor cannot mutate a locked plan; abandoned locks recover predictably without silent overwrite; ownership and staged rollout are documented.
 - Status: discovery.
@@ -274,3 +287,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Applied `INT-003`: shared-plan discovery must implement exclusive edit locking plus explicit acquisition, renewal, recovery, handoff, and release behavior before shared persistence ships. |
 | 2026-07-19 | Completed `NOW-009`: call-center rollups now validate and use current saved Intraday Erlang results, withhold stale/missing and mixed-scope requirement values, name affected plans, and remove unused duplicate summary metrics. |
 | 2026-07-19 | Completed `NOW-010`: explicit actual-data Erlang results now survive plan save, draft restore, IndexedDB/backup round trips, and reload; matching evidence contributes to call-center actual requirement and variance while stale or incomplete results remain withheld. |
+| 2026-07-19 | Completed the fifth-run strategic portfolio review and `NOW-011`: call-center reconciliation now retains its two-tier headings, Month column, and active expanded-month aggregate inside one keyboard-scrollable table; high-Need missing domains remain sequenced behind their prerequisites, and `INT-004` targets abandoned-lock recovery for `NEXT-003`. |

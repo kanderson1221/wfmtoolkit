@@ -439,6 +439,33 @@ describe('PlanningCenterView', () => {
     expect(monthToggles.some((button) => button.attributes('aria-label')?.startsWith('Collapse'))).toBe(false)
   })
 
+  it('keeps report columns and expanded-month context inside one keyboard scroll region', async () => {
+    const wrapper = buildWrapper({
+      selectedGroupId: ''
+    })
+
+    const scrollRegion = wrapper.get('[role="region"][aria-label="Call center monthly plan and actuals"]')
+    const tableHeader = scrollRegion.get('thead')
+    const monthHeader = tableHeader.get('th[scope="col"]')
+    const firstMonthToggle = scrollRegion.findAll('button[aria-expanded]')[0]
+    const firstMonthRow = scrollRegion.get('tr[data-month-start="2026-01-01"]')
+
+    expect(scrollRegion.attributes('tabindex')).toBe('0')
+    expect(scrollRegion.classes()).toContain('overflow-auto')
+    expect(tableHeader.classes()).toContain('sticky')
+    expect(tableHeader.classes()).toContain('top-0')
+    expect(monthHeader.classes()).toContain('sticky')
+    expect(monthHeader.classes()).toContain('left-0')
+    expect(firstMonthRow.classes()).not.toContain('sticky')
+
+    await firstMonthToggle.trigger('click')
+
+    expect(firstMonthRow.classes()).toContain('sticky')
+    expect(firstMonthRow.classes()).toContain('top-[4.7rem]')
+    expect(firstMonthRow.get('th[scope="row"]').classes()).toContain('left-0')
+    expect(firstMonthRow.get('th[scope="row"]').classes()).toContain('bg-[#eef4f8]')
+  })
+
   it('visually separates expanded month totals from staffing-group detail rows', async () => {
     const wrapper = buildWrapper({
       selectedGroupId: ''
