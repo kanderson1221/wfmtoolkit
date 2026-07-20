@@ -494,7 +494,11 @@
   }
 
   .assumption-table-actuals {
-    @apply w-full table-fixed;
+    @apply w-full min-w-[68rem] table-fixed;
+  }
+
+  .actuals-coverage-scroll {
+    @apply relative max-h-[clamp(24rem,calc(100vh-24rem),38rem)] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
   }
 
   .assumption-table-actuals thead th {
@@ -502,7 +506,7 @@
   }
 
   .assumption-table-actuals thead .actuals-super-row th {
-    @apply border-b border-slate-200 bg-slate-50 px-2 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-600;
+    @apply sticky top-0 z-30 h-8 border-b border-slate-200 bg-slate-50 px-2 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-600;
   }
 
   .assumption-table-actuals thead .actuals-super-row th:first-child {
@@ -513,8 +517,21 @@
     @apply bg-[#eef3f7] text-[#15395f];
   }
 
+  .assumption-table-actuals thead .actuals-super-head.actuals-super-evidence {
+    @apply bg-slate-50 text-slate-700;
+  }
+
   .assumption-table-actuals thead .actuals-super-head.actuals-super-staffing {
     @apply bg-[#e7eef4] text-[#15395f];
+  }
+
+  .assumption-table-actuals thead .actuals-detail-row th {
+    @apply sticky top-8 z-20 bg-white;
+  }
+
+  .assumption-table-actuals thead .actuals-detail-row .actuals-sticky-month-head {
+    @apply left-0 z-40 bg-white;
+    box-shadow: 1px 0 0 #e2e8f0;
   }
 
   .assumption-table-actuals thead th.actuals-adjustable-head {
@@ -527,7 +544,13 @@
   }
 
   .assumption-table-actuals .month-cell {
-    @apply text-left;
+    @apply sticky left-0 z-10 bg-white text-left;
+    box-shadow: 1px 0 0 #e2e8f0;
+  }
+
+  .assumption-table-actuals tbody tr:hover .month-cell,
+  .assumption-table-actuals tbody tr.selected .month-cell {
+    @apply bg-[#eef3f7];
   }
 
   .actuals-month-label {
@@ -593,6 +616,10 @@
 
   .actuals-col-month {
     width: 4.5rem;
+  }
+
+  .actuals-col-coverage {
+    width: 6.4rem;
   }
 
   .actuals-col-input,

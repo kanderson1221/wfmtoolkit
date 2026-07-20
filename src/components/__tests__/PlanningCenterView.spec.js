@@ -418,7 +418,8 @@ describe('PlanningCenterView', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Intraday Erlang report scope')
+    expect(wrapper.text()).toContain('Report scope')
+    expect(wrapper.text()).toContain('Intraday Erlang requirements also require complete saved calculations')
     expect(wrapper.text()).toContain('Voice Support · 2026 Erlang Plan')
     expect(wrapper.text()).toContain('Planned requirement values are withheld')
     expect(wrapper.text()).toContain('Actual requirement values are withheld')
@@ -482,7 +483,7 @@ describe('PlanningCenterView', () => {
     expect(bodyRows[1].find('.border-l-2').exists()).toBe(true)
   })
 
-  it('does not show workload variance percentages for months without actuals', () => {
+  it('withholds workload variance percentages for partial and unloaded months', () => {
     const wrapper = buildWrapper({
       selectedGroupId: '',
       center: {
@@ -533,7 +534,9 @@ describe('PlanningCenterView', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('-90.0%')
+    expect(wrapper.text()).toContain('Jan actuals do not cover every expected open date')
+    expect(wrapper.text()).toContain('Review Data')
+    expect(wrapper.text()).not.toContain('-90.0%')
     expect(wrapper.text()).not.toContain('-100.0%')
   })
 

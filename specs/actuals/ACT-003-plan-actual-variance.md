@@ -4,7 +4,7 @@ title: Planned-Versus-Actual Demand and Requirement Variance
 status: draft
 owners: []
 depends_on: [ACT-002, PLAN-006, PLAN-007, PLAN-008]
-last_reviewed: 2026-07-19
+last_reviewed: 2026-07-20
 ---
 
 # Purpose
@@ -23,6 +23,7 @@ Define comparable monthly planned and actual demand, workload, requirement, and 
 - selected planned staffing headcount
 - staffing gap to actual requirement
 - loaded actual days
+- loaded versus expected open-date coverage
 
 # Formulas
 
@@ -44,6 +45,8 @@ staffing gap to actual requirement =
   selected planned staffing headcount - actual required headcount
 ```
 
+These full-month variances and actual requirement formulas apply only when every expected open date in the saved plan calendar is loaded. Partial-month observed contacts, AHT, and workload remain factual evidence, but they shall not be scaled, treated as a complete month, or used to derive actual required headcount.
+
 # Requirement Method Rules
 
 - Workload-ratio plans shall use the saved plan's staffing ratio with actual workload.
@@ -57,6 +60,8 @@ staffing gap to actual requirement =
 
 - Positive and negative signs shall remain visible.
 - Missing actual values shall not display as zero.
+- Every month shall show loaded versus expected open-date coverage.
+- Partial months shall be named in text; contacts variance, AHT variance, actual requirement, requirement variance, and staffing gap shall remain unavailable.
 - Selected staffing comparison metric shall be named.
 - Summary averages shall include only months with applicable actual values.
 - Peak actual requirement shall consider only calculated months.
@@ -95,6 +100,15 @@ staffing gap to actual requirement =
 **Given** no July actuals exist  
 **When** the comparison is shown  
 **Then** July actual values and variances are unavailable, not zero.
+
+## Withhold Partial-Month Decisions
+
+**Given** five of twenty-two expected January open dates are loaded
+**When** January actuals are compared with the saved full-month plan
+**Then** the five observed days remain visible as partial evidence
+**And** coverage reads 5 of 22
+**And** actual requirement and every dependent variance or staffing gap are unavailable
+**And** an Intraday Erlang actual calculation cannot run until coverage is complete.
 
 # Open Questions
 

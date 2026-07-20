@@ -3,6 +3,7 @@ import { getCenterGroups, getGroupPlans } from '../planningSummary'
 import { buildActualsMonthsFromDailyRows, computeActualsRecords } from './actualsModel'
 import { computeMonthlyRecords } from './demandModel'
 import { resolvePlanningGroupActuals } from './groupActuals'
+import { createPlanningGroupOpenDayChecker } from './groupOpenDays'
 import {
   assessPlannerIntradayErlangResults,
   buildPlannerActualsIntradayErlangPayload,
@@ -18,6 +19,7 @@ import {
   resolvePlanningYear
 } from './shared'
 import { computeStaffingRecords } from './staffingModel'
+import { createPlanOpenDayChecker } from './planOpenDays'
 
 const toNumber = (value, fallback = 0) => {
   const parsedValue = Number(value)
@@ -61,6 +63,7 @@ const createMonthlyRollupRow = (planningYear, monthIndex) => ({
   groupsWithPlannedRequirementCount: 0,
   groupsWithPlannedGapCount: 0,
   groupsWithActualsCount: 0,
+  groupsWithCompleteActualsCount: 0,
   groupsWithActualRequirementCount: 0,
   staffingGroupRows: [],
   isBelowRequirement: false
@@ -295,7 +298,11 @@ const buildActualsOnlyRows = ({ group, monthlyActuals, planningYear }) =>
       plannedEndingTotalHeadcount: null,
       plannedGapToRequirement: null,
       gapVsActualRequiredHeadcount: null,
-      actualLoadedDaysCount: Math.max(toNumber(actualsMonth.loadedDaysCount), 0)
+      actualLoadedDaysCount: Math.max(toNumber(actualsMonth.loadedDaysCount), 0),
+      actualLoadedOpenDaysCount: Math.max(toNumber(actualsMonth.loadedOpenDaysCount), 0),
+      actualExpectedOpenDaysCount: actualsMonth.expectedOpenDaysCount,
+      actualsCoverageStatus: actualsMonth.coverageStatus,
+      actualsCoverageComplete: actualsMonth.coverageStatus === 'complete'
     }
   })
 
@@ -309,9 +316,25 @@ const buildGroupActualRows = ({
   staffingRecords,
   planningYear
 }) => {
+  const planHolidaySnapshot = plan
+    ? resolvePlanHolidaySnapshot(plan, center, planningYear)
+    : null
+  const isExpectedOpenDay = plan
+    ? createPlanOpenDayChecker({
+        planningYear,
+        operatingWeekdays:
+          Array.isArray(plan.operatingWeekdays) && plan.operatingWeekdays.length
+            ? plan.operatingWeekdays
+            : center?.operatingWeekdays,
+        holidayCalendarId: planHolidaySnapshot.holidayCalendarId,
+        disabledHolidayRuleIds: planHolidaySnapshot.disabledHolidayRuleIds,
+        customHolidays: planHolidaySnapshot.customHolidays
+      })
+    : createPlanningGroupOpenDayChecker(group, center)
   const monthlyActuals = buildActualsMonthsFromDailyRows(
     resolvePlanningGroupActuals(group).dailyRows,
-    planningYear
+    planningYear,
+    { isExpectedOpenDay }
   )
 
   if (!plan) {
@@ -365,7 +388,11 @@ const buildGroupActualRows = ({
         record.plannedGapToRequirement == null ? null : toNumber(record.plannedGapToRequirement),
       gapVsActualRequiredHeadcount:
         actualRequiredHeadcount == null ? null : plannedStartingFrontlineHeadcount - actualRequiredHeadcount,
-      actualLoadedDaysCount: Math.max(toNumber(record.actualLoadedDaysCount), 0)
+      actualLoadedDaysCount: Math.max(toNumber(record.actualLoadedDaysCount), 0),
+      actualLoadedOpenDaysCount: Math.max(toNumber(record.actualLoadedOpenDaysCount), 0),
+      actualExpectedOpenDaysCount: record.actualExpectedOpenDaysCount,
+      actualsCoverageStatus: record.actualsCoverageStatus,
+      actualsCoverageComplete: record.actualsCoverageComplete
     }
   })
 }
@@ -381,8 +408,11 @@ const finalizeMonthlyRows = (monthlyRows) =>
     const actualRequirementsComplete =
       row.groupsWithActualsCount > 0 &&
       row.groupsWithActualRequirementCount === row.groupsWithActualsCount
-    const actualContacts = row.groupsWithActualsCount > 0 ? row.actualContacts || 0 : null
-    const actualWorkloadHours = row.groupsWithActualsCount > 0 ? row.actualWorkloadHours || 0 : null
+    const actualsCoverageComplete =
+      row.groupsWithActualsCount > 0 &&
+      row.groupsWithCompleteActualsCount === row.groupsWithActualsCount
+    const actualContacts = actualsCoverageComplete ? row.actualContacts || 0 : null
+    const actualWorkloadHours = actualsCoverageComplete ? row.actualWorkloadHours || 0 : null
     const actualRequiredHeadcount = actualRequirementsComplete ? row.actualRequiredHeadcount || 0 : null
     const contactVariance = actualContacts == null ? null : actualContacts - row.expectedContacts
     const workloadVariance = actualWorkloadHours == null ? null : actualWorkloadHours - row.expectedWorkloadHours
@@ -416,6 +446,7 @@ const finalizeMonthlyRows = (monthlyRows) =>
       actualRequiredHeadcount,
       plannedStartingFrontlineHeadcount: row.startingFrontlineHeadcount,
       actualLoadedDaysCount: row.daysLoaded,
+      actualsCoverageComplete,
       expectedAhtSeconds,
       contactVariance,
       contactVariancePercent:
@@ -620,6 +651,26 @@ export const buildAnnualPlanningRollup = ({
         groupsWithActualsIds.add(groupKey)
       }
 
+      const incompleteActualMonths = groupActualRows.filter(
+        (row) => row.isLoaded && row.actualsCoverageComplete === false
+      )
+
+      if (incompleteActualMonths.length) {
+        const monthLabels = incompleteActualMonths.map((row) => row.label).join(', ')
+        integrityIssues.push({
+          type: 'actuals_coverage',
+          centerId: center.id || '',
+          groupId: group.id || '',
+          groupName: group.name || 'Staffing Group',
+          planId: plan?.id || '',
+          planName: plan?.name || `${resolvedYear} actuals`,
+          status: 'incomplete_actuals',
+          plannedRequirementAvailable: Boolean(plan),
+          actualRequirementAvailable: false,
+          message: `${monthLabels} actuals do not cover every expected open date. Aggregate actuals, variances, and actual requirement are withheld for affected months.`
+        })
+      }
+
       monthlyRows.forEach((row, monthIndex) => {
         const groupActualRow = groupActualRows[monthIndex]
         const demandRecord = monthlyDemandRecords[monthIndex]
@@ -663,6 +714,10 @@ export const buildAnnualPlanningRollup = ({
         if (groupActualRow.isLoaded) {
           row.groupsWithActualsCount += 1
           row.daysLoaded += toNumber(groupActualRow.actualLoadedDaysCount)
+
+          if (groupActualRow.actualsCoverageComplete) {
+            row.groupsWithCompleteActualsCount += 1
+          }
 
           if (groupActualRow.actualContacts != null) {
             row.actualContacts = (row.actualContacts || 0) + toNumber(groupActualRow.actualContacts)

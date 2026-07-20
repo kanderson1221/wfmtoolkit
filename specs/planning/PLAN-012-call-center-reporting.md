@@ -4,7 +4,7 @@ title: Call-Center Annual Rollup and Reporting
 status: draft
 owners: []
 depends_on: [PLAN-008, ACT-003, ACT-006]
-last_reviewed: 2026-07-19
+last_reviewed: 2026-07-20
 ---
 
 # Purpose
@@ -27,6 +27,7 @@ Define selected-year aggregate reporting inside one call center. The global plan
 - Headcount requirement and supply are summed only where groups are independently additive.
 - Annual headcount measures shall state when they are monthly averages.
 - Variances are derived from aggregate values only when their planned and actual scopes are comparable.
+- A loaded actual month contributes authoritative aggregate actuals and variance only when every expected open date in the owning saved plan calendar is present; partial observed group facts remain visible only in contributor detail.
 - Intraday Erlang plans contribute planned requirement only from complete saved results whose input signature matches the current saved inputs.
 - Missing, incomplete, or stale Intraday Erlang results shall withhold affected monthly requirement and staffing-gap totals rather than silently substituting workload-ratio outputs.
 - Actual Intraday Erlang requirement shall contribute only from complete saved actual results whose input signature matches the current saved actuals and plan inputs.
@@ -39,7 +40,7 @@ Define selected-year aggregate reporting inside one call center. The global plan
 - Summary values shall include plan and actuals coverage, contacts, required headcount, staffing gap, and AHT where available.
 - Monthly rows shall distinguish planned and actual contacts, AHT, workload, requirement, opening frontline, and staffing gap.
 - Shortage, missing, incomplete, stale, mixed-scope, and error states shall be communicated as text rather than color alone.
-- Requirement-integrity messages shall name each affected staffing group and plan and link to the owning plan workflow.
+- Report-integrity messages shall name each affected staffing group and plan, distinguish open-date coverage from calculation freshness, and link to the owning Data or plan workflow.
 - Dense monthly results shall remain a native table with contained horizontal overflow.
 - The monthly report shall own one keyboard-focusable scroll region. Its two-tier column headings shall remain visible during vertical review, the Month column shall remain visible during horizontal review, and an expanded month's aggregate row shall remain visible while its staffing-group contributors scroll.
 - The call-center directory shall not duplicate these summary values or rank centers using report results.
@@ -57,6 +58,14 @@ Define selected-year aggregate reporting inside one call center. The global plan
 **Given** no actuals exist for September
 **When** the selected-year report is shown
 **Then** actual contacts and variance remain unavailable rather than zero.
+
+## Withhold Partial Actual Coverage
+
+**Given** January actuals for one contributing staffing group omit an expected open date
+**When** the selected-year report is shown
+**Then** the group contributor may show its observed facts and exact coverage state
+**And** January aggregate actual contacts, workload, actual requirement, and variances are unavailable
+**And** the affected staffing group is named with a Data-review action.
 
 ## Withhold Stale Intraday Requirement
 

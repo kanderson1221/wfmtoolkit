@@ -8,6 +8,7 @@ import AppSectionHeader from '../ui/AppSectionHeader.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
+import AppTableShell from '../ui/AppTableShell.vue'
 import PlannerActualsComparisonChart from './PlannerActualsComparisonChart.vue'
 
 const props = defineProps({
@@ -61,19 +62,21 @@ const formatSignedNumber = (value, digits = 1) => {
 
 const summaryItems = computed(() => [
   {
-    label: 'Months Loaded',
-    value: props.formatWhole(props.actualsSummary.loadedMonthsCount),
-    meta: 'Months with loaded Data tab actuals'
+    label: 'Coverage-ready months',
+    value: `${props.formatWhole(props.actualsSummary.completeMonthsCount || 0)} / ${props.formatWhole(props.actualsSummary.loadedMonthsCount)}`,
+    meta: 'Loaded months with every expected open date present'
   },
   {
     label: 'Contacts Variance',
     value: formatSignedNumber(props.actualsSummary.contactsVariance, 0),
-    meta: 'Data tab contacts versus the saved plan across loaded months'
+    meta: 'Data tab contacts versus plan across coverage-ready months'
   },
   {
     label: 'Avg AHT Variance',
-    value: `${formatSignedNumber(props.actualsSummary.averageAhtVarianceSeconds, 1)} sec`,
-    meta: 'Average handle-time variance across months loaded from Data'
+    value: props.actualsSummary.averageAhtVarianceSeconds == null
+      ? '—'
+      : `${formatSignedNumber(props.actualsSummary.averageAhtVarianceSeconds, 1)} sec`,
+    meta: 'Average handle-time variance across coverage-ready months'
   },
   {
     label: 'Average Required Headcount Variance',
@@ -82,8 +85,8 @@ const summaryItems = computed(() => [
   },
   {
     label: 'Peak Actual Required Headcount',
-    value: props.formatNumber(props.actualsSummary.peakActualRequiredHeadcount, 1),
-    meta: 'Highest actual required headcount across loaded months'
+    value: displayValue(props.actualsSummary.peakActualRequiredHeadcount, 1),
+    meta: 'Highest actual required headcount across coverage-ready months'
   },
   {
     label: 'Peak Planned Required Headcount',
@@ -93,6 +96,44 @@ const summaryItems = computed(() => [
 ])
 
 const displayValue = (value, digits = 1) => (value == null ? '—' : props.formatNumber(value, digits))
+
+const incompleteActualsRecords = computed(() => props.actualsRecords.filter(
+  (record) => record.isLoaded && record.actualsCoverageComplete === false
+))
+
+const coverageWarning = computed(() => {
+  if (!incompleteActualsRecords.value.length) {
+    return ''
+  }
+
+  const monthLabels = incompleteActualsRecords.value.map((record) => record.label).join(', ')
+  return `${monthLabels} ${incompleteActualsRecords.value.length === 1 ? 'has' : 'have'} incomplete Data tab coverage. Observed actuals remain visible, but full-month variances, actual requirement, and staffing gap are withheld until every expected open date is loaded.`
+})
+
+const coverageLabel = (record) => {
+  const expected = record.actualExpectedOpenDaysCount
+
+  if (expected == null) {
+    return record.isLoaded ? `${props.formatWhole(record.actualLoadedDaysCount)} loaded` : 'Not loaded'
+  }
+
+  const loaded = props.formatWhole(record.actualLoadedOpenDaysCount)
+  const expectedLabel = props.formatWhole(expected)
+
+  if (!record.isLoaded) {
+    return `${loaded} / ${expectedLabel}`
+  }
+
+  return record.actualsCoverageComplete
+    ? `${loaded} / ${expectedLabel} complete`
+    : `${loaded} / ${expectedLabel} partial`
+}
+
+const coverageClass = (record) => ({
+  'font-semibold text-emerald-700': record.isLoaded && record.actualsCoverageComplete,
+  'font-semibold text-amber-700': record.isLoaded && record.actualsCoverageComplete === false,
+  'text-slate-500': !record.isLoaded
+})
 
 const requirementVarianceClass = (value) => ({
   'variance-negative': (value ?? 0) > 0.05,
@@ -205,7 +246,7 @@ const actualsErlangMessage = computed(() => {
 })
 
 const actualsErlangTone = computed(() => {
-  if (['error', 'stale', 'no_open_days'].includes(actualsErlangStatusValue.value)) {
+  if (['error', 'stale', 'no_open_days', 'incomplete_actuals'].includes(actualsErlangStatusValue.value)) {
     return 'error'
   }
 
@@ -250,10 +291,21 @@ const actualsErlangTone = computed(() => {
         No daily actuals are loaded for this plan year in the staffing group Data tab.
       </AppStatusMessage>
 
-      <div class="assumption-table-shell">
+      <AppStatusMessage v-else-if="coverageWarning" tone="warning">
+        {{ coverageWarning }}
+      </AppStatusMessage>
+
+      <AppTableShell>
+        <div
+          class="actuals-coverage-scroll"
+          role="region"
+          aria-label="Monthly actuals coverage and variance worksheet"
+          tabindex="0"
+        >
         <table class="assumption-table assumption-table-actuals">
           <colgroup>
             <col class="actuals-col-month" />
+            <col class="actuals-col-coverage" />
             <col class="actuals-col-input actuals-col-contacts" />
             <col class="actuals-col-input actuals-col-contacts" />
             <col class="actuals-col-input actuals-col-aht" />
@@ -268,7 +320,12 @@ const actualsErlangTone = computed(() => {
           </colgroup>
           <thead>
             <tr class="actuals-super-row">
-              <th rowspan="2">
+              <th colspan="2" class="actuals-super-head actuals-super-evidence">Evidence</th>
+              <th colspan="9" class="actuals-super-head actuals-super-workload">Workload</th>
+              <th colspan="2" class="actuals-super-head actuals-super-staffing">Staffing</th>
+            </tr>
+            <tr class="actuals-detail-row">
+              <th scope="col" class="actuals-sticky-month-head">
                 <span class="actuals-head-cell">
                   <span>Month</span>
                   <span
@@ -280,10 +337,18 @@ const actualsErlangTone = computed(() => {
                   </span>
                 </span>
               </th>
-              <th colspan="9" class="actuals-super-head actuals-super-workload">Workload</th>
-              <th colspan="2" class="actuals-super-head actuals-super-staffing">Staffing</th>
-            </tr>
-            <tr>
+              <th scope="col">
+                <span class="actuals-head-cell">
+                  <span class="plan-head-label">Open-date<br />Coverage</span>
+                  <span
+                    class="actuals-head-info"
+                    title="Loaded expected open dates versus all expected open dates in the saved plan calendar."
+                    aria-label="Actuals open-date coverage help"
+                  >
+                    <AppIcon :path="infoIconPath" size="12" />
+                  </span>
+                </span>
+              </th>
               <th>
                 <span class="actuals-head-cell">
                   <span class="plan-head-label">Planned<br />Contacts</span>
@@ -432,6 +497,9 @@ const actualsErlangTone = computed(() => {
               <td class="month-cell">
                 <span class="actuals-month-label" :title="record.fullLabel">{{ record.label }}</span>
               </td>
+              <td :class="coverageClass(record)">
+                <span class="text-[0.72rem] leading-4">{{ coverageLabel(record) }}</span>
+              </td>
               <td>{{ displayValue(record.plannedContacts, 0) }}</td>
               <td>{{ displayValue(record.actualContacts, 0) }}</td>
               <td>{{ displayValue(record.plannedAhtSeconds, 0) }}</td>
@@ -461,7 +529,8 @@ const actualsErlangTone = computed(() => {
             </tr>
           </tbody>
         </table>
-      </div>
+        </div>
+      </AppTableShell>
     </section>
   </section>
 </template>

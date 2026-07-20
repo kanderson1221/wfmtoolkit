@@ -24,6 +24,28 @@ const buildPresenceMonths = () =>
     paidHoursPerDay: 8
   }))
 
+const buildCompleteWeekdayActuals = (year, monthIndex, overridesByDate = {}) => {
+  const rows = []
+  const lastDay = new Date(year, monthIndex + 1, 0, 12).getDate()
+
+  for (let day = 1; day <= lastDay; day += 1) {
+    const date = new Date(year, monthIndex, day, 12)
+    if (date.getDay() === 0 || date.getDay() === 6) {
+      continue
+    }
+
+    const serviceDate = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    rows.push({
+      serviceDate,
+      contacts: 0,
+      ahtSeconds: 300,
+      ...overridesByDate[serviceDate]
+    })
+  }
+
+  return rows
+}
+
 const buildIntradayPlan = () => ({
   id: 'erlang-2026',
   name: '2026 Erlang Plan',
@@ -138,10 +160,10 @@ const buildCenter = (groupOverrides = {}) => ({
       name: 'Voice',
       actuals: {
         sourceMode: 'daily_upload',
-        dailyRows: [
-          { serviceDate: '2026-01-02', contacts: 1200, ahtSeconds: 300 },
-          { serviceDate: '2026-01-03', contacts: 800, ahtSeconds: 300 }
-        ]
+        dailyRows: buildCompleteWeekdayActuals(2026, 0, {
+          '2026-01-02': { contacts: 1200, ahtSeconds: 300 },
+          '2026-01-05': { contacts: 800, ahtSeconds: 300 }
+        })
       },
       plans: [
         {
@@ -179,7 +201,7 @@ describe('annualPlanningRollup', () => {
     expect(january.actualContacts).toBe(2000)
     expect(january.contactVariance).toBe(1000)
     expect(january.actualAhtSeconds).toBe(300)
-    expect(january.daysLoaded).toBe(2)
+    expect(january.daysLoaded).toBe(22)
     expect(january.actualRequiredHeadcount).toBeGreaterThan(0)
     expect(january.staffingGroupRows).toHaveLength(1)
     expect(january.staffingGroupRows[0]).toMatchObject({
@@ -217,6 +239,38 @@ describe('annualPlanningRollup', () => {
 
     expect(selectPlanningRollupPlan(group, 2026)).toBe(updatePlan)
     expect(selectPlanningRollupPlan(group, 2026, 'budget')).toBe(budgetPlan)
+  })
+
+  it('withholds aggregate actuals and variances when a loaded month is incomplete', () => {
+    const center = buildCenter({
+      actuals: {
+        sourceMode: 'daily_upload',
+        dailyRows: [
+          { serviceDate: '2026-01-02', contacts: 1200, ahtSeconds: 300 }
+        ]
+      }
+    })
+    const rollup = buildAnnualPlanningRollup({ centers: [center], planningYear: 2026 })
+    const january = rollup.monthlyRows[0]
+
+    expect(january).toMatchObject({
+      actualContacts: null,
+      actualWorkloadHours: null,
+      actualRequiredHeadcount: null,
+      contactVariance: null,
+      requiredHeadcountVariance: null,
+      actualsCoverageComplete: false
+    })
+    expect(january.staffingGroupRows[0]).toMatchObject({
+      actualContacts: 1200,
+      actualsCoverageStatus: 'partial',
+      actualsCoverageComplete: false
+    })
+    expect(rollup.integrityIssues).toContainEqual(expect.objectContaining({
+      type: 'actuals_coverage',
+      status: 'incomplete_actuals',
+      message: expect.stringContaining('Jan actuals do not cover every expected open date')
+    }))
   })
 
   it('rolls staffing movement fields for call-center reporting', () => {

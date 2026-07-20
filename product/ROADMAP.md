@@ -182,6 +182,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-19.
 - Last reviewed: 2026-07-19.
 
+### `NOW-015` — Actuals open-date coverage authority — Completed
+
+- Capability: `CAP-REP-002` (Need 17 after this run; 20 before), supporting `CAP-GOV-001` (Need 26) and `CAP-UX-001` (Need 32)
+- Planner outcome: an annual capacity planner and WFM lead can distinguish observed monthly actuals from authoritative variance and staffing conclusions, with the exact calendar coverage needed to correct incomplete evidence.
+- Problem/opportunity: a single loaded day was treated as a complete month for contacts, AHT, actual requirement, staffing variance, and call-center aggregation, so partial evidence could produce precise but materially misleading decisions.
+- Rationale/evidence: bounded review of `actualsModel.js`, actual Erlang orchestration, plan updates, the Actuals worksheet, and `PLAN-012` found duplicate completeness logic and no shared authority gate. The saved plan already owns the operating-weekday and holiday snapshot needed for an exact test.
+- Dependencies: retained daily actuals and saved plan calendar snapshot only; no schema, route, backend, identity, scheduling, or intraday-management dependency. `INT-004` is unrelated and remains Open.
+- Delivered scope: shared expected-open-date coverage model; loaded/expected/missing evidence; complete-only contacts/AHT variance, actual requirement, staffing gap, actual Erlang, and call-center aggregate conclusions; direct Review Data correction path; grouped sticky desktop worksheet context.
+- Removed scope: duplicate plan-update open-date enumeration, one-off Actuals table overflow shell, unsupported partial-month comparison values, and false zero summary values when no actual evidence exists.
+- Success measures: partial months retain raw contacts/AHT/workload evidence while comparison and staffing conclusions render unavailable; complete months remain unchanged; saved calendar closures are excluded; coverage problems name the affected month/group; the worksheet stays contained and preserves headers/Month context at 1280, 1440, 1920, and reduced/zoom-equivalent desktop widths.
+- Status: completed 2026-07-20.
+- Last reviewed: 2026-07-20.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -342,3 +355,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Applied sponsor direction `INT-005`: retired same-day intraday management as `RET-005` and employee shift scheduling as `RET-006`; interval Erlang remains a capacity-planning method, not an intraday-management commitment. |
 | 2026-07-19 | Completed `NOW-013`: the monthly staffing-supply roll-forward now groups its decision stages and retains both heading tiers and Month context inside one contained keyboard scroll region; calculations and saved data remain unchanged. |
 | 2026-07-19 | Completed `NOW-014`: saved-plan comparison now attributes monthly requirement, peak, supply, and gap movement to exact demand and capacity drivers; misleading annual-average capacity rows were removed. |
+| 2026-07-20 | Completed required code-review remediation `NOW-015`: actuals comparisons, actual requirements, staffing gaps, Erlang runs, and call-center aggregates now require exact saved-calendar open-date coverage; duplicate coverage logic and misleading empty zeros were removed. |

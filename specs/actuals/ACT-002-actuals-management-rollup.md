@@ -4,7 +4,7 @@ title: Actuals Validation, Replacement, Deletion, and Monthly Rollup
 status: draft
 owners: []
 depends_on: [ACT-001, ORG-002, FOUND-003]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-20
 ---
 
 # Purpose
@@ -50,6 +50,7 @@ If every included day has zero contacts, monthly AHT may use the simple mean of 
 - Completeness shall evaluate every expected open date in each loaded calendar month.
 - Closed dates shall not count as missing.
 - Missing open dates anywhere in the calendar month shall produce partial coverage.
+- Monthly coverage evidence shall retain loaded expected open dates, total expected open dates, and the exact missing dates against the saved plan calendar.
 - The actuals management view shall identify the exact missing open dates and provide a CSV gap template that can be completed and re-imported.
 - The system shall not imply a full month merely because one row exists.
 
@@ -79,6 +80,14 @@ If every included day has zero contacts, monthly AHT may use the simple mean of 
 **When** the planner reviews its coverage gaps
 **Then** every missing date is listed
 **And** a CSV template containing those dates is available for download and re-import.
+
+## Keep Partial Facts Without Claiming Full-Month Authority
+
+**Given** a loaded month is missing one or more expected open dates
+**When** the planner reviews actuals inside an annual plan
+**Then** the observed contacts, AHT, and workload remain visible
+**And** coverage states loaded versus expected open dates
+**And** dependent full-month variances and staffing results remain unavailable.
 
 # Open Questions
 

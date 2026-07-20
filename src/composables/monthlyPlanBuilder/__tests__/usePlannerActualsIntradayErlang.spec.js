@@ -101,6 +101,32 @@ describe('usePlannerActualsIntradayErlang', () => {
     })
   })
 
+  it('blocks actual Erlang calculations while a loaded month has missing open dates', async () => {
+    const args = createBaseArgs()
+    args.actualsMonths = ref([
+      {
+        monthIndex: 0,
+        label: 'Jan',
+        loadedDaysCount: 1,
+        coverageStatus: 'partial',
+        missingOpenDates: ['2026-01-06', '2026-01-07']
+      }
+    ])
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const result = usePlannerActualsIntradayErlang(args)
+    await flushPromises()
+
+    expect(result.actualsErlangStatus.value).toMatchObject({
+      status: 'incomplete_actuals',
+      canRun: false,
+      message: 'Jan actuals are missing 2 expected open dates. Complete the Data tab coverage before running actual staffing calculations.'
+    })
+    expect(await result.runActualsErlangCalculations()).toBe(false)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('hydrates matching saved actual results without another API run', async () => {
     const args = createBaseArgs()
     const payloadState = buildPlannerActualsIntradayErlangPayload({

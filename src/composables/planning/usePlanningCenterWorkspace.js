@@ -339,10 +339,19 @@ export function usePlanningCenterWorkspace({
   const callCenterReportIssues = computed(() =>
     callCenterAnnualPlan.value.integrityIssues.map((issue) => ({
       ...issue,
-      openHref: issue.planId
+      openHref: issue.type === 'actuals_coverage'
+        ? buildPlanningGroupHash(
+            center.value.id,
+            issue.groupId,
+            selectedSummaryPlanningYear.value,
+            { tab: 'data' }
+          )
+        : issue.planId
         ? buildPlanningPlanHash(center.value.id, issue.groupId, issue.planId)
         : buildPlanningGroupHash(center.value.id, issue.groupId, selectedSummaryPlanningYear.value),
-      actionLabel: issue.plannedRequirementAvailable ? 'Review Plan' : 'Recalculate Plan'
+      actionLabel: issue.type === 'actuals_coverage'
+        ? 'Review Data'
+        : issue.plannedRequirementAvailable ? 'Review Plan' : 'Recalculate Plan'
     }))
   )
 

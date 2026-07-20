@@ -1,4 +1,5 @@
 import { createPlanningGroupActuals } from './groupActuals'
+import { buildMatchingIsoDatesInRange, buildMonthEndFromDate } from './dateValues'
 import { average, MONTH_LABELS, toNumber } from './shared'
 
 const hasEnteredValue = (value) => value !== null && value !== '' && Number.isFinite(Number(value))
@@ -9,11 +10,84 @@ const emptyActualsMonths = () =>
     label,
     actualContacts: null,
     actualAhtSeconds: null,
-    loadedDaysCount: 0
+    loadedDaysCount: 0,
+    loadedOpenDaysCount: 0,
+    expectedOpenDaysCount: null,
+    unexpectedLoadedDaysCount: 0,
+    missingOpenDates: [],
+    coverageStatus: 'unassessed'
   }))
 
-export const buildActualsMonthsFromDailyRows = (dailyRows = [], planningYear) => {
+const monthStartForIndex = (planningYear, monthIndex) =>
+  `${planningYear}-${String(monthIndex + 1).padStart(2, '0')}-01`
+
+export const buildActualsCoverageByMonth = ({
+  dailyRows = [],
+  planningYear,
+  isExpectedOpenDay
+} = {}) => {
   const resolvedPlanningYear = Number(planningYear)
+  const normalizedRows = createPlanningGroupActuals({ dailyRows }).dailyRows
+    .filter((row) => Number(row.serviceDate.slice(0, 4)) === resolvedPlanningYear)
+  const loadedDates = new Set(normalizedRows.map((row) => row.serviceDate))
+
+  return MONTH_LABELS.map((label, monthIndex) => {
+    const monthPrefix = `${resolvedPlanningYear}-${String(monthIndex + 1).padStart(2, '0')}-`
+    const loadedMonthDates = [...loadedDates].filter((serviceDate) => serviceDate.startsWith(monthPrefix))
+
+    if (!Number.isInteger(resolvedPlanningYear) || typeof isExpectedOpenDay !== 'function') {
+      return {
+        monthIndex,
+        label,
+        loadedOpenDaysCount: loadedMonthDates.length,
+        expectedOpenDaysCount: null,
+        unexpectedLoadedDaysCount: 0,
+        missingOpenDates: [],
+        coverageStatus: 'unassessed'
+      }
+    }
+
+    const monthStart = monthStartForIndex(resolvedPlanningYear, monthIndex)
+    const expectedOpenDates = buildMatchingIsoDatesInRange(
+      monthStart,
+      buildMonthEndFromDate(new Date(resolvedPlanningYear, monthIndex, 1, 12)),
+      isExpectedOpenDay
+    )
+    const expectedOpenDateSet = new Set(expectedOpenDates)
+    const loadedOpenDaysCount = expectedOpenDates.filter((serviceDate) => loadedDates.has(serviceDate)).length
+    const missingOpenDates = expectedOpenDates.filter((serviceDate) => !loadedDates.has(serviceDate))
+    const unexpectedLoadedDaysCount = loadedMonthDates.filter(
+      (serviceDate) => !expectedOpenDateSet.has(serviceDate)
+    ).length
+    const coverageStatus = loadedMonthDates.length === 0
+      ? expectedOpenDates.length === 0 ? 'not_applicable' : 'missing'
+      : expectedOpenDates.length === 0
+        ? 'calendar_mismatch'
+        : unexpectedLoadedDaysCount > 0
+          ? 'calendar_mismatch'
+          : missingOpenDates.length > 0
+          ? 'partial'
+          : 'complete'
+
+    return {
+      monthIndex,
+      label,
+      loadedOpenDaysCount,
+      expectedOpenDaysCount: expectedOpenDates.length,
+      unexpectedLoadedDaysCount,
+      missingOpenDates,
+      coverageStatus
+    }
+  })
+}
+
+export const buildActualsMonthsFromDailyRows = (
+  dailyRows = [],
+  planningYear,
+  { isExpectedOpenDay } = {}
+) => {
+  const resolvedPlanningYear = Number(planningYear)
+  const normalizedRows = createPlanningGroupActuals({ dailyRows }).dailyRows
   const months = emptyActualsMonths().map((month) => ({
     ...month,
     contacts: 0,
@@ -27,7 +101,7 @@ export const buildActualsMonthsFromDailyRows = (dailyRows = [], planningYear) =>
     return emptyActualsMonths()
   }
 
-  createPlanningGroupActuals({ dailyRows }).dailyRows.forEach((row) => {
+  normalizedRows.forEach((row) => {
     if (Number(row.serviceDate.slice(0, 4)) !== resolvedPlanningYear) {
       return
     }
@@ -53,18 +127,33 @@ export const buildActualsMonthsFromDailyRows = (dailyRows = [], planningYear) =>
     }
   })
 
-  return months.map((month) => ({
-    monthIndex: month.monthIndex,
-    label: month.label,
-    actualContacts: month.loadedDaysCount ? month.contacts : null,
-    actualAhtSeconds:
-      month.ahtWeight > 0
-        ? month.weightedAhtTotal / month.ahtWeight
-        : month.ahtEntryCount > 0
-          ? month.ahtTotal / month.ahtEntryCount
-          : null,
-    loadedDaysCount: month.loadedDaysCount
-  }))
+  const coverageByMonth = buildActualsCoverageByMonth({
+    dailyRows: normalizedRows,
+    planningYear: resolvedPlanningYear,
+    isExpectedOpenDay
+  })
+
+  return months.map((month) => {
+    const coverage = coverageByMonth[month.monthIndex] || {}
+
+    return {
+      monthIndex: month.monthIndex,
+      label: month.label,
+      actualContacts: month.loadedDaysCount ? month.contacts : null,
+      actualAhtSeconds:
+        month.ahtWeight > 0
+          ? month.weightedAhtTotal / month.ahtWeight
+          : month.ahtEntryCount > 0
+            ? month.ahtTotal / month.ahtEntryCount
+            : null,
+      loadedDaysCount: month.loadedDaysCount,
+      loadedOpenDaysCount: coverage.loadedOpenDaysCount ?? month.loadedDaysCount,
+      expectedOpenDaysCount: coverage.expectedOpenDaysCount ?? null,
+      unexpectedLoadedDaysCount: coverage.unexpectedLoadedDaysCount ?? 0,
+      missingOpenDates: coverage.missingOpenDates || [],
+      coverageStatus: coverage.coverageStatus || 'unassessed'
+    }
+  })
 }
 
 export const computeActualsRecords = (
@@ -88,6 +177,8 @@ export const computeActualsRecords = (
       : null
 
     const isLoaded = actualContacts != null || actualAhtSeconds != null
+    const actualsCoverageStatus = String(actualsMonth.coverageStatus || 'unassessed')
+    const actualsCoverageComplete = actualsCoverageStatus === 'complete' || actualsCoverageStatus === 'unassessed'
 
     const actualWorkloadHours =
       actualContacts != null && actualAhtSeconds != null
@@ -104,8 +195,9 @@ export const computeActualsRecords = (
       ? record.workloadStaffingRatio
       : null
 
-    const actualRequiredStaffHours =
-      actualErlangStaffedHours != null && workloadStaffingRatio != null
+    const actualRequiredStaffHours = !actualsCoverageComplete
+      ? null
+      : actualErlangStaffedHours != null && workloadStaffingRatio != null
         ? actualErlangStaffedHours * workloadStaffingRatio
         : usesActualErlangOutputs
           ? null
@@ -127,10 +219,14 @@ export const computeActualsRecords = (
       : null
 
     const contactsVariance =
-      actualContacts != null ? actualContacts - toNumber(record.contacts, 0) : null
+      actualsCoverageComplete && actualContacts != null
+        ? actualContacts - toNumber(record.contacts, 0)
+        : null
 
     const ahtVarianceSeconds =
-      actualAhtSeconds != null ? actualAhtSeconds - toNumber(record.ahtSeconds, 0) : null
+      actualsCoverageComplete && actualAhtSeconds != null
+        ? actualAhtSeconds - toNumber(record.ahtSeconds, 0)
+        : null
 
     const requiredHeadcountVariance =
       actualRequiredHeadcount != null && plannedRequiredHeadcount != null
@@ -156,6 +252,16 @@ export const computeActualsRecords = (
       actualRequiredStaffHours,
       actualRequiredHeadcount,
       actualLoadedDaysCount: Math.max(toNumber(actualsMonth.loadedDaysCount, 0), 0),
+      actualLoadedOpenDaysCount: Math.max(toNumber(actualsMonth.loadedOpenDaysCount, 0), 0),
+      actualExpectedOpenDaysCount: actualsMonth.expectedOpenDaysCount == null
+        ? null
+        : Math.max(toNumber(actualsMonth.expectedOpenDaysCount, 0), 0),
+      actualUnexpectedLoadedDaysCount: Math.max(toNumber(actualsMonth.unexpectedLoadedDaysCount, 0), 0),
+      actualMissingOpenDates: Array.isArray(actualsMonth.missingOpenDates)
+        ? [...actualsMonth.missingOpenDates]
+        : [],
+      actualsCoverageStatus,
+      actualsCoverageComplete,
       contactsVariance,
       ahtVarianceSeconds,
       requiredHeadcountVariance,
@@ -165,21 +271,29 @@ export const computeActualsRecords = (
 
 export const summarizeActualsRecords = (records = []) => {
   const loadedRecords = records.filter((record) => record.isLoaded)
+  const completeRecords = loadedRecords.filter((record) => record.actualsCoverageComplete !== false)
+  const incompleteRecords = loadedRecords.filter((record) => record.actualsCoverageComplete === false)
+  const contactVarianceRecords = completeRecords.filter((record) => record.contactsVariance != null)
   const demandVarianceRecords = records.filter((record) => record.requiredHeadcountVariance != null)
   const ahtVarianceRecords = records.filter((record) => record.ahtVarianceSeconds != null)
   const actualRequirementRecords = records.filter((record) => record.actualRequiredHeadcount != null)
 
   return {
     loadedMonthsCount: loadedRecords.length,
-    contactsVariance: loadedRecords.reduce((sum, record) => sum + (record.contactsVariance ?? 0), 0),
-    averageAhtVarianceSeconds: average(ahtVarianceRecords.map((record) => record.ahtVarianceSeconds)),
-    averageRequiredHeadcountVariance: average(
-      demandVarianceRecords.map((record) => record.requiredHeadcountVariance)
-    ),
-    peakActualRequiredHeadcount: Math.max(
-      0,
-      ...actualRequirementRecords.map((record) => record.actualRequiredHeadcount)
-    ),
+    completeMonthsCount: completeRecords.length,
+    incompleteMonthsCount: incompleteRecords.length,
+    contactsVariance: contactVarianceRecords.length
+      ? contactVarianceRecords.reduce((sum, record) => sum + record.contactsVariance, 0)
+      : null,
+    averageAhtVarianceSeconds: ahtVarianceRecords.length
+      ? average(ahtVarianceRecords.map((record) => record.ahtVarianceSeconds))
+      : null,
+    averageRequiredHeadcountVariance: demandVarianceRecords.length
+      ? average(demandVarianceRecords.map((record) => record.requiredHeadcountVariance))
+      : null,
+    peakActualRequiredHeadcount: actualRequirementRecords.length
+      ? Math.max(...actualRequirementRecords.map((record) => record.actualRequiredHeadcount))
+      : null,
     peakPlannedRequiredHeadcount: Math.max(
       0,
       ...records.map((record) => toNumber(record.plannedRequiredHeadcount, 0))

@@ -71,6 +71,7 @@ export const usePlannerActualsIntradayErlang = ({
   requirementMethod,
   planningYear,
   actualDailyRows,
+  actualsMonths,
   monthlyRecords,
   operatingWeekdays,
   holidayCalendarId,
@@ -96,6 +97,25 @@ export const usePlannerActualsIntradayErlang = ({
       return {
         status: 'inactive',
         message: '',
+        rows: []
+      }
+    }
+
+    const incompleteMonth = (actualsMonths?.value || []).find(
+      (month) => month.loadedDaysCount > 0 && !['complete', 'unassessed'].includes(month.coverageStatus)
+    )
+
+    if (incompleteMonth) {
+      const missingCount = Array.isArray(incompleteMonth.missingOpenDates)
+        ? incompleteMonth.missingOpenDates.length
+        : 0
+      const missingLabel = missingCount > 0
+        ? `missing ${missingCount} expected open ${missingCount === 1 ? 'date' : 'dates'}`
+        : 'not aligned with the saved operating calendar'
+
+      return {
+        status: 'incomplete_actuals',
+        message: `${incompleteMonth.label} actuals are ${missingLabel}. Complete the Data tab coverage before running actual staffing calculations.`,
         rows: []
       }
     }

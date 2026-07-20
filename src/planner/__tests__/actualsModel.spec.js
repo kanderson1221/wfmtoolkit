@@ -77,6 +77,86 @@ describe('actualsModel', () => {
     })
   })
 
+  it('retains partial observed actuals but withholds full-month variances and requirement', () => {
+    const monthlyActuals = buildActualsMonthsFromDailyRows(
+      [
+        { serviceDate: '2026-01-02', contacts: 1200, ahtSeconds: 300 }
+      ],
+      2026,
+      {
+        isExpectedOpenDay: (serviceDate) => {
+          const date = new Date(`${serviceDate}T12:00:00`)
+          return date.getDay() >= 1 && date.getDay() <= 5
+        }
+      }
+    )
+    const records = computeActualsRecords(
+      [
+        {
+          monthIndex: 0,
+          label: 'Jan',
+          contacts: 10000,
+          ahtSeconds: 300,
+          workloadHours: 833.3,
+          requiredHeadcount: 10,
+          workloadStaffingRatio: 1.5,
+          paidHoursPerMonth: 160
+        }
+      ],
+      [{ startingFrontlineHeadcount: 12 }],
+      monthlyActuals
+    )
+
+    expect(monthlyActuals[0]).toMatchObject({
+      actualContacts: 1200,
+      loadedOpenDaysCount: 1,
+      expectedOpenDaysCount: 22,
+      coverageStatus: 'partial'
+    })
+    expect(monthlyActuals[0].missingOpenDates).toHaveLength(21)
+    expect(records[0]).toMatchObject({
+      actualContacts: 1200,
+      actualWorkloadHours: 100,
+      actualsCoverageComplete: false,
+      contactsVariance: null,
+      ahtVarianceSeconds: null,
+      actualRequiredStaffHours: null,
+      actualRequiredHeadcount: null,
+      requiredHeadcountVariance: null
+    })
+  })
+
+  it('withholds conclusions when loaded rows include a configured closed date', () => {
+    const monthlyActuals = buildActualsMonthsFromDailyRows(
+      [
+        { serviceDate: '2026-01-02', contacts: 100, ahtSeconds: 300 },
+        { serviceDate: '2026-01-03', contacts: 50, ahtSeconds: 300 }
+      ],
+      2026,
+      { isExpectedOpenDay: (serviceDate) => serviceDate === '2026-01-02' }
+    )
+    const [record] = computeActualsRecords(
+      [{ contacts: 100, ahtSeconds: 300, workloadStaffingRatio: 1, paidHoursPerMonth: 10 }],
+      [{}],
+      monthlyActuals
+    )
+
+    expect(monthlyActuals[0]).toMatchObject({
+      loadedOpenDaysCount: 1,
+      expectedOpenDaysCount: 1,
+      unexpectedLoadedDaysCount: 1,
+      missingOpenDates: [],
+      coverageStatus: 'calendar_mismatch'
+    })
+    expect(record).toMatchObject({
+      actualContacts: 150,
+      actualWorkloadHours: 12.5,
+      actualsCoverageComplete: false,
+      contactsVariance: null,
+      actualRequiredHeadcount: null
+    })
+  })
+
   it('uses actual Erlang staffed hours for intraday actual requirements when provided', () => {
     const records = computeActualsRecords(
       [

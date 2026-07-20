@@ -306,6 +306,78 @@ test('keeps annual-plan readiness visible across desktop widths', async ({ page 
   }
 })
 
+test('keeps actuals coverage authority visible while the worksheet scrolls', async ({ page }) => {
+  await page.goto('/#planning')
+  await importLocalBackup(page, planUpdateReviewFixturePath)
+
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByText('Customer Care', { exact: true }).click()
+  await page.getByRole('button', { name: 'Plans', exact: true }).click()
+  await page.getByRole('link', { name: 'Open 2026 Spring Outlook plan for Customer Care' }).click()
+  await page.getByRole('button', { name: 'Actuals & Variance 1 month' }).click()
+
+  await expect(page.getByText('Coverage-ready months', { exact: true })).toBeVisible()
+  await expect(page.getByText('1 / 1', { exact: true })).toBeVisible()
+
+  const worksheet = page.getByRole('region', { name: 'Monthly actuals coverage and variance worksheet' })
+  await expect(worksheet).toBeVisible()
+  await expect(worksheet).toHaveAttribute('tabindex', '0')
+  await expect(worksheet.getByRole('columnheader', { name: /Open-date Coverage/ })).toBeVisible()
+  await expect(worksheet.getByText('22 / 22 complete', { exact: true })).toBeVisible()
+
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+    { width: 1152, height: 720 }
+  ]) {
+    await page.setViewportSize(viewport)
+
+    const geometry = await worksheet.evaluate((region) => ({
+      clientHeight: region.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      scrollHeight: region.scrollHeight
+    }))
+
+    expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight)
+    expect(geometry.documentScrollWidth).toBeLessThanOrEqual(geometry.documentClientWidth)
+  }
+
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await worksheet.evaluate((region) => {
+    region.scrollTop = 220
+    region.scrollLeft = 90
+  })
+
+  const stickyPositions = await worksheet.evaluate((region) => {
+    const groupHeader = region.querySelector('.actuals-super-row th').getBoundingClientRect()
+    const detailHeader = region.querySelector('.actuals-detail-row th').getBoundingClientRect()
+    const monthHeader = region.querySelector('.actuals-sticky-month-head').getBoundingClientRect()
+    const monthCell = region.querySelector('tbody .month-cell').getBoundingClientRect()
+    const regionBox = region.getBoundingClientRect()
+
+    return {
+      detailHeaderTop: detailHeader.top,
+      groupHeaderBottom: groupHeader.bottom,
+      groupHeaderTop: groupHeader.top,
+      monthCellLeft: monthCell.left,
+      monthHeaderLeft: monthHeader.left,
+      regionLeft: regionBox.left,
+      regionTop: regionBox.top,
+      scrollLeft: region.scrollLeft,
+      scrollTop: region.scrollTop
+    }
+  })
+
+  expect(stickyPositions.scrollTop).toBeGreaterThan(0)
+  expect(stickyPositions.scrollLeft).toBeGreaterThan(0)
+  expect(Math.abs(stickyPositions.groupHeaderTop - stickyPositions.regionTop)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.detailHeaderTop - stickyPositions.groupHeaderBottom)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.monthHeaderLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.monthCellLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
+})
+
 test('keeps monthly staffing supply context visible while the worksheet scrolls', async ({ page }) => {
   await page.goto('/#planning')
   await importLocalBackup(page, planUpdateReviewFixturePath)

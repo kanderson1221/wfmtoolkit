@@ -1,9 +1,5 @@
-import { buildActualsMonthsFromDailyRows } from './actualsModel'
-import {
-  buildDateFromIso,
-  buildMatchingIsoDatesInRange,
-  buildMonthEndFromDate
-} from './dateValues'
+import { buildActualsCoverageByMonth, buildActualsMonthsFromDailyRows } from './actualsModel'
+import { buildDateFromIso } from './dateValues'
 import { createPlanningGroupActuals } from './groupActuals'
 import { createPlanningGroupOpenDayChecker } from './groupOpenDays'
 import { createPlanDemandSource } from './demandSources'
@@ -48,42 +44,16 @@ const missingDateFormatter = new Intl.DateTimeFormat('en-US', {
   year: 'numeric'
 })
 
-const buildExpectedOpenDatesByMonth = (planningYear, group = {}, center = {}) => {
-  const isExpectedOpenDay = createPlanningGroupOpenDayChecker(group, center)
-
-  return MONTH_LABELS.map((label, monthIndex) => {
-    const monthStartDate = new Date(planningYear, monthIndex, 1, 12)
-    const expectedOpenDates = buildMatchingIsoDatesInRange(
-      monthStartForIndex(planningYear, monthIndex),
-      buildMonthEndFromDate(monthStartDate),
-      isExpectedOpenDay
-    )
-
-    return {
-      monthIndex,
-      label,
-      expectedOpenDates
-    }
-  })
-}
-
 const buildActualsCompletenessByMonth = ({
   dailyRows,
   planningYear,
   group,
   center
-}) => {
-  const loadedDates = new Set(
-    dailyRows
-      .filter((row) => Number(row.serviceDate.slice(0, 4)) === Number(planningYear))
-      .map((row) => row.serviceDate)
-  )
-
-  return buildExpectedOpenDatesByMonth(planningYear, group, center).map((month) => ({
-    ...month,
-    missingOpenDates: month.expectedOpenDates.filter((serviceDate) => !loadedDates.has(serviceDate))
-  }))
-}
+}) => buildActualsCoverageByMonth({
+  dailyRows,
+  planningYear,
+  isExpectedOpenDay: createPlanningGroupOpenDayChecker(group, center)
+})
 
 const buildIncompleteActualsBlocker = (month, planningYear) => {
   const missingCount = month.missingOpenDates.length

@@ -52,6 +52,7 @@ import {
   mergeIntradayErlangMonthlyRecords,
   normalizePlannerIntradayErlangResults
 } from '../planner/intradayErlang'
+import { createPlanOpenDayChecker } from '../planner/planOpenDays'
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
 import { buildExamplePlannerState } from './monthlyPlanBuilder/examplePlan'
 import { usePlannerAutosave } from './monthlyPlanBuilder/usePlannerAutosave'
@@ -661,8 +662,18 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       .filter((row) => Number(row.serviceDate.slice(0, 4)) === planningYear.value)
   )
 
+  const actualsOpenDayChecker = computed(() => createPlanOpenDayChecker({
+    planningYear: planningYear.value,
+    operatingWeekdays: operatingWeekdays.value,
+    holidayCalendarId: holidayCalendarId.value,
+    disabledHolidayRuleIds: disabledHolidayRuleIds.value,
+    customHolidays: customHolidays.value
+  }))
+
   const actualsDataMonths = computed(() =>
-    buildActualsMonthsFromDailyRows(actualsDailyRows.value, planningYear.value)
+    buildActualsMonthsFromDailyRows(actualsDailyRows.value, planningYear.value, {
+      isExpectedOpenDay: actualsOpenDayChecker.value
+    })
   )
 
   const {
@@ -673,6 +684,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     requirementMethod,
     planningYear,
     actualDailyRows: actualsDailyRows,
+    actualsMonths: actualsDataMonths,
     monthlyRecords: baselineMonthlyRecords,
     operatingWeekdays,
     holidayCalendarId,

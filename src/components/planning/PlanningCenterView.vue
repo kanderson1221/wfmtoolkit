@@ -869,13 +869,13 @@ watch(
                   <AppStatusMessage v-if="callCenterReportIssues.length">
                     <div class="grid gap-2">
                       <p>
-                        <strong>Intraday Erlang report scope:</strong>
-                        planned and actual requirement are shown only from complete saved calculations that still match their current inputs.
+                        <strong>Report scope:</strong>
+                        actual-versus-plan results require complete open-date coverage, and Intraday Erlang requirements also require complete saved calculations that still match their current inputs.
                       </p>
-                      <ul class="grid gap-2" aria-label="Intraday Erlang report issues">
+                      <ul class="grid gap-2" aria-label="Call center report integrity issues">
                         <li
                           v-for="issue in callCenterReportIssues"
-                          :key="`${issue.groupId}-${issue.planId}`"
+                          :key="`${issue.groupId}-${issue.planId}-${issue.status}`"
                           class="flex flex-wrap items-center justify-between gap-2 border-t border-[#d5e0ea] pt-2"
                         >
                           <span class="min-w-0 leading-5">

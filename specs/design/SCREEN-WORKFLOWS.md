@@ -665,9 +665,11 @@ Section content:
 | Occupancy and Adherence | Defaults or monthly overrides, design factor, staffing ratio | Mark reviewed and continue |
 | Demand Requirement | Monthly contacts, AHT, workload, required hours and headcount | Calculate or rerun when required |
 | Staffing Plan | Opening position, attrition, training pipeline, and a contained grouped supply worksheet with pinned headings and Month context | Save draft or plan |
-| Actuals and Variance | Plan versus actual demand, AHT, requirement, and staffing gap | Run actuals Erlang when required |
+| Actuals and Variance | Loaded/expected open-date coverage, observed actuals, and coverage-gated demand, AHT, requirement, and staffing-gap variance | Repair partial coverage or run actuals Erlang when ready |
 
 The Staffing Plan supply worksheet groups the roll-forward into Requirement, Opening Supply, Pipeline and Loss, Ending Supply, and Decision. Its native table owns keyboard-focusable contained scrolling and retains both heading tiers and Month identity while planners review the year.
+
+The Actuals and Variance worksheet keeps observed partial-month facts visible but never presents them as a full-month comparison. It names incomplete months, shows loaded versus expected open dates, withholds dependent variances and actual requirement, and blocks actual Erlang calculation until coverage is complete. Its native table keeps the two-tier headings and Month identity inside one keyboard-focusable contained scroll region.
 
 Finalization state:
 
