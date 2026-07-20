@@ -360,7 +360,7 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('Call Center Plan')
     expect(wrapper.text()).toContain('Expected vs actuals across staffing groups.')
     expect(wrapper.text()).toContain('Total / Avg')
-    expect(wrapper.text()).toContain('Gap vs Actual Req HC')
+    expect(wrapper.text()).toContain('Opening Gap vs Actual Req HC')
     expect(wrapper.text()).toContain('Voice Support')
     expect(wrapper.text()).toContain('Actual Contacts')
     expect(wrapper.text()).not.toContain('Monthly Actuals From Data')

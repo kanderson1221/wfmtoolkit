@@ -437,7 +437,7 @@
   }
 
   .assumption-table-staffing {
-    @apply w-full min-w-[61rem] table-fixed;
+    @apply w-full min-w-[66rem] table-fixed;
   }
 
   .staffing-supply-scroll {

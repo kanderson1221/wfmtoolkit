@@ -967,7 +967,7 @@ watch(
                             <th scope="col" :class="callCenterActualsHeaderCellRightClass">Actual Req HC</th>
                             <th scope="col" :class="callCenterActualsHeaderCellRightClass">Req HC Var</th>
                             <th scope="col" :class="callCenterActualsHeaderCellRightClass">Start FL HC</th>
-                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Gap vs Actual Req HC</th>
+                            <th scope="col" :class="callCenterActualsHeaderCellRightClass">Opening Gap vs Actual Req HC</th>
                           </tr>
                           </thead>
 
@@ -1436,7 +1436,7 @@ watch(
                           <span :class="planHeaderCellRightClass">Contacts</span>
                           <span :class="planHeaderCellRightClass">Total Req Hrs</span>
                           <span :class="planHeaderCellRightClass">Avg Req HC</span>
-                          <span :class="planHeaderCellRightClass">Avg Gap</span>
+                          <span :class="planHeaderCellRightClass">Avg Opening Gap</span>
                           <span :class="planHeaderCellRightClass">Saved</span>
                         </div>
                         <div class="pr-2 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400">

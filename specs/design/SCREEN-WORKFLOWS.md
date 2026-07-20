@@ -583,7 +583,7 @@ Key interactions:
 | 2027                                      Current: 2027 June Update              |
 |                              [Compare Plans] [Create Updated Plan]               |
 |----------------------------------------------------------------------------------|
-| Plan                    | Contacts | Req Hrs | Avg Req HC | Avg Gap | Saved       |
+| Plan                 | Contacts | Req Hrs | Avg Req HC | Avg Opening Gap | Saved       |
 | 2027 Budget             |          |         |            |         |             |
 | 2027 April Update       |          |         |            |         |             |
 | 2027 June Update        |          |         |            |         |             |
@@ -730,7 +730,7 @@ Finalization state:
 | Month | Plan Contacts | Actual | Var | Plan AHT | Actual | Plan Req | Actual Req |
 | Jan   |               |        |     |          |        |          |            |
 | ...                                                                              |
-| Staffing Metric [Starting Frontline v] | Gap to Actual Requirement               |
+| Staffing Metric [Starting Frontline v] | Opening Gap to Actual Requirement       |
 +----------------------------------------------------------------------------------+
 ```
 

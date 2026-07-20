@@ -109,6 +109,10 @@ describe('PlanningPlanComparisonDialog', () => {
     expect(wrapper.text()).toContain('Contacts +250 contacts')
     expect(wrapper.text()).toContain('Occupancy -5.0 pts')
     expect(wrapper.text()).toContain('Peak-day required HC change')
+    expect(wrapper.text()).toContain('Average opening staffing gap')
+    expect(wrapper.text()).toContain('Average ending staffing gap')
+    expect(wrapper.text()).toContain('Opening gap change')
+    expect(wrapper.text()).toContain('Ending gap change')
   })
 
   it('surfaces offsetting monthly capacity changes that an annual average would hide', () => {

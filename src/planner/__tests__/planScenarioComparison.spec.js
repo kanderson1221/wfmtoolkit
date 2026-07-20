@@ -65,6 +65,8 @@ describe('planScenarioComparison', () => {
       peakDayUpliftPercentDelta: 10,
       endingFrontlineHeadcountDelta: 1
     })
+    expect(comparison.monthlyRows[2].openingGapToRequirementDelta).toBeCloseTo(0.7688, 4)
+    expect(comparison.monthlyRows[2].endingGapToRequirementDelta).toBeCloseTo(0.7688, 4)
     expect(comparison.monthlyRows[2].peakDayRequiredHeadcountDelta).toBeGreaterThan(0)
     expect(comparison.monthlyRows[0].contactsDelta).toBe(0)
   })
@@ -99,7 +101,8 @@ describe('planScenarioComparison', () => {
       delta: null
     })
     expect(comparison.monthlyRows[0].requiredHeadcountDelta).toBeNull()
-    expect(comparison.monthlyRows[0].gapToRequirementDelta).toBeNull()
+    expect(comparison.monthlyRows[0].openingGapToRequirementDelta).toBeNull()
+    expect(comparison.monthlyRows[0].endingGapToRequirementDelta).toBeNull()
   })
 
   it('exports all monthly evidence and leaves withheld deltas blank', () => {
@@ -122,6 +125,9 @@ describe('planScenarioComparison', () => {
     expect(headers).toContain('aht_seconds_delta')
     expect(headers).toContain('presence_percentage_point_delta')
     expect(headers).toContain('peak_day_required_headcount_delta')
+    expect(headers).toContain('opening_staffing_gap_delta')
+    expect(headers).toContain('ending_staffing_gap_delta')
+    expect(headers).not.toContain('staffing_gap_delta')
     expect(january[headers.indexOf('contacts_delta')]).toBe('0')
     expect(january[headers.indexOf('required_headcount_delta')]).toBe('')
     expect(january[headers.indexOf('peak_day_required_headcount_delta')]).toBe('')

@@ -4,7 +4,7 @@ title: Staffing Supply, Opening Headcount, and Attrition
 status: draft
 owners: []
 depends_on: [PLAN-006, PLAN-007, FOUND-003]
-last_reviewed: 2026-07-19
+last_reviewed: 2026-07-20
 ---
 
 # Purpose
@@ -48,18 +48,21 @@ ending gap = ending frontline - required headcount
 - Hires enter roster on hire date but not frontline until ready.
 - Graduation alone does not make a class frontline-ready when nesting days remain.
 - Training fallout reduces roster when the class completes training.
-- The default staffing-gap metric shall identify whether it uses starting or ending frontline.
+- Opening gap is the current default opening-position measure because it uses frontline supply available before monthly hiring, graduation, and attrition movements are applied.
+- Ending gap is a forward-looking close-position measure and shall not silently replace opening gap in reports, recommendations, or risk states.
+- Neither point-in-time gap shall be presented as average in-month available capacity; the monthly model does not time-weight hires, readiness, or attrition.
 
 # Functional Requirements
 
 - Planner shall enter opening headcount and monthly attrition.
 - Derived hiring and training movements shall be visible by month.
-- Worksheet shall show required, starting roster, starting frontline, hires, graduates, in-training, attrition, ending roster, ending frontline, and gap.
+- Worksheet shall show required, starting roster, starting frontline, hires, graduates, in-training, attrition, ending roster, ending frontline, opening gap, and ending gap.
 - Worksheet columns shall be grouped as Requirement, Opening Supply, Pipeline and Loss, Ending Supply, and Decision so planners can follow the monthly roll-forward without reconstructing abbreviated headings.
 - The annual worksheet shall own a named keyboard-focusable scroll region and keep its two-tier headings and Month column visible while contained scrolling is required.
 - Editable worksheet fields shall expose the month, measure, and unit in their accessible name when table context alone is insufficient.
 - Months below requirement shall be visibly identifiable.
 - Saved plans shall preserve opening and movement inputs.
+- Existing `gapToRequirement` summary fields remain an opening-gap compatibility alias; interfaces and new exports shall name that basis explicitly.
 
 # Acceptance Scenarios
 
@@ -90,11 +93,25 @@ ending gap = ending frontline - required headcount
 
 **And** the document does not acquire horizontal overflow.
 
+## Distinguish Opening And Ending Exposure
+
+**Given** a month opens with 90 frontline headcount against a requirement of 100
+
+**And** planned movements produce 105 ending frontline headcount
+
+**When** the planner reviews staffing supply
+
+**Then** opening gap is shown as -10
+
+**And** ending gap is shown as +5
+
+**And** downstream reporting continues to name the opening-position basis it uses.
+
 # Open Questions
 
 1. Should attrition be entered as headcount, percent, or either?
 2. Are transfers and non-frontline exits required?
-3. Which gap should drive call-center risk: opening, ending, or both?
+3. Should a future in-month risk measure time-weight dated supply movements rather than use either point-in-time gap?
 
 # Implementation Traceability
 

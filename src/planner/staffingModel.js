@@ -430,7 +430,11 @@ export const summarizeStaffingRecords = (staffingRecords) => {
   const gapRecords = staffingRecords.filter(
     (row) => typeof row.gapToRequirement === 'number' && Number.isFinite(row.gapToRequirement)
   )
+  const endingGapRecords = staffingRecords.filter(
+    (row) => typeof row.endingGapToRequirement === 'number' && Number.isFinite(row.endingGapToRequirement)
+  )
   const hasCompleteRequirementGaps = staffingRecords.length > 0 && gapRecords.length === staffingRecords.length
+  const hasCompleteEndingRequirementGaps = staffingRecords.length > 0 && endingGapRecords.length === staffingRecords.length
   const peakShortageMonth = hasCompleteRequirementGaps
     ? gapRecords.reduce((shortest, row) => (row.gapToRequirement < shortest.gapToRequirement ? row : shortest))
     : null
@@ -447,6 +451,9 @@ export const summarizeStaffingRecords = (staffingRecords) => {
     averageEndingFrontlineHeadcount: average(staffingRecords.map((row) => row.endingFrontlineHeadcount)),
     averageGapToRequirement: hasCompleteRequirementGaps
       ? average(gapRecords.map((row) => row.gapToRequirement))
+      : null,
+    averageEndingGapToRequirement: hasCompleteEndingRequirementGaps
+      ? average(endingGapRecords.map((row) => row.endingGapToRequirement))
       : null,
     monthsBelowRequirement: staffingRecords.filter((row) => row.isBelowRequirement).length,
     peakShortageMonth,

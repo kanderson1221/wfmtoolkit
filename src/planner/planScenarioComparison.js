@@ -129,7 +129,8 @@ export const buildPlanScenarioSnapshot = (plan, center) => {
       averageRequiredHeadcount: preferSavedMetric(summary.averageRequiredHeadcount, planSummary.averageRequiredHeadcount),
       peakRequiredHeadcount: preferSavedMetric(summary.peakRequiredHeadcount, planSummary.peakMonth?.requiredHeadcount),
       endingFrontlineHeadcount: preferSavedMetric(summary.endingFrontlineHeadcount, staffingSummary.endingFrontlineHeadcount),
-      averageGapToRequirement: preferSavedMetric(summary.averageGapToRequirement, staffingSummary.averageGapToRequirement)
+      averageOpeningGapToRequirement: preferSavedMetric(summary.averageGapToRequirement, staffingSummary.averageGapToRequirement),
+      averageEndingGapToRequirement: staffingSummary.averageEndingGapToRequirement
     },
     monthlyRows: monthlyRecords.map((row, index) => ({
       monthIndex: row.monthIndex,
@@ -147,7 +148,10 @@ export const buildPlanScenarioSnapshot = (plan, center) => {
       requiredHeadcount: finiteOrNull(row.requiredHeadcount),
       peakDayRequiredHeadcount: finiteOrNull(row.peakDayRequiredHeadcount),
       endingFrontlineHeadcount: finiteOrNull(staffingRecords[index]?.endingFrontlineHeadcount),
-      gapToRequirement: finiteOrNull(staffingRecords[index]?.gapToRequirement)
+      openingGapToRequirement: finiteOrNull(
+        staffingRecords[index]?.startingGapToRequirement ?? staffingRecords[index]?.gapToRequirement
+      ),
+      endingGapToRequirement: finiteOrNull(staffingRecords[index]?.endingGapToRequirement)
     }))
   }
 }
@@ -183,7 +187,8 @@ export const buildPlanScenarioComparison = ({ baselinePlan, candidatePlan, cente
       ['Average required headcount', 'headcount', baseline.metrics.averageRequiredHeadcount, candidate.metrics.averageRequiredHeadcount, requirementMethodComparable],
       ['Peak required headcount', 'headcount', baseline.metrics.peakRequiredHeadcount, candidate.metrics.peakRequiredHeadcount, requirementMethodComparable],
       ['Ending frontline headcount', 'headcount', baseline.metrics.endingFrontlineHeadcount, candidate.metrics.endingFrontlineHeadcount, requirementMethodComparable],
-      ['Average staffing gap', 'headcount', baseline.metrics.averageGapToRequirement, candidate.metrics.averageGapToRequirement, requirementMethodComparable]
+      ['Average opening staffing gap', 'headcount', baseline.metrics.averageOpeningGapToRequirement, candidate.metrics.averageOpeningGapToRequirement, requirementMethodComparable],
+      ['Average ending staffing gap', 'headcount', baseline.metrics.averageEndingGapToRequirement, candidate.metrics.averageEndingGapToRequirement, requirementMethodComparable]
     ].map(([label, unit, baselineValue, candidateValue, comparable]) => ({
       label,
       unit,
@@ -239,10 +244,15 @@ export const buildPlanScenarioComparison = ({ baselinePlan, candidatePlan, cente
         endingFrontlineHeadcountDelta: requirementMethodComparable
           ? delta(baselineRow.endingFrontlineHeadcount, candidateRow.endingFrontlineHeadcount)
           : null,
-        baselineGapToRequirement: baselineRow.gapToRequirement,
-        candidateGapToRequirement: candidateRow.gapToRequirement,
-        gapToRequirementDelta: requirementMethodComparable
-          ? delta(baselineRow.gapToRequirement, candidateRow.gapToRequirement)
+        baselineOpeningGapToRequirement: baselineRow.openingGapToRequirement,
+        candidateOpeningGapToRequirement: candidateRow.openingGapToRequirement,
+        openingGapToRequirementDelta: requirementMethodComparable
+          ? delta(baselineRow.openingGapToRequirement, candidateRow.openingGapToRequirement)
+          : null,
+        baselineEndingGapToRequirement: baselineRow.endingGapToRequirement,
+        candidateEndingGapToRequirement: candidateRow.endingGapToRequirement,
+        endingGapToRequirementDelta: requirementMethodComparable
+          ? delta(baselineRow.endingGapToRequirement, candidateRow.endingGapToRequirement)
           : null
       }
     })
@@ -285,9 +295,12 @@ export const buildPlanScenarioComparisonCsv = (comparison) => buildCsv(
     { header: 'baseline_ending_frontline_headcount', value: (row) => formatCsvNumber(row.baselineEndingFrontlineHeadcount, 2) },
     { header: 'candidate_ending_frontline_headcount', value: (row) => formatCsvNumber(row.candidateEndingFrontlineHeadcount, 2) },
     { header: 'ending_frontline_headcount_delta', value: (row) => formatCsvNumber(row.endingFrontlineHeadcountDelta, 2) },
-    { header: 'baseline_staffing_gap', value: (row) => formatCsvNumber(row.baselineGapToRequirement, 2) },
-    { header: 'candidate_staffing_gap', value: (row) => formatCsvNumber(row.candidateGapToRequirement, 2) },
-    { header: 'staffing_gap_delta', value: (row) => formatCsvNumber(row.gapToRequirementDelta, 2) }
+    { header: 'baseline_opening_staffing_gap', value: (row) => formatCsvNumber(row.baselineOpeningGapToRequirement, 2) },
+    { header: 'candidate_opening_staffing_gap', value: (row) => formatCsvNumber(row.candidateOpeningGapToRequirement, 2) },
+    { header: 'opening_staffing_gap_delta', value: (row) => formatCsvNumber(row.openingGapToRequirementDelta, 2) },
+    { header: 'baseline_ending_staffing_gap', value: (row) => formatCsvNumber(row.baselineEndingGapToRequirement, 2) },
+    { header: 'candidate_ending_staffing_gap', value: (row) => formatCsvNumber(row.candidateEndingGapToRequirement, 2) },
+    { header: 'ending_staffing_gap_delta', value: (row) => formatCsvNumber(row.endingGapToRequirementDelta, 2) }
   ],
   comparison?.monthlyRows || []
 )

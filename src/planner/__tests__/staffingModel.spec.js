@@ -327,6 +327,7 @@ describe('staffingModel', () => {
     expect(recommendations).toHaveLength(0)
     expect(summary).toMatchObject({
       averageGapToRequirement: null,
+      averageEndingGapToRequirement: null,
       peakShortageMonth: null
     })
   })

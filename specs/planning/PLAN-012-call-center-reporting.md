@@ -37,8 +37,8 @@ Define selected-year aggregate reporting inside one call center. The global plan
 # Required Presentation
 
 - The report shall identify the call center, planning year, and current-plan scope.
-- Summary values shall include plan and actuals coverage, contacts, required headcount, staffing gap, and AHT where available.
-- Monthly rows shall distinguish planned and actual contacts, AHT, workload, requirement, opening frontline, and staffing gap.
+- Summary values shall include plan and actuals coverage, contacts, required headcount, opening staffing gap, and AHT where available.
+- Monthly rows shall distinguish planned and actual contacts, AHT, workload, requirement, opening frontline, and opening staffing gap.
 - Shortage, missing, incomplete, stale, mixed-scope, and error states shall be communicated as text rather than color alone.
 - Report-integrity messages shall name each affected staffing group and plan, distinguish open-date coverage from calculation freshness, and link to the owning Data or plan workflow.
 - Dense monthly results shall remain a native table with contained horizontal overflow.

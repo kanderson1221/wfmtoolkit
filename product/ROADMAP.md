@@ -195,6 +195,19 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 - Status: completed 2026-07-20.
 - Last reviewed: 2026-07-20.
 
+### `NOW-016` — Explicit opening and ending staffing gaps — Completed
+
+- Capability: `CAP-SUP-001` (Need 20), supporting `CAP-SCEN-001` (Need 20), `CAP-REP-001` (Need 20), and `CAP-UX-001` (Need 32)
+- Planner outcome: an annual capacity planner can distinguish a month that opens short from a planned month-end recovery instead of treating one unlabeled gap as both decisions.
+- Problem/opportunity: the supply model already calculated opening and ending gaps, but the worksheet exposed only a generic opening-based Gap to Req; plan lists, reports, comparisons, and CSVs also used generic gap labels even when showing ending frontline supply beside them.
+- Rationale/evidence: `PLAN-008` defines both formulas, while generic repository labels allowed an ending position to appear reconciled to an opening-position value. The opening gap is the retained report default; the ending gap is the close position after planned movements. Neither is misrepresented as time-weighted in-month capacity.
+- Dependencies: retained staffing roll-forward and saved requirement snapshots only; no schema, route, backend, identity, scheduling, intraday-management, or sponsor-policy dependency. `INT-004` is unrelated and remains Open.
+- Delivered scope: side-by-side opening and ending gap columns; opening/ending annual and monthly saved-plan comparison; explicit plan-library, call-center, dialog, and CSV basis labels; complete focused and Chromium regression coverage.
+- Removed scope: generic Gap to Req, Avg Gap, Staffing gap change, and generic `staffing_gap` CSV fields. The legacy internal summary alias remains for saved-plan compatibility.
+- Success measures: opening and ending gaps reconcile independently to the same requirement; negative values remain visible; reports name their opening-position basis; CSV fields name both bases; the 13-column worksheet and comparison stay contained at supported desktop and zoom-equivalent widths; stored plans remain migration-free.
+- Status: completed 2026-07-20.
+- Last reviewed: 2026-07-20.
+
 ## Next
 
 ### `NEXT-003` — Shared planning persistence discovery and migration design
@@ -356,3 +369,4 @@ Canonical strategy established 2026-07-18. Items are ordered for a desktop-first
 | 2026-07-19 | Completed `NOW-013`: the monthly staffing-supply roll-forward now groups its decision stages and retains both heading tiers and Month context inside one contained keyboard scroll region; calculations and saved data remain unchanged. |
 | 2026-07-19 | Completed `NOW-014`: saved-plan comparison now attributes monthly requirement, peak, supply, and gap movement to exact demand and capacity drivers; misleading annual-average capacity rows were removed. |
 | 2026-07-20 | Completed required code-review remediation `NOW-015`: actuals comparisons, actual requirements, staffing gaps, Erlang runs, and call-center aggregates now require exact saved-calendar open-date coverage; duplicate coverage logic and misleading empty zeros were removed. |
+| 2026-07-20 | Completed `NOW-016`: staffing supply and saved-plan comparison now distinguish opening capacity risk from ending post-movement position; generic UI and CSV gap labels were retired without changing stored data or the opening-risk basis. |

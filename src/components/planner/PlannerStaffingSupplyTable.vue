@@ -160,6 +160,7 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
           <col class="staffing-col-value" />
           <col class="staffing-col-value" />
           <col class="staffing-col-gap" />
+          <col class="staffing-col-gap" />
         </colgroup>
         <thead>
           <tr class="staffing-super-row">
@@ -175,7 +176,7 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
             <th colspan="2" scope="colgroup">Opening Supply</th>
             <th colspan="4" scope="colgroup">Pipeline &amp; Loss</th>
             <th colspan="2" scope="colgroup">Ending Supply</th>
-            <th scope="colgroup">Decision</th>
+            <th colspan="2" scope="colgroup">Decision</th>
           </tr>
           <tr class="staffing-detail-row">
             <th scope="col" title="Frontline headcount required by the demand model for this month.">
@@ -208,8 +209,11 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
             <th scope="col" title="Productive frontline headcount available at the end of the month after graduates and attrition are applied.">
               <span class="plan-head-label">End Frontline<br />HC</span>
             </th>
-            <th scope="col" title="Starting frontline headcount minus required headcount from the demand model. Negative values indicate the month opens short.">
-              <span class="plan-head-label">Gap to<br />Req</span>
+            <th scope="col" title="Opening frontline headcount minus required headcount. Negative values indicate the month opens short.">
+              <span class="plan-head-label">Opening<br />Gap</span>
+            </th>
+            <th scope="col" title="Ending frontline headcount minus required headcount. Negative values indicate planned monthly movements still leave the month short at close.">
+              <span class="plan-head-label">Ending<br />Gap</span>
             </th>
           </tr>
         </thead>
@@ -286,7 +290,12 @@ const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIRE
               </div>
               <template v-else>{{ props.formatNumber(record.endingFrontlineHeadcount, 1) }}</template>
             </td>
-            <td :class="gapClass(record.gapToRequirement)">{{ formatSignedNumber(record.gapToRequirement, 1) }}</td>
+            <td :class="gapClass(record.startingGapToRequirement ?? record.gapToRequirement)">
+              {{ formatSignedNumber(record.startingGapToRequirement ?? record.gapToRequirement, 1) }}
+            </td>
+            <td :class="gapClass(record.endingGapToRequirement)">
+              {{ formatSignedNumber(record.endingGapToRequirement, 1) }}
+            </td>
           </tr>
         </tbody>
         </table>

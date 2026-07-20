@@ -198,7 +198,8 @@ const monthlyExceptions = computed(() => (comparison.value?.monthlyRows || [])
     hasMaterialDelta(row.requiredHeadcountDelta, 0.05) ||
     hasMaterialDelta(row.peakDayRequiredHeadcountDelta, 0.05) ||
     hasMaterialDelta(row.endingFrontlineHeadcountDelta, 0.05) ||
-    hasMaterialDelta(row.gapToRequirementDelta, 0.05)
+    hasMaterialDelta(row.openingGapToRequirementDelta, 0.05) ||
+    hasMaterialDelta(row.endingGapToRequirementDelta, 0.05)
   ))
 
 const downloadComparison = () => {
@@ -312,7 +313,7 @@ const downloadComparison = () => {
           </div>
           <AppTableShell v-if="monthlyExceptions.length">
             <div class="overflow-x-auto">
-              <table class="w-full min-w-[1100px] border-collapse text-sm">
+              <table class="w-full min-w-[1260px] border-collapse text-sm">
               <thead class="bg-slate-50 text-left text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-slate-500">
                 <tr>
                   <th scope="col" class="px-4 py-2.5">Month</th>
@@ -320,7 +321,8 @@ const downloadComparison = () => {
                   <th scope="col" class="px-4 py-2.5 text-right">Average required HC change</th>
                   <th scope="col" class="px-4 py-2.5 text-right">Peak-day required HC change</th>
                   <th scope="col" class="px-4 py-2.5 text-right">Ending frontline change</th>
-                  <th scope="col" class="px-4 py-2.5 text-right">Staffing gap change</th>
+                  <th scope="col" class="px-4 py-2.5 text-right">Opening gap change</th>
+                  <th scope="col" class="px-4 py-2.5 text-right">Ending gap change</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200">
@@ -332,7 +334,8 @@ const downloadComparison = () => {
                   <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.requiredHeadcountDelta, 1) : 'Not comparable' }}</td>
                   <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.peakDayRequiredHeadcountDelta, 1) : 'Not comparable' }}</td>
                   <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.endingFrontlineHeadcountDelta, 1) : 'Not comparable' }}</td>
-                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.gapToRequirementDelta, 1) : 'Not comparable' }}</td>
+                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.openingGapToRequirementDelta, 1) : 'Not comparable' }}</td>
+                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.endingGapToRequirementDelta, 1) : 'Not comparable' }}</td>
                 </tr>
               </tbody>
               </table>

@@ -265,6 +265,10 @@ test('requires and exposes updated-plan decision reasons across the desktop work
     'Approved product launch and revised spring demand outlook'
   )
   await expect(comparisonDialog.getByRole('columnheader', { name: 'Changed demand and capacity drivers' })).toBeVisible()
+  await expect(comparisonDialog.getByRole('row', { name: /Average opening staffing gap/ })).toBeVisible()
+  await expect(comparisonDialog.getByRole('row', { name: /Average ending staffing gap/ })).toBeVisible()
+  await expect(comparisonDialog.getByRole('columnheader', { name: 'Opening gap change' })).toBeVisible()
+  await expect(comparisonDialog.getByRole('columnheader', { name: 'Ending gap change' })).toBeVisible()
   await expect(comparisonDialog.getByRole('row', { name: /January Contacts/ })).toContainText(
     'Contacts +2,000 contacts · AHT +1.0 sec'
   )
@@ -393,6 +397,9 @@ test('keeps monthly staffing supply context visible while the worksheet scrolls'
   await expect(worksheet).toHaveAttribute('tabindex', '0')
   await expect(worksheet.getByRole('columnheader', { name: 'Requirement' })).toHaveAttribute('scope', 'colgroup')
   await expect(worksheet.getByRole('columnheader', { name: 'Pipeline & Loss' })).toHaveAttribute('scope', 'colgroup')
+  await expect(worksheet.getByRole('columnheader', { name: 'Decision' })).toHaveAttribute('colspan', '2')
+  await expect(worksheet.getByRole('columnheader', { name: 'Opening Gap' })).toBeVisible()
+  await expect(worksheet.getByRole('columnheader', { name: 'Ending Gap' })).toBeVisible()
 
   for (const viewport of [
     { width: 1280, height: 900 },

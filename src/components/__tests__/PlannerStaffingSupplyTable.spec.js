@@ -29,8 +29,10 @@ describe('PlannerStaffingSupplyTable', () => {
             inTrainingHeadcount: 0,
             frontlineAttritionPercent: 0,
             endingRosterHeadcount: 20,
-            endingFrontlineHeadcount: 18,
-            gapToRequirement: 5.6
+            endingFrontlineHeadcount: 20,
+            gapToRequirement: 5.6,
+            startingGapToRequirement: 5.6,
+            endingGapToRequirement: 7.6
           }
         ],
         formatNumber: (value) => Number(value ?? 0).toFixed(1)
@@ -44,7 +46,10 @@ describe('PlannerStaffingSupplyTable', () => {
 
     expect(wrapper.text()).toContain('Avg Req')
     expect(wrapper.text()).toContain('Peak Req')
+    expect(wrapper.text()).toContain('OpeningGap')
+    expect(wrapper.text()).toContain('EndingGap')
     expect(wrapper.text()).toContain('15.8')
+    expect(wrapper.findAll('tbody td').slice(-2).map((cell) => cell.text())).toEqual(['+5.6', '+7.6'])
     expect(wrapper.get('[role="region"][aria-label="Monthly staffing supply worksheet"]').attributes('tabindex')).toBe('0')
     expect(wrapper.findAll('th[scope="colgroup"]').map((heading) => heading.text())).toEqual([
       'Requirement',
@@ -53,6 +58,7 @@ describe('PlannerStaffingSupplyTable', () => {
       'Ending Supply',
       'Decision'
     ])
+    expect(wrapper.get('th[scope="colgroup"]:last-child').attributes('colspan')).toBe('2')
     expect(wrapper.find('input[aria-label="Frontline attrition headcount for January"]').exists()).toBe(true)
   })
 
