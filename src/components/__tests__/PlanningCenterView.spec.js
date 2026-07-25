@@ -445,14 +445,19 @@ describe('PlanningCenterView', () => {
       selectedGroupId: ''
     })
 
+    const workspace = wrapper.get('[data-test="planning-center-workspace"]')
     const scrollRegion = wrapper.get('[role="region"][aria-label="Call center monthly plan and actuals"]')
     const tableHeader = scrollRegion.get('thead')
     const monthHeader = tableHeader.get('th[scope="col"]')
     const firstMonthToggle = scrollRegion.findAll('button[aria-expanded]')[0]
     const firstMonthRow = scrollRegion.get('tr[data-month-start="2026-01-01"]')
 
+    expect(workspace.classes()).not.toContain('h-[calc(100vh-12.5rem)]')
+    expect(workspace.classes()).not.toContain('min-h-[36rem]')
     expect(scrollRegion.attributes('tabindex')).toBe('0')
-    expect(scrollRegion.classes()).toContain('overflow-auto')
+    expect(scrollRegion.classes()).toContain('overflow-x-auto')
+    expect(scrollRegion.classes()).not.toContain('overflow-auto')
+    expect(scrollRegion.classes().some((className) => className.startsWith('max-h-'))).toBe(false)
     expect(tableHeader.classes()).toContain('sticky')
     expect(tableHeader.classes()).toContain('top-0')
     expect(monthHeader.classes()).toContain('sticky')

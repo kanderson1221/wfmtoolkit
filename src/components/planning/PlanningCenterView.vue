@@ -722,7 +722,15 @@ watch(
       </div>
 
       <AppPanel :padded="false">
-        <div class="grid h-[calc(100vh-12.5rem)] min-h-[36rem] xl:grid-cols-[256px_minmax(0,1fr)] 2xl:grid-cols-[272px_minmax(0,1fr)] xl:items-stretch">
+        <div
+          data-test="planning-center-workspace"
+          :class="[
+            'grid xl:grid-cols-[256px_minmax(0,1fr)] xl:items-stretch 2xl:grid-cols-[272px_minmax(0,1fr)]',
+            selectedGroup
+              ? 'h-[calc(100vh-12.5rem)] min-h-[36rem]'
+              : ''
+          ]"
+        >
           <div class="flex min-h-0 flex-col border-b border-slate-200 xl:border-b-0 xl:border-r">
             <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-4 py-3 xl:h-[6rem]">
               <div class="flex h-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:items-start">
@@ -864,7 +872,7 @@ watch(
                 </div>
               </div>
 
-              <div class="flex-1 min-h-0 overflow-y-auto p-4">
+              <div class="p-4">
                 <div v-if="groupRows.length" class="grid gap-4">
                   <AppStatusMessage v-if="callCenterReportIssues.length">
                     <div class="grid gap-2">
@@ -919,7 +927,7 @@ watch(
 
                     <AppTableShell>
                       <div
-                        class="max-h-[clamp(28rem,calc(100vh-19rem),42rem)] overflow-auto bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#c3d2df]"
+                        class="overflow-x-auto bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#c3d2df]"
                         role="region"
                         aria-label="Call center monthly plan and actuals"
                         tabindex="0"
