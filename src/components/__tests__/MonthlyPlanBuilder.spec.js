@@ -1454,6 +1454,11 @@ describe('MonthlyPlanBuilder', () => {
         sourcePlanId: 'budget-2026',
         planningYear: 2026,
         actualsThroughMonth: '2026-05-01',
+        planMonths: Array.from({ length: 12 }, (_, monthIndex) => ({
+          contacts: monthIndex < 5 ? 10000 + (monthIndex * 1000) : 14000 + (monthIndex * 100),
+          ahtSeconds: 360,
+          peakDayUpliftPercent: monthIndex < 5 ? 20 : 0
+        })),
         demandSource: createPlanDemandSource({
           mode: 'forecast',
           forecastProjectId: 'forecast-1',
@@ -1464,7 +1469,14 @@ describe('MonthlyPlanBuilder', () => {
             monthLabel: row.monthLabel,
             monthStart: row.monthStart,
             contacts: row.contacts
-          }))
+          })),
+          forecastDailySnapshot: [
+            { serviceDate: '2026-01-02', monthIndex: 0, contacts: 1000 },
+            { serviceDate: '2026-02-02', monthIndex: 1, contacts: 1100 },
+            { serviceDate: '2026-03-02', monthIndex: 2, contacts: 1200 },
+            { serviceDate: '2026-04-01', monthIndex: 3, contacts: 1300 },
+            { serviceDate: '2026-05-01', monthIndex: 4, contacts: 1400 }
+          ]
         })
       }
     })
@@ -1476,12 +1488,30 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.vm.builder.selectedForecastProjectId).toBe('forecast-1')
     expect(wrapper.vm.builder.forecastCanApply).toBe(true)
     expect(wrapper.vm.builder.demandSource.forecastDailySnapshot.map((row) => row.serviceDate)).toEqual([
-      '2026-06-01',
-      '2026-06-02'
+      '2026-01-02',
+      '2026-02-02',
+      '2026-03-02',
+      '2026-04-01',
+      '2026-05-01'
     ])
 
     expect(wrapper.vm.builder.applyForecastToDemand()).toBe(true)
     expect(wrapper.vm.builder.forecastApplyMessage).toContain('Reapplied 2026 Demand Forecast')
+    expect(wrapper.vm.builder.demandSource.forecastDailySnapshot.map((row) => row.serviceDate)).toEqual([
+      '2026-01-02',
+      '2026-02-02',
+      '2026-03-02',
+      '2026-04-01',
+      '2026-05-01',
+      '2026-06-01',
+      '2026-06-02'
+    ])
+    expect(wrapper.vm.builder.demandSourceSummary).toMatchObject({
+      matchedMonthCount: 7,
+      coverageLabel: 'Covers 7/7 required months'
+    })
+    expect(wrapper.vm.builder.monthlyRecords[0].requiredHeadcount).toBeGreaterThan(0)
+    expect(wrapper.vm.builder.monthlyRecords[4].requiredHeadcount).toBeGreaterThan(0)
   })
 
   it('auto-selects the only replacement forecast when the applied source was deleted', async () => {

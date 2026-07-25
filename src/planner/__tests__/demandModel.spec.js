@@ -161,6 +161,42 @@ describe('computeMonthlyRecords peak planning', () => {
     expect(januaryMonth.ahtSeconds).toBe(420)
     expect(januaryMonth.workloadHours).toBeCloseTo((500 * 420) / 3600, 5)
   })
+
+  it('keeps actualized monthly requirements when an update forecast has only future daily rows', () => {
+    const records = computeMonthlyRecords({
+      ...basePayload,
+      demandSource: {
+        mode: 'forecast',
+        forecastDailySnapshot: [
+          { serviceDate: '2026-05-01', monthIndex: 4, monthLabel: 'May', contacts: 500 },
+          { serviceDate: '2026-05-04', monthIndex: 4, monthLabel: 'May', contacts: 700 }
+        ],
+        forecastMonthSnapshot: [
+          { monthIndex: 4, monthLabel: 'May 2026', contacts: 1200, ahtSeconds: 420 }
+        ]
+      },
+      planMonths: basePayload.planMonths.map((month, monthIndex) => ({
+        ...month,
+        contacts: monthIndex < 4 ? 10000 + (monthIndex * 1000) : month.contacts,
+        ahtSeconds: monthIndex < 4 ? 360 : month.ahtSeconds,
+        peakDayUpliftPercent: monthIndex < 4 ? 20 : month.peakDayUpliftPercent
+      }))
+    })
+
+    expect(records[0]).toMatchObject({
+      contacts: 10000,
+      ahtSeconds: 360,
+      peakDayUpliftPercent: 20
+    })
+    expect(records[0].requiredHeadcount).toBeGreaterThan(0)
+    expect(records[0].peakDayRequiredHeadcount).toBeGreaterThan(records[0].requiredHeadcount)
+    expect(records[3].contacts).toBe(13000)
+    expect(records[3].requiredHeadcount).toBeGreaterThan(0)
+    expect(records[4]).toMatchObject({
+      contacts: 1200,
+      ahtSeconds: 420
+    })
+  })
 })
 
 describe('computeMonthlyRecords invalid capacity', () => {

@@ -189,10 +189,6 @@ export const computeMonthlyRecords = ({
             customHolidays
           })
         : new Map()
-    const hasForecastDailyDemand =
-      demandSource?.mode === DEMAND_SOURCE_FORECAST &&
-      Array.isArray(demandSource?.forecastDailySnapshot) &&
-      demandSource.forecastDailySnapshot.length > 0
     const forecastMonthByMonthIndex =
       demandSource?.mode === DEMAND_SOURCE_FORECAST
         ? buildForecastMonthByMonthIndex(demandSource)
@@ -206,6 +202,7 @@ export const computeMonthlyRecords = ({
       : createRandomMonth(randomDefaults || {})
     const planInput = createPlanMonth(planMonths?.[monthIndex] || {})
     const filteredForecastDemand = forecastDailyDemandByMonthIndex.get(monthIndex) || null
+    const hasForecastDailyDemandForMonth = filteredForecastDemand != null
     const forecastMonth = forecastMonthByMonthIndex.get(monthIndex) || null
 
     const {
@@ -274,7 +271,7 @@ export const computeMonthlyRecords = ({
     const designFactorShare = designFactorPercent / 100
     const workloadStaffingRatio = designFactorShare > 0 ? 1 / designFactorShare : null
 
-    const contacts = hasForecastDailyDemand
+    const contacts = hasForecastDailyDemandForMonth
       ? Math.max(toNumber(filteredForecastDemand?.contacts, 0), 0)
       : Math.max(toNumber(planInput.contacts, 0), 0)
     const forecastAhtSeconds = forecastMonth?.ahtSeconds == null
@@ -283,15 +280,15 @@ export const computeMonthlyRecords = ({
     const ahtSeconds = forecastAhtSeconds != null
       ? forecastAhtSeconds
       : Math.max(toNumber(planInput.ahtSeconds, 0), 0)
-    const peakDayUpliftPercent = hasForecastDailyDemand
+    const peakDayUpliftPercent = hasForecastDailyDemandForMonth
       ? derivePeakDayUpliftPercent(filteredForecastDemand || {})
       : Math.max(toNumber(planInput.peakDayUpliftPercent, 0), 0)
-    const averageDailyContacts = hasForecastDailyDemand
+    const averageDailyContacts = hasForecastDailyDemandForMonth
       ? Math.max(toNumber(filteredForecastDemand?.averageDailyVolume, 0), 0)
       : openDays > 0
         ? contacts / openDays
         : 0
-    const peakDayContacts = hasForecastDailyDemand
+    const peakDayContacts = hasForecastDailyDemandForMonth
       ? Math.max(toNumber(filteredForecastDemand?.peakDailyVolume, 0), 0)
       : averageDailyContacts * (1 + peakDayUpliftPercent / 100)
     const workloadHours = (contacts * ahtSeconds) / 3600

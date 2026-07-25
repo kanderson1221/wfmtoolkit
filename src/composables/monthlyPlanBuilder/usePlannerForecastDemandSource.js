@@ -20,6 +20,7 @@ import {
   applyForecastSnapshotToPlanMonths,
   buildForecastDailyDemandSnapshot,
   buildForecastDemandSnapshot,
+  buildPlanRequiredMonthStarts,
   createPlanDemandSource,
   summarizeForecastCoverageForPlan,
   summarizeForecastDemandSnapshot
@@ -65,6 +66,47 @@ export const usePlannerForecastDemandSource = ({
     planType: planType?.value || '',
     actualsThroughMonth: actualsThroughMonth?.value || ''
   }))
+
+  const updateActualsCutoffMonthIndex = computed(() => {
+    if (planType?.value !== 'update') {
+      return -1
+    }
+
+    const normalizedCutoff = String(actualsThroughMonth?.value || '').trim()
+    const match = normalizedCutoff.match(/^(\d{4})-(\d{2})-01$/)
+    if (!match || Number(match[1]) !== Number(planningYear.value)) {
+      return -1
+    }
+
+    const monthIndex = Number(match[2]) - 1
+    return monthIndex >= 0 && monthIndex < 12 ? monthIndex : -1
+  })
+
+  const mergeUpdateForecastHistory = (currentRows, nextRows, resolveMonthIndex) => {
+    const cutoffMonthIndex = updateActualsCutoffMonthIndex.value
+    if (cutoffMonthIndex < 0) {
+      return nextRows
+    }
+
+    return [
+      ...(Array.isArray(currentRows) ? currentRows : []).filter(
+        (row, fallbackIndex) => resolveMonthIndex(row, fallbackIndex) <= cutoffMonthIndex
+      ),
+      ...(Array.isArray(nextRows) ? nextRows : []).filter(
+        (row, fallbackIndex) => resolveMonthIndex(row, fallbackIndex) > cutoffMonthIndex
+      )
+    ]
+  }
+
+  const resolveSnapshotMonthIndex = (row, fallbackIndex = 0) => {
+    const explicitMonthIndex = Number(row?.monthIndex)
+    if (Number.isInteger(explicitMonthIndex)) {
+      return explicitMonthIndex
+    }
+
+    const serviceDateMonth = Number(String(row?.serviceDate || row?.monthStart || '').slice(5, 7)) - 1
+    return Number.isInteger(serviceDateMonth) ? serviceDateMonth : fallbackIndex
+  }
 
   const requiresDailyForecast = computed(() =>
     requirementMethod?.value === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
@@ -267,9 +309,18 @@ export const usePlannerForecastDemandSource = ({
       const dailySnapshotCount = Array.isArray(demandSource.value.forecastDailySnapshot)
         ? demandSource.value.forecastDailySnapshot.length
         : 0
+      const requiredMonthIndexes = new Set(
+        buildPlanRequiredMonthStarts(
+          planningYear.value,
+          planCoverageOptions.value
+        ).map((monthStart) => Number(monthStart.slice(5, 7)) - 1)
+      )
+      const requiredMonthSnapshot = demandSource.value.forecastMonthSnapshot.filter(
+        (month, fallbackIndex) => requiredMonthIndexes.has(resolveSnapshotMonthIndex(month, fallbackIndex))
+      )
       const snapshotSummary = summarizeForecastDemandSnapshot(
-        demandSource.value.forecastMonthSnapshot,
-        demandSource.value.forecastMonthSnapshot.length || 12
+        requiredMonthSnapshot,
+        requiredMonthIndexes.size || 12
       )
 
       return {
@@ -320,6 +371,16 @@ export const usePlannerForecastDemandSource = ({
 
     const wasSameForecast = normalizeForecastId(demandSource.value.forecastProjectId) === normalizeForecastId(selectedForecastProject.value.id)
     planMonths.value = applyForecastSnapshotToPlanMonths(planMonths.value, selectedForecastSnapshot.value)
+    const nextForecastMonthSnapshot = mergeUpdateForecastHistory(
+      demandSource.value.forecastMonthSnapshot,
+      selectedForecastSnapshot.value,
+      resolveSnapshotMonthIndex
+    )
+    const nextForecastDailySnapshot = mergeUpdateForecastHistory(
+      demandSource.value.forecastDailySnapshot,
+      selectedForecastDailySnapshot.value,
+      resolveSnapshotMonthIndex
+    )
     demandSource.value = createPlanDemandSource({
       mode: DEMAND_SOURCE_FORECAST,
       forecastProjectId: selectedForecastProject.value.id,
@@ -330,8 +391,8 @@ export const usePlannerForecastDemandSource = ({
       importedAt: new Date().toISOString(),
       importedPlanningYear: planningYear.value,
       coverageStartMonthIndex: selectedForecastProject.value.coverageStartMonthIndex ?? null,
-      forecastMonthSnapshot: selectedForecastSnapshot.value,
-      forecastDailySnapshot: selectedForecastDailySnapshot.value
+      forecastMonthSnapshot: nextForecastMonthSnapshot,
+      forecastDailySnapshot: nextForecastDailySnapshot
     })
     forecastApplyTone.value = 'success'
     forecastApplyMessage.value = requiresDailyForecast.value
