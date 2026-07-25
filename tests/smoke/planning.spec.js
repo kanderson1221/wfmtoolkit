@@ -66,11 +66,13 @@ test('opens the public landing page and highlights the available tools', async (
   await page.goto('/')
 
   await expect(page.getByRole('heading', { level: 1, name: /Practical workforce planning tools, shared free\./i })).toBeVisible()
-  await expect(page.getByRole('main').getByText('Planning Workspace', { exact: true })).toBeVisible()
-  await expect(page.getByRole('main').getByText('Forecasting', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('main').getByText('Erlang Calculators', { exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Open Planning Workspace' }).first()).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Open Call Centers' }).first()).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Annual staffing plan preview with monthly requirements, supply, and gaps' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'From demand signal to staffing decision.' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'A forecast you can inspect before you plan from it.' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Build a maintained plan, not a disposable calculation.' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'See what changed, then update the forward plan.' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Planning Workspace' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Erlang Calculators' })).toBeVisible()
 })
 
 test('opens the terms page from the public footer', async ({ page }) => {
