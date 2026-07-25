@@ -98,6 +98,8 @@ const activeContactsSubview = defineModel('activeContactsSubview', {
             </span>
           </div>
 
+          <slot name="before-accuracy" />
+
           <ForecastAccuracyReview
             v-if="holdoutMetrics"
             :holdout="holdoutMetrics"
