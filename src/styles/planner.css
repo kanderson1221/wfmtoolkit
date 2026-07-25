@@ -441,7 +441,7 @@
   }
 
   .staffing-supply-scroll {
-    @apply relative max-h-[clamp(22rem,calc(100vh-27rem),34rem)] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
+    @apply relative overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
   }
 
   .assumption-table-staffing thead th {
@@ -498,7 +498,7 @@
   }
 
   .actuals-coverage-scroll {
-    @apply relative max-h-[clamp(24rem,calc(100vh-24rem),38rem)] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
+    @apply relative overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
   }
 
   .assumption-table-actuals thead th {

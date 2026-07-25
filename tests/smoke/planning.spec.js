@@ -310,7 +310,7 @@ test('keeps annual-plan readiness visible across desktop widths', async ({ page 
   }
 })
 
-test('keeps actuals coverage authority visible while the worksheet scrolls', async ({ page }) => {
+test('shows the full actuals worksheet and leaves vertical scrolling to the browser', async ({ page }) => {
   await page.goto('/#planning')
   await importLocalBackup(page, planUpdateReviewFixturePath)
 
@@ -344,45 +344,42 @@ test('keeps actuals coverage authority visible while the worksheet scrolls', asy
       scrollHeight: region.scrollHeight
     }))
 
-    expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight)
+    expect(Math.abs(geometry.scrollHeight - geometry.clientHeight)).toBeLessThanOrEqual(1)
     expect(geometry.documentScrollWidth).toBeLessThanOrEqual(geometry.documentClientWidth)
   }
 
   await page.setViewportSize({ width: 1024, height: 768 })
   await worksheet.evaluate((region) => {
-    region.scrollTop = 220
     region.scrollLeft = 90
   })
 
   const stickyPositions = await worksheet.evaluate((region) => {
-    const groupHeader = region.querySelector('.actuals-super-row th').getBoundingClientRect()
-    const detailHeader = region.querySelector('.actuals-detail-row th').getBoundingClientRect()
     const monthHeader = region.querySelector('.actuals-sticky-month-head').getBoundingClientRect()
     const monthCell = region.querySelector('tbody .month-cell').getBoundingClientRect()
     const regionBox = region.getBoundingClientRect()
 
     return {
-      detailHeaderTop: detailHeader.top,
-      groupHeaderBottom: groupHeader.bottom,
-      groupHeaderTop: groupHeader.top,
       monthCellLeft: monthCell.left,
       monthHeaderLeft: monthHeader.left,
       regionLeft: regionBox.left,
-      regionTop: regionBox.top,
       scrollLeft: region.scrollLeft,
       scrollTop: region.scrollTop
     }
   })
 
-  expect(stickyPositions.scrollTop).toBeGreaterThan(0)
+  expect(stickyPositions.scrollTop).toBe(0)
   expect(stickyPositions.scrollLeft).toBeGreaterThan(0)
-  expect(Math.abs(stickyPositions.groupHeaderTop - stickyPositions.regionTop)).toBeLessThanOrEqual(2)
-  expect(Math.abs(stickyPositions.detailHeaderTop - stickyPositions.groupHeaderBottom)).toBeLessThanOrEqual(2)
   expect(Math.abs(stickyPositions.monthHeaderLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
   expect(Math.abs(stickyPositions.monthCellLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
+
+  const browserScrollY = await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+    return window.scrollY
+  })
+  expect(browserScrollY).toBeGreaterThan(0)
 })
 
-test('keeps monthly staffing supply context visible while the worksheet scrolls', async ({ page }) => {
+test('shows the full staffing worksheet and leaves vertical scrolling to the browser', async ({ page }) => {
   await page.goto('/#planning')
   await importLocalBackup(page, planUpdateReviewFixturePath)
 
@@ -418,42 +415,39 @@ test('keeps monthly staffing supply context visible while the worksheet scrolls'
       scrollWidth: region.scrollWidth
     }))
 
-    expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight)
+    expect(Math.abs(geometry.scrollHeight - geometry.clientHeight)).toBeLessThanOrEqual(1)
     expect(geometry.documentScrollWidth).toBeLessThanOrEqual(geometry.documentClientWidth)
   }
 
   await page.setViewportSize({ width: 1024, height: 768 })
   await worksheet.evaluate((region) => {
-    region.scrollTop = 240
     region.scrollLeft = 80
   })
 
   const stickyPositions = await worksheet.evaluate((region) => {
-    const groupHeader = region.querySelector('.staffing-super-row th[scope="colgroup"]').getBoundingClientRect()
-    const detailHeader = region.querySelector('.staffing-detail-row th').getBoundingClientRect()
     const monthHeader = region.querySelector('.staffing-sticky-month-head').getBoundingClientRect()
     const monthCell = region.querySelector('tbody .month-cell').getBoundingClientRect()
     const regionBox = region.getBoundingClientRect()
 
     return {
-      detailHeaderTop: detailHeader.top,
-      groupHeaderBottom: groupHeader.bottom,
-      groupHeaderTop: groupHeader.top,
       monthCellLeft: monthCell.left,
       monthHeaderLeft: monthHeader.left,
       regionLeft: regionBox.left,
-      regionTop: regionBox.top,
       scrollLeft: region.scrollLeft,
       scrollTop: region.scrollTop
     }
   })
 
-  expect(stickyPositions.scrollTop).toBeGreaterThan(0)
+  expect(stickyPositions.scrollTop).toBe(0)
   expect(stickyPositions.scrollLeft).toBeGreaterThan(0)
-  expect(Math.abs(stickyPositions.groupHeaderTop - stickyPositions.regionTop)).toBeLessThanOrEqual(2)
-  expect(Math.abs(stickyPositions.detailHeaderTop - stickyPositions.groupHeaderBottom)).toBeLessThanOrEqual(2)
   expect(Math.abs(stickyPositions.monthHeaderLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
   expect(Math.abs(stickyPositions.monthCellLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
+
+  const browserScrollY = await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+    return window.scrollY
+  })
+  expect(browserScrollY).toBeGreaterThan(0)
 })
 
 test('keeps call-center reconciliation context visible while expanded months scroll', async ({ page }) => {
