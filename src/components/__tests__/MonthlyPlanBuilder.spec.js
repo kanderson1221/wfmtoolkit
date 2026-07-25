@@ -1508,10 +1508,13 @@ describe('MonthlyPlanBuilder', () => {
     ])
     expect(wrapper.vm.builder.demandSourceSummary).toMatchObject({
       matchedMonthCount: 7,
+      requiredMonthCount: 7,
+      requiredMonthIndexes: [5, 6, 7, 8, 9, 10, 11],
       coverageLabel: 'Covers 7/7 required months'
     })
     expect(wrapper.vm.builder.monthlyRecords[0].requiredHeadcount).toBeGreaterThan(0)
     expect(wrapper.vm.builder.monthlyRecords[4].requiredHeadcount).toBeGreaterThan(0)
+    expect(wrapper.text()).not.toContain('Coverage incomplete')
   })
 
   it('auto-selects the only replacement forecast when the applied source was deleted', async () => {

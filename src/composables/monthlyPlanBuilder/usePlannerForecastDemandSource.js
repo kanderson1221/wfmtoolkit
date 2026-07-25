@@ -337,6 +337,8 @@ export const usePlannerForecastDemandSource = ({
         dailySnapshotCount,
         requiresDailyForecast: requiresDailyForecast.value,
         dailyForecastReady: !requiresDailyForecast.value || dailySnapshotCount > 0,
+        requiredMonthCount: requiredMonthIndexes.size,
+        requiredMonthIndexes: [...requiredMonthIndexes],
         ...snapshotSummary
       }
     }

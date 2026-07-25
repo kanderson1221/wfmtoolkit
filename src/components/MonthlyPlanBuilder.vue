@@ -81,7 +81,7 @@ const hasAppliedForecastDemand = computed(() =>
   builder.demandSource.forecastMonthSnapshot.length > 0
 )
 
-const formatMonthCoverage = (count) => `${count}/${TOTAL_PLAN_MONTHS} months`
+const formatMonthCoverage = (count, total = TOTAL_PLAN_MONTHS) => `${count}/${total} months`
 const formatMonthCount = (count) => `${count} ${count === 1 ? 'month' : 'months'}`
 
 const getFirstMissingMonthLabel = (items, predicate) => {
@@ -264,18 +264,47 @@ const intradayForecastDailySnapshot = computed(() =>
     : []
 )
 
+const requiredForecastMonthIndexes = computed(() => {
+  const indexes = Array.isArray(builder.demandSourceSummary?.requiredMonthIndexes)
+    ? builder.demandSourceSummary.requiredMonthIndexes
+    : []
+
+  return indexes.length
+    ? indexes
+    : Array.from({ length: TOTAL_PLAN_MONTHS }, (_, monthIndex) => monthIndex)
+})
+
+const intradayForecastMonthsByIndex = computed(() =>
+  new Map(
+    intradayForecastMonthSnapshot.value.map((month, fallbackIndex) => [
+      Number.isInteger(Number(month?.monthIndex)) ? Number(month.monthIndex) : fallbackIndex,
+      month
+    ])
+  )
+)
+
 const intradayMonthsWithForecastAht = computed(() =>
-  intradayForecastMonthSnapshot.value.filter((month) => toNumber(month?.ahtSeconds, 0) > 0).length
+  requiredForecastMonthIndexes.value.filter(
+    (monthIndex) => toNumber(intradayForecastMonthsByIndex.value.get(monthIndex)?.ahtSeconds, 0) > 0
+  ).length
 )
 
 const intradayFirstMissingAhtMonthLabel = computed(() => {
-  const missingMonth = intradayForecastMonthSnapshot.value.find((month) => toNumber(month?.ahtSeconds, 0) <= 0)
-  return missingMonth?.monthLabel || ''
+  const missingMonthIndex = requiredForecastMonthIndexes.value.find(
+    (monthIndex) => toNumber(intradayForecastMonthsByIndex.value.get(monthIndex)?.ahtSeconds, 0) <= 0
+  )
+
+  return missingMonthIndex == null
+    ? ''
+    : intradayForecastMonthsByIndex.value.get(missingMonthIndex)?.monthLabel ||
+        FULL_MONTH_LABELS[missingMonthIndex] ||
+        ''
 })
 
 const forecastProgress = computed(() => {
   const forecastName = builder.demandSourceSummary?.projectName || 'Saved Forecast'
   const matchedMonthCount = Number(builder.demandSourceSummary?.matchedMonthCount || 0)
+  const requiredMonthCount = Number(builder.demandSourceSummary?.requiredMonthCount || TOTAL_PLAN_MONTHS)
   const coverageLabel = builder.demandSourceSummary?.coverageLabel || formatMonthCoverage(matchedMonthCount)
 
   if (builder.hasLegacyManualDemandSource) {
@@ -314,7 +343,7 @@ const forecastProgress = computed(() => {
 
   if (isIntradayErlang.value) {
     const hasDailyForecast = intradayForecastDailySnapshot.value.length > 0
-    const hasMonthlyAhtCoverage = intradayMonthsWithForecastAht.value === TOTAL_PLAN_MONTHS
+    const hasMonthlyAhtCoverage = intradayMonthsWithForecastAht.value === requiredMonthCount
     const missingAhtMonthLabel = intradayFirstMissingAhtMonthLabel.value
 
     if (!hasDailyForecast) {
@@ -367,7 +396,7 @@ const forecastProgress = computed(() => {
     }
   }
 
-  if (matchedMonthCount < TOTAL_PLAN_MONTHS) {
+  if (matchedMonthCount < requiredMonthCount) {
     return {
       id: 'forecast',
       title: 'Forecasts',
@@ -375,12 +404,12 @@ const forecastProgress = computed(() => {
       overviewValue: 'Coverage incomplete',
       overviewMeta: `${forecastName} is applied for ${coverageLabel}.`,
       summary: `${forecastName} is applied for ${coverageLabel}.`,
-      blocker: 'Apply a saved forecast with complete monthly coverage before reviewing the demand model.',
+      blocker: 'Apply a saved forecast with complete required-month coverage before reviewing the demand model.',
       tone: 'attention',
       isReady: false,
       isStarted: true,
       nextTitle: 'Forecasts',
-      nextDescription: 'Replace or refresh the saved forecast so all 12 plan months are covered before continuing.'
+      nextDescription: `Replace or refresh the saved forecast so all ${requiredMonthCount} required forecast months are covered before continuing.`
     }
   }
 
@@ -405,6 +434,7 @@ const requirementProgress = computed(() => {
     const erlangStatus = String(builder.erlangStatus?.status || '').trim()
     const hasDailyForecast = intradayForecastDailySnapshot.value.length > 0
     const configuredCount = intradayMonthsWithForecastAht.value
+    const requiredMonthCount = Number(builder.demandSourceSummary?.requiredMonthCount || TOTAL_PLAN_MONTHS)
     const isReady = erlangStatus === 'ready'
     const isLoading = erlangStatus === 'loading'
     const hasStoredResults = Boolean(builder.erlangStatus?.hasResults)
@@ -425,7 +455,7 @@ const requirementProgress = computed(() => {
             ? 'Rerun needed'
             : erlangStatus === 'ready_to_run'
               ? 'Ready to run'
-              : formatMonthCoverage(configuredCount),
+              : formatMonthCoverage(configuredCount, requiredMonthCount),
       detail: isReady
         ? forecastName
           ? `Daily demand and monthly AHT are locked from ${forecastName}. Interval Erlang outputs are stored with this plan.`
@@ -436,7 +466,7 @@ const requirementProgress = computed(() => {
             ? String(builder.erlangStatus?.message || '').trim()
           : !hasDailyForecast
             ? 'Apply a saved daily forecast to provide the daily demand stream this plan requires.'
-            : configuredCount < TOTAL_PLAN_MONTHS
+            : configuredCount < requiredMonthCount
               ? `Monthly AHT assumptions are still missing in ${missingAhtMonthLabel}.`
               : forecastName
                 ? `Daily forecast demand is applied from ${forecastName}. Run the interval Erlang calculation to populate monthly staffing outputs.`
