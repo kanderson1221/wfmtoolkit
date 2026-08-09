@@ -619,8 +619,6 @@ export const createPlanningGroupDraft = (overrides = {}) => {
 
   return {
     name: '',
-    channelType,
-    serviceGoal,
     operatingWeekdays: [1, 2, 3, 4, 5],
     defaultPaidHoursPerDay: 8,
     defaultOccupancyPercent: 90,

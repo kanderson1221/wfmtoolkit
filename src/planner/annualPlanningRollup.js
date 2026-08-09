@@ -15,7 +15,6 @@ import {
 import { computeStaffingRecords } from './staffingModel'
 import { createPlanOpenDayChecker } from './planOpenDays'
 import {
-  buildPlanDemandRecords,
   buildPlanIntradayPayloadArgs,
   resolvePlanRequirementRecords
 } from './planRequirementRecords'

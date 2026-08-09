@@ -452,7 +452,7 @@ test('shows the full staffing worksheet and leaves vertical scrolling to the bro
   expect(browserScrollY).toBeGreaterThan(0)
 })
 
-test('keeps call-center reconciliation context visible while expanded months scroll', async ({ page }) => {
+test('shows the full call-center reconciliation report and leaves vertical scrolling to the browser', async ({ page }) => {
   await page.goto('/#planning')
   await importLocalBackup(page, planUpdateReviewFixturePath)
 
@@ -469,38 +469,37 @@ test('keeps call-center reconciliation context visible while expanded months scr
     scrollHeight: region.scrollHeight,
     scrollWidth: region.scrollWidth
   }))
-  expect(beforeScroll.scrollHeight).toBeGreaterThan(beforeScroll.clientHeight)
+  expect(Math.abs(beforeScroll.scrollHeight - beforeScroll.clientHeight)).toBeLessThanOrEqual(1)
   expect(beforeScroll.scrollWidth).toBeGreaterThan(beforeScroll.clientWidth)
 
   await reportRegion.evaluate((region) => {
-    const monthRow = region.querySelector('tr[data-month-start="2026-06-01"]')
-    region.scrollTop = monthRow.offsetTop + 20
     region.scrollLeft = 160
   })
 
   const stickyPositions = await reportRegion.evaluate((region) => {
-    const header = region.querySelector('thead').getBoundingClientRect()
     const monthHeader = region.querySelector('thead th[scope="col"]').getBoundingClientRect()
-    const monthRow = region.querySelector('tr[data-month-start="2026-06-01"]').getBoundingClientRect()
+    const monthRow = region.querySelector('tr[data-month-start="2026-06-01"]')
     const regionBox = region.getBoundingClientRect()
 
     return {
-      headerTop: header.top,
-      headerBottom: header.bottom,
       monthHeaderLeft: monthHeader.left,
-      monthRowTop: monthRow.top,
+      monthRowLeft: monthRow.querySelector('th[scope="row"]').getBoundingClientRect().left,
       regionLeft: regionBox.left,
-      regionTop: regionBox.top,
       scrollLeft: region.scrollLeft,
       scrollTop: region.scrollTop
     }
   })
 
-  expect(stickyPositions.scrollTop).toBeGreaterThan(0)
+  expect(stickyPositions.scrollTop).toBe(0)
   expect(stickyPositions.scrollLeft).toBeGreaterThan(0)
-  expect(Math.abs(stickyPositions.headerTop - stickyPositions.regionTop)).toBeLessThanOrEqual(2)
-  expect(Math.abs(stickyPositions.monthRowTop - stickyPositions.headerBottom)).toBeLessThanOrEqual(2)
   expect(Math.abs(stickyPositions.monthHeaderLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
+  expect(Math.abs(stickyPositions.monthRowLeft - stickyPositions.regionLeft)).toBeLessThanOrEqual(2)
+
+  const browserScrollY = await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+    return window.scrollY
+  })
+  expect(browserScrollY).toBeGreaterThan(0)
 })
 
 test('opens and edits an existing call center from the call-center list', async ({ page }) => {
