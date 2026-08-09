@@ -8,7 +8,7 @@ import {
   normalizePlannerIntradayErlangResults
 } from '../../planner/intradayErlang'
 
-const ERLANG_RESULTS_VERSION = 1
+const ERLANG_RESULTS_VERSION = 2
 
 const extractApiErrorMessage = async (response) => {
   const rawErrorText = await response.text().catch(() => '')
@@ -80,6 +80,15 @@ const enrichIntervalOutputRows = (intervalPlans = [], requestRows = []) =>
         : callsOffered * averageHandleTimeSeconds / 3600
     )
     const requiredStaffNet = firstFiniteNumber(intervalPlan?.requiredStaffNet)
+    const erlangRequiredStaffNet = firstFiniteNumber(
+      intervalPlan?.erlangRequiredStaffNet,
+      requiredStaffNet
+    )
+    const minimumHeadcount = firstFiniteNumber(
+      intervalPlan?.minimumHeadcount,
+      requestRow.minimumHeadcount,
+      0
+    )
     const intervalHours = intervalLengthMinutes == null ? null : intervalLengthMinutes / 60
     const laborHoursNet = firstFiniteNumber(
       intervalPlan?.laborHoursNet,
@@ -95,7 +104,14 @@ const enrichIntervalOutputRows = (intervalPlans = [], requestRows = []) =>
       callsOffered,
       averageHandleTimeSeconds,
       workloadHours: roundMetric(workloadHours),
+      erlangRequiredStaffNet,
+      minimumHeadcount,
       requiredStaffNet,
+      minimumApplied: Boolean(
+        intervalPlan?.minimumApplied ?? (
+          requiredStaffNet != null && erlangRequiredStaffNet != null && requiredStaffNet > erlangRequiredStaffNet
+        )
+      ),
       laborHoursNet: roundMetric(laborHoursNet)
     }
   })

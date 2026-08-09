@@ -510,7 +510,10 @@ describe('PlannerMonthlyPlanTab', () => {
           callsOffered: 25,
           averageHandleTimeSeconds: 325,
           workloadHours: 2.256944,
+          erlangRequiredStaffNet: 1,
+          minimumHeadcount: 7,
           requiredStaffNet: 7,
+          minimumApplied: true,
           laborHoursNet: 3.5,
           serviceLevel: 0.81234,
           occupancy: 0.76234,
@@ -532,6 +535,8 @@ describe('PlannerMonthlyPlanTab', () => {
           workloadStaffingRatio: 1.451379,
           workloadHours: 1200,
           erlangStaffedHours: 1330.25,
+          minimumHeadcount: 7,
+          minimumAppliedIntervalCount: 14,
           weightedOccupancyPercent: 84.5,
           weightedServiceLevelPercent: 79.25,
           requiredStaffHours: 1930.98,
@@ -568,13 +573,13 @@ describe('PlannerMonthlyPlanTab', () => {
     expect(clickSpy).toHaveBeenCalledTimes(2)
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:csv-1')
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:csv-2')
-    expect(monthlyCsv).toContain('month,contacts,aht_seconds,open_days,fte_paid_hours,workload_hours,erlang_hours,base_headcount')
+    expect(monthlyCsv).toContain('month,contacts,aht_seconds,open_days,fte_paid_hours,workload_hours,erlang_hours,minimum_headcount,minimum_applied_intervals,base_headcount')
     expect(monthlyCsv).not.toContain('peak_interval_base_headcount')
     expect(monthlyCsv).toContain('peak_day_total_headcount')
-    expect(monthlyCsv).toContain('Jan,12000,325,20,160,1200,1330.25,8.314063,84.5,79.25,72.5')
+    expect(monthlyCsv).toContain('Jan,12000,325,20,160,1200,1330.25,7,14,8.314063,84.5,79.25,72.5')
     expect(intervalCsv).toContain('month_index,month,service_date,interval_start,interval_length_minutes,calls_offered')
-    expect(intervalCsv).toContain('labor_hours_net,wfm_staffing_ratio,wfm_labor_hours_gross')
+    expect(intervalCsv).toContain('erlang_required_staff_net,minimum_headcount,required_staff_net,minimum_applied,labor_hours_net,wfm_staffing_ratio,wfm_labor_hours_gross')
     expect(intervalCsv).not.toContain(',labor_hours_gross,')
-    expect(intervalCsv).toContain('0,Jan,2026-01-02,2026-01-02T08:00:00,30,25,325,2.256944,7,3.5,1.451379,5.079827,81.234,76.234,12.3,42,1')
+    expect(intervalCsv).toContain('0,Jan,2026-01-02,2026-01-02T08:00:00,30,25,325,2.256944,1,7,7,true,3.5,1.451379,5.079827,81.234,76.234,12.3,42,1')
   })
 })

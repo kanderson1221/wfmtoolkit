@@ -144,6 +144,10 @@ const operatingWindowLabel = computed(() => {
 const intervalProfileRows = computed(() =>
   Array.isArray(props.intraday?.intervalRatios) ? props.intraday.intervalRatios : []
 )
+const minimumHeadcountLabel = computed(() => {
+  const minimumHeadcount = Math.max(Math.round(Number(props.intraday?.minimumHeadcount) || 0), 0)
+  return minimumHeadcount > 0 ? props.formatWhole(minimumHeadcount) : 'No floor'
+})
 const intradayForecastSourceLabel = computed(() => {
   if (!isIntradayErlang.value) {
     return ''
@@ -183,6 +187,11 @@ const intradaySummaryItems = computed(() => [
     value: intervalProfileRows.value.length
       ? `${props.formatWhole(intervalProfileRows.value.length)} intervals @ ${props.formatWhole(props.intraday?.intervalLengthMinutes || 30)} min`
       : 'Needs intraday profile',
+    meta: 'Inherited from staffing group setup'
+  },
+  {
+    label: 'Minimum HC / Open Interval',
+    value: minimumHeadcountLabel.value,
     meta: 'Inherited from staffing group setup'
   },
   {
@@ -229,7 +238,7 @@ const summaryItems = computed(() =>
   isIntradayErlang.value ? intradaySummaryItems.value : workloadRatioSummaryItems.value
 )
 const summaryColumns = computed(() =>
-  isIntradayErlang.value ? 'md:grid-cols-2 xl:grid-cols-6' : 'md:grid-cols-2 xl:grid-cols-5'
+  isIntradayErlang.value ? 'md:grid-cols-2 xl:grid-cols-7' : 'md:grid-cols-2 xl:grid-cols-5'
 )
 </script>
 
@@ -291,7 +300,7 @@ const summaryColumns = computed(() =>
               Staffing Group Inputs
             </strong>
             <p class="text-sm leading-6 text-slate-600">
-              Service goal, operating window, and interval mix are inherited from staffing-group setup and stay read-only here.
+              Service goal, operating window, interval mix, and minimum interval headcount are inherited from staffing-group setup and stay read-only here.
             </p>
           </div>
 
@@ -309,6 +318,10 @@ const summaryColumns = computed(() =>
               <dd class="text-sm font-semibold text-slate-900">
                 {{ intervalProfileRows.length ? `${intervalProfileRows.length} intervals @ ${props.intraday?.intervalLengthMinutes || 30} min` : 'Needs profile' }}
               </dd>
+            </div>
+            <div class="grid gap-1 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5">
+              <dt class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Minimum HC / Open Interval</dt>
+              <dd class="text-sm font-semibold text-slate-900">{{ minimumHeadcountLabel }}</dd>
             </div>
             <div class="grid gap-1 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5">
               <dt class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Forecast Input</dt>

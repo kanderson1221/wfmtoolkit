@@ -43,6 +43,7 @@ describe('usePlannerIntradayErlang', () => {
     serviceLevelThresholdSeconds: ref(20),
     intraday: ref({
       intervalLengthMinutes: 30,
+      minimumHeadcount: 2,
       intervalRatios: [
         { startTime: '08:00', ratioPercent: 50 },
         { startTime: '08:30', ratioPercent: 50 }
@@ -178,7 +179,7 @@ describe('usePlannerIntradayErlang', () => {
       hasResults: true
     })
     expect(storedResults.value).toMatchObject({
-      version: 1,
+      version: 2,
       rowCount: 2,
       monthCount: 1
     })
@@ -194,6 +195,16 @@ describe('usePlannerIntradayErlang', () => {
     })
     expect(result.monthlyOutputsByMonthIndex.value.get(0)).toMatchObject({
       erlangStaffedHours: 123.4
+    })
+
+    args.serviceLevelPercent.value = 80
+    args.intraday.value.minimumHeadcount = 4
+    await flushPromises()
+
+    expect(result.erlangStatus.value).toMatchObject({
+      status: 'stale',
+      canRun: true,
+      hasResults: true
     })
   })
 

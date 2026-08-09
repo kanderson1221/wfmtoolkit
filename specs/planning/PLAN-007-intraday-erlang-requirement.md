@@ -4,7 +4,7 @@ title: Intraday Erlang Staffing Requirement
 status: draft
 owners: []
 depends_on: [PLAN-003, PLAN-004, PLAN-005, ORG-004]
-last_reviewed: 2026-07-19
+last_reviewed: 2026-08-09
 ---
 
 # Purpose
@@ -47,6 +47,7 @@ Each calculated interval shall include:
 - service-level target and threshold
 - max occupancy
 - caller patience default or approved input
+- minimum headcount per open interval
 
 # Model Contract
 
@@ -69,8 +70,11 @@ Each calculated interval shall include:
 - Each planning interval shall calculate net required agents with Erlang C.
 - Required agents shall be the lowest whole number that satisfies both the
   service-level target and the max-occupancy constraint.
-- An interval with zero contacts shall require zero agents, have zero
-  occupancy, and have a service level of one.
+- Before an operational floor, an interval with zero contacts shall have an
+  Erlang requirement of zero agents, zero occupancy, and a service level of one.
+- When a saved minimum is greater than the Erlang requirement, final required
+  agents shall equal the minimum and queue metrics shall be recalculated at
+  that staffing level as defined by `PLAN-014`.
 - Monthly Erlang staffed hours shall equal the sum of `required agents * interval hours`.
 - Monthly workload hours shall equal source contacts times AHT.
 - Weighted occupancy and service level shall use documented weighting.
@@ -187,3 +191,4 @@ results.
 - `src/planner/intradayErlang.js`
 - `backend/app/planner.py`
 - `src/composables/monthlyPlanBuilder/usePlannerIntradayErlang.js`
+- `PLAN-014` Minimum headcount per open interval

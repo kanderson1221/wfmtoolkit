@@ -7,8 +7,12 @@ import {
   resolvePlanningGroupIntraday,
   summarizePlanningGroupIntraday
 } from '../../planner/groupIntraday'
+import { buildPlanningGroupIntradayImportStateFromFile } from '../../planner/groupIntradayImport'
 import { describeOperatingWindow } from '../../planner/operatingSchedule'
 import AppButton from '../ui/AppButton.vue'
+import AppFieldGroup from '../ui/AppFieldGroup.vue'
+import AppFileDropzone from '../ui/AppFileDropzone.vue'
+import AppNumberField from '../ui/AppNumberField.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
@@ -31,11 +35,21 @@ const props = defineProps({
 const emit = defineEmits(['save-intraday'])
 
 const intradayDraft = ref(resolvePlanningGroupIntraday(props.group, { center: props.center }))
+const importFeedback = ref({
+  tone: 'info',
+  message: '',
+  issues: []
+})
 
 const resetDraft = () => {
   intradayDraft.value = resolvePlanningGroupIntraday(props.group, {
     center: props.center
   })
+  importFeedback.value = {
+    tone: 'info',
+    message: '',
+    issues: []
+  }
 }
 
 watch(
@@ -53,11 +67,16 @@ watch(
 )
 
 const summary = computed(() => summarizePlanningGroupIntraday(intradayDraft.value))
+const minimumHeadcountIsValid = computed(() => {
+  const value = Number(intradayDraft.value.minimumHeadcount)
+  return Number.isInteger(value) && value >= 0
+})
 
 const operatingWindowLabel = computed(() => describeOperatingWindow(props.center))
 
 const canSave = computed(() =>
   summary.value.isBalanced &&
+  minimumHeadcountIsValid.value &&
   intradayDraft.value.intervalRatios.length > 0
 )
 
@@ -80,6 +99,50 @@ const normalizeRatios = () => {
   intradayDraft.value = {
     ...intradayDraft.value,
     intervalRatios: normalizePlanningGroupIntradayRatios(intradayDraft.value.intervalRatios)
+  }
+}
+
+const handleRatioFileSelect = async (event) => {
+  const input = event?.target
+  const droppedFiles = event?.dataTransfer?.files
+  const file = input?.files?.[0] || droppedFiles?.[0]
+
+  if (!file) {
+    return
+  }
+
+  try {
+    const importState = await buildPlanningGroupIntradayImportStateFromFile(
+      file,
+      intradayDraft.value.intervalRatios
+    )
+
+    if (importState.issues.length) {
+      importFeedback.value = {
+        tone: 'error',
+        message: `Unable to import ${file.name || 'the selected CSV'}. Correct the file and try again.`,
+        issues: importState.issues
+      }
+      return
+    }
+
+    intradayDraft.value = {
+      ...intradayDraft.value,
+      intervalRatios: importState.intervalRatios
+    }
+    importFeedback.value = {
+      tone: importState.isBalanced ? 'success' : 'warning',
+      message: importState.isBalanced
+        ? `Imported ${importState.importedCount} interval ratios from ${importState.uploadedFileName}. Review the values and save the intraday profile.`
+        : `Imported ${importState.importedCount} interval ratios from ${importState.uploadedFileName}, totaling ${props.formatNumber(importState.totalRatioPercent, 1)}%. Normalize or edit the ratios before saving.`,
+      issues: []
+    }
+  } catch {
+    importFeedback.value = {
+      tone: 'error',
+      message: 'The selected CSV could not be read. Choose another file and try again.',
+      issues: []
+    }
   }
 }
 
@@ -129,6 +192,62 @@ defineExpose({
                 {{ intradayDraft.intervalRatios.length }}
               </strong>
             </div>
+            <AppFieldGroup
+              label="Minimum Headcount per Open Interval"
+              input-id="minimum-headcount-per-open-interval"
+              help-text="Use 0 for no floor. The saved whole-number minimum applies to every interval on open operating days."
+              :error="minimumHeadcountIsValid ? '' : 'Enter a whole number of 0 or greater.'"
+              compact
+            >
+              <AppNumberField
+                id="minimum-headcount-per-open-interval"
+                v-model.number="intradayDraft.minimumHeadcount"
+                :min="0"
+                :step="1"
+                :min-fraction-digits="0"
+                :max-fraction-digits="0"
+                compact
+                aria-label="Minimum headcount per open interval"
+              />
+            </AppFieldGroup>
+          </div>
+
+          <AppFileDropzone
+            input-id="planning-group-intraday-ratios-upload"
+            title="Import Interval Ratios"
+            button-label="Choose CSV"
+            description="Upload one percentage for every active interval. Imported values replace the current ratio profile after validation."
+            hint-text=""
+            :format-badges="['.CSV']"
+            accept=".csv,text/csv"
+            compact
+            centered
+            @file-select="handleRatioFileSelect"
+          >
+            <template #actions>
+              <AppButton
+                size="sm"
+                variant="quiet"
+                href="/planning_group_intraday_ratios_template.csv"
+                download
+              >
+                Download Sample Template
+              </AppButton>
+            </template>
+          </AppFileDropzone>
+
+          <AppStatusMessage v-if="importFeedback.message" :tone="importFeedback.tone">
+            {{ importFeedback.message }}
+          </AppStatusMessage>
+
+          <div v-if="importFeedback.issues.length" class="grid gap-2">
+            <AppStatusMessage
+              v-for="issue in importFeedback.issues"
+              :key="issue"
+              tone="error"
+            >
+              {{ issue }}
+            </AppStatusMessage>
           </div>
         </div>
 

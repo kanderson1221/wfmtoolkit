@@ -53,6 +53,7 @@ class PlannerIntradayErlangRowRequest(BaseModel):
     serviceLevelGoal: float = Field(gt=0, le=100)
     serviceLevelThreshold: float = Field(ge=0)
     maxOccupancy: float = Field(gt=0, le=100, default=85)
+    minimumHeadcount: int = Field(ge=0, default=0)
     averageCustomerPatience: float = Field(gt=0, default=60)
 
 
@@ -235,6 +236,7 @@ def calculate_planner_intraday_erlang(payload: PlannerIntradayErlangRequest) -> 
                     "service_level_goal": row.serviceLevelGoal / 100.0,
                     "service_level_threshold_seconds": row.serviceLevelThreshold,
                     "max_occupancy": row.maxOccupancy / 100.0,
+                    "minimum_headcount": row.minimumHeadcount,
                     "mean_patience_seconds": row.averageCustomerPatience,
                 }
                 for row in payload.rows

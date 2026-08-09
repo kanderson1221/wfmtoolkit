@@ -7,6 +7,7 @@ import {
 
 const MINUTES_PER_DAY = 24 * 60
 const DEFAULT_INTERVAL_LENGTH_MINUTES = 30
+const DEFAULT_MINIMUM_HEADCOUNT = 0
 
 const toNumber = (value, fallback = 0) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -136,6 +137,7 @@ export const createPlanningGroupIntraday = (overrides = {}) => {
 
   return {
     intervalLengthMinutes: DEFAULT_INTERVAL_LENGTH_MINUTES,
+    minimumHeadcount: Math.max(Math.round(toNumber(snapshot.minimumHeadcount, DEFAULT_MINIMUM_HEADCOUNT)), 0),
     intervalRatios: normalizeStoredRatioRows(snapshot.intervalRatios)
   }
 }
@@ -171,6 +173,7 @@ export const resolvePlanningGroupIntraday = (source = {}, context = {}) => {
 
   return {
     intervalLengthMinutes: DEFAULT_INTERVAL_LENGTH_MINUTES,
+    minimumHeadcount: snapshot.minimumHeadcount,
     intervalRatios: ratioRows
   }
 }

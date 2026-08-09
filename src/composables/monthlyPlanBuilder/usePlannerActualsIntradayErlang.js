@@ -8,7 +8,7 @@ import {
   normalizePlannerIntradayErlangResults
 } from '../../planner/intradayErlang'
 
-const ERLANG_RESULTS_VERSION = 1
+const ERLANG_RESULTS_VERSION = 2
 
 const extractApiErrorMessage = async (response) => {
   const rawErrorText = await response.text().catch(() => '')

@@ -176,6 +176,8 @@ create table intraday_profiles (
   staffing_group_id uuid not null unique references staffing_groups(id) on delete cascade,
   interval_length_minutes integer not null default 30
     check (interval_length_minutes > 0 and interval_length_minutes <= 1440),
+  minimum_headcount_per_open_interval integer not null default 0
+    check (minimum_headcount_per_open_interval >= 0),
   status text not null default 'draft'
     check (status in ('draft', 'valid', 'invalid')),
   created_at timestamptz not null default now(),
@@ -595,6 +597,8 @@ create table plan_intraday_profile_snapshots (
   source_intraday_profile_id uuid references intraday_profiles(id) on delete set null,
   interval_length_minutes integer not null
     check (interval_length_minutes > 0 and interval_length_minutes <= 1440),
+  minimum_headcount_per_open_interval integer not null default 0
+    check (minimum_headcount_per_open_interval >= 0),
   captured_at timestamptz not null default now()
 );
 

@@ -55,6 +55,7 @@ import {
   normalizePlannerIntradayErlangResults
 } from '../planner/intradayErlang'
 import { createPlanOpenDayChecker } from '../planner/planOpenDays'
+import { createPlanningGroupIntraday } from '../planner/groupIntraday'
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
 import { buildExamplePlannerState } from './monthlyPlanBuilder/examplePlan'
 import { usePlannerAutosave } from './monthlyPlanBuilder/usePlannerAutosave'
@@ -219,6 +220,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     randomDefaults.value = createRandomMonth(bootstrapState.initialState.randomDefaults)
     useMonthlyRandomOverrides.value = bootstrapState.initialState.useMonthlyRandomOverrides
     randomMonths.value = bootstrapState.initialState.randomMonths.map((month) => createRandomMonth(month))
+    intraday.value = createPlanningGroupIntraday(bootstrapState.initialState.intraday)
     planMonths.value = bootstrapState.initialState.planMonths.map((month) => createPlanMonth(month))
     intradayErlangResults.value = normalizePlannerIntradayErlangResults(
       bootstrapState.initialState.intradayErlangResults
@@ -283,6 +285,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const randomDefaults = ref(createRandomMonth(initialBootstrapState.initialState.randomDefaults))
   const useMonthlyRandomOverrides = ref(initialBootstrapState.initialState.useMonthlyRandomOverrides)
   const randomMonths = ref(initialBootstrapState.initialState.randomMonths.map((month) => createRandomMonth(month)))
+  const intraday = ref(createPlanningGroupIntraday(initialBootstrapState.initialState.intraday))
   const planMonths = ref(initialBootstrapState.initialState.planMonths.map((month) => createPlanMonth(month)))
   const intradayErlangResults = ref(normalizePlannerIntradayErlangResults(initialBootstrapState.initialState.intradayErlangResults))
   const actualsIntradayErlangResults = ref(
@@ -564,16 +567,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     )
   )
   const intradayErlangProfile = computed(() => {
-    const snapshot =
-      sourcePlanReference.value?.intraday ||
-      props.centerDefaults?.intraday ||
-      {}
+    const snapshot = createPlanningGroupIntraday(intraday.value)
 
     return {
       intervalLengthMinutes: snapshot.intervalLengthMinutes,
-      intervalRatios: Array.isArray(snapshot.intervalRatios)
-        ? snapshot.intervalRatios.map((row) => ({ ...row }))
-        : []
+      minimumHeadcount: snapshot.minimumHeadcount,
+      intervalRatios: snapshot.intervalRatios.map((row) => ({ ...row }))
     }
   })
 
@@ -835,6 +834,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       operatingCloseTime: intradayErlangCloseTime.value,
       intraday: {
         intervalLengthMinutes: intradayErlangProfile.value.intervalLengthMinutes,
+        minimumHeadcount: intradayErlangProfile.value.minimumHeadcount,
         intervalRatios: intradayErlangProfile.value.intervalRatios.map((row) => ({ ...row }))
       },
       intradayErlangResults: requirementMethod.value === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG

@@ -248,7 +248,15 @@ describe('MonthlyPlanBuilder', () => {
       prefilledYear: 2026,
       centerDefaults: {
         ...centerDefaults,
-        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        intraday: {
+          intervalLengthMinutes: 30,
+          minimumHeadcount: 3,
+          intervalRatios: [
+            { startTime: '08:00', ratioPercent: 50 },
+            { startTime: '08:30', ratioPercent: 50 }
+          ]
+        }
       }
     })
 
@@ -619,7 +627,15 @@ describe('MonthlyPlanBuilder', () => {
       prefilledYear: 2026,
       centerDefaults: {
         ...centerDefaults,
-        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        intraday: {
+          intervalLengthMinutes: 30,
+          minimumHeadcount: 3,
+          intervalRatios: [
+            { startTime: '08:00', ratioPercent: 50 },
+            { startTime: '08:30', ratioPercent: 50 }
+          ]
+        }
       }
     })
 
@@ -637,6 +653,9 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.emitted('save')[0][0]).toMatchObject({
       requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
       status: PLAN_STATUS_DRAFT,
+      intraday: {
+        minimumHeadcount: 3
+      },
       summary: {
         requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
       }

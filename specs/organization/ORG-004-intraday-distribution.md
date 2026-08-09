@@ -4,7 +4,7 @@ title: Staffing-Group Intraday Demand Distribution
 status: draft
 owners: []
 depends_on: [ORG-002, ORG-003, FOUND-003]
-last_reviewed: 2026-06-14
+last_reviewed: 2026-08-09
 ---
 
 # Purpose
@@ -19,6 +19,7 @@ An intraday profile shall include:
 - ordered intervals derived from the effective operating window
 - one non-negative demand ratio per interval
 - normalized total ratio of 100 percent
+- one non-negative whole-number minimum headcount applied to all open intervals
 - last-updated metadata
 
 # Functional Requirements
@@ -28,7 +29,9 @@ An intraday profile shall include:
 - The planner shall be able to edit each interval ratio.
 - The system shall display the running total.
 - The planner shall be able to normalize entered ratios to 100 percent.
+- The planner shall be able to import interval ratios from CSV and download a sample template.
 - Saving shall persist business values without UI-only labels or state.
+- The planner shall be able to set one minimum headcount for every open interval; zero shall disable the floor.
 - Changing operating hours shall reconcile matching interval ratios and identify added or removed intervals.
 
 # Business Rules
@@ -39,6 +42,22 @@ An intraday profile shall include:
 - Interval ordering shall follow local call-center time.
 - Applying the profile to a daily total shall preserve that total within rounding tolerance.
 - Profile changes shall not silently rewrite finalized plan interval snapshots.
+- Existing profiles without a minimum shall normalize to zero.
+
+# Interval Ratio Import
+
+The CSV import contract shall contain:
+
+- `interval_start`: the local interval start in 24-hour `HH:MM` format
+- `ratio_percent`: the percentage of daily contacts assigned to that interval,
+  between 0 and 100
+
+The file shall contain every active interval exactly once. Duplicate starts,
+missing active intervals, intervals outside the current operating window,
+invalid times, and invalid percentages shall reject the import without changing
+the current draft. A structurally valid import may be loaded when its ratios do
+not yet total 100 percent, but save shall remain blocked until the planner edits
+or normalizes the values.
 
 # Failure Behavior
 
@@ -69,6 +88,14 @@ An intraday profile shall include:
 **Then** matching interval ratios are retained  
 **And** new intervals are clearly initialized.
 
+## Import Interval Ratios
+
+**Given** the planner downloads the sample template and supplies every active
+interval exactly once
+**When** the CSV is imported
+**Then** the worksheet ratios are replaced in operating-time order
+**And** the planner reviews and saves the imported profile.
+
 # Open Questions
 
 1. Are multiple profiles by weekday or season required?
@@ -80,4 +107,3 @@ An intraday profile shall include:
 - `src/planner/groupIntraday.js`
 - `src/components/planning/PlanningGroupIntradayView.vue`
 - `src/components/__tests__/PlanningGroupIntradayView.spec.js`
-

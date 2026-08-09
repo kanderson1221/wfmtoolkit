@@ -30,6 +30,7 @@ import {
   toNumber
 } from '../../plannerModel'
 import { createPlanDemandSource } from '../../planner/demandSources'
+import { createPlanningGroupIntraday } from '../../planner/groupIntraday'
 
 export const WEEKDAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -164,6 +165,7 @@ export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYe
     holidayScheduleMode,
     presenceMonths,
     randomDefaults,
+    intraday: createPlanningGroupIntraday(centerDefaults),
     startingHeadcount: startingPosition.rosterHeadcount,
     startingFrontlineHeadcount: startingPosition.frontlineHeadcount
   }
@@ -227,6 +229,7 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
     randomDefaults: createRandomMonth(basePlan.randomDefaults || seedDefaults.randomDefaults),
     useMonthlyRandomOverrides: Boolean(basePlan.useMonthlyRandomOverrides),
     randomMonths: hydrateMonths(basePlan.randomMonths, buildRandomMonths, createRandomMonth),
+    intraday: createPlanningGroupIntraday(basePlan.intraday || seedDefaults.intraday),
     planMonths: hydrateMonths(basePlan.planMonths, buildPlanMonths, createPlanMonth),
     demandSource: createPlanDemandSource(basePlan.demandSource),
     trainingSettings,

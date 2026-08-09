@@ -49,6 +49,7 @@ describe('groupIntraday', () => {
       { startTime: '09:00', endTime: '09:30', label: '09:00 - 09:30', ratioPercent: 25 },
       { startTime: '09:30', endTime: '10:00', label: '09:30 - 10:00', ratioPercent: 25 }
     ])
+    expect(intraday.minimumHeadcount).toBe(0)
   })
 
   it('preserves saved ratios for matching intervals', () => {
@@ -93,6 +94,7 @@ describe('groupIntraday', () => {
   it('strips UI-only interval metadata when saving the intraday profile', () => {
     expect(
       createPlanningGroupIntraday({
+        minimumHeadcount: 3,
         intervalRatios: [
           {
             startTime: '08:00',
@@ -104,12 +106,22 @@ describe('groupIntraday', () => {
       })
     ).toEqual({
       intervalLengthMinutes: 30,
+      minimumHeadcount: 3,
       intervalRatios: [
         {
           startTime: '08:00',
           ratioPercent: 30
         }
       ]
+    })
+  })
+
+  it('normalizes the shared minimum headcount to a non-negative whole number', () => {
+    expect(createPlanningGroupIntraday({ minimumHeadcount: 2.6 })).toMatchObject({
+      minimumHeadcount: 3
+    })
+    expect(createPlanningGroupIntraday({ minimumHeadcount: -4 })).toMatchObject({
+      minimumHeadcount: 0
     })
   })
 })

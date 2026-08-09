@@ -344,6 +344,15 @@ def _metrics_for_agents(inputs: StaffingInput, num_agents: int, model: str = ERL
     )
 
 
+def staffing_metrics_for_agents(
+    inputs: StaffingInput,
+    num_agents: int,
+    model: str = ERLANG_C_MODEL,
+) -> StaffingMetrics:
+    """Return queue metrics for an explicitly selected staffing level."""
+    return _metrics_for_agents(inputs, num_agents, model)
+
+
 def _meets_staffing_targets(inputs: StaffingInput, metrics: StaffingMetrics) -> bool:
     return (
         metrics["occupancy"] <= inputs.max_occupancy

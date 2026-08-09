@@ -3,12 +3,12 @@ from __future__ import annotations
 import csv
 import math
 from collections import defaultdict
-from dataclasses import asdict, fields
+from dataclasses import asdict, fields, replace
 from datetime import datetime
 from pathlib import Path
 from typing import TypeVar
 
-from .erlang import staff_for_interval
+from .erlang import staff_for_interval, staffing_metrics_for_agents
 from .models import DailyStaffingPlan, IntervalForecast, IntervalPlan, StaffingInput
 
 DataClassType = TypeVar("DataClassType")
@@ -25,17 +25,7 @@ def apply_shrinkage(net_staff: int, shrinkage: float) -> int:
 
 
 def plan_interval(forecast: IntervalForecast) -> IntervalPlan:
-    result = staff_for_interval(
-        StaffingInput(
-            calls_offered=forecast.calls_offered,
-            interval_duration_seconds=forecast.interval_duration_seconds,
-            avg_handle_time_seconds=forecast.avg_handle_time_seconds,
-            target_service_level=forecast.service_level_threshold,
-            service_level_answer_time_seconds=forecast.service_level_target_seconds,
-            max_occupancy=forecast.max_occupancy,
-            avg_caller_patience_seconds=forecast.mean_patience_seconds,
-        )
-    )
+    result = staff_for_interval(_staffing_input_for_forecast(forecast))
 
     gross_staff = apply_shrinkage(result["required_staff"], forecast.shrinkage)
 
@@ -50,6 +40,18 @@ def plan_interval(forecast: IntervalForecast) -> IntervalPlan:
         percent_answered_immediately=result["percent_answered_immediately"],
         abandon_percent=result["abandon_percent"],
         interval_duration_seconds=forecast.interval_duration_seconds,
+    )
+
+
+def _staffing_input_for_forecast(forecast: IntervalForecast) -> StaffingInput:
+    return StaffingInput(
+        calls_offered=forecast.calls_offered,
+        interval_duration_seconds=forecast.interval_duration_seconds,
+        avg_handle_time_seconds=forecast.avg_handle_time_seconds,
+        target_service_level=forecast.service_level_threshold,
+        service_level_answer_time_seconds=forecast.service_level_target_seconds,
+        max_occupancy=forecast.max_occupancy,
+        avg_caller_patience_seconds=forecast.mean_patience_seconds,
     )
 
 
@@ -123,6 +125,14 @@ def plan_intraday_monthly_rows(
     for row in rows:
         month_index = int(row["month_index"])
         interval_duration_seconds = float(row.get("interval_duration_seconds") or 30 * 60)
+        minimum_headcount_value = float(row.get("minimum_headcount") or 0)
+        if (
+            not math.isfinite(minimum_headcount_value)
+            or minimum_headcount_value < 0
+            or not minimum_headcount_value.is_integer()
+        ):
+            raise ValueError("minimum_headcount must be a whole number >= 0")
+        minimum_headcount = int(minimum_headcount_value)
         interval_forecasts.append(
             IntervalForecast(
                 queue_id=f"month-{month_index}",
@@ -146,10 +156,58 @@ def plan_intraday_monthly_rows(
                 "interval_duration_seconds": interval_duration_seconds,
                 "calls_offered": float(row["calls_offered"]),
                 "average_handle_time_seconds": float(row["average_handle_time_seconds"]),
+                "minimum_headcount": minimum_headcount,
+                "minimum_headcount_configured": "minimum_headcount" in row,
             }
         )
 
-    interval_plans = plan_intervals(interval_forecasts)
+    configured_minimum_headcounts = {
+        int(row["minimum_headcount"]) for row in normalized_rows
+    }
+    if len(configured_minimum_headcounts) > 1:
+        raise ValueError("minimum_headcount must be consistent across all rows")
+
+    erlang_interval_plans = plan_intervals(interval_forecasts)
+    interval_plans: list[IntervalPlan] = []
+    for forecast, metadata, erlang_plan in zip(
+        interval_forecasts,
+        normalized_rows,
+        erlang_interval_plans,
+        strict=False,
+    ):
+        erlang_required_staff_net = erlang_plan.required_staff_net
+        minimum_headcount = int(metadata["minimum_headcount"])
+        final_required_staff_net = max(erlang_required_staff_net, minimum_headcount)
+        metadata["erlang_required_staff_net"] = erlang_required_staff_net
+
+        if final_required_staff_net == erlang_required_staff_net:
+            interval_plans.append(erlang_plan)
+            continue
+
+        metrics = staffing_metrics_for_agents(
+            _staffing_input_for_forecast(forecast),
+            final_required_staff_net,
+            model="erlang_c",
+        )
+        interval_plans.append(
+            replace(
+                erlang_plan,
+                required_staff_net=final_required_staff_net,
+                required_staff_gross=apply_shrinkage(
+                    final_required_staff_net,
+                    forecast.shrinkage,
+                ),
+                service_level=metrics["service_level"],
+                occupancy=metrics["occupancy"],
+                average_speed_of_answer_seconds=metrics[
+                    "average_speed_of_answer_seconds"
+                ],
+                percent_answered_immediately=metrics[
+                    "percent_answered_immediately"
+                ],
+                abandon_percent=metrics["abandon_percent"],
+            )
+        )
     daily_plans = plan_daily(interval_plans)
 
     interval_payload_rows = []
@@ -164,24 +222,34 @@ def plan_intraday_monthly_rows(
         workload_hours = calls_offered * average_handle_time_seconds / 3600.0
         interval_hours = interval_plan.required_staff_net * interval_duration_hours
 
-        interval_payload_rows.append(
-            {
-                "monthIndex": month_index,
-                "serviceDate": service_date,
-                "intervalStart": interval_plan.interval_start,
-                "callsOffered": calls_offered,
-                "averageHandleTimeSeconds": average_handle_time_seconds,
-                "workloadHours": round(workload_hours, 6),
-                "requiredStaffNet": interval_plan.required_staff_net,
-                "laborHoursNet": round(interval_hours, 6),
-                "serviceLevel": interval_plan.service_level,
-                "occupancy": interval_plan.occupancy,
-                "averageSpeedOfAnswerSeconds": interval_plan.average_speed_of_answer_seconds,
-                "percentAnsweredImmediately": interval_plan.percent_answered_immediately,
-                "abandonPercent": interval_plan.abandon_percent,
-                "intervalLengthMinutes": interval_plan.interval_duration_seconds / 60.0,
-            }
-        )
+        interval_payload_row = {
+            "monthIndex": month_index,
+            "serviceDate": service_date,
+            "intervalStart": interval_plan.interval_start,
+            "callsOffered": calls_offered,
+            "averageHandleTimeSeconds": average_handle_time_seconds,
+            "workloadHours": round(workload_hours, 6),
+            "requiredStaffNet": interval_plan.required_staff_net,
+            "laborHoursNet": round(interval_hours, 6),
+            "serviceLevel": interval_plan.service_level,
+            "occupancy": interval_plan.occupancy,
+            "averageSpeedOfAnswerSeconds": interval_plan.average_speed_of_answer_seconds,
+            "percentAnsweredImmediately": interval_plan.percent_answered_immediately,
+            "abandonPercent": interval_plan.abandon_percent,
+            "intervalLengthMinutes": interval_plan.interval_duration_seconds / 60.0,
+        }
+        if bool(metadata["minimum_headcount_configured"]):
+            erlang_required_staff_net = int(metadata["erlang_required_staff_net"])
+            minimum_headcount = int(metadata["minimum_headcount"])
+            interval_payload_row.update(
+                {
+                    "erlangRequiredStaffNet": erlang_required_staff_net,
+                    "minimumHeadcount": minimum_headcount,
+                    "minimumApplied": interval_plan.required_staff_net
+                    > erlang_required_staff_net,
+                }
+            )
+        interval_payload_rows.append(interval_payload_row)
 
         monthly_summary = monthly_rollups.setdefault(
             month_index,
@@ -194,6 +262,7 @@ def plan_intraday_monthly_rows(
                 "callsOffered": 0.0,
                 "peakIntervalRequiredHeadcount": 0,
                 "openDayCount": 0,
+                "minimumAppliedIntervalCount": 0,
                 "serviceDateSet": set(),
             },
         )
@@ -216,6 +285,10 @@ def plan_intraday_monthly_rows(
             int(monthly_summary["peakIntervalRequiredHeadcount"]),
             interval_plan.required_staff_net,
         )
+        if interval_plan.required_staff_net > int(metadata["erlang_required_staff_net"]):
+            monthly_summary["minimumAppliedIntervalCount"] = int(
+                monthly_summary["minimumAppliedIntervalCount"]
+            ) + 1
         service_date_set = monthly_summary["serviceDateSet"]
         service_date_set.add(service_date)
         monthly_summary["openDayCount"] = len(service_date_set)
@@ -240,8 +313,16 @@ def plan_intraday_monthly_rows(
             }
         )
 
-    monthly_payload_rows = [
-        {
+    monthly_payload_rows = []
+    minimum_headcount_configured = any(
+        bool(row["minimum_headcount_configured"]) for row in normalized_rows
+    )
+    configured_minimum_headcount = max(
+        (int(row["minimum_headcount"]) for row in normalized_rows),
+        default=0,
+    )
+    for month_index, summary in sorted(monthly_rollups.items()):
+        monthly_payload_row = {
             "monthIndex": month_index,
             "workloadHours": round(float(summary["workloadHours"]), 4),
             "erlangStaffedHours": round(float(summary["erlangStaffedHours"]), 4),
@@ -266,8 +347,16 @@ def plan_intraday_monthly_rows(
             ),
             "openDayCount": int(summary["openDayCount"]),
         }
-        for month_index, summary in sorted(monthly_rollups.items())
-    ]
+        if minimum_headcount_configured:
+            monthly_payload_row.update(
+                {
+                    "minimumHeadcount": configured_minimum_headcount,
+                    "minimumAppliedIntervalCount": int(
+                        summary["minimumAppliedIntervalCount"]
+                    ),
+                }
+            )
+        monthly_payload_rows.append(monthly_payload_row)
 
     return {
         "intervalPlans": interval_payload_rows,

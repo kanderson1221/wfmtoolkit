@@ -1,10 +1,32 @@
 import {
   buildPlannerActualsIntradayErlangPayload,
+  buildPlannerIntradayErlangInputSignature,
   buildPlannerIntradayErlangPayload,
   mergeIntradayErlangMonthlyRecords
 } from '../intradayErlang'
 
 describe('intraday Erlang planner payloads', () => {
+  it('includes the minimum headcount in the saved-result input signature', () => {
+    const baseRow = {
+      monthIndex: 0,
+      serviceDate: '2026-01-02',
+      intervalStart: '2026-01-02T08:00:00',
+      callsOffered: 10,
+      averageHandleTime: 300,
+      intervalLengthMinutes: 30,
+      serviceLevelGoal: 80,
+      serviceLevelThreshold: 20,
+      maxOccupancy: 85,
+      minimumHeadcount: 0
+    }
+
+    expect(buildPlannerIntradayErlangInputSignature([baseRow])).not.toBe(
+      buildPlannerIntradayErlangInputSignature([
+        { ...baseRow, minimumHeadcount: 2 }
+      ])
+    )
+  })
+
   it('builds 48 unique interval rows for one always-open forecast day', () => {
     const payload = buildPlannerIntradayErlangPayload({
       planningYear: 2026,
@@ -110,6 +132,7 @@ describe('intraday Erlang planner payloads', () => {
       serviceLevelThresholdSeconds: 20,
       intraday: {
         intervalLengthMinutes: 30,
+        minimumHeadcount: 3,
         intervalRatios: [
           { startTime: '08:00', ratioPercent: 25 },
           { startTime: '08:30', ratioPercent: 75 }
@@ -124,14 +147,16 @@ describe('intraday Erlang planner payloads', () => {
         intervalStart: '2026-01-02T08:00:00',
         callsOffered: 25,
         averageHandleTime: 300,
-        maxOccupancy: 90
+        maxOccupancy: 90,
+        minimumHeadcount: 3
       }),
       expect.objectContaining({
         serviceDate: '2026-01-02',
         intervalStart: '2026-01-02T08:30:00',
         callsOffered: 75,
         averageHandleTime: 300,
-        maxOccupancy: 90
+        maxOccupancy: 90,
+        minimumHeadcount: 3
       })
     ])
   })

@@ -63,6 +63,7 @@ const sampleCenters = [
         holidayScheduleMode: 'closed',
         intraday: {
           intervalLengthMinutes: 30,
+          minimumHeadcount: 2,
           intervalRatios: [
             { startTime: '08:00', ratioPercent: 30 },
             { startTime: '08:30', ratioPercent: 20 },
@@ -304,7 +305,8 @@ describe('localDataStore', () => {
       serviceLevelThresholdSeconds: 20
     })
     expect(loadedCenters[0].groups[0].intraday).toMatchObject({
-      intervalLengthMinutes: 30
+      intervalLengthMinutes: 30,
+      minimumHeadcount: 2
     })
     expect(loadedCenters[0].groups[0].intraday.intervalRatios.slice(0, 4)).toEqual([
       { startTime: '08:00', ratioPercent: 30 },
