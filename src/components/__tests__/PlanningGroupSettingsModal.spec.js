@@ -72,9 +72,8 @@ describe('PlanningGroupSettingsModal', () => {
     const wrapper = mountModal()
 
     expect(wrapper.text()).toContain('Service Level')
-    expect(wrapper.text()).toContain('Answer')
-    expect(wrapper.text()).toContain('% of contacts within')
-    expect(wrapper.text()).toContain('seconds')
+    expect(wrapper.text()).toContain('Contacts answered (%)')
+    expect(wrapper.text()).toContain('Within (seconds)')
 
     await wrapper.get('#group-service-level-percent').setValue('85')
     await wrapper.get('#group-service-goal-threshold').setValue('30')
@@ -85,7 +84,7 @@ describe('PlanningGroupSettingsModal', () => {
     expect(wrapper.emitted('save')).toHaveLength(1)
   })
 
-  it('presents email response targets and the Phase 1 limitation', () => {
+  it('presents a compact email response target without the Phase 1 message', () => {
     const wrapper = mountModal({
       channelType: 'email',
       serviceGoalPercent: 90,
@@ -93,10 +92,10 @@ describe('PlanningGroupSettingsModal', () => {
     })
 
     expect(wrapper.text()).toContain('Response Target')
-    expect(wrapper.text()).toContain('Respond to')
-    expect(wrapper.text()).toContain('% of emails within')
-    expect(wrapper.text()).toContain('business hours')
+    expect(wrapper.text()).toContain('Emails responded to (%)')
+    expect(wrapper.text()).toContain('Within (business hours)')
     expect(wrapper.text()).toContain('Productive Utilization (%)')
-    expect(wrapper.text()).toContain('does not simulate backlog aging')
+    expect(wrapper.text()).not.toContain('Phase 1 converts email volume')
+    expect(wrapper.text()).not.toContain('does not simulate backlog aging')
   })
 })
