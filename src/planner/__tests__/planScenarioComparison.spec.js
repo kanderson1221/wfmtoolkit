@@ -33,6 +33,37 @@ const buildPlan = (overrides = {}) => ({
   ...overrides
 })
 
+const buildUncalculatedIntradayPlan = (overrides = {}) => buildPlan({
+  requirementMethod: 'intraday_erlang',
+  operatingOpenTime: '08:00',
+  operatingCloseTime: '09:00',
+  serviceLevelPercent: 80,
+  serviceLevelThresholdSeconds: 20,
+  intraday: {
+    intervalLengthMinutes: 30,
+    intervalRatios: [
+      { startTime: '08:00', ratioPercent: 50 },
+      { startTime: '08:30', ratioPercent: 50 }
+    ]
+  },
+  demandSource: {
+    mode: 'forecast',
+    forecastDailySnapshot: [
+      { serviceDate: '2027-01-04', monthIndex: 0, contacts: 100, ahtSeconds: 300 }
+    ],
+    forecastMonthSnapshot: [
+      { monthIndex: 0, monthLabel: 'Jan 2027', contacts: 100, ahtSeconds: 300 }
+    ]
+  },
+  summary: {
+    annualRequiredStaffHours: 9999,
+    averageRequiredHeadcount: 99,
+    peakRequiredHeadcount: 199,
+    averageGapToRequirement: -89
+  },
+  ...overrides
+})
+
 describe('planScenarioComparison', () => {
   it('reconciles saved snapshots into annual and monthly candidate-minus-baseline deltas', () => {
     const baselinePlan = buildPlan()
@@ -131,5 +162,43 @@ describe('planScenarioComparison', () => {
     expect(january[headers.indexOf('contacts_delta')]).toBe('0')
     expect(january[headers.indexOf('required_headcount_delta')]).toBe('')
     expect(january[headers.indexOf('peak_day_required_headcount_delta')]).toBe('')
+  })
+
+  it('withholds requirements and gaps when same-method Erlang results are unavailable', () => {
+    const comparison = buildPlanScenarioComparison({
+      baselinePlan: buildUncalculatedIntradayPlan({ name: '2027 Erlang Budget' }),
+      candidatePlan: buildUncalculatedIntradayPlan({
+        id: 'update-erlang',
+        name: '2027 Erlang Update',
+        planType: 'update'
+      }),
+      center
+    })
+
+    expect(comparison.requirementMethodComparable).toBe(true)
+    expect(comparison.requirementsComparable).toBe(false)
+    expect(comparison.requirementWarning).toContain('2027 Erlang Budget')
+    expect(comparison.requirementWarning).toContain('2027 Erlang Update')
+    expect(comparison.baseline.metrics).toMatchObject({
+      annualRequiredStaffHours: null,
+      averageRequiredHeadcount: null,
+      peakRequiredHeadcount: null,
+      averageOpeningGapToRequirement: null,
+      averageEndingGapToRequirement: null
+    })
+    expect(comparison.monthlyRows[0]).toMatchObject({
+      baselineRequiredHeadcount: null,
+      candidateRequiredHeadcount: null,
+      requiredHeadcountDelta: null,
+      baselineOpeningGapToRequirement: null,
+      openingGapToRequirementDelta: null
+    })
+
+    const csv = buildPlanScenarioComparisonCsv(comparison)
+    const [headers, january] = csv.split('\r\n').map((row) => row.split(','))
+    expect(january[headers.indexOf('baseline_required_headcount')]).toBe('')
+    expect(january[headers.indexOf('candidate_required_headcount')]).toBe('')
+    expect(january[headers.indexOf('required_headcount_delta')]).toBe('')
+    expect(january[headers.indexOf('opening_staffing_gap_delta')]).toBe('')
   })
 })

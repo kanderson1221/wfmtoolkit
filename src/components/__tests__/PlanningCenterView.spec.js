@@ -621,6 +621,76 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).not.toContain('Utilization %')
   })
 
+  it('withholds Plans-table requirements and warns when saved Erlang results are unavailable', async () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 90,
+            defaultAdherencePercent: 95,
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
+            plans: [
+              {
+                id: 'plan-1',
+                name: '2026 Erlang Plan',
+                planningYear: 2026,
+                planType: 'budget',
+                isCurrent: true,
+                requirementMethod: 'intraday_erlang',
+                operatingOpenTime: '08:00',
+                operatingCloseTime: '09:00',
+                serviceLevelPercent: 80,
+                serviceLevelThresholdSeconds: 20,
+                intraday: {
+                  intervalLengthMinutes: 30,
+                  intervalRatios: [
+                    { startTime: '08:00', ratioPercent: 50 },
+                    { startTime: '08:30', ratioPercent: 50 }
+                  ]
+                },
+                presenceMonths: Array.from({ length: 12 }, () => ({ monthlyPaidHoursPerFte: 160 })),
+                randomDefaults: { occupancyPercent: 90, adherencePercent: 95 },
+                demandSource: {
+                  mode: 'forecast',
+                  forecastDailySnapshot: [
+                    { serviceDate: '2026-01-05', monthIndex: 0, contacts: 100, ahtSeconds: 300 }
+                  ],
+                  forecastMonthSnapshot: [
+                    { monthIndex: 0, monthLabel: 'Jan 2026', contacts: 100, ahtSeconds: 300 }
+                  ]
+                },
+                summary: {
+                  annualContacts: 100,
+                  annualRequiredStaffHours: 9999,
+                  averageRequiredHeadcount: 99,
+                  averageGapToRequirement: -89
+                }
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    await openTab(wrapper, 'Plans')
+
+    expect(wrapper.text()).toContain('Recalculation required: Run staffing calculations')
+    expect(wrapper.text()).not.toContain('9,999')
+    expect(wrapper.text()).not.toContain('99.0')
+    expect(wrapper.text()).not.toContain('-89.0')
+    expect(wrapper.findAll('span').filter((node) => node.text() === '—').length).toBeGreaterThanOrEqual(3)
+  })
+
   it('groups Budget and Update plans by year with current badges, comparison, and update actions', async () => {
     window.location.hash = '#planning'
 

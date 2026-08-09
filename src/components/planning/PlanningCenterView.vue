@@ -127,6 +127,14 @@ const formatSignedNumber = (value, digits = 1) => {
   const prefix = Number.isFinite(numericValue) && numericValue > 0 ? '+' : ''
   return `${prefix}${formatNumber(value, digits)}`
 }
+const formatOptionalSignedNumber = (value, digits = 1) => {
+  if (value == null || value === '') {
+    return '—'
+  }
+
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? formatSignedNumber(numericValue, digits) : '—'
+}
 const formatOptionalWhole = (value) => {
   if (value == null || value === '') {
     return '—'
@@ -1495,18 +1503,25 @@ watch(
                                 ? `${plan.actualsThroughBadge || 'Update'} · ${plan.decisionReason || 'Decision reason not recorded (legacy plan)'}`
                                 : plan.requirementMethodLabel }}
                             </span>
+                            <span
+                              v-if="plan.requirementWarning"
+                              class="text-xs font-medium leading-4 text-amber-800"
+                              role="status"
+                            >
+                              Recalculation required: {{ plan.requirementWarning }}
+                            </span>
                           </div>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
                             {{ formatWhole(plan.annualContacts) }}
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                            {{ formatWhole(plan.totalRequiredStaffHours) }}
+                            {{ formatOptionalWhole(plan.totalRequiredStaffHours) }}
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                            {{ formatNumber(plan.averageTotalRequiredHeadcount, 1) }}
+                            {{ formatOptionalNumber(plan.averageTotalRequiredHeadcount, 1) }}
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                            {{ formatSignedNumber(plan.averageGapToRequirement, 1) }}
+                            {{ formatOptionalSignedNumber(plan.averageGapToRequirement, 1) }}
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
                             {{ plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : '—' }}
@@ -1614,6 +1629,7 @@ watch(
       v-if="planComparisonSection"
       v-model:visible="planComparisonOpen"
       :center="props.center"
+      :group="selectedGroup"
       :group-name="selectedGroup?.name || 'Staffing Group'"
       :section="planComparisonSection"
     />

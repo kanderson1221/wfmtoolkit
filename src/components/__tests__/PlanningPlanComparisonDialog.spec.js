@@ -37,8 +37,8 @@ const buildPlan = (overrides = {}) => ({
   ...overrides
 })
 
-const buildWrapper = (candidateOverrides = {}) => {
-  const budget = buildPlan()
+const buildWrapper = (candidateOverrides = {}, budgetOverrides = {}) => {
+  const budget = buildPlan(budgetOverrides)
   const update = buildPlan({
     id: 'update-2027-03',
     name: '2027 March Update',
@@ -139,6 +139,38 @@ describe('PlanningPlanComparisonDialog', () => {
 
     expect(wrapper.text()).toContain('Requirement methods differ')
     expect(wrapper.text()).toContain('Not comparable')
+  })
+
+  it('warns and withholds requirement comparisons when Erlang results need recalculation', () => {
+    const erlangInputs = {
+      requirementMethod: 'intraday_erlang',
+      operatingOpenTime: '08:00',
+      operatingCloseTime: '09:00',
+      serviceLevelPercent: 80,
+      serviceLevelThresholdSeconds: 20,
+      intraday: {
+        intervalLengthMinutes: 30,
+        intervalRatios: [
+          { startTime: '08:00', ratioPercent: 50 },
+          { startTime: '08:30', ratioPercent: 50 }
+        ]
+      },
+      demandSource: {
+        mode: 'forecast',
+        forecastDailySnapshot: [
+          { serviceDate: '2027-01-04', monthIndex: 0, contacts: 100, ahtSeconds: 300 }
+        ],
+        forecastMonthSnapshot: [
+          { monthIndex: 0, monthLabel: 'Jan 2027', contacts: 100, ahtSeconds: 300 }
+        ]
+      }
+    }
+    const wrapper = buildWrapper(erlangInputs, erlangInputs)
+
+    expect(wrapper.text()).toContain('Requirement and staffing-gap values are unavailable')
+    expect(wrapper.text()).toContain('Run staffing calculations')
+    expect(wrapper.text()).toContain('Unavailable')
+    expect(wrapper.text()).not.toContain('Not comparable')
   })
 
   it('downloads the exact 12-month comparison through the shared CSV utility', async () => {

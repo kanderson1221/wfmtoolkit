@@ -1,11 +1,7 @@
 import { buildCsv, formatCsvNumber } from '../csvExport'
-import { computeMonthlyRecords, summarizePlanRecords } from './demandModel'
-import { mergeIntradayErlangMonthlyRecords } from './intradayErlang'
-import {
-  getPlanRequirementMethodLabel,
-  normalizePlanRequirementMethod,
-  PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
-} from './shared'
+import { summarizePlanRecords } from './demandModel'
+import { resolvePlanRequirementRecords } from './planRequirementRecords'
+import { getPlanRequirementMethodLabel } from './shared'
 import { computeStaffingRecords, summarizeStaffingRecords } from './staffingModel'
 import { resolvePlanHolidaySnapshot } from '../planningStorage'
 
@@ -21,56 +17,6 @@ const finiteOrNull = (value) => {
 const preferSavedMetric = (savedValue, computedValue) =>
   finiteOrNull(savedValue) ?? finiteOrNull(computedValue)
 
-const buildMonthlyRecords = (plan, center) => {
-  const planningYear = Number(plan?.planningYear)
-  const requirementMethod = normalizePlanRequirementMethod(
-    plan?.summary?.requirementMethod || plan?.requirementMethod
-  )
-  const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
-  const baselineRecords = computeMonthlyRecords({
-    planningYear,
-    requirementMethod,
-    demandSource: plan?.demandSource,
-    operatingWeekdays:
-      Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
-        ? plan.operatingWeekdays
-        : Array.isArray(center?.operatingWeekdays) && center.operatingWeekdays.length
-          ? center.operatingWeekdays
-          : [1, 2, 3, 4, 5],
-    holidayCalendarId: holidaySnapshot.holidayCalendarId,
-    disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
-    customHolidays: holidaySnapshot.customHolidays,
-    holidayScheduleMode: plan?.holidayScheduleMode,
-    presenceMonths: Array.isArray(plan?.presenceMonths) ? plan.presenceMonths : [],
-    randomDefaults: plan?.randomDefaults || {},
-    useMonthlyRandomOverrides: Boolean(plan?.useMonthlyRandomOverrides),
-    randomMonths: Array.isArray(plan?.randomMonths) ? plan.randomMonths : [],
-    planMonths: Array.isArray(plan?.planMonths) ? plan.planMonths : []
-  })
-
-  if (requirementMethod !== PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG) {
-    return baselineRecords
-  }
-
-  const storedResults = plan?.intradayErlangResults || {}
-  const monthlyOutputs = Array.isArray(storedResults.monthlyOutputs)
-    ? storedResults.monthlyOutputs
-    : Array.isArray(storedResults.monthlyPlans)
-      ? storedResults.monthlyPlans
-      : []
-  const dailyOutputs = Array.isArray(storedResults.dailyOutputs)
-    ? storedResults.dailyOutputs
-    : Array.isArray(storedResults.dailyPlans)
-      ? storedResults.dailyPlans
-      : []
-
-  return mergeIntradayErlangMonthlyRecords(
-    baselineRecords,
-    new Map(monthlyOutputs.map((row) => [Number(row.monthIndex), row])),
-    dailyOutputs
-  )
-}
-
 const resolveDemandSourceLabel = (plan) => {
   const demandSource = plan?.demandSource || {}
   return String(
@@ -82,12 +28,16 @@ const resolveDemandSourceLabel = (plan) => {
   )
 }
 
-export const buildPlanScenarioSnapshot = (plan, center) => {
+export const buildPlanScenarioSnapshot = (plan, center, group = null) => {
   const planningYear = Number(plan?.planningYear)
-  const requirementMethod = normalizePlanRequirementMethod(
-    plan?.summary?.requirementMethod || plan?.requirementMethod
-  )
-  const monthlyRecords = buildMonthlyRecords(plan, center)
+  const requirementState = resolvePlanRequirementRecords({
+    plan,
+    center,
+    group,
+    planningYear
+  })
+  const requirementMethod = requirementState.requirementMethod
+  const monthlyRecords = requirementState.records
   const planSummary = summarizePlanRecords(monthlyRecords)
   const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
   const staffingRecords = computeStaffingRecords(
@@ -106,6 +56,10 @@ export const buildPlanScenarioSnapshot = (plan, center) => {
   )
   const staffingSummary = summarizeStaffingRecords(staffingRecords)
   const summary = plan?.summary || {}
+  const resolveRequirementMetric = (savedValue, computedValue) =>
+    requirementState.usesIntradayErlang
+      ? finiteOrNull(computedValue)
+      : preferSavedMetric(savedValue, computedValue)
 
   return {
     id: plan?.id || '',
@@ -114,6 +68,9 @@ export const buildPlanScenarioSnapshot = (plan, center) => {
     planType: plan?.planType === 'update' ? 'update' : 'budget',
     requirementMethod,
     requirementMethodLabel: getPlanRequirementMethodLabel(requirementMethod),
+    requirementStatus: requirementState.status,
+    requirementMessage: requirementState.message,
+    requirementsAvailable: requirementState.requirementsAvailable,
     demandSourceLabel: resolveDemandSourceLabel(plan),
     actualsThroughMonth: String(plan?.actualsThroughMonth || ''),
     decisionReason: String(plan?.decisionReason || ''),
@@ -125,12 +82,27 @@ export const buildPlanScenarioSnapshot = (plan, center) => {
     metrics: {
       annualContacts: preferSavedMetric(summary.annualContacts, planSummary.annualContacts),
       annualWorkloadHours: preferSavedMetric(summary.annualWorkloadHours, planSummary.annualWorkloadHours),
-      annualRequiredStaffHours: preferSavedMetric(summary.annualRequiredStaffHours, planSummary.annualRequiredStaffHours),
-      averageRequiredHeadcount: preferSavedMetric(summary.averageRequiredHeadcount, planSummary.averageRequiredHeadcount),
-      peakRequiredHeadcount: preferSavedMetric(summary.peakRequiredHeadcount, planSummary.peakMonth?.requiredHeadcount),
-      endingFrontlineHeadcount: preferSavedMetric(summary.endingFrontlineHeadcount, staffingSummary.endingFrontlineHeadcount),
-      averageOpeningGapToRequirement: preferSavedMetric(summary.averageGapToRequirement, staffingSummary.averageGapToRequirement),
-      averageEndingGapToRequirement: staffingSummary.averageEndingGapToRequirement
+      annualRequiredStaffHours: resolveRequirementMetric(
+        summary.annualRequiredStaffHours,
+        planSummary.annualRequiredStaffHours
+      ),
+      averageRequiredHeadcount: resolveRequirementMetric(
+        summary.averageRequiredHeadcount,
+        planSummary.averageRequiredHeadcount
+      ),
+      peakRequiredHeadcount: resolveRequirementMetric(
+        summary.peakRequiredHeadcount,
+        planSummary.peakMonth?.requiredHeadcount
+      ),
+      endingFrontlineHeadcount: preferSavedMetric(
+        summary.endingFrontlineHeadcount,
+        staffingSummary.endingFrontlineHeadcount
+      ),
+      averageOpeningGapToRequirement: resolveRequirementMetric(
+        summary.averageGapToRequirement,
+        staffingSummary.averageGapToRequirement
+      ),
+      averageEndingGapToRequirement: finiteOrNull(staffingSummary.averageEndingGapToRequirement)
     },
     monthlyRows: monthlyRecords.map((row, index) => ({
       monthIndex: row.monthIndex,
@@ -163,33 +135,41 @@ const delta = (baselineValue, candidateValue) => {
   return baselineNumber == null || candidateNumber == null ? null : candidateNumber - baselineNumber
 }
 
-export const buildPlanScenarioComparison = ({ baselinePlan, candidatePlan, center }) => {
+export const buildPlanScenarioComparison = ({ baselinePlan, candidatePlan, center, group = null }) => {
   if (!baselinePlan || !candidatePlan) {
     return null
   }
 
-  const baseline = buildPlanScenarioSnapshot(baselinePlan, center)
-  const candidate = buildPlanScenarioSnapshot(candidatePlan, center)
+  const baseline = buildPlanScenarioSnapshot(baselinePlan, center, group)
+  const candidate = buildPlanScenarioSnapshot(candidatePlan, center, group)
   const sameYear = baseline.planningYear === candidate.planningYear
   const requirementMethodComparable = baseline.requirementMethod === candidate.requirementMethod
+  const requirementsComparable = requirementMethodComparable &&
+    baseline.requirementsAvailable &&
+    candidate.requirementsAvailable
+  const unavailablePlans = [baseline, candidate].filter((snapshot) => !snapshot.requirementsAvailable)
 
   return {
     baseline,
     candidate,
     sameYear,
     requirementMethodComparable,
+    requirementsComparable,
     methodWarning: requirementMethodComparable
       ? ''
       : 'Requirement methods differ. Demand and workload remain comparable; requirement, supply-gap, and staffing-risk deltas are withheld.',
+    requirementWarning: requirementMethodComparable && unavailablePlans.length
+      ? `${unavailablePlans.map((snapshot) => `${snapshot.name}: ${snapshot.requirementMessage}`).join(' ')} Requirement and staffing-gap values are unavailable until the affected plan is recalculated.`
+      : '',
     metricRows: [
       ['Annual contacts', 'contacts', baseline.metrics.annualContacts, candidate.metrics.annualContacts, true],
       ['Annual workload hours', 'hours', baseline.metrics.annualWorkloadHours, candidate.metrics.annualWorkloadHours, true],
-      ['Annual required staff hours', 'hours', baseline.metrics.annualRequiredStaffHours, candidate.metrics.annualRequiredStaffHours, requirementMethodComparable],
-      ['Average required headcount', 'headcount', baseline.metrics.averageRequiredHeadcount, candidate.metrics.averageRequiredHeadcount, requirementMethodComparable],
-      ['Peak required headcount', 'headcount', baseline.metrics.peakRequiredHeadcount, candidate.metrics.peakRequiredHeadcount, requirementMethodComparable],
+      ['Annual required staff hours', 'hours', baseline.metrics.annualRequiredStaffHours, candidate.metrics.annualRequiredStaffHours, requirementsComparable],
+      ['Average required headcount', 'headcount', baseline.metrics.averageRequiredHeadcount, candidate.metrics.averageRequiredHeadcount, requirementsComparable],
+      ['Peak required headcount', 'headcount', baseline.metrics.peakRequiredHeadcount, candidate.metrics.peakRequiredHeadcount, requirementsComparable],
       ['Ending frontline headcount', 'headcount', baseline.metrics.endingFrontlineHeadcount, candidate.metrics.endingFrontlineHeadcount, requirementMethodComparable],
-      ['Average opening staffing gap', 'headcount', baseline.metrics.averageOpeningGapToRequirement, candidate.metrics.averageOpeningGapToRequirement, requirementMethodComparable],
-      ['Average ending staffing gap', 'headcount', baseline.metrics.averageEndingGapToRequirement, candidate.metrics.averageEndingGapToRequirement, requirementMethodComparable]
+      ['Average opening staffing gap', 'headcount', baseline.metrics.averageOpeningGapToRequirement, candidate.metrics.averageOpeningGapToRequirement, requirementsComparable],
+      ['Average ending staffing gap', 'headcount', baseline.metrics.averageEndingGapToRequirement, candidate.metrics.averageEndingGapToRequirement, requirementsComparable]
     ].map(([label, unit, baselineValue, candidateValue, comparable]) => ({
       label,
       unit,
@@ -235,12 +215,12 @@ export const buildPlanScenarioComparison = ({ baselinePlan, candidatePlan, cente
         ),
         baselineRequiredHeadcount: baselineRow.requiredHeadcount,
         candidateRequiredHeadcount: candidateRow.requiredHeadcount,
-        requiredHeadcountDelta: requirementMethodComparable
+        requiredHeadcountDelta: requirementsComparable
           ? delta(baselineRow.requiredHeadcount, candidateRow.requiredHeadcount)
           : null,
         baselinePeakDayRequiredHeadcount: baselineRow.peakDayRequiredHeadcount,
         candidatePeakDayRequiredHeadcount: candidateRow.peakDayRequiredHeadcount,
-        peakDayRequiredHeadcountDelta: requirementMethodComparable
+        peakDayRequiredHeadcountDelta: requirementsComparable
           ? delta(baselineRow.peakDayRequiredHeadcount, candidateRow.peakDayRequiredHeadcount)
           : null,
         baselineEndingFrontlineHeadcount: baselineRow.endingFrontlineHeadcount,
@@ -250,12 +230,12 @@ export const buildPlanScenarioComparison = ({ baselinePlan, candidatePlan, cente
           : null,
         baselineOpeningGapToRequirement: baselineRow.openingGapToRequirement,
         candidateOpeningGapToRequirement: candidateRow.openingGapToRequirement,
-        openingGapToRequirementDelta: requirementMethodComparable
+        openingGapToRequirementDelta: requirementsComparable
           ? delta(baselineRow.openingGapToRequirement, candidateRow.openingGapToRequirement)
           : null,
         baselineEndingGapToRequirement: baselineRow.endingGapToRequirement,
         candidateEndingGapToRequirement: candidateRow.endingGapToRequirement,
-        endingGapToRequirementDelta: requirementMethodComparable
+        endingGapToRequirementDelta: requirementsComparable
           ? delta(baselineRow.endingGapToRequirement, candidateRow.endingGapToRequirement)
           : null
       }

@@ -23,6 +23,10 @@ const props = defineProps({
     type: String,
     required: true
   },
+  group: {
+    type: Object,
+    default: null
+  },
   section: {
     type: Object,
     required: true
@@ -71,7 +75,8 @@ const candidatePlan = computed(() =>
 const comparison = computed(() => buildPlanScenarioComparison({
   baselinePlan: baselinePlan.value,
   candidatePlan: candidatePlan.value,
-  center: props.center
+  center: props.center,
+  group: props.group
 }))
 
 const formatNumber = (value, digits = 1) => {
@@ -115,7 +120,9 @@ const formatMetricDelta = (row) => row.comparable
   ? row.unit === 'contacts'
     ? formatSigned(row.delta, 0)
     : formatSigned(row.delta, row.unit === 'hours' ? 0 : 1)
-  : 'Not comparable'
+  : comparison.value?.requirementMethodComparable
+    ? 'Unavailable'
+    : 'Not comparable'
 
 const formatMonth = (value) => {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-01$/)
@@ -245,6 +252,10 @@ const downloadComparison = () => {
           {{ comparison.methodWarning }}
         </AppStatusMessage>
 
+        <AppStatusMessage v-if="comparison.requirementWarning" tone="warning">
+          {{ comparison.requirementWarning }}
+        </AppStatusMessage>
+
         <section class="grid gap-2" aria-labelledby="comparison-outcomes-heading">
           <div class="flex items-end justify-between gap-4">
             <div>
@@ -332,11 +343,11 @@ const downloadComparison = () => {
                   <td class="px-4 py-2.5 text-slate-700">
                     {{ row.driverChanges.length ? row.driverChanges.join(' · ') : 'No demand or capacity driver change' }}
                   </td>
-                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.requiredHeadcountDelta, 1) : 'Not comparable' }}</td>
-                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.peakDayRequiredHeadcountDelta, 1) : 'Not comparable' }}</td>
+                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementsComparable ? formatSigned(row.requiredHeadcountDelta, 1) : comparison.requirementMethodComparable ? 'Unavailable' : 'Not comparable' }}</td>
+                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementsComparable ? formatSigned(row.peakDayRequiredHeadcountDelta, 1) : comparison.requirementMethodComparable ? 'Unavailable' : 'Not comparable' }}</td>
                   <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.endingFrontlineHeadcountDelta, 1) : 'Not comparable' }}</td>
-                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.openingGapToRequirementDelta, 1) : 'Not comparable' }}</td>
-                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementMethodComparable ? formatSigned(row.endingGapToRequirementDelta, 1) : 'Not comparable' }}</td>
+                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementsComparable ? formatSigned(row.openingGapToRequirementDelta, 1) : comparison.requirementMethodComparable ? 'Unavailable' : 'Not comparable' }}</td>
+                  <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ comparison.requirementsComparable ? formatSigned(row.endingGapToRequirementDelta, 1) : comparison.requirementMethodComparable ? 'Unavailable' : 'Not comparable' }}</td>
                 </tr>
               </tbody>
               </table>
