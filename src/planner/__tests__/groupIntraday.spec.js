@@ -1,11 +1,37 @@
 import {
+  buildPlanningGroupIntradayIntervals,
   createPlanningGroupIntraday,
   normalizePlanningGroupIntradayRatios,
   resolvePlanningGroupIntraday,
   summarizePlanningGroupIntraday
 } from '../groupIntraday'
+import {
+  OPERATING_SCHEDULE_ALWAYS_OPEN,
+  OPERATING_SCHEDULE_CONFIGURED_HOURS
+} from '../operatingSchedule'
 
 describe('groupIntraday', () => {
+  it('builds exactly 48 unique intervals for an explicit always-open schedule', () => {
+    const intervals = buildPlanningGroupIntradayIntervals(
+      '',
+      '',
+      30,
+      OPERATING_SCHEDULE_ALWAYS_OPEN
+    )
+
+    expect(intervals).toHaveLength(48)
+    expect(new Set(intervals.map((row) => row.startTime)).size).toBe(48)
+    expect(intervals[0].label).toBe('00:00 - 00:30')
+    expect(intervals.at(-1).label).toBe('23:30 - 00:00')
+  })
+
+  it('rejects missing, equal, overnight, and interval-misaligned configured windows', () => {
+    expect(buildPlanningGroupIntradayIntervals('', '', 30, OPERATING_SCHEDULE_CONFIGURED_HOURS)).toEqual([])
+    expect(buildPlanningGroupIntradayIntervals('00:00', '00:00', 30, OPERATING_SCHEDULE_CONFIGURED_HOURS)).toEqual([])
+    expect(buildPlanningGroupIntradayIntervals('22:00', '06:00', 30, OPERATING_SCHEDULE_CONFIGURED_HOURS)).toEqual([])
+    expect(buildPlanningGroupIntradayIntervals('00:00', '23:59', 30, OPERATING_SCHEDULE_CONFIGURED_HOURS)).toEqual([])
+  })
+
   it('builds an even 30-minute profile across the configured operating window by default', () => {
     const intraday = resolvePlanningGroupIntraday(
       {},

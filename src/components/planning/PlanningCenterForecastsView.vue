@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { describeOperatingWindow } from '../../planner/operatingSchedule'
 
 import { buildPlanningCenterHash } from '../../appRoutes'
 import ForecastingWorkspace from '../ForecastingWorkspace.vue'
@@ -42,11 +43,7 @@ const operatingDaysLabel = computed(() =>
     .join(', ') || 'No operating days selected'
 )
 
-const operatingHoursLabel = computed(() =>
-  props.center?.operatingOpenTime && props.center?.operatingCloseTime
-    ? `${props.center.operatingOpenTime} to ${props.center.operatingCloseTime}`
-    : 'Hours not set'
-)
+const operatingHoursLabel = computed(() => describeOperatingWindow(props.center))
 
 const holidayProfileLabel = computed(() =>
   props.forecastSeed?.sourceCenterSnapshot?.holidayCalendarLabel || 'No holiday calendar'

@@ -48,6 +48,7 @@ import {
   normalizePlanStatus
 } from '../planningStorage'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../planner/shared'
+import { normalizeOperatingScheduleMode } from '../planner/operatingSchedule'
 import {
   mergeIntradayErlangMonthlyRecords,
   normalizePlannerIntradayErlangResults
@@ -550,6 +551,13 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const intradayErlangCloseTime = computed(() =>
     String(sourcePlanReference.value?.operatingCloseTime || props.centerDefaults?.operatingCloseTime || '').trim()
   )
+  const intradayErlangScheduleMode = computed(() =>
+    normalizeOperatingScheduleMode(
+      sourcePlanReference.value?.operatingScheduleMode || props.centerDefaults?.operatingScheduleMode,
+      intradayErlangOpenTime.value,
+      intradayErlangCloseTime.value
+    )
+  )
   const intradayErlangProfile = computed(() => {
     const snapshot =
       sourcePlanReference.value?.intraday ||
@@ -579,6 +587,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     holidayCalendarId,
     disabledHolidayRuleIds,
     customHolidays,
+    operatingScheduleMode: intradayErlangScheduleMode,
     operatingOpenTime: intradayErlangOpenTime,
     operatingCloseTime: intradayErlangCloseTime,
     serviceLevelPercent: intradayErlangServiceLevelPercent,
@@ -690,6 +699,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     holidayCalendarId,
     disabledHolidayRuleIds,
     customHolidays,
+    operatingScheduleMode: intradayErlangScheduleMode,
     operatingOpenTime: intradayErlangOpenTime,
     operatingCloseTime: intradayErlangCloseTime,
     serviceLevelPercent: intradayErlangServiceLevelPercent,
@@ -813,6 +823,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       planMonths: planMonths.value.map((month) => createPlanMonth(month)),
       serviceLevelPercent: intradayErlangServiceLevelPercent.value,
       serviceLevelThresholdSeconds: intradayErlangServiceLevelThresholdSeconds.value,
+      operatingScheduleMode: intradayErlangScheduleMode.value,
       operatingOpenTime: intradayErlangOpenTime.value,
       operatingCloseTime: intradayErlangCloseTime.value,
       intraday: {
@@ -1189,6 +1200,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     actualsSummary,
     intradayErlangServiceLevelPercent,
     intradayErlangServiceLevelThresholdSeconds,
+    intradayErlangScheduleMode,
     intradayErlangOpenTime,
     intradayErlangCloseTime,
     intradayErlangProfile,

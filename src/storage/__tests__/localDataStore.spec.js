@@ -41,6 +41,7 @@ const sampleCenters = [
       }
     ],
     operatingWeekdays: [1, 2, 3, 4, 5],
+    operatingScheduleMode: 'configured_hours',
     operatingOpenTime: '08:00',
     operatingCloseTime: '17:00',
     defaultPaidHoursPerDay: 8,
@@ -89,12 +90,16 @@ const sampleCenters = [
             id: 'plan-1',
             name: '2026 Plan',
             planningYear: 2026,
+            operatingScheduleMode: 'configured_hours',
             operatingWeekdays: [1, 2, 3, 4, 5],
             holidayCalendarId: 'none',
             disabledHolidayRuleIds: [],
             customHolidays: [],
             holidayScheduleMode: 'closed',
-            presenceMonths: Array.from({ length: 12 }, () => ({ paidHoursPerDay: 8 })),
+            presenceMonths: Array.from({ length: 12 }, () => ({
+              paidHoursPerDay: 8,
+              monthlyPaidHoursPerFte: 173.33
+            })),
             randomDefaults: {
               occupancyPercent: 90,
               adherencePercent: 95
@@ -282,6 +287,9 @@ describe('localDataStore', () => {
     const loadedDraft = await loadPlannerDraftFromDexie('user-1:plan:plan-1')
 
     expect(loadedCenters[0].groups[0].plans[0].planningYear).toBe(2026)
+    expect(loadedCenters[0].operatingScheduleMode).toBe('configured_hours')
+    expect(loadedCenters[0].groups[0].plans[0].operatingScheduleMode).toBe('configured_hours')
+    expect(loadedCenters[0].groups[0].plans[0].presenceMonths[0].monthlyPaidHoursPerFte).toBe(173.33)
     expect(loadedCenters[0].groups[0].actuals).toMatchObject({
       sourceMode: 'daily_upload',
       uploadedFileName: 'group-actuals.csv'

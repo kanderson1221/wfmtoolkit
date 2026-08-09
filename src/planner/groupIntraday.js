@@ -1,3 +1,10 @@
+import {
+  OPERATING_SCHEDULE_ALWAYS_OPEN,
+  normalizeOperatingScheduleMode,
+  parseOperatingTimeToMinutes,
+  validateConfiguredOperatingWindow
+} from './operatingSchedule'
+
 const MINUTES_PER_DAY = 24 * 60
 const DEFAULT_INTERVAL_LENGTH_MINUTES = 30
 
@@ -17,19 +24,7 @@ const normalizeTimeValue = (value) => {
   return /^\d{2}:\d{2}$/.test(normalized) ? normalized : ''
 }
 
-const parseTimeToMinutes = (value) => {
-  const normalized = normalizeTimeValue(value)
-  if (!normalized) {
-    return null
-  }
-
-  const [hours, minutes] = normalized.split(':').map(Number)
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return null
-  }
-
-  return (hours * 60 + minutes) % MINUTES_PER_DAY
-}
+const parseTimeToMinutes = (value) => parseOperatingTimeToMinutes(normalizeTimeValue(value))
 
 const formatMinutesToTime = (minutes) => {
   const normalizedMinutes = ((Number(minutes) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY
@@ -44,13 +39,13 @@ const formatIntervalLabel = (startTime, endTime) => `${startTime} - ${endTime}`
 export const buildPlanningGroupIntradayIntervals = (
   openTime = '',
   closeTime = '',
-  intervalLengthMinutes = DEFAULT_INTERVAL_LENGTH_MINUTES
+  intervalLengthMinutes = DEFAULT_INTERVAL_LENGTH_MINUTES,
+  operatingScheduleMode = ''
 ) => {
   const intervalLength = Math.max(Math.round(toNumber(intervalLengthMinutes, DEFAULT_INTERVAL_LENGTH_MINUTES)), 1)
-  const openMinutes = parseTimeToMinutes(openTime)
-  const closeMinutes = parseTimeToMinutes(closeTime)
+  const resolvedScheduleMode = normalizeOperatingScheduleMode(operatingScheduleMode, openTime, closeTime)
 
-  if (openMinutes == null || closeMinutes == null || openMinutes === closeMinutes) {
+  if (resolvedScheduleMode === OPERATING_SCHEDULE_ALWAYS_OPEN) {
     return Array.from({ length: Math.floor(MINUTES_PER_DAY / intervalLength) }, (_, index) => {
       const startMinutes = index * intervalLength
       const endMinutes = (startMinutes + intervalLength) % MINUTES_PER_DAY
@@ -65,11 +60,21 @@ export const buildPlanningGroupIntradayIntervals = (
     })
   }
 
+  const validation = validateConfiguredOperatingWindow({
+    openTime,
+    closeTime,
+    intervalLengthMinutes: intervalLength
+  })
+  if (!validation.valid) {
+    return []
+  }
+
+  const { openMinutes, closeMinutes } = validation
+
   const intervals = []
   let cursor = openMinutes
-  let safety = 0
 
-  while (cursor !== closeMinutes && safety < Math.ceil(MINUTES_PER_DAY / intervalLength) + 1) {
+  while (cursor < closeMinutes) {
     const nextCursor = (cursor + intervalLength) % MINUTES_PER_DAY
     const startTime = formatMinutesToTime(cursor)
     const endTime = formatMinutesToTime(nextCursor)
@@ -80,13 +85,10 @@ export const buildPlanningGroupIntradayIntervals = (
       label: formatIntervalLabel(startTime, endTime)
     })
 
-    cursor = nextCursor
-    safety += 1
+    cursor += intervalLength
   }
 
-  return intervals.length
-    ? intervals
-    : buildPlanningGroupIntradayIntervals('', '', intervalLength)
+  return intervals
 }
 
 const normalizeStoredRatioRows = (intervalRatios) => {
@@ -144,7 +146,8 @@ export const resolvePlanningGroupIntraday = (source = {}, context = {}) => {
   const intervals = buildPlanningGroupIntradayIntervals(
     center.operatingOpenTime,
     center.operatingCloseTime,
-    snapshot.intervalLengthMinutes
+    snapshot.intervalLengthMinutes,
+    center.operatingScheduleMode
   )
 
   const storedRatios = normalizeStoredRatioRows(snapshot.intervalRatios)

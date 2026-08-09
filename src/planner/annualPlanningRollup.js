@@ -144,6 +144,8 @@ const buildPlanIntradayPayloadArgs = ({ plan, center, group, planningYear, month
     holidayCalendarId: holidaySnapshot.holidayCalendarId,
     disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
     customHolidays: holidaySnapshot.customHolidays,
+    operatingScheduleMode:
+      plan?.operatingScheduleMode || group?.operatingScheduleMode || center?.operatingScheduleMode,
     operatingOpenTime: plan?.operatingOpenTime || group?.operatingOpenTime || center?.operatingOpenTime,
     operatingCloseTime: plan?.operatingCloseTime || group?.operatingCloseTime || center?.operatingCloseTime,
     serviceLevelPercent: plan?.serviceLevelPercent ?? group?.serviceLevelPercent,

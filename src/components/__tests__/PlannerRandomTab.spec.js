@@ -163,4 +163,31 @@ describe('PlannerRandomTab', () => {
     expect(wrapper.text()).toContain('Continue to Demand Model')
     expect(wrapper.text()).not.toContain('Monthly Overrides')
   })
+
+  it('labels an always-open Erlang schedule without relying on equal clock times', () => {
+    const wrapper = mount(PlannerRandomTab, {
+      props: buildProps({
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        operatingScheduleMode: 'always_open',
+        operatingOpenTime: '',
+        operatingCloseTime: ''
+      }),
+      global: {
+        stubs: {
+          AppButton: AppButtonStub,
+          AppCheckbox: true,
+          AppFieldGroup: true,
+          AppNumberField: true,
+          AppSectionHeader: AppSectionHeaderStub,
+          AppStatStrip: true,
+          AppStatusMessage: AppStatusMessageStub,
+          AppTableNumberField: AppTableNumberFieldStub,
+          PlannerCopyMenu: true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Open 24 hours')
+    expect(wrapper.text()).not.toContain('Needs call center hours')
+  })
 })

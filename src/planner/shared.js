@@ -16,6 +16,9 @@ export const FULL_MONTH_LABELS = [
 ]
 
 export const WEEKDAY_FALLBACK = [1, 2, 3, 4, 5]
+export const DEFAULT_FTE_WORKDAYS_PER_WEEK = 5
+export const WEEKS_PER_YEAR = 52
+export const MONTHS_PER_YEAR = 12
 export const PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO = 'workload_ratio'
 export const PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG = 'intraday_erlang'
 export const PLAN_REQUIREMENT_METHOD_OPTIONS = [
@@ -67,6 +70,9 @@ export const average = (values) => {
   return values.reduce((sum, value) => sum + value, 0) / values.length
 }
 
+export const calculateDefaultMonthlyPaidHoursPerFte = (paidHoursPerDay = 8) =>
+  Number((Math.max(toNumber(paidHoursPerDay, 8), 0) * DEFAULT_FTE_WORKDAYS_PER_WEEK * WEEKS_PER_YEAR / MONTHS_PER_YEAR).toFixed(2))
+
 export const normalizeWeekdays = (weekdays) =>
   Array.isArray(weekdays) && weekdays.length
     ? [...new Set(weekdays.map((value) => toNumber(value, 0)))].sort((left, right) => left - right)
@@ -92,6 +98,7 @@ export const getPlanRequirementMethodLabel = (value) =>
 
 export const createPresenceMonth = (overrides = {}) => ({
   paidHoursPerDay: 8,
+  monthlyPaidHoursPerFte: null,
   plannedTimeOffHours: 0,
   unplannedTimeOffHours: 0,
   leaveTimeHours: 0,

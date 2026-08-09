@@ -5,6 +5,58 @@ import {
 } from '../intradayErlang'
 
 describe('intraday Erlang planner payloads', () => {
+  it('builds 48 unique interval rows for one always-open forecast day', () => {
+    const payload = buildPlannerIntradayErlangPayload({
+      planningYear: 2026,
+      demandSource: {
+        forecastDailySnapshot: [
+          { serviceDate: '2026-01-02', monthIndex: 0, contacts: 480, ahtSeconds: 300 }
+        ]
+      },
+      monthlyRecords: [
+        { monthIndex: 0, occupancyPercent: 90, adherencePercent: 95 }
+      ],
+      operatingWeekdays: [0, 1, 2, 3, 4, 5, 6],
+      operatingScheduleMode: 'always_open',
+      operatingOpenTime: '',
+      operatingCloseTime: '',
+      serviceLevelPercent: 80,
+      serviceLevelThresholdSeconds: 20,
+      intraday: { intervalLengthMinutes: 30, intervalRatios: [] }
+    })
+
+    expect(payload.status).toBe('ready')
+    expect(payload.rows).toHaveLength(48)
+    expect(new Set(payload.rows.map((row) => row.intervalStart)).size).toBe(48)
+    expect(payload.rows[0].intervalStart).toBe('2026-01-02T00:00:00')
+    expect(payload.rows.at(-1).intervalStart).toBe('2026-01-02T23:30:00')
+  })
+
+  it('rejects 23:59 as a configured close time for 30-minute intervals', () => {
+    const payload = buildPlannerIntradayErlangPayload({
+      planningYear: 2026,
+      demandSource: {
+        forecastDailySnapshot: [
+          { serviceDate: '2026-01-02', monthIndex: 0, contacts: 480, ahtSeconds: 300 }
+        ]
+      },
+      monthlyRecords: [{ monthIndex: 0, occupancyPercent: 90, adherencePercent: 95 }],
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      operatingScheduleMode: 'configured_hours',
+      operatingOpenTime: '00:00',
+      operatingCloseTime: '23:59',
+      serviceLevelPercent: 80,
+      serviceLevelThresholdSeconds: 20,
+      intraday: { intervalLengthMinutes: 30, intervalRatios: [] }
+    })
+
+    expect(payload).toMatchObject({
+      status: 'schedule_required',
+      rows: [],
+      message: expect.stringContaining('30-minute staffing intervals')
+    })
+  })
+
   it('blocks Erlang mode when no applied daily forecast is available', () => {
     expect(
       buildPlannerIntradayErlangPayload({

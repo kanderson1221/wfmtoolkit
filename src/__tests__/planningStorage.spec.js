@@ -1,5 +1,9 @@
 import { getCurrentCalendarYear } from '../planner/shared'
 import {
+  OPERATING_SCHEDULE_ALWAYS_OPEN,
+  OPERATING_SCHEDULE_CONFIGURED_HOURS
+} from '../planner/operatingSchedule'
+import {
   createPlanningCenterDraft,
   loadPlanningCenters,
   PLAN_STATUS_DRAFT,
@@ -199,6 +203,7 @@ describe('planningStorage', () => {
       sourcePlanId: '',
       actualsThroughMonth: ''
     })
+    expect(plan.operatingScheduleMode).toBe('')
   })
 
   it('persists draft budgets without converting them to finalized baselines', () => {
@@ -442,6 +447,16 @@ describe('planningStorage', () => {
   it('defaults new call center drafts to Monday through Friday operating days', () => {
     expect(createPlanningCenterDraft().operatingWeekdays).toEqual([1, 2, 3, 4, 5])
     expect(createPlanningCenterDraft({ operatingWeekdays: undefined }).operatingWeekdays).toEqual([1, 2, 3, 4, 5])
+    expect(createPlanningCenterDraft().operatingScheduleMode).toBe(OPERATING_SCHEDULE_CONFIGURED_HOURS)
+  })
+
+  it('migrates legacy equal operating times to explicit always-open mode', () => {
+    const draft = createPlanningCenterDraft({
+      operatingOpenTime: '00:00',
+      operatingCloseTime: '00:00'
+    })
+
+    expect(draft.operatingScheduleMode).toBe(OPERATING_SCHEDULE_ALWAYS_OPEN)
   })
 
   it('migrates legacy staffing-group actuals years into one shared actuals history', () => {

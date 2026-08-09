@@ -16,6 +16,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { createPlanningCenterDraft } from '../planningStorage'
 import { getCenterGroups } from '../planningSummary'
 import { resolvePlanningGroupActuals } from '../planner/groupActuals'
+import { describeOperatingWindow } from '../planner/operatingSchedule'
 import { getCurrentCalendarYear } from '../planner/shared'
 
 const props = defineProps({
@@ -85,10 +86,7 @@ const operatingDaysLabel = (center) => {
     .join(', ') || 'No operating days set'
 }
 
-const operatingHoursLabel = (center) =>
-  center.operatingOpenTime && center.operatingCloseTime
-    ? `${center.operatingOpenTime}–${center.operatingCloseTime}`
-    : 'Hours not set'
+const operatingHoursLabel = (center) => describeOperatingWindow(center).replace(' to ', '–')
 
 const openCreateCenter = () => {
   centerDraft.value = createPlanningCenterDraft()
@@ -101,6 +99,7 @@ const openEditCenter = (center) => {
     name: center.name,
     holidayProfiles: center.holidayProfiles,
     operatingWeekdays: center.operatingWeekdays,
+    operatingScheduleMode: center.operatingScheduleMode,
     operatingOpenTime: center.operatingOpenTime,
     operatingCloseTime: center.operatingCloseTime,
     defaultPaidHoursPerDay: center.defaultPaidHoursPerDay,
@@ -239,6 +238,7 @@ const handleCenterMenuSelect = (center, item) => {
       v-model:center-name="centerDraft.name"
       v-model:holiday-profiles="centerDraft.holidayProfiles"
       v-model:operating-weekdays="centerDraft.operatingWeekdays"
+      v-model:operating-schedule-mode="centerDraft.operatingScheduleMode"
       v-model:operating-open-time="centerDraft.operatingOpenTime"
       v-model:operating-close-time="centerDraft.operatingCloseTime"
       :display-year="displayYear"

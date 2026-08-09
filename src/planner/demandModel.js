@@ -111,11 +111,11 @@ const buildMonthlyWarnings = ({
 
   if (openDays === 0 && operatingWeekdays.length) {
     presenceWarnings.push('Open days are zero after applying the operating days and holiday closures. Check the call center schedule.')
-    planWarnings.push('Open days are zero for this month, so the plan shows no monthly paid capacity.')
+    planWarnings.push('Open days are zero for this month, so there are no demand-serving days in the month.')
   }
 
   if (paidHoursPerMonth === 0 && totalLossHours > 0) {
-    presenceWarnings.push('Presence hours are entered, but monthly paid hours are zero. Check open days or paid hours per day.')
+    presenceWarnings.push('Presence hours are entered, but monthly FTE paid hours are zero. Check the FTE capacity inputs.')
   }
 
   if (otherLossHoursPerDay >= paidHoursPerDay && paidHoursPerDay > 0) {
@@ -221,7 +221,14 @@ export const computeMonthlyRecords = ({
     )
     const openDays = calendarOpenDays
     const paidHoursPerDay = clamp(toNumber(presenceInput.paidHoursPerDay, 8), 0, 24)
-    const paidHoursPerMonth = openDays * paidHoursPerDay
+    const hasConfiguredMonthlyPaidHours =
+      presenceInput.monthlyPaidHoursPerFte !== null &&
+      presenceInput.monthlyPaidHoursPerFte !== '' &&
+      Number.isFinite(Number(presenceInput.monthlyPaidHoursPerFte))
+    const paidHoursPerMonth = hasConfiguredMonthlyPaidHours
+      ? Math.max(toNumber(presenceInput.monthlyPaidHoursPerFte, 0), 0)
+      : openDays * paidHoursPerDay
+    const fteWorkdays = paidHoursPerDay > 0 ? paidHoursPerMonth / paidHoursPerDay : 0
 
     const plannedTimeOffHours = Math.max(toNumber(presenceInput.plannedTimeOffHours, 0), 0)
     const unplannedTimeOffHours = Math.max(toNumber(presenceInput.unplannedTimeOffHours, 0), 0)
@@ -232,8 +239,8 @@ export const computeMonthlyRecords = ({
     const paidBreaksHoursPerDay = Math.max(toNumber(presenceInput.paidBreaksHoursPerDay, 0), 0)
     const otherAwayHoursPerDay = Math.max(toNumber(presenceInput.otherAwayHoursPerDay, 0), 0)
 
-    const rawPaidBreaksHours = paidBreaksHoursPerDay * openDays
-    const rawOtherAwayHours = otherAwayHoursPerDay * openDays
+    const rawPaidBreaksHours = paidBreaksHoursPerDay * fteWorkdays
+    const rawOtherAwayHours = otherAwayHoursPerDay * fteWorkdays
     const otherLossHoursPerDay = paidBreaksHoursPerDay + otherAwayHoursPerDay
 
     const absenceLossHours = plannedTimeOffHours + unplannedTimeOffHours + leaveTimeHours
@@ -340,6 +347,8 @@ export const computeMonthlyRecords = ({
       openDays,
       paidHoursPerDay,
       paidHoursPerMonth,
+      monthlyPaidHoursPerFte: paidHoursPerMonth,
+      fteWorkdays,
       plannedTimeOffHours,
       unplannedTimeOffHours,
       leaveTimeHours,
@@ -395,7 +404,8 @@ export const computeMonthlyRecords = ({
   }
 
 export const summarizePresenceRecords = (monthlyRecords) => ({
-  totalOpenDays: monthlyRecords.reduce((sum, row) => sum + row.openDays, 0),
+  averageMonthlyPaidHoursPerFte: average(monthlyRecords.map((row) => row.paidHoursPerMonth)),
+  averageFteWorkdays: average(monthlyRecords.map((row) => row.fteWorkdays)),
   averageAbsenceLossHours: average(monthlyRecords.map((row) => row.absenceLossHours)),
   averageScheduledLossHours: average(monthlyRecords.map((row) => row.scheduledLossHours)),
   averageOtherLossHours: average(monthlyRecords.map((row) => row.otherLossHours)),

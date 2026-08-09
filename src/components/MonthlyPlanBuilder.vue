@@ -818,6 +818,7 @@ const planWorkspaceDisabled = computed(() =>
                   :current-demand-source-summary="builder.demandSourceSummary"
                   :service-level-percent="builder.intradayErlangServiceLevelPercent"
                   :service-level-threshold-seconds="builder.intradayErlangServiceLevelThresholdSeconds"
+                  :operating-schedule-mode="builder.intradayErlangScheduleMode"
                   :operating-open-time="builder.intradayErlangOpenTime"
                   :operating-close-time="builder.intradayErlangCloseTime"
                   :intraday="builder.intradayErlangProfile"

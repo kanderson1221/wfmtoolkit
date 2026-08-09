@@ -8,6 +8,7 @@ import {
   buildRandomMonths,
   buildStaffingMonths,
   calculateCalendarOpenDays,
+  calculateDefaultMonthlyPaidHoursPerFte,
   createNextYearOpening,
   createPlanMonth,
   createPresenceMonth,
@@ -67,6 +68,50 @@ export const hydrateMonths = (months, fallbackBuilder, factory) =>
     ? months.map((month) => factory(month))
     : fallbackBuilder()
 
+const createNewPresenceMonths = (paidHoursPerDay) => {
+  const monthlyPaidHoursPerFte = calculateDefaultMonthlyPaidHoursPerFte(paidHoursPerDay)
+  return MONTH_LABELS.map(() => createPresenceMonth({ paidHoursPerDay, monthlyPaidHoursPerFte }))
+}
+
+const hasMonthlyPaidHoursPerFte = (month) =>
+  month?.monthlyPaidHoursPerFte !== null &&
+  month?.monthlyPaidHoursPerFte !== '' &&
+  Number.isFinite(Number(month?.monthlyPaidHoursPerFte))
+
+export const hydratePresenceMonths = (months, fallbackBuilder, {
+  planningYear,
+  operatingWeekdays,
+  holidayCalendarId,
+  disabledHolidayRuleIds,
+  customHolidays
+}) => {
+  if (!Array.isArray(months) || months.length !== MONTH_LABELS.length) {
+    return fallbackBuilder()
+  }
+
+  return months.map((month, monthIndex) => {
+    const normalizedMonth = createPresenceMonth(month)
+    if (hasMonthlyPaidHoursPerFte(month)) {
+      return normalizedMonth
+    }
+
+    const openDays = calculateCalendarOpenDays(
+      planningYear,
+      monthIndex,
+      operatingWeekdays,
+      holidayCalendarId,
+      HOLIDAY_SCHEDULE_CLOSED,
+      disabledHolidayRuleIds,
+      customHolidays
+    ).calendarOpenDays
+
+    return createPresenceMonth({
+      ...normalizedMonth,
+      monthlyPaidHoursPerFte: Number((openDays * normalizedMonth.paidHoursPerDay).toFixed(2))
+    })
+  })
+}
+
 export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYear = currentYear) => {
   const planningYear = toNumber(centerDefaults?.planningYear, fallbackPlanningYear)
   const operatingWeekdays = normalizeWeekdays(centerDefaults?.operatingWeekdays)
@@ -78,10 +123,16 @@ export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYe
     toNumber(centerDefaults?.presenceMonths?.[0]?.paidHoursPerDay ?? centerDefaults?.defaultPaidHoursPerDay, 8),
     0
   )
-  const presenceMonths = hydrateMonths(
+  const presenceMonths = hydratePresenceMonths(
     centerDefaults?.presenceMonths,
-    () => MONTH_LABELS.map(() => createPresenceMonth({ paidHoursPerDay })),
-    createPresenceMonth
+    () => createNewPresenceMonths(paidHoursPerDay),
+    {
+      planningYear,
+      operatingWeekdays,
+      holidayCalendarId,
+      disabledHolidayRuleIds,
+      customHolidays
+    }
   )
   const randomDefaults = createRandomMonth(
     centerDefaults?.randomDefaults || {
@@ -136,21 +187,32 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
       seedDefaults.startingFrontlineHeadcount ??
       deriveStartingFrontlineHeadcount(planningYear, startingHeadcount, trainingClasses, trainingSettings, trainingCalendar)
   }).frontlineHeadcount
+  const operatingWeekdays = normalizeWeekdays(basePlan.operatingWeekdays ?? seedDefaults.operatingWeekdays)
+  const holidayCalendarId = normalizeHolidayCalendarId(basePlan.holidayCalendarId, seedDefaults.holidayCalendarId)
+  const disabledHolidayRuleIds = normalizeDisabledHolidayRuleIds(basePlan.disabledHolidayRuleIds ?? seedDefaults.disabledHolidayRuleIds)
+  const customHolidays = normalizeCustomHolidays(basePlan.customHolidays ?? seedDefaults.customHolidays)
+  const presenceMonths = hydratePresenceMonths(
+    basePlan.presenceMonths,
+    () => seedDefaults.presenceMonths.map((month) => createPresenceMonth(month)),
+    {
+      planningYear,
+      operatingWeekdays,
+      holidayCalendarId,
+      disabledHolidayRuleIds,
+      customHolidays
+    }
+  )
 
   return {
     seedDefaults,
     planningYear,
     requirementMethod: normalizePlanRequirementMethod(basePlan.requirementMethod, seedDefaults.requirementMethod),
-    operatingWeekdays: normalizeWeekdays(basePlan.operatingWeekdays ?? seedDefaults.operatingWeekdays),
-    holidayCalendarId: normalizeHolidayCalendarId(basePlan.holidayCalendarId, seedDefaults.holidayCalendarId),
-    disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(basePlan.disabledHolidayRuleIds ?? seedDefaults.disabledHolidayRuleIds),
-    customHolidays: normalizeCustomHolidays(basePlan.customHolidays ?? seedDefaults.customHolidays),
+    operatingWeekdays,
+    holidayCalendarId,
+    disabledHolidayRuleIds,
+    customHolidays,
     holidayScheduleMode: normalizeHolidayScheduleMode(basePlan.holidayScheduleMode, seedDefaults.holidayScheduleMode),
-    presenceMonths: hydrateMonths(
-      basePlan.presenceMonths,
-      () => seedDefaults.presenceMonths.map((month) => createPresenceMonth(month)),
-      createPresenceMonth
-    ),
+    presenceMonths,
     randomDefaults: createRandomMonth(basePlan.randomDefaults || seedDefaults.randomDefaults),
     useMonthlyRandomOverrides: Boolean(basePlan.useMonthlyRandomOverrides),
     randomMonths: hydrateMonths(basePlan.randomMonths, buildRandomMonths, createRandomMonth),
@@ -166,10 +228,8 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
 }
 
 export const createPresenceMonthFromProfile = ({
-  year,
-  monthIndex,
-  weekdays,
   paidHoursPerDay = 8,
+  monthlyPaidHoursPerFte = calculateDefaultMonthlyPaidHoursPerFte(paidHoursPerDay),
   plannedTimeOffPercent = 0,
   unplannedTimeOffPercent = 0,
   leaveTimePercent = 0,
@@ -179,12 +239,12 @@ export const createPresenceMonthFromProfile = ({
   paidBreaksHoursPerDay = 0.5,
   otherAwayHoursPerDay = 0.1
 }) => {
-  const openDays = calculateCalendarOpenDays(year, monthIndex, weekdays).calendarOpenDays
-  const paidHoursPerMonth = openDays * paidHoursPerDay
+  const paidHoursPerMonth = Math.max(toNumber(monthlyPaidHoursPerFte, 0), 0)
   const convertPercentToHours = (percent) => Number(((paidHoursPerMonth * percent) / 100).toFixed(1))
 
   return createPresenceMonth({
     paidHoursPerDay,
+    monthlyPaidHoursPerFte: paidHoursPerMonth,
     plannedTimeOffHours: convertPercentToHours(plannedTimeOffPercent),
     unplannedTimeOffHours: convertPercentToHours(unplannedTimeOffPercent),
     leaveTimeHours: convertPercentToHours(leaveTimePercent),

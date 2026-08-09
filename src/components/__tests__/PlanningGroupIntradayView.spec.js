@@ -74,4 +74,25 @@ describe('PlanningGroupIntradayView', () => {
       wrapper.emitted('save-intraday')[0][0].intervalRatios.reduce((sum, row) => sum + row.ratioPercent, 0)
     ).toBe(100)
   })
+
+  it('renders a complete 48-interval profile for an always-open center', () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        operatingScheduleMode: 'always_open',
+        operatingOpenTime: '',
+        operatingCloseTime: ''
+      },
+      group: {
+        id: 'group-1',
+        name: 'Voice Support',
+        intraday: {}
+      }
+    })
+
+    expect(wrapper.text()).toContain('Open 24 hours')
+    expect(wrapper.findAll('tbody tr')).toHaveLength(48)
+    expect(wrapper.text()).toContain('00:00 - 00:30')
+    expect(wrapper.text()).toContain('23:30 - 00:00')
+  })
 })

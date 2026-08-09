@@ -350,7 +350,8 @@ const standardMonthlyExportColumns = computed(() => [
   },
   { header: 'aht_seconds', value: (record) => formatCsvNumber(resolveWorkloadRatioAht(record.monthIndex), 6) },
   { header: 'peak_day_percent', value: (record) => formatCsvNumber(resolveWorkloadRatioPeakDayUplift(record.monthIndex), 6) },
-  { header: 'business_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'open_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'fte_paid_hours', value: (record) => formatCsvNumber(record.paidHoursPerMonth, 6) },
   { header: 'scheduled_percent', value: (record) => formatCsvNumber(record.scheduledPercent, 6) },
   { header: 'random_percent', value: (record) => formatCsvNumber(record.randomLossPercent, 6) },
   { header: 'design_percent', value: (record) => formatCsvNumber(record.designFactorPercent, 6) },
@@ -380,7 +381,8 @@ const intradayErlangMonthlyExportColumns = computed(() => [
     value: (record) => formatCsvNumber(planMonths.value?.[record.monthIndex]?.contacts ?? record.contacts, 6)
   },
   { header: 'aht_seconds', value: (record) => formatCsvNumber(resolveWorkloadRatioAht(record.monthIndex), 6) },
-  { header: 'business_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'open_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'fte_paid_hours', value: (record) => formatCsvNumber(record.paidHoursPerMonth, 6) },
   { header: 'workload_hours', value: (record) => formatCsvNumber(record.workloadHours, 6) },
   { header: 'erlang_hours', value: (record) => formatCsvNumber(record.erlangStaffedHours, 6) },
   { header: 'base_headcount', value: (record) => formatCsvNumber(resolveBaseHeadcount(record), 6) },
@@ -759,8 +761,8 @@ const erlangRunButtonLabel = computed(() => {
             >
               <span class="plan-head-label">Peak Day<br />%</span>
             </th>
-            <th title="Business days flowing in from the call-center operating days and holiday closures.">
-              <span class="plan-head-label">Bus. Days</span>
+            <th title="Open days flowing in from the call-center operating days and holiday closures.">
+              <span class="plan-head-label">Open Days</span>
             </th>
             <th v-if="isIntradayErlang" title="Monthly workload hours calculated from contacts and AHT.">
               <span class="plan-head-label plan-output-head-label">Wkld Hrs</span>

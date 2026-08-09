@@ -10,6 +10,7 @@ import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
+import { describeOperatingWindow } from '../../planner/operatingSchedule'
 import PlannerCopyMenu from './PlannerCopyMenu.vue'
 
 const props = defineProps({
@@ -38,6 +39,10 @@ const props = defineProps({
     default: 0
   },
   operatingOpenTime: {
+    type: String,
+    default: ''
+  },
+  operatingScheduleMode: {
     type: String,
     default: ''
   },
@@ -123,9 +128,12 @@ const operatingWindowLabel = computed(() => {
     return ''
   }
 
-  const open = String(props.operatingOpenTime || '').trim()
-  const close = String(props.operatingCloseTime || '').trim()
-  return open && close ? `${open} to ${close}` : 'Needs call center hours'
+  const label = describeOperatingWindow({
+    operatingScheduleMode: props.operatingScheduleMode,
+    operatingOpenTime: props.operatingOpenTime,
+    operatingCloseTime: props.operatingCloseTime
+  })
+  return label === 'Hours not set' ? 'Needs call center hours' : label
 })
 const intervalProfileRows = computed(() =>
   Array.isArray(props.intraday?.intervalRatios) ? props.intraday.intervalRatios : []

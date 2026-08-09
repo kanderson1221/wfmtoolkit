@@ -129,9 +129,9 @@ describe('PlanningPlanComparisonDialog', () => {
     })
 
     expect(wrapper.text()).toContain('January')
-    expect(wrapper.text()).toContain('Paid time -1.00 hr/day')
+    expect(wrapper.text()).toContain('Shift paid hours -1.00 hr/day')
     expect(wrapper.text()).toContain('February')
-    expect(wrapper.text()).toContain('Paid time +1.00 hr/day')
+    expect(wrapper.text()).toContain('Shift paid hours +1.00 hr/day')
   })
 
   it('explains incompatible methods instead of presenting false requirement deltas', () => {

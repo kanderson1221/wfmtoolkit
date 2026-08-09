@@ -38,6 +38,7 @@ describe('PlannerMonthlyPlanTab', () => {
         label: 'Jan',
         fullLabel: 'January',
         openDays: 20,
+        paidHoursPerMonth: 160,
         scheduledPercent: 72.5,
         randomLossPercent: 12.1,
         designFactorPercent: 60.4,
@@ -93,7 +94,7 @@ describe('PlannerMonthlyPlanTab', () => {
     expect(wrapper.text()).toContain('Peak Day Required Headcount')
     expect(wrapper.text()).toContain('12000')
     expect(wrapper.text()).toContain('Peak Day%')
-    expect(wrapper.text()).toContain('Bus. Days')
+    expect(wrapper.text()).toContain('Open Days')
     expect(wrapper.text()).toContain('Peak DayReq HC')
     expect(wrapper.findAll('input')).toHaveLength(0)
   })
@@ -125,8 +126,8 @@ describe('PlannerMonthlyPlanTab', () => {
 
     expect(clickSpy).toHaveBeenCalledTimes(1)
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:csv-1')
-    expect(monthlyCsv).toContain('month,contacts,aht_seconds,peak_day_percent,business_days,scheduled_percent,random_percent,design_percent,staffing_ratio,workload_hours,required_hours,required_headcount,peak_day_required_headcount')
-    expect(monthlyCsv).toContain('Jan,12000,300,15,20,72.5,12.1,60.4,1.65,1200,1980,12.4,15.8')
+    expect(monthlyCsv).toContain('month,contacts,aht_seconds,peak_day_percent,open_days,fte_paid_hours,scheduled_percent,random_percent,design_percent,staffing_ratio,workload_hours,required_hours,required_headcount,peak_day_required_headcount')
+    expect(monthlyCsv).toContain('Jan,12000,300,15,20,160,72.5,12.1,60.4,1.65,1200,1980,12.4,15.8')
     expect(monthlyCsv).not.toContain('erlang_hours')
   })
 
@@ -567,10 +568,10 @@ describe('PlannerMonthlyPlanTab', () => {
     expect(clickSpy).toHaveBeenCalledTimes(2)
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:csv-1')
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:csv-2')
-    expect(monthlyCsv).toContain('month,contacts,aht_seconds,business_days,workload_hours,erlang_hours,base_headcount')
+    expect(monthlyCsv).toContain('month,contacts,aht_seconds,open_days,fte_paid_hours,workload_hours,erlang_hours,base_headcount')
     expect(monthlyCsv).not.toContain('peak_interval_base_headcount')
     expect(monthlyCsv).toContain('peak_day_total_headcount')
-    expect(monthlyCsv).toContain('Jan,12000,325,20,1200,1330.25,8.314063,84.5,79.25,72.5')
+    expect(monthlyCsv).toContain('Jan,12000,325,20,160,1200,1330.25,8.314063,84.5,79.25,72.5')
     expect(intervalCsv).toContain('month_index,month,service_date,interval_start,interval_length_minutes,calls_offered')
     expect(intervalCsv).toContain('labor_hours_net,wfm_staffing_ratio,wfm_labor_hours_gross')
     expect(intervalCsv).not.toContain(',labor_hours_gross,')

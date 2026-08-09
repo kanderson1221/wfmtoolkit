@@ -24,6 +24,7 @@ import {
 import { computeMonthlyRecords, summarizePlanRecords } from '../../planner/demandModel'
 import { buildAnnualPlanningRollup } from '../../planner/annualPlanningRollup'
 import { resolvePlanningGroupActuals } from '../../planner/groupActuals'
+import { describeOperatingWindow } from '../../planner/operatingSchedule'
 import { computeStaffingRecords, summarizeStaffingRecords } from '../../planner/staffingModel'
 import { buildPlanUpdateActualsState, buildPlanUpdateName } from '../../planner/planUpdates'
 import {
@@ -453,11 +454,7 @@ export function usePlanningCenterWorkspace({
       .join(', ') || 'No operating days selected'
   )
 
-  const operatingHoursLabel = computed(() =>
-    center.value?.operatingOpenTime && center.value?.operatingCloseTime
-      ? `${center.value.operatingOpenTime} to ${center.value.operatingCloseTime}`
-      : 'Hours not set'
-  )
+  const operatingHoursLabel = computed(() => describeOperatingWindow(center.value))
 
   const selectedGroupDefaults = computed(() => {
     if (!selectedGroup.value) {

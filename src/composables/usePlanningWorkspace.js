@@ -22,6 +22,7 @@ import {
 import { resolvePlanningGroupActuals } from '../planner/groupActuals'
 import { buildForecastTrainingSeedFromPlanningGroupActuals } from '../planner/groupActualsForecastSeed'
 import {
+  calculateDefaultMonthlyPaidHoursPerFte,
   findLinkedPriorPlan,
   getCurrentCalendarYear,
   normalizePlanRequirementMethod,
@@ -236,6 +237,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       customHolidays: centerHolidayProfile.customHolidays.map((holiday) => ({ ...holiday })),
       holidayScheduleMode: normalizeHolidayScheduleMode(HOLIDAY_SCHEDULE_CLOSED),
       operatingWeekdays: [...currentCenter.value.operatingWeekdays],
+      operatingScheduleMode: currentCenter.value.operatingScheduleMode,
       operatingOpenTime: currentCenter.value.operatingOpenTime,
       operatingCloseTime: currentCenter.value.operatingCloseTime,
       defaultPaidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay,
@@ -247,9 +249,13 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       actuals: resolvePlanningGroupActuals(currentGroup.value),
       startingHeadcount: seededStartingPosition.rosterHeadcount,
       startingFrontlineHeadcount: seededStartingPosition.frontlineHeadcount,
-      presenceMonths: Array.from({ length: 12 }, () => ({
-        paidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay
-      })),
+      presenceMonths: Array.from({ length: 12 }, () => {
+        const paidHoursPerDay = currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay
+        return {
+          paidHoursPerDay,
+          monthlyPaidHoursPerFte: calculateDefaultMonthlyPaidHoursPerFte(paidHoursPerDay)
+        }
+      }),
       randomDefaults: {
         occupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
         adherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent
@@ -359,6 +365,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
           Array.isArray(currentGroup.value?.operatingWeekdays) && currentGroup.value.operatingWeekdays.length
             ? currentGroup.value.operatingWeekdays
             : currentCenter.value.operatingWeekdays,
+        operatingScheduleMode: currentCenter.value.operatingScheduleMode,
         operatingOpenTime: currentCenter.value.operatingOpenTime,
         operatingCloseTime: currentCenter.value.operatingCloseTime,
         holidayProfileYear,

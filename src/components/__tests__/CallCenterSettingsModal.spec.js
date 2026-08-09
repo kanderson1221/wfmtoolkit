@@ -38,6 +38,7 @@ const mountModal = (props = {}) => {
       holidayProfiles: [],
       displayYear: 2026,
       operatingWeekdays: [1, 2, 3, 4, 5],
+      operatingScheduleMode: 'configured_hours',
       operatingOpenTime: '',
       operatingCloseTime: '',
       weekdayOptions: [
@@ -50,6 +51,7 @@ const mountModal = (props = {}) => {
         { value: 6, label: 'Sat' }
       ],
       'onUpdate:operatingWeekdays': (value) => syncProps({ operatingWeekdays: value }),
+      'onUpdate:operatingScheduleMode': (value) => syncProps({ operatingScheduleMode: value }),
       'onUpdate:operatingOpenTime': (value) => syncProps({ operatingOpenTime: value }),
       'onUpdate:operatingCloseTime': (value) => syncProps({ operatingCloseTime: value }),
       'onUpdate:holidayProfiles': (value) => syncProps({ holidayProfiles: value }),
@@ -123,6 +125,27 @@ describe('CallCenterSettingsModal', () => {
     await closeTimeInput.setValue('08:30')
 
     expect(wrapper.text()).toContain('Closing time must be later than opening time.')
+    expect(findButtonByText(wrapper, 'Save Call Center').attributes('disabled')).toBeDefined()
+  })
+
+  it('supports explicit 24-hour operation and disables configured time inputs', async () => {
+    const wrapper = mountModal()
+
+    await wrapper.get('#call-center-always-open').setValue(true)
+
+    expect(wrapper.props('operatingScheduleMode')).toBe('always_open')
+    expect(wrapper.get('#call-center-open-time').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('#call-center-close-time').attributes('disabled')).toBeDefined()
+    expect(findButtonByText(wrapper, 'Save Call Center').attributes('disabled')).toBeUndefined()
+  })
+
+  it('rejects 23:59 because configured hours must align to 30-minute intervals', async () => {
+    const wrapper = mountModal()
+
+    await wrapper.get('#call-center-open-time').setValue('00:00')
+    await wrapper.get('#call-center-close-time').setValue('23:59')
+
+    expect(wrapper.text()).toContain('30-minute staffing intervals')
     expect(findButtonByText(wrapper, 'Save Call Center').attributes('disabled')).toBeDefined()
   })
 

@@ -121,6 +121,7 @@ export const createForecastCenterSnapshot = (overrides = {}) => {
     centerName: snapshot.centerName || '',
     timezone: snapshot.timezone || DEFAULT_FORECAST_TIMEZONE,
     operatingWeekdays: Array.isArray(snapshot.operatingWeekdays) ? [...snapshot.operatingWeekdays] : [],
+    operatingScheduleMode: snapshot.operatingScheduleMode || '',
     operatingOpenTime: snapshot.operatingOpenTime || '',
     operatingCloseTime: snapshot.operatingCloseTime || '',
     holidayProfileYear: Number(snapshot.holidayProfileYear) || null,

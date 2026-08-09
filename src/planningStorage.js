@@ -12,6 +12,7 @@ import {
 } from './planner/holidayCalendars'
 import { createPlanningGroupActuals, resolvePlanningGroupActuals } from './planner/groupActuals'
 import { createPlanningGroupIntraday, resolvePlanningGroupIntraday } from './planner/groupIntraday'
+import { normalizeOperatingScheduleMode } from './planner/operatingSchedule'
 import { createPlanDemandSource } from './planner/demandSources'
 import {
   createNextYearOpening,
@@ -328,6 +329,11 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
   const status = normalizePlanStatus(planSnapshot.status, planType)
   const id = planSnapshot.id || createEntityId('plan')
   const name = String(planSnapshot.name || '').trim() || buildPlanName(resolvedYear, planType)
+  const operatingOpenTime = normalizeOperatingTime(planSnapshot.operatingOpenTime)
+  const operatingCloseTime = normalizeOperatingTime(planSnapshot.operatingCloseTime)
+  const hasOperatingScheduleSnapshot = Boolean(
+    String(planSnapshot.operatingScheduleMode || '').trim() || operatingOpenTime || operatingCloseTime
+  )
 
   return {
     ...planSnapshot,
@@ -345,6 +351,15 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
     actualizedAt: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.actualizedAt || '').trim() : '',
     decisionReason: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.decisionReason || '').trim() : '',
     planningYear: resolvedYear,
+    operatingScheduleMode: hasOperatingScheduleSnapshot
+      ? normalizeOperatingScheduleMode(
+          planSnapshot.operatingScheduleMode,
+          operatingOpenTime,
+          operatingCloseTime
+        )
+      : '',
+    operatingOpenTime,
+    operatingCloseTime,
     holidayCalendarId: normalizeHolidayCalendarId(planSnapshot.holidayCalendarId, HOLIDAY_CALENDAR_NONE),
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),
     customHolidays: normalizeCustomHolidays(planSnapshot.customHolidays),
@@ -387,6 +402,7 @@ export const normalizePlanningGroup = (draftGroup, timestamp = new Date().toISOS
     intraday: createPlanningGroupIntraday(
       resolvePlanningGroupIntraday(snapshot, {
         center: {
+          operatingScheduleMode: defaults.operatingScheduleMode,
           operatingOpenTime: defaults.operatingOpenTime,
           operatingCloseTime: defaults.operatingCloseTime
         }
@@ -455,12 +471,20 @@ export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toIS
   const normalizedHolidayProfiles = Array.isArray(holidayProfiles) && holidayProfiles.length
     ? normalizeCenterHolidayProfiles(holidayProfiles)
     : migrateLegacyHolidayProfiles(snapshot)
+  const operatingOpenTime = normalizeOperatingTime(snapshot.operatingOpenTime)
+  const operatingCloseTime = normalizeOperatingTime(snapshot.operatingCloseTime)
+  const operatingScheduleMode = normalizeOperatingScheduleMode(
+    snapshot.operatingScheduleMode,
+    operatingOpenTime,
+    operatingCloseTime
+  )
   const normalizedGroups = Array.isArray(groups)
     ? groups.map((group) =>
         normalizePlanningGroup(group, timestamp, {
           operatingWeekdays: snapshot.operatingWeekdays,
-          operatingOpenTime: snapshot.operatingOpenTime,
-          operatingCloseTime: snapshot.operatingCloseTime,
+          operatingScheduleMode,
+          operatingOpenTime,
+          operatingCloseTime,
           defaultPaidHoursPerDay: snapshot.defaultPaidHoursPerDay,
           defaultOccupancyPercent: snapshot.defaultOccupancyPercent,
           defaultAdherencePercent: snapshot.defaultAdherencePercent,
@@ -479,8 +503,9 @@ export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toIS
     timezone: snapshot.timezone?.trim() || getDefaultTimeZone(),
     holidayProfiles: normalizedHolidayProfiles,
     operatingWeekdays: normalizeWeekdays(snapshot.operatingWeekdays),
-    operatingOpenTime: normalizeOperatingTime(snapshot.operatingOpenTime),
-    operatingCloseTime: normalizeOperatingTime(snapshot.operatingCloseTime),
+    operatingScheduleMode,
+    operatingOpenTime,
+    operatingCloseTime,
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, 90), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, 95), 1)),
@@ -536,6 +561,8 @@ export const createPlanningCenterDraft = (overrides = {}) => {
     holidayProfiles,
     ...centerSnapshot
   } = snapshot
+  const operatingOpenTime = normalizeOperatingTime(overrides?.operatingOpenTime)
+  const operatingCloseTime = normalizeOperatingTime(overrides?.operatingCloseTime)
 
   return {
     ...centerSnapshot,
@@ -543,8 +570,13 @@ export const createPlanningCenterDraft = (overrides = {}) => {
     timezone: overrides?.timezone ?? getDefaultTimeZone(),
     holidayProfiles: normalizeCenterHolidayProfiles(holidayProfiles),
     operatingWeekdays: normalizeWeekdays(overrides?.operatingWeekdays),
-    operatingOpenTime: normalizeOperatingTime(overrides?.operatingOpenTime),
-    operatingCloseTime: normalizeOperatingTime(overrides?.operatingCloseTime),
+    operatingScheduleMode: normalizeOperatingScheduleMode(
+      overrides?.operatingScheduleMode,
+      operatingOpenTime,
+      operatingCloseTime
+    ),
+    operatingOpenTime,
+    operatingCloseTime,
     defaultPaidHoursPerDay: Math.max(toNumber(overrides?.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(overrides?.defaultOccupancyPercent, 90), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(overrides?.defaultAdherencePercent, 95), 1)),
@@ -561,6 +593,7 @@ export const createPlanningGroupDraft = (overrides = {}) => {
   const { actualsYears: _legacyActualsYears, ...groupSnapshot } = snapshot
   const intraday = resolvePlanningGroupIntraday(snapshot, {
     center: {
+      operatingScheduleMode: snapshot.operatingScheduleMode,
       operatingOpenTime: snapshot.operatingOpenTime,
       operatingCloseTime: snapshot.operatingCloseTime
     }

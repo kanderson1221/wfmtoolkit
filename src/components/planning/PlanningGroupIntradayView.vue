@@ -7,6 +7,7 @@ import {
   resolvePlanningGroupIntraday,
   summarizePlanningGroupIntraday
 } from '../../planner/groupIntraday'
+import { describeOperatingWindow } from '../../planner/operatingSchedule'
 import AppButton from '../ui/AppButton.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
@@ -41,6 +42,7 @@ watch(
   () => [
     props.group?.id,
     props.group?.updatedAt,
+    props.center?.operatingScheduleMode,
     props.center?.operatingOpenTime,
     props.center?.operatingCloseTime
   ],
@@ -52,11 +54,7 @@ watch(
 
 const summary = computed(() => summarizePlanningGroupIntraday(intradayDraft.value))
 
-const operatingWindowLabel = computed(() =>
-  props.center?.operatingOpenTime && props.center?.operatingCloseTime
-    ? `${props.center.operatingOpenTime} to ${props.center.operatingCloseTime}`
-    : '24-hour profile'
-)
+const operatingWindowLabel = computed(() => describeOperatingWindow(props.center))
 
 const canSave = computed(() =>
   summary.value.isBalanced &&

@@ -336,6 +336,7 @@ const planSettingsStatusTone = computed(() =>
 const openCreateGroup = () => {
   groupDraft.value = createPlanningGroupDraft({
     operatingWeekdays: props.center.operatingWeekdays,
+    operatingScheduleMode: props.center.operatingScheduleMode,
     operatingOpenTime: props.center.operatingOpenTime,
     operatingCloseTime: props.center.operatingCloseTime
   })
