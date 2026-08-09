@@ -26,6 +26,7 @@ import {
   buildPlanningHomeHash
 } from '../appRoutes'
 import { useMonthlyPlanBuilder } from '../composables/useMonthlyPlanBuilder'
+import { isEmailChannel } from '../planner/channels'
 
 const props = defineProps({
   initialPlan: {
@@ -73,6 +74,7 @@ const builder = reactive(useMonthlyPlanBuilder(props, emit))
 const TOTAL_PLAN_MONTHS = FULL_MONTH_LABELS.length
 const reviewedSections = computed(() => new Set(builder.reviewedSections))
 const isIntradayErlang = computed(() => builder.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+const isEmailPlan = computed(() => isEmailChannel(builder.channelType))
 const variabilityTitle = computed(() => isIntradayErlang.value ? 'Erlang Inputs' : 'Random/Variability')
 const requirementTitle = computed(() => 'Demand Model')
 const hasAppliedForecastDemand = computed(() =>
@@ -736,6 +738,10 @@ const planWorkspaceDisabled = computed(() =>
         {{ builder.readOnlyBudgetMessage }}
       </AppStatusMessage>
 
+      <AppStatusMessage v-if="isEmailPlan" tone="info" class="mb-3">
+        Dedicated email plan · Workload Ratio converts emails and handling time into staffing. The saved response target is informational; backlog aging and SLA attainment are not simulated in Phase 1.
+      </AppStatusMessage>
+
       <AppStatusMessage v-else-if="builder.validationMessage" tone="error" class="mb-3">
         {{ builder.validationMessage }}
       </AppStatusMessage>
@@ -770,6 +776,7 @@ const planWorkspaceDisabled = computed(() =>
                   class="grid gap-3"
                 >
                   <PlannerForecastPanel
+                    :channel-type="builder.channelType"
                     v-model:demand-source="builder.demandSource"
                     v-model:selected-forecast-project-id="builder.selectedForecastProjectId"
                     :saved-forecast-project-count="builder.savedForecastProjectCount"
@@ -812,6 +819,7 @@ const planWorkspaceDisabled = computed(() =>
                   v-model:use-monthly-random-overrides="builder.useMonthlyRandomOverrides"
                   v-model:random-months="builder.randomMonths"
                   :requirement-method="builder.requirementMethod"
+                  :channel-type="builder.channelType"
                   :monthly-records="builder.monthlyRecords"
                   :summary="builder.randomSummary"
                   :demand-source="builder.demandSource"
@@ -836,6 +844,7 @@ const planWorkspaceDisabled = computed(() =>
                   v-model:plan-months="builder.planMonths"
                   v-model:selected-month-index="builder.selectedMonthIndex"
                   :requirement-method="builder.requirementMethod"
+                  :channel-type="builder.channelType"
                   :monthly-records="builder.monthlyRecords"
                   :interval-records="builder.intradayErlangIntervalOutputs"
                   :plan-summary="builder.planSummary"

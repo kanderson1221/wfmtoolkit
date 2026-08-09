@@ -47,4 +47,23 @@ describe('monthly planner FTE capacity defaults and migration', () => {
 
     expect(state.presenceMonths.every((month) => month.monthlyPaidHoursPerFte === 176)).toBe(true)
   })
+
+  it('inherits email context and forces workload-ratio planning', () => {
+    const state = resolvePlannerInitialState({
+      sourcePlan: {
+        planningYear: 2027,
+        channelType: 'email',
+        serviceGoal: { targetPercent: 95, threshold: 8 },
+        requirementMethod: 'intraday_erlang'
+      }
+    })
+
+    expect(state.channelType).toBe('email')
+    expect(state.serviceGoal).toEqual({
+      targetPercent: 95,
+      threshold: 8,
+      thresholdUnit: 'business_hours'
+    })
+    expect(state.requirementMethod).toBe('workload_ratio')
+  })
 })

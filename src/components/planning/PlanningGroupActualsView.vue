@@ -15,6 +15,7 @@ import {
   resolvePlanningGroupActuals
 } from '../../planner/groupActuals'
 import { summarizePlanningGroupActualsDataset } from '../../planner/groupActualsDataSummary'
+import { getChannelPlanningTerms } from '../../planner/channels'
 
 const props = defineProps({
   center: {
@@ -41,6 +42,7 @@ const importModalVisible = ref(false)
 const actualsDraft = ref(resolvePlanningGroupActuals(props.group))
 const selectedScope = ref(null)
 const activeGapScope = ref(null)
+const channelTerms = computed(() => getChannelPlanningTerms(props.group.channelType))
 
 const clonePlain = (value) => JSON.parse(JSON.stringify(value))
 
@@ -188,7 +190,7 @@ const downloadGapTemplate = () => {
   }
 
   const csvText = [
-    'service_date,contacts,average_handle_time_seconds',
+    `service_date,${channelTerms.value.contactPlural},average_handle_time_seconds`,
     ...activeGapScope.value.missingOpenDates.map((serviceDate) => `${serviceDate},,`)
   ].join('\r\n')
   const fileName = [
@@ -286,10 +288,10 @@ defineExpose({
                 Max Date
               </th>
               <th class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">
-                Contacts
+                {{ channelTerms.contactLabel }}
               </th>
               <th class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">
-                Weighted Avg AHT
+                Weighted {{ channelTerms.averageHandleTimeLabel }}
               </th>
               <th class="px-4 py-3 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">
                 Coverage
@@ -419,6 +421,7 @@ defineExpose({
     <PlanningGroupActualsImportModal
       v-model:visible="importModalVisible"
       :actuals="actualsDraft"
+      :channel-type="props.group.channelType"
       :format-whole="props.formatWhole"
       :format-number="props.formatNumber"
       @apply="handleImportApply"
@@ -435,7 +438,7 @@ defineExpose({
     >
       <div v-if="activeGapScope" class="grid gap-4">
         <p class="text-sm leading-6 text-slate-600">
-          Download the gap template, add contacts and average handle time for each date, then import it with Add Data. Existing dates will remain unchanged.
+          Download the gap template, add {{ channelTerms.contactPlural }} and average handling time for each date, then import it with Add Data. Existing dates will remain unchanged.
         </p>
         <ol class="grid max-h-[22rem] gap-x-6 gap-y-1 overflow-y-auto border-y border-slate-200 py-3 sm:grid-cols-2">
           <li

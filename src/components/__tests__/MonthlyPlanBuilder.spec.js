@@ -169,6 +169,40 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.get('[data-section-id="requirement"]').text()).toContain('Demand Model')
   })
 
+  it('saves dedicated email context with workload-ratio requirements', async () => {
+    const wrapper = await mountBuilder({
+      draftKey: 'new-email-plan',
+      prefilledYear: 2027,
+      centerDefaults: {
+        ...centerDefaults,
+        channelType: 'email',
+        serviceGoal: {
+          targetPercent: 95,
+          threshold: 8,
+          thresholdUnit: 'business_hours'
+        },
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      }
+    })
+
+    expect(wrapper.vm.builder.channelType).toBe('email')
+    expect(wrapper.vm.builder.requirementMethod).toBe('workload_ratio')
+    expect(wrapper.text()).toContain('Dedicated email plan')
+
+    await wrapper.vm.builder.savePlan()
+
+    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+      channelType: 'email',
+      serviceGoal: {
+        targetPercent: 95,
+        threshold: 8,
+        thresholdUnit: 'business_hours'
+      },
+      requirementMethod: 'workload_ratio',
+      intradayErlangResults: null
+    })
+  })
+
   it('orders the planner nav with forecasts first under the plan section', async () => {
     const wrapper = await mountBuilder({
       draftKey: 'new-plan',

@@ -13,11 +13,16 @@ import {
 import { createPlanningGroupActuals, resolvePlanningGroupActuals } from './planner/groupActuals'
 import { createPlanningGroupIntraday, resolvePlanningGroupIntraday } from './planner/groupIntraday'
 import { normalizeOperatingScheduleMode } from './planner/operatingSchedule'
+import {
+  STAFFING_CHANNEL_VOICE,
+  normalizeRequirementMethodForChannel,
+  normalizeStaffingChannel,
+  resolveChannelServiceGoal
+} from './planner/channels'
 import { createPlanDemandSource } from './planner/demandSources'
 import {
   createNextYearOpening,
   getCurrentCalendarYear,
-  normalizePlanRequirementMethod,
   resolvePlanningYear
 } from './planner/shared'
 import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/browserStorage'
@@ -334,6 +339,8 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
   const hasOperatingScheduleSnapshot = Boolean(
     String(planSnapshot.operatingScheduleMode || '').trim() || operatingOpenTime || operatingCloseTime
   )
+  const channelType = normalizeStaffingChannel(planSnapshot.channelType, STAFFING_CHANNEL_VOICE)
+  const serviceGoal = resolveChannelServiceGoal(planSnapshot, channelType)
 
   return {
     ...planSnapshot,
@@ -364,7 +371,9 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),
     customHolidays: normalizeCustomHolidays(planSnapshot.customHolidays),
     holidayScheduleMode: normalizeHolidayScheduleMode(planSnapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
-    requirementMethod: normalizePlanRequirementMethod(planSnapshot.requirementMethod),
+    channelType,
+    serviceGoal,
+    requirementMethod: normalizeRequirementMethodForChannel(planSnapshot.requirementMethod, channelType),
     demandSource: createPlanDemandSource(planSnapshot.demandSource),
     nextYearOpening: createNextYearOpening(planSnapshot.nextYearOpening),
     createdAt: planSnapshot.createdAt || timestamp,
@@ -383,19 +392,26 @@ export const normalizePlanningGroup = (draftGroup, timestamp = new Date().toISOS
     Math.round(toNumber(defaults.serviceLevelThresholdSeconds, DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS)),
     1
   )
+  const channelType = normalizeStaffingChannel(snapshot.channelType, STAFFING_CHANNEL_VOICE)
+  const serviceGoal = resolveChannelServiceGoal({
+    ...snapshot,
+    serviceLevelPercent: snapshot.serviceLevelPercent ?? defaultServiceLevelPercent,
+    serviceLevelThresholdSeconds: snapshot.serviceLevelThresholdSeconds ?? defaultServiceLevelThresholdSeconds
+  }, channelType)
 
   return {
     id: snapshot.id || createEntityId('group'),
     name: snapshot.name?.trim() || 'Staffing Group',
+    channelType,
+    serviceGoal,
     operatingWeekdays: normalizeWeekdays(snapshot.operatingWeekdays ?? defaultOperatingWeekdays),
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, defaultPaidHoursPerDay), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, defaultOccupancyPercent), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, defaultAdherencePercent), 1)),
-    serviceLevelPercent: Math.min(100, Math.max(toNumber(snapshot.serviceLevelPercent, defaultServiceLevelPercent), 1)),
-    serviceLevelThresholdSeconds: Math.max(
-      Math.round(toNumber(snapshot.serviceLevelThresholdSeconds, defaultServiceLevelThresholdSeconds)),
-      1
-    ),
+    serviceLevelPercent: serviceGoal.targetPercent,
+    serviceLevelThresholdSeconds: channelType === STAFFING_CHANNEL_VOICE
+      ? Math.max(Math.round(serviceGoal.threshold), 1)
+      : defaultServiceLevelThresholdSeconds,
     holidayCalendarId: normalizeGroupHolidayCalendarId(snapshot.holidayCalendarId, GROUP_HOLIDAY_CALENDAR_INHERIT),
     holidayScheduleMode: normalizeHolidayScheduleMode(snapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
     actuals: resolvePlanningGroupActuals(snapshot),
@@ -598,9 +614,13 @@ export const createPlanningGroupDraft = (overrides = {}) => {
       operatingCloseTime: snapshot.operatingCloseTime
     }
   })
+  const channelType = normalizeStaffingChannel(snapshot.channelType, STAFFING_CHANNEL_VOICE)
+  const serviceGoal = resolveChannelServiceGoal(snapshot, channelType)
 
   return {
     name: '',
+    channelType,
+    serviceGoal,
     operatingWeekdays: [1, 2, 3, 4, 5],
     defaultPaidHoursPerDay: 8,
     defaultOccupancyPercent: 90,
@@ -611,7 +631,9 @@ export const createPlanningGroupDraft = (overrides = {}) => {
     holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED,
     actuals: resolvePlanningGroupActuals(snapshot),
     intraday: createPlanningGroupIntraday(intraday),
-    ...groupSnapshot
+    ...groupSnapshot,
+    channelType,
+    serviceGoal
   }
 }
 
@@ -745,9 +767,15 @@ export const upsertPlanningGroup = (centers, centerId, draftGroup) => {
       const nextGroups = existingIndex >= 0 ? [...center.groups] : [...center.groups, nextGroup]
 
       if (existingIndex >= 0) {
+        const existingChannelType = normalizeStaffingChannel(nextGroups[existingIndex].channelType)
+        const channelChanged = nextGroup.channelType !== existingChannelType
         nextGroups[existingIndex] = {
           ...nextGroups[existingIndex],
           ...nextGroup,
+          channelType: existingChannelType,
+          serviceGoal: channelChanged
+            ? resolveChannelServiceGoal(nextGroups[existingIndex], existingChannelType)
+            : nextGroup.serviceGoal,
           actuals: nextGroup.actuals || nextGroups[existingIndex].actuals || createPlanningGroupActuals(),
           plans: nextGroups[existingIndex].plans || nextGroup.plans || []
         }

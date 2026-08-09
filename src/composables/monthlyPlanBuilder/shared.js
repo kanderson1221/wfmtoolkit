@@ -2,7 +2,6 @@ import {
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_SCHEDULE_CLOSED,
   MONTH_LABELS,
-  PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO,
   buildPlanMonths,
   buildPlanningYearRange,
   buildRandomMonths,
@@ -23,7 +22,9 @@ import {
   normalizeDisabledHolidayRuleIds,
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode,
-  normalizePlanRequirementMethod,
+  normalizeRequirementMethodForChannel,
+  normalizeStaffingChannel,
+  resolveChannelServiceGoal,
   normalizeWeekdays,
   resolveLinkedOpeningPosition,
   toNumber
@@ -145,12 +146,16 @@ export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYe
     startingHeadcount: centerDefaults?.startingHeadcount,
     startingFrontlineHeadcount: centerDefaults?.startingFrontlineHeadcount
   })
+  const channelType = normalizeStaffingChannel(centerDefaults?.channelType)
+  const serviceGoal = resolveChannelServiceGoal(centerDefaults, channelType)
 
   return {
     planningYear,
-    requirementMethod: normalizePlanRequirementMethod(
+    channelType,
+    serviceGoal,
+    requirementMethod: normalizeRequirementMethodForChannel(
       centerDefaults?.requirementMethod,
-      PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+      channelType
     ),
     operatingWeekdays,
     holidayCalendarId,
@@ -168,6 +173,7 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
   const hasPrefilledYear = Number.isFinite(prefilledYear)
   const seedDefaults = buildPlannerSeedDefaults(centerDefaults, hasPrefilledYear ? prefilledYear : currentYear)
   const basePlan = sourcePlan || {}
+  const channelType = normalizeStaffingChannel(basePlan.channelType || seedDefaults.channelType)
   const planningYear = toNumber(basePlan.planningYear, seedDefaults.planningYear)
   const trainingSettings = createTrainingSettings(basePlan.trainingSettings || {})
   const trainingClasses = Array.isArray(basePlan.trainingClasses)
@@ -206,7 +212,12 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
   return {
     seedDefaults,
     planningYear,
-    requirementMethod: normalizePlanRequirementMethod(basePlan.requirementMethod, seedDefaults.requirementMethod),
+    channelType,
+    serviceGoal: resolveChannelServiceGoal(basePlan.serviceGoal ? basePlan : centerDefaults, channelType),
+    requirementMethod: normalizeRequirementMethodForChannel(
+      basePlan.requirementMethod || seedDefaults.requirementMethod,
+      channelType
+    ),
     operatingWeekdays,
     holidayCalendarId,
     disabledHolidayRuleIds,

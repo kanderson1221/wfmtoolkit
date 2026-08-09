@@ -8,17 +8,17 @@ import {
 import {
   PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
   WEEKDAY_FALLBACK,
-  normalizePlanRequirementMethod,
   resolvePlanningYear
 } from './shared'
+import { normalizeRequirementMethodForChannel, normalizeStaffingChannel } from './channels'
 
-export const buildPlanDemandRecords = (plan, center, planningYear) => {
+export const buildPlanDemandRecords = (plan, center, planningYear, requirementMethod = null) => {
   const resolvedYear = resolvePlanningYear(planningYear, plan?.planningYear)
   const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, resolvedYear)
 
   return computeMonthlyRecords({
     planningYear: resolvedYear,
-    requirementMethod: plan?.requirementMethod || plan?.summary?.requirementMethod,
+    requirementMethod: requirementMethod || plan?.requirementMethod || plan?.summary?.requirementMethod,
     demandSource: plan?.demandSource,
     operatingWeekdays:
       Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
@@ -78,10 +78,12 @@ export const buildPlanIntradayPayloadArgs = ({ plan, center, group, planningYear
 
 export const resolvePlanRequirementRecords = ({ plan, center, group, planningYear }) => {
   const resolvedYear = resolvePlanningYear(planningYear, plan?.planningYear)
-  const baselineRecords = buildPlanDemandRecords(plan, center, resolvedYear)
-  const requirementMethod = normalizePlanRequirementMethod(
-    plan?.requirementMethod || plan?.summary?.requirementMethod
+  const channelType = normalizeStaffingChannel(plan?.channelType || group?.channelType)
+  const requirementMethod = normalizeRequirementMethodForChannel(
+    plan?.requirementMethod || plan?.summary?.requirementMethod,
+    channelType
   )
+  const baselineRecords = buildPlanDemandRecords(plan, center, resolvedYear, requirementMethod)
 
   if (requirementMethod !== PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG) {
     return {

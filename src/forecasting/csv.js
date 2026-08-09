@@ -1,6 +1,6 @@
 const CANDIDATE_HEADERS = {
   dateColumn: ['date', 'service_date', 'day', 'ds'],
-  volumeColumn: ['call_volume', 'volume', 'calls', 'daily_calls', 'y']
+  volumeColumn: ['contacts', 'call_volume', 'volume', 'calls', 'daily_calls', 'emails', 'email_volume', 'daily_emails', 'y']
 }
 
 const normalizeHeader = (value) =>
@@ -167,7 +167,7 @@ export const normalizeUploadedRows = ({ rows = [], mapping = {} } = {}) => {
   }
 
   if (!volumeColumn) {
-    issues.push('Choose the call volume column before running a forecast.')
+    issues.push('Choose the contact volume column before running a forecast.')
   }
 
   if (issues.length) {
@@ -187,13 +187,13 @@ export const normalizeUploadedRows = ({ rows = [], mapping = {} } = {}) => {
     }
 
     if (rawVolume == null) {
-      issues.push(`Row ${row.rowIndex}: enter a numeric daily call volume in "${volumeColumn}".`)
+      issues.push(`Row ${row.rowIndex}: enter a numeric daily contact volume in "${volumeColumn}".`)
       return
     }
 
     const y = rawVolume
     if (y == null || y < 0) {
-      issues.push(`Row ${row.rowIndex}: daily call volume must be zero or greater.`)
+      issues.push(`Row ${row.rowIndex}: daily contact volume must be zero or greater.`)
       return
     }
 

@@ -89,6 +89,20 @@ const attachCurrentResults = (plan, monthlyOutputs = [
 }
 
 describe('planRequirementRecords', () => {
+  it('never uses Intraday Erlang for a dedicated email plan', () => {
+    const resolution = resolvePlanRequirementRecords({
+      plan: buildPlan({ channelType: 'email' }),
+      center,
+      group: { ...group, channelType: 'email' },
+      planningYear: 2027
+    })
+
+    expect(resolution.requirementMethod).toBe('workload_ratio')
+    expect(resolution.usesIntradayErlang).toBe(false)
+    expect(resolution.requirementsAvailable).toBe(true)
+    expect(resolution.records[0].requiredHeadcount).toBeTypeOf('number')
+  })
+
   it('uses current stored Erlang outputs as the requirement source of truth', () => {
     const state = resolvePlanRequirementRecords({
       plan: attachCurrentResults(buildPlan()),

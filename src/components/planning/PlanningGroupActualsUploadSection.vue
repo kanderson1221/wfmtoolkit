@@ -5,8 +5,13 @@ import AppButton from '../ui/AppButton.vue'
 import AppFileDropzone from '../ui/AppFileDropzone.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppTableShell from '../ui/AppTableShell.vue'
+import { getChannelPlanningTerms } from '../../planner/channels'
 
 const props = defineProps({
+  channelType: {
+    type: String,
+    default: 'voice'
+  },
   columnOptions: {
     type: Array,
     default: () => []
@@ -21,6 +26,7 @@ const state = defineModel('state', {
 })
 
 const hasLoadedFile = computed(() => Boolean(state.value.uploadedFileName))
+const channelTerms = computed(() => getChannelPlanningTerms(props.channelType))
 
 const definitionRows = computed(() => [
   {
@@ -33,15 +39,15 @@ const definitionRows = computed(() => [
   },
   {
     id: 'contacts',
-    label: 'Contacts',
+    label: channelTerms.value.contactLabel,
     required: 'Y',
     example: '1420',
-    definition: 'Daily contact volume.',
+    definition: `Daily ${channelTerms.value.contactSingular} volume.`,
     mappingKey: 'volumeColumn'
   },
   {
     id: 'aht',
-    label: 'Avg AHT Sec',
+    label: `${channelTerms.value.averageHandleTimeLabel} Sec`,
     required: 'Y',
     example: '318',
     definition: 'Average handle time in seconds for that day.',
@@ -71,7 +77,7 @@ const definitionRows = computed(() => [
         <div class="grid gap-0.5">
           <p class="text-sm font-semibold text-slate-950">File Definition</p>
           <p class="text-sm text-slate-600">
-            Map the service date, contacts, and average handle time columns. Other file columns are ignored.
+            Map the service date, {{ channelTerms.contactPlural }}, and average handling time columns. Other file columns are ignored.
           </p>
         </div>
         <AppButton

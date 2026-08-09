@@ -48,6 +48,7 @@ import {
   normalizePlanStatus
 } from '../planningStorage'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../planner/shared'
+import { normalizeRequirementMethodForChannel, normalizeStaffingChannel, resolveChannelServiceGoal } from '../planner/channels'
 import { normalizeOperatingScheduleMode } from '../planner/operatingSchedule'
 import {
   mergeIntradayErlangMonthlyRecords,
@@ -203,6 +204,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const applyBootstrapState = (bootstrapState) => {
     planningYear.value = bootstrapState.initialState.planningYear
+    channelType.value = bootstrapState.initialState.channelType
+    serviceGoal.value = bootstrapState.initialState.serviceGoal
     requirementMethod.value = bootstrapState.initialState.requirementMethod
     activeSection.value = bootstrapState.activeSection
     activeForecastStep.value = bootstrapState.activeForecastStep
@@ -265,6 +268,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const readOnlyBudgetMessage = 'Finalized budget plan is locked. Create an updated plan to change future assumptions.'
 
   const planningYear = ref(initialBootstrapState.initialState.planningYear)
+  const channelType = ref(initialBootstrapState.initialState.channelType)
+  const serviceGoal = ref(initialBootstrapState.initialState.serviceGoal)
   const requirementMethod = ref(initialBootstrapState.initialState.requirementMethod)
   const activeSection = ref(initialBootstrapState.activeSection)
   const activeForecastStep = ref(initialBootstrapState.activeForecastStep)
@@ -504,7 +509,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const baselineMonthlyRecords = computed(() =>
     computeMonthlyRecords({
       planningYear: planningYear.value,
-      requirementMethod: requirementMethod.value,
+      requirementMethod: normalizeRequirementMethodForChannel(requirementMethod.value, channelType.value),
       demandSource: demandSource.value,
       operatingWeekdays: operatingWeekdays.value,
       holidayCalendarId: holidayCalendarId.value,
@@ -810,7 +815,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       actualizedAt: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualizedAt || '') : '',
       decisionReason: planType.value === PLAN_TYPE_UPDATE ? String(sourcePlanReference.value?.decisionReason || '').trim() : '',
       planningYear: planningYear.value,
-      requirementMethod: requirementMethod.value,
+      channelType: normalizeStaffingChannel(channelType.value),
+      serviceGoal: resolveChannelServiceGoal({ channelType: channelType.value, serviceGoal: serviceGoal.value }),
+      requirementMethod: normalizeRequirementMethodForChannel(requirementMethod.value, channelType.value),
       operatingWeekdays: [...operatingWeekdays.value],
       holidayCalendarId: holidayCalendarId.value,
       disabledHolidayRuleIds: [...disabledHolidayRuleIds.value],
@@ -1138,6 +1145,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   return {
     planningYear,
+    channelType,
+    serviceGoal,
     requirementMethod,
     activeSection,
     activeForecastStep,

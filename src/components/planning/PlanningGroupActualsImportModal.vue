@@ -14,8 +14,13 @@ import {
   buildGroupActualsImportStateFromFile,
   normalizeGroupActualsUploadedRows
 } from '../../planner/groupActualsImport'
+import { getChannelPlanningTerms } from '../../planner/channels'
 
 const props = defineProps({
+  channelType: {
+    type: String,
+    default: 'voice'
+  },
   actuals: {
     type: Object,
     default: null
@@ -51,6 +56,7 @@ const draftImportState = ref({
 })
 const draftUploadedRows = ref([])
 const existingActuals = computed(() => createPlanningGroupActuals(props.actuals))
+const channelTerms = computed(() => getChannelPlanningTerms(props.channelType))
 
 const resetDraft = () => {
   const normalizedActuals = createPlanningGroupActuals(props.actuals)
@@ -159,12 +165,12 @@ const previewItems = computed(() => [
     meta: 'Distinct months in the uploaded file'
   },
   {
-    label: 'Total Contacts',
+    label: `Total ${channelTerms.value.contactLabel}`,
     value: props.formatWhole(previewSummary.value.totalContacts),
-    meta: 'Contacts from the uploaded daily file'
+    meta: `${channelTerms.value.contactLabel} from the uploaded daily file`
   },
   {
-    label: 'Weighted Avg AHT',
+    label: `Weighted ${channelTerms.value.averageHandleTimeLabel}`,
     value:
       previewSummary.value.averageAhtSeconds == null
         ? '—'
@@ -235,6 +241,7 @@ const handleApply = () => {
       <PlanningGroupActualsUploadSection
         v-model:state="draftImportState"
         :column-options="columnOptions"
+        :channel-type="props.channelType"
         @file-select="handleFileSelect"
       />
 

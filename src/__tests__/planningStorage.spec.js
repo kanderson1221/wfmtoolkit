@@ -6,6 +6,8 @@ import {
 import {
   createPlanningCenterDraft,
   loadPlanningCenters,
+  normalizePlanningGroup,
+  normalizePlanningPlan,
   PLAN_STATUS_DRAFT,
   PLAN_STATUS_FINALIZED,
   PLAN_TYPE_BUDGET,
@@ -14,6 +16,7 @@ import {
   resolveCenterHolidayProfile,
   resolvePlanHolidaySnapshot,
   setCurrentPlanningPlan,
+  upsertPlanningGroup,
   upsertPlanningPlan
 } from '../planningStorage'
 
@@ -70,6 +73,69 @@ const clearPlanningStorage = () => {
 }
 
 describe('planningStorage', () => {
+  it('migrates legacy staffing groups to voice service goals', () => {
+    const group = normalizePlanningGroup({
+      name: 'Legacy Voice',
+      serviceLevelPercent: 85,
+      serviceLevelThresholdSeconds: 30
+    })
+
+    expect(group.channelType).toBe('voice')
+    expect(group.serviceGoal).toEqual({
+      targetPercent: 85,
+      threshold: 30,
+      thresholdUnit: 'seconds'
+    })
+  })
+
+  it('snapshots email channel context and rejects an Erlang requirement method', () => {
+    const plan = normalizePlanningPlan({
+      planningYear: 2027,
+      channelType: 'email',
+      serviceGoal: {
+        targetPercent: 95,
+        threshold: 8
+      },
+      requirementMethod: 'intraday_erlang'
+    })
+
+    expect(plan.channelType).toBe('email')
+    expect(plan.serviceGoal).toEqual({
+      targetPercent: 95,
+      threshold: 8,
+      thresholdUnit: 'business_hours'
+    })
+    expect(plan.requirementMethod).toBe('workload_ratio')
+  })
+
+  it('does not reinterpret an existing staffing group as another channel', () => {
+    const centers = [{
+      id: 'center-1',
+      name: 'Operations',
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      groups: [{
+        id: 'group-1',
+        name: 'Voice Support',
+        channelType: 'voice',
+        serviceGoal: { targetPercent: 80, threshold: 20 },
+        plans: []
+      }]
+    }]
+
+    const nextCenters = upsertPlanningGroup(centers, 'center-1', {
+      ...centers[0].groups[0],
+      channelType: 'email',
+      serviceGoal: { targetPercent: 90, threshold: 24 }
+    })
+
+    expect(nextCenters[0].groups[0].channelType).toBe('voice')
+    expect(nextCenters[0].groups[0].serviceGoal).toEqual({
+      targetPercent: 80,
+      threshold: 20,
+      thresholdUnit: 'seconds'
+    })
+  })
+
   beforeEach(() => {
     clearPlanningStorage()
   })

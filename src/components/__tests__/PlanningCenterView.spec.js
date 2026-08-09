@@ -352,6 +352,43 @@ describe('PlanningCenterView', () => {
     vi.restoreAllMocks()
   })
 
+  it('uses the dedicated email workspace and omits Intraday setup', () => {
+    const wrapper = buildWrapper({
+      selectedGroupTab: 'intraday',
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Email Support',
+            channelType: 'email',
+            serviceGoal: {
+              targetPercent: 90,
+              threshold: 24,
+              thresholdUnit: 'business_hours'
+            },
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 85,
+            defaultAdherencePercent: 95,
+            actuals: { dailyRows: [] },
+            plans: []
+          }
+        ]
+      }
+    })
+
+    const tabLabels = wrapper.findAll('button').map((node) => node.text().trim())
+    expect(tabLabels).not.toContain('Intraday')
+    expect(wrapper.text()).toContain('Email requirements use Workload Ratio')
+    expect(wrapper.text()).toContain('Response Target')
+    expect(wrapper.text()).toContain('90% within 24 business hours')
+  })
+
   it('shows a call-center summary before drilling into a staffing group', () => {
     const wrapper = buildWrapper({
       selectedGroupId: ''

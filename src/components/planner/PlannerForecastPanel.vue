@@ -9,8 +9,13 @@ import AppSelect from '../ui/AppSelect.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 import { formatNumber as formatForecastNumber, getForecastTypeLabel } from '../../forecasting/shared'
+import { getChannelPlanningTerms } from '../../planner/channels'
 
 const props = defineProps({
+  channelType: {
+    type: String,
+    default: 'voice'
+  },
   forecastSelectOptions: {
     type: Array,
     default: () => []
@@ -90,6 +95,7 @@ const selectedForecastProjectId = defineModel('selectedForecastProjectId', {
 })
 
 const hasForecastChoices = computed(() => props.forecastSelectOptions.length > 1)
+const channelTerms = computed(() => getChannelPlanningTerms(props.channelType))
 const hasSavedForecastProjects = computed(() => props.savedForecastProjectCount > 0)
 const hasAppliedForecast = computed(() =>
   Array.isArray(demandSource.value?.forecastMonthSnapshot) && demandSource.value.forecastMonthSnapshot.length > 0
@@ -116,7 +122,7 @@ const shouldShowSelectedForecastPreview = computed(() =>
 const demandSourceDescription = computed(() =>
   props.readOnly
     ? 'Review the forecast currently applied to this locked budget plan. Create an updated plan before changing forecast assumptions.'
-    : 'Review the forecast currently applied to this plan, or choose another saved staffing-group forecast to replace monthly contacts and starting AHT assumptions.'
+    : `Review the forecast currently applied to this plan, or choose another saved staffing-group forecast to replace monthly ${channelTerms.value.contactPlural} and starting ${channelTerms.value.handleTimeLabel} assumptions.`
 )
 const readOnlyForecastMessage = computed(() =>
   props.readOnlyMessage || 'This plan is locked. Create an updated plan to change the applied forecast.'
@@ -170,11 +176,11 @@ const selectedForecastItems = computed(() => {
         'Covers 0 required months'
     },
     {
-      label: 'Forecast Contacts',
+      label: `Forecast ${channelTerms.value.contactLabel}`,
       value: props.formatWhole(props.selectedForecastPreviewSummary.totalContacts)
     },
     {
-      label: 'Assumed Avg AHT',
+      label: `Assumed ${channelTerms.value.averageHandleTimeLabel}`,
       value: props.selectedForecastPreviewSummary.averageAhtSeconds != null
         ? `${formatForecastNumber(props.selectedForecastPreviewSummary.averageAhtSeconds, 1)} sec`
         : '—'
@@ -240,11 +246,11 @@ const appliedForecastItems = computed(() => {
       value: props.currentDemandSourceSummary.coverageLabel || '0/12 months'
     },
     {
-      label: 'Forecast Contacts',
+      label: `Forecast ${channelTerms.value.contactLabel}`,
       value: props.formatWhole(props.currentDemandSourceSummary.totalContacts)
     },
     {
-      label: 'Assumed Avg AHT',
+      label: `Assumed ${channelTerms.value.averageHandleTimeLabel}`,
       value: props.currentDemandSourceSummary.averageAhtSeconds != null
         ? `${formatForecastNumber(props.currentDemandSourceSummary.averageAhtSeconds, 1)} sec`
         : '—'

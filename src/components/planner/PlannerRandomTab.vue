@@ -12,8 +12,13 @@ import AppTableNumberField from '../ui/AppTableNumberField.vue'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
 import { describeOperatingWindow } from '../../planner/operatingSchedule'
 import PlannerCopyMenu from './PlannerCopyMenu.vue'
+import { getChannelPlanningTerms } from '../../planner/channels'
 
 const props = defineProps({
+  channelType: {
+    type: String,
+    default: 'voice'
+  },
   monthlyRecords: {
     type: Array,
     required: true
@@ -102,6 +107,7 @@ const handleOverrideModeChange = (value) => {
 }
 
 const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+const channelTerms = computed(() => getChannelPlanningTerms(props.channelType))
 const sectionTitle = computed(() => isIntradayErlang.value ? 'Erlang Inputs' : 'Random/Variability')
 const continueLabel = computed(() => 'Continue to Demand Model')
 const shellMessage = computed(() =>
@@ -188,7 +194,7 @@ const intradaySummaryItems = computed(() => [
 
 const workloadRatioSummaryItems = computed(() => [
   {
-    label: 'Occupancy',
+    label: channelTerms.value.utilizationLabel,
     value: props.formatPercent(
       props.summary.usesMonthlyOverrides
         ? props.summary.averageOccupancyPercent
@@ -318,7 +324,7 @@ const summaryColumns = computed(() =>
 
       <div class="grid gap-3 xl:grid-cols-[minmax(0,12rem)_minmax(0,12rem)_minmax(0,1fr)] xl:items-start">
         <AppFieldGroup
-          :label="useMonthlyRandomOverrides ? 'Default Occupancy %' : 'Occupancy %'"
+          :label="useMonthlyRandomOverrides ? `Default ${channelTerms.utilizationLabel} %` : `${channelTerms.utilizationLabel} %`"
           input-id="global-occupancy"
           :help-text="useMonthlyRandomOverrides ? 'Seeds the monthly override table.' : 'Applies across the full plan year.'"
           class="xl:max-w-[12rem]"
@@ -386,7 +392,7 @@ const summaryColumns = computed(() =>
               <tr>
                 <th title="Planning month for the worksheet row.">Month</th>
                 <th title="Scheduled percentage flowing in from Step 1.">Scheduled %</th>
-                <th title="Expected monthly occupancy assumption used in the random loss build.">Occupancy %</th>
+                <th title="Expected monthly productive utilization assumption used in the random loss build.">{{ channelTerms.utilizationLabel }} %</th>
                 <th title="Expected monthly adherence assumption used in the random loss build.">Adherence %</th>
                 <th title="Adherence loss calculated as (1 - Adherence %) x Scheduled %.">Adherence Loss</th>
                 <th title="Occupancy loss calculated as (1 - Occupancy %) x (Scheduled % - Adherence Loss).">Occupancy Loss</th>
@@ -420,7 +426,7 @@ const summaryColumns = computed(() =>
                     step="0.1"
                     :min-fraction-digits="1"
                     :max-fraction-digits="1"
-                    aria-label="Occupancy percent"
+                    :aria-label="`${channelTerms.utilizationLabel} percent`"
                   />
                 </td>
                 <td>

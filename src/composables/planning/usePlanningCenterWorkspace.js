@@ -29,6 +29,11 @@ import { resolvePlanRequirementRecords } from '../../planner/planRequirementReco
 import { computeStaffingRecords, summarizeStaffingRecords } from '../../planner/staffingModel'
 import { buildPlanUpdateActualsState, buildPlanUpdateName } from '../../planner/planUpdates'
 import { getPlanRequirementMethodLabel } from '../../planner/shared'
+import {
+  describeChannelServiceGoal,
+  getStaffingChannelLabel,
+  isEmailChannel
+} from '../../planner/channels'
 import { currentYear, yearOptions } from '../monthlyPlanBuilder/shared'
 
 const formatWhole = (value) =>
@@ -456,14 +461,18 @@ export function usePlanningCenterWorkspace({
     }
 
     return [
+      { label: 'Channel', value: getStaffingChannelLabel(selectedGroup.value.channelType) },
       { label: 'Operating Days', value: operatingDayLabel.value },
       { label: 'Hours of Operation', value: operatingHoursLabel.value },
       { label: 'Paid Hours / Day', value: formatNumber(selectedGroup.value.defaultPaidHoursPerDay, 1) },
-      { label: 'Default Occupancy', value: `${formatNumber(selectedGroup.value.defaultOccupancyPercent, 1)}%` },
+      {
+        label: isEmailChannel(selectedGroup.value.channelType) ? 'Productive Utilization' : 'Default Occupancy',
+        value: `${formatNumber(selectedGroup.value.defaultOccupancyPercent, 1)}%`
+      },
       { label: 'Default Adherence', value: `${formatNumber(selectedGroup.value.defaultAdherencePercent, 1)}%` },
       {
-        label: 'Service Level',
-        value: `${formatNumber(selectedGroup.value.serviceLevelPercent, 1)}% in ${formatWhole(selectedGroup.value.serviceLevelThresholdSeconds)}s`
+        label: isEmailChannel(selectedGroup.value.channelType) ? 'Response Target' : 'Service Level',
+        value: describeChannelServiceGoal(selectedGroup.value)
       }
     ]
   })

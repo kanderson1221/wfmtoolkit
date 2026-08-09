@@ -24,6 +24,11 @@ import {
   PLAN_REQUIREMENT_METHOD_OPTIONS,
   PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
 } from '../../plannerModel'
+import {
+  createChannelServiceGoal,
+  getChannelPlanningTerms,
+  isEmailChannel
+} from '../../planner/channels'
 import { usePlanningCenterForecastLibrary } from '../../composables/planning/usePlanningCenterForecastLibrary'
 import { usePlanningGroupDataActions } from '../../composables/planning/usePlanningGroupDataActions'
 import { usePlanningGroupForecastActions } from '../../composables/planning/usePlanningGroupForecastActions'
@@ -204,9 +209,12 @@ const STAFFING_GROUP_TABS = [
   { id: 'intraday', label: 'Intraday' },
   { id: 'plans', label: 'Plans' }
 ]
-const resolveGroupWorkspaceTab = (value) => {
+const resolveGroupWorkspaceTab = (value, group = null) => {
   const normalizedValue = String(value || '').trim().toLowerCase()
-  return STAFFING_GROUP_TABS.some((item) => item.id === normalizedValue) ? normalizedValue : 'data'
+  const availableTabs = isEmailChannel(group?.channelType)
+    ? STAFFING_GROUP_TABS.filter((item) => item.id !== 'intraday')
+    : STAFFING_GROUP_TABS
+  return availableTabs.some((item) => item.id === normalizedValue) ? normalizedValue : 'data'
 }
 const {
   breadcrumbItems,
@@ -233,6 +241,19 @@ const {
   newPlanYear,
   newPlanRequirementMethod
 })
+
+const staffingGroupTabs = computed(() =>
+  isEmailChannel(selectedGroup.value?.channelType)
+    ? STAFFING_GROUP_TABS.filter((item) => item.id !== 'intraday')
+    : STAFFING_GROUP_TABS
+)
+const planRequirementMethodOptions = computed(() =>
+  isEmailChannel(selectedGroup.value?.channelType)
+    ? PLAN_REQUIREMENT_METHOD_OPTIONS.filter((option) => option.value === PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO)
+    : PLAN_REQUIREMENT_METHOD_OPTIONS
+)
+const selectedChannelTerms = computed(() => getChannelPlanningTerms(selectedGroup.value?.channelType))
+const groupDraftChannelLocked = computed(() => Boolean(groupDraft.value.id))
 
 const centerSummaryHref = computed(() => buildPlanningCenterHash(props.center.id))
 
@@ -673,7 +694,7 @@ watch(
   ([group, routeTab], previousValue = []) => {
     const previousGroup = previousValue[0]
     const previousRouteTab = previousValue[1]
-    const normalizedRouteTab = resolveGroupWorkspaceTab(routeTab)
+    const normalizedRouteTab = resolveGroupWorkspaceTab(routeTab, group)
 
     if (!group) {
       activeGroupWorkspaceTab.value = 'data'
@@ -705,6 +726,17 @@ watch(
     if (validYears.length && !validYears.includes(Number(newPlanYear.value))) {
       newPlanYear.value = validYears[0]
     }
+  }
+)
+
+watch(
+  () => groupDraft.value.channelType,
+  (channelType, previousChannelType) => {
+    if (!groupSettingsOpen.value || !previousChannelType || channelType === previousChannelType) {
+      return
+    }
+
+    groupDraft.value.serviceGoal = createChannelServiceGoal(channelType)
   }
 )
 
@@ -819,6 +851,9 @@ watch(
                       >
                         {{ group.name }}
                       </strong>
+                      <span class="truncate text-[0.72rem] text-slate-500">
+                        {{ getChannelPlanningTerms(group.channelType).channelLabel }}
+                      </span>
                     </span>
                   </div>
 
@@ -1196,13 +1231,16 @@ watch(
                       <strong class="font-semibold text-slate-950">{{ item.value }}</strong>
                     </div>
                   </div>
+                  <p v-if="isEmailChannel(selectedGroup.channelType)" class="text-xs font-medium text-slate-500">
+                    Email requirements use Workload Ratio. Response targets are informational in Phase 1; backlog aging and SLA attainment are not simulated.
+                  </p>
                 </div>
               </div>
 
               <div class="bg-white pr-5 pt-0">
                 <AppAttachedTabs
                   v-model:active-id="activeGroupWorkspaceTab"
-                  :items="STAFFING_GROUP_TABS"
+                  :items="staffingGroupTabs"
                   aria-label="Staffing group workspace sections"
                   height-class="h-12"
                   button-padding-class="px-4"
@@ -1256,7 +1294,7 @@ watch(
                             Coverage
                           </span>
                           <span :class="planHeaderCellRightClass">
-                            Contacts
+                            {{ selectedChannelTerms.contactLabel }}
                           </span>
                           <span :class="planHeaderCellRightClass">
                             Peak Month
@@ -1450,7 +1488,7 @@ watch(
                         <span class="h-8 w-1" aria-hidden="true" />
                         <div :class="[planRowGridClass, 'px-2']">
                           <span :class="planHeaderCellClass">Plan</span>
-                          <span :class="planHeaderCellRightClass">Contacts</span>
+                          <span :class="planHeaderCellRightClass">{{ selectedChannelTerms.contactLabel }}</span>
                           <span :class="planHeaderCellRightClass">Total Req Hrs</span>
                           <span :class="planHeaderCellRightClass">Avg Req HC</span>
                           <span :class="planHeaderCellRightClass">Avg Opening Gap</span>
@@ -1567,12 +1605,14 @@ watch(
     <PlanningGroupSettingsModal
       v-if="groupSettingsOpen"
       v-model:group-name="groupDraft.name"
+      v-model:channel-type="groupDraft.channelType"
+      v-model:service-goal-percent="groupDraft.serviceGoal.targetPercent"
+      v-model:service-goal-threshold="groupDraft.serviceGoal.threshold"
       v-model:default-paid-hours-per-day="groupDraft.defaultPaidHoursPerDay"
       v-model:default-occupancy-percent="groupDraft.defaultOccupancyPercent"
       v-model:default-adherence-percent="groupDraft.defaultAdherencePercent"
-      v-model:service-level-percent="groupDraft.serviceLevelPercent"
-      v-model:service-level-threshold-seconds="groupDraft.serviceLevelThresholdSeconds"
       :title="groupDraft.id ? 'Edit Staffing Group' : 'Create Staffing Group'"
+      :channel-locked="groupDraftChannelLocked"
       :submit-label="groupDraft.id ? 'Save Staffing Group' : 'Create Staffing Group'"
       @close="closeGroupSettings"
       @save="saveGroup"
@@ -1583,7 +1623,7 @@ watch(
       v-model:planning-year="newPlanYear"
       v-model:requirement-method="newPlanRequirementMethod"
       :year-options="availablePlanYearOptions"
-      :requirement-method-options="PLAN_REQUIREMENT_METHOD_OPTIONS"
+      :requirement-method-options="planRequirementMethodOptions"
       :can-close="canCreatePlanDraft"
       :existing-plan-href="existingPlanHref"
       :status-message="planSettingsStatusMessage"

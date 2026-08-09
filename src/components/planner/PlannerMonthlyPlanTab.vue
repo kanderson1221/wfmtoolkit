@@ -13,8 +13,13 @@ import { DEMAND_SOURCE_FORECAST, derivePeakDayUpliftPercent } from '../../planne
 import {
   PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
 } from '../../plannerModel'
+import { getChannelPlanningTerms } from '../../planner/channels'
 
 const props = defineProps({
+  channelType: {
+    type: String,
+    default: 'voice'
+  },
   monthlyRecords: {
     type: Array,
     required: true
@@ -101,6 +106,7 @@ const selectedMonth = computed(
 )
 
 const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+const channelTerms = computed(() => getChannelPlanningTerms(props.channelType))
 const requirementTitle = computed(() => 'Demand Model')
 const previousLabel = computed(() => isIntradayErlang.value ? 'Back to Erlang Inputs' : 'Back to Random/Variability')
 const appliedDailyForecastRowCount = computed(() =>
@@ -449,7 +455,7 @@ const summaryItems = computed(() => {
   if (isIntradayErlang.value) {
     return [
       {
-        label: 'Annual Contacts',
+        label: `Annual ${channelTerms.value.contactLabel}`,
         value: props.formatWhole(props.planSummary?.annualContacts)
       },
       {
@@ -473,7 +479,7 @@ const summaryItems = computed(() => {
 
   return [
     {
-      label: 'Annual Contacts',
+      label: `Annual ${channelTerms.value.contactLabel}`,
       value: props.formatWhole(props.planSummary?.annualContacts)
     },
     {
@@ -753,8 +759,8 @@ const erlangRunButtonLabel = computed(() => {
           </tr>
           <tr>
             <th title="Planning month. Click a month name to highlight that row.">Month</th>
-            <th :title="isIntradayErlang ? 'Daily forecast-owned contacts are flattened into monthly workload context in Intraday Erlang mode.' : 'Monthly contact demand used to create workload hours.'">Contacts</th>
-            <th :title="isIntradayErlang ? 'Monthly AHT assumptions come from the applied forecast and stay read-only in Intraday Erlang mode.' : 'Average handle time in seconds used to create workload hours.'">AHT</th>
+            <th :title="isIntradayErlang ? 'Daily forecast-owned contacts are flattened into monthly workload context in Intraday Erlang mode.' : `Monthly ${channelTerms.contactPlural} used to create workload hours.`">{{ channelTerms.contactLabel }}</th>
+            <th :title="isIntradayErlang ? 'Monthly AHT assumptions come from the applied forecast and stay read-only in Intraday Erlang mode.' : 'Average handling time in seconds used to create workload hours.'">{{ channelTerms.handleTimeLabel }}</th>
             <th
               v-if="!isIntradayErlang"
               title="Peak Day Uplift % increases average open-day contacts to represent the busiest day of the month."
