@@ -100,6 +100,19 @@ test('opens the planning workspace directly and creates a call center', async ({
   await expect(page.getByRole('heading', { level: 1, name: 'North America Operations' })).toBeVisible()
 })
 
+test('keeps the new-group action clickable when call-center header text wraps', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto('/#planning')
+  await page.addStyleTag({ content: 'html { font-size: 20px; }' })
+
+  await page.getByRole('button', { name: 'New Center' }).first().click()
+  await page.getByLabel('Call Center Name').fill('Large Text Operations')
+  await page.getByRole('button', { name: 'Create Call Center' }).last().click()
+
+  await page.getByRole('button', { name: 'New Group' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Create Staffing Group' })).toBeVisible()
+})
+
 test('opens staffing-group forecasts from the call-center workspace', async ({ page }) => {
   await page.goto('/#planning')
 

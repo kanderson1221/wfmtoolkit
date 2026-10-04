@@ -992,15 +992,15 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).not.toContain('Create Updated Plan')
   })
 
-  it('uses matching compact xl header heights for the group and plan panes', () => {
+  it('uses matching minimum xl header heights that allow wrapped content', () => {
     const wrapper = buildWrapper()
     const staffingGroupsHeading = findHeadingByText(wrapper, 'Staffing Groups')
     const groupWorkspaceHeading = findHeadingByText(wrapper, 'Voice Support')
     const staffingGroupsHeader = staffingGroupsHeading.element.closest('.border-b')
     const groupWorkspaceHeader = groupWorkspaceHeading.element.closest('.border-b')
 
-    expect(staffingGroupsHeader.className).toContain('xl:h-[6rem]')
-    expect(groupWorkspaceHeader.className).toContain('xl:h-[6rem]')
+    expect(staffingGroupsHeader.className).toContain('xl:min-h-[6rem]')
+    expect(groupWorkspaceHeader.className).toContain('xl:min-h-[6rem]')
   })
 
   it('shows the saved hours of operation in the group defaults summary', () => {

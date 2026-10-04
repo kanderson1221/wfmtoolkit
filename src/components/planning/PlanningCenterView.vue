@@ -773,7 +773,7 @@ watch(
           ]"
         >
           <div class="flex min-h-0 flex-col border-b border-slate-200 xl:border-b-0 xl:border-r">
-            <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-4 py-3 xl:h-[6rem]">
+            <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-4 py-3 shrink-0 xl:min-h-[6rem]">
               <div class="flex h-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:items-start">
                 <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">
                   Staffing Groups
@@ -874,7 +874,7 @@ watch(
 
           <div class="flex min-h-0 flex-col bg-slate-50/30">
             <div v-if="!selectedGroup" class="flex min-h-0 flex-col">
-              <div class="border-b border-slate-200 px-4 py-3 xl:h-[6rem]">
+              <div class="border-b border-slate-200 px-4 py-3 shrink-0 xl:min-h-[6rem]">
                 <div class="flex h-full flex-col justify-between gap-1.5">
                   <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <div class="grid gap-0.5">
@@ -1163,7 +1163,7 @@ watch(
             </div>
 
             <div v-else class="flex min-h-0 flex-col">
-              <div class="border-b border-slate-200 px-4 py-3 xl:h-[6rem]">
+              <div class="border-b border-slate-200 px-4 py-3 shrink-0 xl:min-h-[6rem]">
                 <div class="flex h-full flex-col justify-between gap-1.5">
                   <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                     <div class="grid gap-0.5">
