@@ -4,6 +4,15 @@ import {
 } from '../shared'
 
 describe('monthly planner FTE capacity defaults and migration', () => {
+  it('restores a legacy Erlang draft from its results before applying workspace defaults', () => {
+    const state = resolvePlannerInitialState({
+      sourcePlan: { intradayErlangResults: { version: 1 } },
+      centerDefaults: { requirementMethod: 'workload_ratio' }
+    })
+
+    expect(state.requirementMethod).toBe('intraday_erlang')
+  })
+
   it('creates new plans with monthly FTE hours independent from seven-day center operations', () => {
     const defaults = buildPlannerSeedDefaults({
       planningYear: 2026,

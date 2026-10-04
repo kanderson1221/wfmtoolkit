@@ -35,6 +35,7 @@ htmlcov/
 
 # Build / temp / local outputs
 build/
+**/target/
 tmp/
 temp/
 *.log

@@ -47,7 +47,7 @@ import {
   PLAN_TYPE_UPDATE,
   normalizePlanStatus
 } from '../planningStorage'
-import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../planner/shared'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG, resolvePlanRequirementMethod } from '../planner/shared'
 import { normalizeRequirementMethodForChannel, normalizeStaffingChannel, resolveChannelServiceGoal } from '../planner/channels'
 import { normalizeOperatingScheduleMode } from '../planner/operatingSchedule'
 import {
@@ -121,7 +121,14 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const buildBootstrapState = (draftPayload = null) => {
     const sourcePlan =
       draftPayload?.plan
-        ? syncPlanScheduleWithSeed(draftPayload.plan)
+        ? syncPlanScheduleWithSeed({
+            ...draftPayload.plan,
+            // Drafts restore editable inputs; the saved plan owns its requirement method.
+            requirementMethod: resolvePlanRequirementMethod(
+              savedPlan,
+              resolvePlanRequirementMethod(draftPayload.plan, plannerSeedDefaults.value.requirementMethod)
+            )
+          })
         : savedPlan
           ? syncPlanScheduleWithSeed(savedPlan)
           : null
@@ -412,7 +419,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     const examplePlan = buildExamplePlannerState(currentYear + 1)
 
     planningYear.value = currentYear + 1
-    requirementMethod.value = examplePlan.requirementMethod || plannerSeedDefaults.value.requirementMethod
     operatingWeekdays.value = examplePlan.operatingWeekdays
     holidayCalendarId.value = normalizeHolidayCalendarId(examplePlan.holidayCalendarId, HOLIDAY_CALENDAR_NONE)
     disabledHolidayRuleIds.value = normalizeDisabledHolidayRuleIds(examplePlan.disabledHolidayRuleIds)
@@ -446,7 +452,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     validationMessage.value = ''
     planningYear.value = plannerSeedDefaults.value.planningYear
-    requirementMethod.value = plannerSeedDefaults.value.requirementMethod
     operatingWeekdays.value = [...plannerSeedDefaults.value.operatingWeekdays]
     holidayCalendarId.value = plannerSeedDefaults.value.holidayCalendarId
     disabledHolidayRuleIds.value = [...plannerSeedDefaults.value.disabledHolidayRuleIds]

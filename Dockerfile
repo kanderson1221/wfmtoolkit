@@ -12,7 +12,14 @@ COPY src ./src
 RUN npm run build
 
 
-FROM python:3.11-slim AS runtime
+FROM rust:1.99-bookworm AS backend-build
+
+WORKDIR /app
+COPY rust ./rust
+RUN cargo build --manifest-path rust/Cargo.toml --locked --release -p wfm-server
+
+
+FROM python:3.11-slim-bookworm AS runtime
 
 WORKDIR /app
 
@@ -23,8 +30,9 @@ COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 COPY backend /app/backend
+COPY --from=backend-build /app/rust/target/release/wfm-server /usr/local/bin/wfm-server
 COPY --from=frontend-build /app/dist /app/dist
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
+CMD ["python", "-m", "backend.run_native"]

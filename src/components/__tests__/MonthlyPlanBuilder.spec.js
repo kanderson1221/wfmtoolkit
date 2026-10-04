@@ -153,6 +153,50 @@ describe('MonthlyPlanBuilder', () => {
     vi.restoreAllMocks()
   })
 
+  it('keeps a saved Erlang method when restoring a conflicting autosaved draft', async () => {
+    plannerDraftStore.set('intraday-plan', {
+      plan: {
+        id: 'intraday-plan',
+        planningYear: 2026,
+        requirementMethod: 'workload_ratio',
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        startingHeadcount: 42
+      }
+    })
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'intraday-plan',
+        planningYear: 2026,
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      }
+    })
+
+    expect(wrapper.vm.builder.startingHeadcount).toBe(42)
+    expect(wrapper.vm.builder.requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+    await wrapper.vm.builder.savePlan()
+    expect(wrapper.emitted('save')?.[0]?.[0].requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+  })
+
+  it('keeps an Erlang method when resetting inputs or loading example inputs', async () => {
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'intraday-plan',
+        planningYear: 2026,
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      }
+    })
+
+    wrapper.vm.builder.resetPlanner()
+    expect(wrapper.vm.builder.requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+    wrapper.vm.builder.loadExamplePlan()
+    expect(wrapper.vm.builder.requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+  })
+
   it('opens new plans directly in the editor workflow', async () => {
     const wrapper = await mountBuilder({
       draftKey: 'new-plan',

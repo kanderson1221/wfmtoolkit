@@ -31,6 +31,7 @@ import {
 } from '../../plannerModel'
 import { createPlanDemandSource } from '../../planner/demandSources'
 import { createPlanningGroupIntraday } from '../../planner/groupIntraday'
+import { resolvePlanRequirementMethod } from '../../planner/shared'
 
 export const WEEKDAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -217,7 +218,7 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
     channelType,
     serviceGoal: resolveChannelServiceGoal(basePlan.serviceGoal ? basePlan : centerDefaults, channelType),
     requirementMethod: normalizeRequirementMethodForChannel(
-      basePlan.requirementMethod || seedDefaults.requirementMethod,
+      resolvePlanRequirementMethod(basePlan, seedDefaults.requirementMethod),
       channelType
     ),
     operatingWeekdays,

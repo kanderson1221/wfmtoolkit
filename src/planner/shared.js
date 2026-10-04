@@ -91,6 +91,16 @@ export const normalizePlanRequirementMethod = (
       : fallback
 }
 
+// Recover legacy metadata before applying defaults. Explicit methods take precedence
+// over old result snapshots, which may remain after an intentional method change.
+export const resolvePlanRequirementMethod = (
+  plan,
+  fallback = PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+) =>
+  normalizePlanRequirementMethod(plan?.requirementMethod, null) ||
+  normalizePlanRequirementMethod(plan?.summary?.requirementMethod, null) ||
+  (plan?.intradayErlangResults ? PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG : fallback)
+
 export const getPlanRequirementMethodLabel = (value) =>
   normalizePlanRequirementMethod(value) === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
     ? 'Intraday Erlang'

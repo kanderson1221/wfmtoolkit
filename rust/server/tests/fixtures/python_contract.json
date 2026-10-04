@@ -1,0 +1,1519 @@
+[
+  {
+    "name": "erlang_c_0",
+    "path": "/api/erlang-c/calculate",
+    "request": {
+      "callsOffered": 0,
+      "intervalLength": 30,
+      "averageHandleTime": 360,
+      "averageCustomerPatience": 180,
+      "serviceLevelGoal": 80,
+      "serviceLevelThreshold": 40,
+      "maxOccupancy": 85,
+      "shrinkageAssumption": 30,
+      "model": "erlang_c"
+    },
+    "response": {
+      "summary": {
+        "requiredAgents": "0",
+        "requiredHeadcount": "0",
+        "serviceLevel": "100.0%",
+        "expectedAsa": "0.0 sec",
+        "percentAnsweredImmediately": "100.0%",
+        "estimatedOccupancy": "0.0%",
+        "abandonPercent": "0.0%"
+      },
+      "scenarios": [
+        {
+          "agents": "0",
+          "requiredHeadcount": "0",
+          "serviceLevel": "100.0%",
+          "asa": "0.0 sec",
+          "percentAnsweredImmediately": "100.0%",
+          "expectedOccupancy": "0.0%",
+          "abandonment": "0.0%",
+          "isRecommended": true
+        },
+        {
+          "agents": "1",
+          "requiredHeadcount": "2",
+          "serviceLevel": "100.0%",
+          "asa": "0.0 sec",
+          "percentAnsweredImmediately": "100.0%",
+          "expectedOccupancy": "0.0%",
+          "abandonment": "0.0%",
+          "isRecommended": false
+        },
+        {
+          "agents": "2",
+          "requiredHeadcount": "3",
+          "serviceLevel": "100.0%",
+          "asa": "0.0 sec",
+          "percentAnsweredImmediately": "100.0%",
+          "expectedOccupancy": "0.0%",
+          "abandonment": "0.0%",
+          "isRecommended": false
+        },
+        {
+          "agents": "3",
+          "requiredHeadcount": "5",
+          "serviceLevel": "100.0%",
+          "asa": "0.0 sec",
+          "percentAnsweredImmediately": "100.0%",
+          "expectedOccupancy": "0.0%",
+          "abandonment": "0.0%",
+          "isRecommended": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "erlang_c_25",
+    "path": "/api/erlang-c/calculate",
+    "request": {
+      "callsOffered": 25,
+      "intervalLength": 30,
+      "averageHandleTime": 360,
+      "averageCustomerPatience": 180,
+      "serviceLevelGoal": 80,
+      "serviceLevelThreshold": 40,
+      "maxOccupancy": 85,
+      "shrinkageAssumption": 30,
+      "model": "erlang_c"
+    },
+    "response": {
+      "summary": {
+        "requiredAgents": "8",
+        "requiredHeadcount": "12",
+        "serviceLevel": "88.0%",
+        "expectedAsa": "20.1 sec",
+        "percentAnsweredImmediately": "83.3%",
+        "estimatedOccupancy": "62.5%",
+        "abandonPercent": "3.4%"
+      },
+      "scenarios": [
+        {
+          "agents": "5",
+          "requiredHeadcount": "8",
+          "serviceLevel": "0.0%",
+          "asa": "Unstable",
+          "percentAnsweredImmediately": "0.0%",
+          "expectedOccupancy": "100.0%",
+          "abandonment": "20.4%",
+          "isRecommended": false
+        },
+        {
+          "agents": "6",
+          "requiredHeadcount": "9",
+          "serviceLevel": "47.4%",
+          "asa": "> 2 min",
+          "percentAnsweredImmediately": "41.2%",
+          "expectedOccupancy": "83.3%",
+          "abandonment": "12.2%",
+          "isRecommended": false
+        },
+        {
+          "agents": "7",
+          "requiredHeadcount": "10",
+          "serviceLevel": "74.0%",
+          "asa": "58.3 sec",
+          "percentAnsweredImmediately": "67.6%",
+          "expectedOccupancy": "71.4%",
+          "abandonment": "6.7%",
+          "isRecommended": false
+        },
+        {
+          "agents": "8",
+          "requiredHeadcount": "12",
+          "serviceLevel": "88.0%",
+          "asa": "20.1 sec",
+          "percentAnsweredImmediately": "83.3%",
+          "expectedOccupancy": "62.5%",
+          "abandonment": "3.4%",
+          "isRecommended": true
+        },
+        {
+          "agents": "9",
+          "requiredHeadcount": "13",
+          "serviceLevel": "94.8%",
+          "asa": "7.2 sec",
+          "percentAnsweredImmediately": "91.9%",
+          "expectedOccupancy": "55.6%",
+          "abandonment": "1.6%",
+          "isRecommended": false
+        },
+        {
+          "agents": "10",
+          "requiredHeadcount": "15",
+          "serviceLevel": "97.9%",
+          "asa": "2.6 sec",
+          "percentAnsweredImmediately": "96.4%",
+          "expectedOccupancy": "50.0%",
+          "abandonment": "0.7%",
+          "isRecommended": false
+        },
+        {
+          "agents": "11",
+          "requiredHeadcount": "16",
+          "serviceLevel": "99.2%",
+          "asa": "0.9 sec",
+          "percentAnsweredImmediately": "98.5%",
+          "expectedOccupancy": "45.5%",
+          "abandonment": "0.3%",
+          "isRecommended": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "erlang_c_140",
+    "path": "/api/erlang-c/calculate",
+    "request": {
+      "callsOffered": 140,
+      "intervalLength": 30,
+      "averageHandleTime": 360,
+      "averageCustomerPatience": 180,
+      "serviceLevelGoal": 80,
+      "serviceLevelThreshold": 40,
+      "maxOccupancy": 85,
+      "shrinkageAssumption": 30,
+      "model": "erlang_c"
+    },
+    "response": {
+      "summary": {
+        "requiredAgents": "33",
+        "requiredHeadcount": "48",
+        "serviceLevel": "84.4%",
+        "expectedAsa": "19.5 sec",
+        "percentAnsweredImmediately": "72.9%",
+        "estimatedOccupancy": "84.8%",
+        "abandonPercent": "2.5%"
+      },
+      "scenarios": [
+        {
+          "agents": "30",
+          "requiredHeadcount": "43",
+          "serviceLevel": "50.3%",
+          "asa": "> 1 min",
+          "percentAnsweredImmediately": "38.0%",
+          "expectedOccupancy": "93.3%",
+          "abandonment": "5.6%",
+          "isRecommended": false
+        },
+        {
+          "agents": "31",
+          "requiredHeadcount": "45",
+          "serviceLevel": "65.7%",
+          "asa": "57.4 sec",
+          "percentAnsweredImmediately": "52.2%",
+          "expectedOccupancy": "90.3%",
+          "abandonment": "4.4%",
+          "isRecommended": false
+        },
+        {
+          "agents": "32",
+          "requiredHeadcount": "46",
+          "serviceLevel": "76.7%",
+          "asa": "32.7 sec",
+          "percentAnsweredImmediately": "63.7%",
+          "expectedOccupancy": "87.5%",
+          "abandonment": "3.3%",
+          "isRecommended": false
+        },
+        {
+          "agents": "33",
+          "requiredHeadcount": "48",
+          "serviceLevel": "84.4%",
+          "asa": "19.5 sec",
+          "percentAnsweredImmediately": "72.9%",
+          "expectedOccupancy": "84.8%",
+          "abandonment": "2.5%",
+          "isRecommended": true
+        },
+        {
+          "agents": "34",
+          "requiredHeadcount": "49",
+          "serviceLevel": "89.8%",
+          "asa": "12.0 sec",
+          "percentAnsweredImmediately": "80.0%",
+          "expectedOccupancy": "82.4%",
+          "abandonment": "1.8%",
+          "isRecommended": false
+        },
+        {
+          "agents": "35",
+          "requiredHeadcount": "50",
+          "serviceLevel": "93.4%",
+          "asa": "7.4 sec",
+          "percentAnsweredImmediately": "85.6%",
+          "expectedOccupancy": "80.0%",
+          "abandonment": "1.3%",
+          "isRecommended": false
+        },
+        {
+          "agents": "36",
+          "requiredHeadcount": "52",
+          "serviceLevel": "95.8%",
+          "asa": "4.6 sec",
+          "percentAnsweredImmediately": "89.8%",
+          "expectedOccupancy": "77.8%",
+          "abandonment": "0.9%",
+          "isRecommended": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "erlang_a_0",
+    "path": "/api/erlang-c/calculate",
+    "request": {
+      "callsOffered": 0,
+      "intervalLength": 30,
+      "averageHandleTime": 360,
+      "averageCustomerPatience": 180,
+      "serviceLevelGoal": 80,
+      "serviceLevelThreshold": 40,
+      "maxOccupancy": 85,
+      "shrinkageAssumption": 30,
+      "model": "erlang_a"
+    },
+    "response": {
+      "summary": {
+        "requiredAgents": "0",
+        "requiredHeadcount": "0",
+        "serviceLevel": "100.0%",
+        "expectedAsa": "0.0 sec",
+        "percentAnsweredImmediately": "100.0%",
+        "estimatedOccupancy": "0.0%",
+        "abandonPercent": "0.0%"
+      },
+      "scenarios": [
+        {
+          "agents": "0",
+          "requiredHeadcount": "0",
+          "serviceLevel": "100.0%",
+          "asa": "0.0 sec",
+          "percentAnsweredImmediately": "100.0%",
+          "expectedOccupancy": "0.0%",
+          "abandonment": "0.0%",
+          "isRecommended": true
+        },
+        {
+          "agents": "1",
+          "requiredHeadcount": "2",
+          "serviceLevel": "100.0%",
+          "asa": "0.0 sec",
+          "percentAnsweredImmediately": "100.0%",
+          "expectedOccupancy": "0.0%",
+          "abandonment": "0.0%",
+          "isRecommended": false
+        },
+        {
+          "agents": "2",
+          "requiredHeadcount": "3",
+          "serviceLevel": "100.0%",
+          "asa": "0.0 sec",
+          "percentAnsweredImmediately": "100.0%",
+          "expectedOccupancy": "0.0%",
+          "abandonment": "0.0%",
+          "isRecommended": false
+        },
+        {
+          "agents": "3",
+          "requiredHeadcount": "5",
+          "serviceLevel": "100.0%",
+          "asa": "0.0 sec",
+          "percentAnsweredImmediately": "100.0%",
+          "expectedOccupancy": "0.0%",
+          "abandonment": "0.0%",
+          "isRecommended": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "erlang_a_25",
+    "path": "/api/erlang-c/calculate",
+    "request": {
+      "callsOffered": 25,
+      "intervalLength": 30,
+      "averageHandleTime": 360,
+      "averageCustomerPatience": 180,
+      "serviceLevelGoal": 80,
+      "serviceLevelThreshold": 40,
+      "maxOccupancy": 85,
+      "shrinkageAssumption": 30,
+      "model": "erlang_a"
+    },
+    "response": {
+      "summary": {
+        "requiredAgents": "7",
+        "requiredHeadcount": "10",
+        "serviceLevel": "85.6%",
+        "expectedAsa": "9.1 sec",
+        "percentAnsweredImmediately": "78.9%",
+        "estimatedOccupancy": "66.6%",
+        "abandonPercent": "6.7%"
+      },
+      "scenarios": [
+        {
+          "agents": "4",
+          "requiredHeadcount": "6",
+          "serviceLevel": "44.8%",
+          "asa": "46.7 sec",
+          "percentAnsweredImmediately": "35.2%",
+          "expectedOccupancy": "85.5%",
+          "abandonment": "31.6%",
+          "isRecommended": false
+        },
+        {
+          "agents": "5",
+          "requiredHeadcount": "8",
+          "serviceLevel": "61.2%",
+          "asa": "28.7 sec",
+          "percentAnsweredImmediately": "51.2%",
+          "expectedOccupancy": "79.6%",
+          "abandonment": "20.4%",
+          "isRecommended": false
+        },
+        {
+          "agents": "6",
+          "requiredHeadcount": "9",
+          "serviceLevel": "75.2%",
+          "asa": "16.7 sec",
+          "percentAnsweredImmediately": "66.4%",
+          "expectedOccupancy": "73.2%",
+          "abandonment": "12.2%",
+          "isRecommended": false
+        },
+        {
+          "agents": "7",
+          "requiredHeadcount": "10",
+          "serviceLevel": "85.6%",
+          "asa": "9.1 sec",
+          "percentAnsweredImmediately": "78.9%",
+          "expectedOccupancy": "66.6%",
+          "abandonment": "6.7%",
+          "isRecommended": true
+        },
+        {
+          "agents": "8",
+          "requiredHeadcount": "12",
+          "serviceLevel": "92.4%",
+          "asa": "4.7 sec",
+          "percentAnsweredImmediately": "88.0%",
+          "expectedOccupancy": "60.4%",
+          "abandonment": "3.4%",
+          "isRecommended": false
+        },
+        {
+          "agents": "9",
+          "requiredHeadcount": "13",
+          "serviceLevel": "96.4%",
+          "asa": "2.2 sec",
+          "percentAnsweredImmediately": "93.8%",
+          "expectedOccupancy": "54.7%",
+          "abandonment": "1.6%",
+          "isRecommended": false
+        },
+        {
+          "agents": "10",
+          "requiredHeadcount": "15",
+          "serviceLevel": "98.4%",
+          "asa": "1.0 sec",
+          "percentAnsweredImmediately": "97.0%",
+          "expectedOccupancy": "49.7%",
+          "abandonment": "0.7%",
+          "isRecommended": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "erlang_a_140",
+    "path": "/api/erlang-c/calculate",
+    "request": {
+      "callsOffered": 140,
+      "intervalLength": 30,
+      "averageHandleTime": 360,
+      "averageCustomerPatience": 180,
+      "serviceLevelGoal": 80,
+      "serviceLevelThreshold": 40,
+      "maxOccupancy": 85,
+      "shrinkageAssumption": 30,
+      "model": "erlang_a"
+    },
+    "response": {
+      "summary": {
+        "requiredAgents": "32",
+        "requiredHeadcount": "46",
+        "serviceLevel": "91.9%",
+        "expectedAsa": "5.4 sec",
+        "percentAnsweredImmediately": "78.6%",
+        "estimatedOccupancy": "84.6%",
+        "abandonPercent": "3.3%"
+      },
+      "scenarios": [
+        {
+          "agents": "29",
+          "requiredHeadcount": "42",
+          "serviceLevel": "82.2%",
+          "asa": "11.6 sec",
+          "percentAnsweredImmediately": "61.9%",
+          "expectedOccupancy": "89.7%",
+          "abandonment": "7.1%",
+          "isRecommended": false
+        },
+        {
+          "agents": "30",
+          "requiredHeadcount": "43",
+          "serviceLevel": "86.0%",
+          "asa": "9.1 sec",
+          "percentAnsweredImmediately": "67.9%",
+          "expectedOccupancy": "88.1%",
+          "abandonment": "5.6%",
+          "isRecommended": false
+        },
+        {
+          "agents": "31",
+          "requiredHeadcount": "45",
+          "serviceLevel": "89.3%",
+          "asa": "7.1 sec",
+          "percentAnsweredImmediately": "73.5%",
+          "expectedOccupancy": "86.4%",
+          "abandonment": "4.4%",
+          "isRecommended": false
+        },
+        {
+          "agents": "32",
+          "requiredHeadcount": "46",
+          "serviceLevel": "91.9%",
+          "asa": "5.4 sec",
+          "percentAnsweredImmediately": "78.6%",
+          "expectedOccupancy": "84.6%",
+          "abandonment": "3.3%",
+          "isRecommended": true
+        },
+        {
+          "agents": "33",
+          "requiredHeadcount": "48",
+          "serviceLevel": "94.1%",
+          "asa": "4.0 sec",
+          "percentAnsweredImmediately": "83.1%",
+          "expectedOccupancy": "82.7%",
+          "abandonment": "2.5%",
+          "isRecommended": false
+        },
+        {
+          "agents": "34",
+          "requiredHeadcount": "49",
+          "serviceLevel": "95.7%",
+          "asa": "2.9 sec",
+          "percentAnsweredImmediately": "86.9%",
+          "expectedOccupancy": "80.8%",
+          "abandonment": "1.8%",
+          "isRecommended": false
+        },
+        {
+          "agents": "35",
+          "requiredHeadcount": "50",
+          "serviceLevel": "97.0%",
+          "asa": "2.1 sec",
+          "percentAnsweredImmediately": "90.1%",
+          "expectedOccupancy": "78.9%",
+          "abandonment": "1.3%",
+          "isRecommended": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "batch_valid",
+    "path": "/api/erlang-c/batch-calculate",
+    "request": {
+      "rows": [
+        {
+          "queue_id": "sales",
+          "interval_start": "2026-03-08T09:00:00Z",
+          "calls_offered": 180,
+          "aht_seconds": 240,
+          "mean_patience_seconds": 180,
+          "service_level_threshold": 80,
+          "service_level_target_seconds": 20,
+          "max_occupancy": 85,
+          "shrinkage": 30
+        },
+        {
+          "queue_id": "support",
+          "interval_start": "2026-03-08T09:00:00Z",
+          "calls_offered": 150,
+          "aht_seconds": 240,
+          "mean_patience_seconds": 180,
+          "service_level_threshold": 80,
+          "service_level_target_seconds": 20,
+          "max_occupancy": 85,
+          "shrinkage": 0.25
+        }
+      ]
+    },
+    "response": {
+      "results": [
+        {
+          "rowIndex": 1,
+          "queueId": "sales",
+          "intervalStart": "2026-03-08T09:00:00Z",
+          "requiredStaffNet": 29,
+          "requiredStaffGross": 42,
+          "serviceLevel": 0.840283145662605,
+          "asaSeconds": 11.629151264332679,
+          "percentAnsweredImmediately": 0.7577260153264026,
+          "expectedOccupancy": 0.8275862068965517,
+          "abandonPercent": 0.020356183787075877
+        },
+        {
+          "rowIndex": 2,
+          "queueId": "support",
+          "intervalStart": "2026-03-08T09:00:00Z",
+          "requiredStaffNet": 25,
+          "requiredStaffGross": 34,
+          "serviceLevel": 0.8621509208162889,
+          "asaSeconds": 10.036935676744152,
+          "percentAnsweredImmediately": 0.7908971734011634,
+          "expectedOccupancy": 0.8,
+          "abandonPercent": 0.018999954309123848
+        }
+      ],
+      "summary": {
+        "processedRows": 2,
+        "successfulRows": 2,
+        "failedRows": 0,
+        "totalCallsOffered": 330.0,
+        "avgServiceLevel": 0.850223043459734,
+        "avgAsaSeconds": 10.905416906337894,
+        "totalRequiredStaffMinutesNet": 1620.0,
+        "totalRequiredStaffHoursNet": 27.0,
+        "totalRequiredStaffMinutesGross": 2280.0,
+        "totalRequiredStaffHoursGross": 38.0,
+        "peakStaffNet": 29,
+        "peakStaffGross": 42
+      },
+      "errors": []
+    }
+  },
+  {
+    "name": "file_valid",
+    "path": "/api/erlang-c/batch/file-processor",
+    "request": {
+      "rows": [
+        {
+          "queue_id": "sales",
+          "interval_start": "2026-03-08T09:00:00Z",
+          "calls_offered": 180,
+          "aht_seconds": 240,
+          "mean_patience_seconds": 180,
+          "service_level_threshold": 80,
+          "service_level_target_seconds": 20,
+          "max_occupancy": 85,
+          "shrinkage": 30
+        },
+        {
+          "queue_id": "support",
+          "interval_start": "2026-03-08T09:00:00Z",
+          "calls_offered": 150,
+          "aht_seconds": 240,
+          "mean_patience_seconds": 180,
+          "service_level_threshold": 80,
+          "service_level_target_seconds": 20,
+          "max_occupancy": 85,
+          "shrinkage": 0.25
+        }
+      ]
+    },
+    "response": {
+      "mode": "file-processor",
+      "results": [
+        {
+          "rowIndex": 1,
+          "queueId": "sales",
+          "intervalStart": "2026-03-08T09:00:00Z",
+          "requiredStaffNet": 29,
+          "requiredStaffGross": 42,
+          "serviceLevel": 0.840283145662605,
+          "asaSeconds": 11.629151264332679,
+          "percentAnsweredImmediately": 0.7577260153264026,
+          "expectedOccupancy": 0.8275862068965517,
+          "abandonPercent": 0.020356183787075877
+        },
+        {
+          "rowIndex": 2,
+          "queueId": "support",
+          "intervalStart": "2026-03-08T09:00:00Z",
+          "requiredStaffNet": 25,
+          "requiredStaffGross": 34,
+          "serviceLevel": 0.8621509208162889,
+          "asaSeconds": 10.036935676744152,
+          "percentAnsweredImmediately": 0.7908971734011634,
+          "expectedOccupancy": 0.8,
+          "abandonPercent": 0.018999954309123848
+        }
+      ],
+      "summary": {
+        "processedRows": 2,
+        "successfulRows": 2,
+        "failedRows": 0,
+        "totalCallsOffered": 330.0,
+        "avgServiceLevel": 0.850223043459734,
+        "avgAsaSeconds": 10.905416906337894,
+        "totalRequiredStaffMinutesNet": 1620.0,
+        "totalRequiredStaffHoursNet": 27.0,
+        "totalRequiredStaffMinutesGross": 2280.0,
+        "totalRequiredStaffHoursGross": 38.0,
+        "peakStaffNet": 29,
+        "peakStaffGross": 42
+      },
+      "errors": [],
+      "export": {
+        "enrichedFile": {
+          "headers": [
+            "queue_id",
+            "interval_start",
+            "calls_offered",
+            "aht_seconds",
+            "mean_patience_seconds",
+            "service_level_threshold",
+            "service_level_target_seconds",
+            "max_occupancy",
+            "shrinkage",
+            "Required Agents",
+            "Required Headcount",
+            "Service Level",
+            "Average Speed of Answer",
+            "Answered Immediately",
+            "Expected Occupancy",
+            "Caller Abandonment"
+          ],
+          "rows": [
+            [
+              "sales",
+              "2026-03-08T09:00:00Z",
+              180,
+              240,
+              180,
+              80,
+              20,
+              85,
+              30,
+              29,
+              42,
+              84.03,
+              11.629151264332679,
+              75.77,
+              82.76,
+              2.04
+            ],
+            [
+              "support",
+              "2026-03-08T09:00:00Z",
+              150,
+              240,
+              180,
+              80,
+              20,
+              85,
+              0.25,
+              25,
+              34,
+              86.22,
+              10.036935676744152,
+              79.09,
+              80.0,
+              1.9
+            ]
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "batch_zero",
+    "path": "/api/erlang-c/batch-calculate",
+    "request": {
+      "rows": [
+        {
+          "queue_id": "sales",
+          "interval_start": "2026-03-08T09:00:00Z",
+          "calls_offered": 0,
+          "aht_seconds": 240,
+          "mean_patience_seconds": 180,
+          "service_level_threshold": 80,
+          "service_level_target_seconds": 20,
+          "max_occupancy": 85,
+          "shrinkage": 30
+        }
+      ]
+    },
+    "response": {
+      "results": [
+        {
+          "rowIndex": 1,
+          "queueId": "sales",
+          "intervalStart": "2026-03-08T09:00:00Z",
+          "requiredStaffNet": 0,
+          "requiredStaffGross": 0,
+          "serviceLevel": 1.0,
+          "asaSeconds": 0.0,
+          "percentAnsweredImmediately": 1.0,
+          "expectedOccupancy": 0.0,
+          "abandonPercent": 0.0
+        }
+      ],
+      "summary": {
+        "processedRows": 1,
+        "successfulRows": 1,
+        "failedRows": 0,
+        "totalCallsOffered": 0.0,
+        "avgServiceLevel": 0.0,
+        "avgAsaSeconds": null,
+        "totalRequiredStaffMinutesNet": 0.0,
+        "totalRequiredStaffHoursNet": 0.0,
+        "totalRequiredStaffMinutesGross": 0.0,
+        "totalRequiredStaffHoursGross": 0.0,
+        "peakStaffNet": 0,
+        "peakStaffGross": 0
+      },
+      "errors": []
+    }
+  },
+  {
+    "name": "file_zero",
+    "path": "/api/erlang-c/batch/file-processor",
+    "request": {
+      "rows": [
+        {
+          "queue_id": "sales",
+          "interval_start": "2026-03-08T09:00:00Z",
+          "calls_offered": 0,
+          "aht_seconds": 240,
+          "mean_patience_seconds": 180,
+          "service_level_threshold": 80,
+          "service_level_target_seconds": 20,
+          "max_occupancy": 85,
+          "shrinkage": 30
+        }
+      ]
+    },
+    "response": {
+      "mode": "file-processor",
+      "results": [
+        {
+          "rowIndex": 1,
+          "queueId": "sales",
+          "intervalStart": "2026-03-08T09:00:00Z",
+          "requiredStaffNet": 0,
+          "requiredStaffGross": 0,
+          "serviceLevel": 1.0,
+          "asaSeconds": 0.0,
+          "percentAnsweredImmediately": 1.0,
+          "expectedOccupancy": 0.0,
+          "abandonPercent": 0.0
+        }
+      ],
+      "summary": {
+        "processedRows": 1,
+        "successfulRows": 1,
+        "failedRows": 0,
+        "totalCallsOffered": 0.0,
+        "avgServiceLevel": 0.0,
+        "avgAsaSeconds": null,
+        "totalRequiredStaffMinutesNet": 0.0,
+        "totalRequiredStaffHoursNet": 0.0,
+        "totalRequiredStaffMinutesGross": 0.0,
+        "totalRequiredStaffHoursGross": 0.0,
+        "peakStaffNet": 0,
+        "peakStaffGross": 0
+      },
+      "errors": [],
+      "export": {
+        "enrichedFile": {
+          "headers": [
+            "queue_id",
+            "interval_start",
+            "calls_offered",
+            "aht_seconds",
+            "mean_patience_seconds",
+            "service_level_threshold",
+            "service_level_target_seconds",
+            "max_occupancy",
+            "shrinkage",
+            "Required Agents",
+            "Required Headcount",
+            "Service Level",
+            "Average Speed of Answer",
+            "Answered Immediately",
+            "Expected Occupancy",
+            "Caller Abandonment"
+          ],
+          "rows": [
+            [
+              "sales",
+              "2026-03-08T09:00:00Z",
+              0,
+              240,
+              180,
+              80,
+              20,
+              85,
+              30,
+              0,
+              0,
+              100.0,
+              0.0,
+              100.0,
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "batch_strings",
+    "path": "/api/erlang-c/batch-calculate",
+    "request": {
+      "rows": [
+        {
+          "queue_id": "sales",
+          "interval_start": "2026-03-08T09:00:00Z",
+          "calls_offered": "180",
+          "aht_seconds": "240",
+          "mean_patience_seconds": "180",
+          "service_level_threshold": "80",
+          "service_level_target_seconds": "20",
+          "max_occupancy": "85",
+          "shrinkage": "30"
+        }
+      ]
+    },
+    "response": {
+      "results": [
+        {
+          "rowIndex": 1,
+          "queueId": "sales",
+          "intervalStart": "2026-03-08T09:00:00Z",
+          "requiredStaffNet": 29,
+          "requiredStaffGross": 42,
+          "serviceLevel": 0.840283145662605,
+          "asaSeconds": 11.629151264332679,
+          "percentAnsweredImmediately": 0.7577260153264026,
+          "expectedOccupancy": 0.8275862068965517,
+          "abandonPercent": 0.020356183787075877
+        }
+      ],
+      "summary": {
+        "processedRows": 1,
+        "successfulRows": 1,
+        "failedRows": 0,
+        "totalCallsOffered": 180.0,
+        "avgServiceLevel": 0.840283145662605,
+        "avgAsaSeconds": 11.629151264332679,
+        "totalRequiredStaffMinutesNet": 870.0,
+        "totalRequiredStaffHoursNet": 14.5,
+        "totalRequiredStaffMinutesGross": 1260.0,
+        "totalRequiredStaffHoursGross": 21.0,
+        "peakStaffNet": 29,
+        "peakStaffGross": 42
+      },
+      "errors": []
+    }
+  },
+  {
+    "name": "file_strings",
+    "path": "/api/erlang-c/batch/file-processor",
+    "request": {
+      "rows": [
+        {
+          "queue_id": "sales",
+          "interval_start": "2026-03-08T09:00:00Z",
+          "calls_offered": "180",
+          "aht_seconds": "240",
+          "mean_patience_seconds": "180",
+          "service_level_threshold": "80",
+          "service_level_target_seconds": "20",
+          "max_occupancy": "85",
+          "shrinkage": "30"
+        }
+      ]
+    },
+    "response": {
+      "mode": "file-processor",
+      "results": [
+        {
+          "rowIndex": 1,
+          "queueId": "sales",
+          "intervalStart": "2026-03-08T09:00:00Z",
+          "requiredStaffNet": 29,
+          "requiredStaffGross": 42,
+          "serviceLevel": 0.840283145662605,
+          "asaSeconds": 11.629151264332679,
+          "percentAnsweredImmediately": 0.7577260153264026,
+          "expectedOccupancy": 0.8275862068965517,
+          "abandonPercent": 0.020356183787075877
+        }
+      ],
+      "summary": {
+        "processedRows": 1,
+        "successfulRows": 1,
+        "failedRows": 0,
+        "totalCallsOffered": 180.0,
+        "avgServiceLevel": 0.840283145662605,
+        "avgAsaSeconds": 11.629151264332679,
+        "totalRequiredStaffMinutesNet": 870.0,
+        "totalRequiredStaffHoursNet": 14.5,
+        "totalRequiredStaffMinutesGross": 1260.0,
+        "totalRequiredStaffHoursGross": 21.0,
+        "peakStaffNet": 29,
+        "peakStaffGross": 42
+      },
+      "errors": [],
+      "export": {
+        "enrichedFile": {
+          "headers": [
+            "queue_id",
+            "interval_start",
+            "calls_offered",
+            "aht_seconds",
+            "mean_patience_seconds",
+            "service_level_threshold",
+            "service_level_target_seconds",
+            "max_occupancy",
+            "shrinkage",
+            "Required Agents",
+            "Required Headcount",
+            "Service Level",
+            "Average Speed of Answer",
+            "Answered Immediately",
+            "Expected Occupancy",
+            "Caller Abandonment"
+          ],
+          "rows": [
+            [
+              "sales",
+              "2026-03-08T09:00:00Z",
+              "180",
+              "240",
+              "180",
+              "80",
+              "20",
+              "85",
+              "30",
+              29,
+              42,
+              84.03,
+              11.629151264332679,
+              75.77,
+              82.76,
+              2.04
+            ]
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "planner_floor",
+    "path": "/api/planner/intraday-erlang/calculate",
+    "request": {
+      "rows": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:00:00",
+          "callsOffered": 0,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 3,
+          "averageCustomerPatience": 60
+        }
+      ]
+    },
+    "response": {
+      "intervalPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:00:00",
+          "callsOffered": 0.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 0.0,
+          "requiredStaffNet": 3,
+          "laborHoursNet": 1.5,
+          "serviceLevel": 1.0,
+          "occupancy": 0.0,
+          "averageSpeedOfAnswerSeconds": 0.0,
+          "percentAnsweredImmediately": 1.0,
+          "abandonPercent": 0.0,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 0,
+          "minimumHeadcount": 3,
+          "minimumApplied": true
+        }
+      ],
+      "dailyPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalCount": 1,
+          "totalLaborHoursNet": 1.5,
+          "peakStaffNet": 3
+        }
+      ],
+      "monthlyPlans": [
+        {
+          "monthIndex": 0,
+          "workloadHours": 0.0,
+          "erlangStaffedHours": 1.5,
+          "weightedOccupancyPercent": 0.0,
+          "weightedServiceLevelPercent": 0.0,
+          "peakIntervalRequiredHeadcount": 3,
+          "openDayCount": 1,
+          "minimumHeadcount": 3,
+          "minimumAppliedIntervalCount": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "planner_floor_metrics",
+    "path": "/api/planner/intraday-erlang/calculate",
+    "request": {
+      "rows": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:00:00",
+          "callsOffered": 3,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 5,
+          "averageCustomerPatience": 60
+        }
+      ]
+    },
+    "response": {
+      "intervalPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:00:00",
+          "callsOffered": 3.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 0.25,
+          "requiredStaffNet": 5,
+          "laborHoursNet": 2.5,
+          "serviceLevel": 0.9998699862722567,
+          "occupancy": 0.1,
+          "averageSpeedOfAnswerSeconds": 0.011700011700011701,
+          "percentAnsweredImmediately": 0.9998244998244998,
+          "abandonPercent": 8.444369083519835e-05,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 2,
+          "minimumHeadcount": 5,
+          "minimumApplied": true
+        }
+      ],
+      "dailyPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalCount": 1,
+          "totalLaborHoursNet": 2.5,
+          "peakStaffNet": 5
+        }
+      ],
+      "monthlyPlans": [
+        {
+          "monthIndex": 0,
+          "workloadHours": 0.25,
+          "erlangStaffedHours": 2.5,
+          "weightedOccupancyPercent": 10.0,
+          "weightedServiceLevelPercent": 99.987,
+          "peakIntervalRequiredHeadcount": 5,
+          "openDayCount": 1,
+          "minimumHeadcount": 5,
+          "minimumAppliedIntervalCount": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "planner_multi",
+    "path": "/api/planner/intraday-erlang/calculate",
+    "request": {
+      "rows": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:00:00",
+          "callsOffered": 50,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 3,
+          "averageCustomerPatience": 60
+        },
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:30:00",
+          "callsOffered": 10,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 3,
+          "averageCustomerPatience": 60
+        },
+        {
+          "monthIndex": 1,
+          "serviceDate": "2026-02-03",
+          "intervalStart": "2026-02-03T09:00:00+04:00",
+          "callsOffered": 50,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 3,
+          "averageCustomerPatience": 60
+        }
+      ]
+    },
+    "response": {
+      "intervalPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:00:00",
+          "callsOffered": 50.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 4.166667,
+          "requiredStaffNet": 12,
+          "laborHoursNet": 6.0,
+          "serviceLevel": 0.8621885023646618,
+          "occupancy": 0.6944444444444443,
+          "averageSpeedOfAnswerSeconds": 14.397800447427848,
+          "percentAnsweredImmediately": 0.8240268834203263,
+          "abandonPercent": 0.039174372683822345,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 12,
+          "minimumHeadcount": 3,
+          "minimumApplied": false
+        },
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:30:00",
+          "callsOffered": 10.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 0.833333,
+          "requiredStaffNet": 4,
+          "laborHoursNet": 2.0,
+          "serviceLevel": 0.9122868991420453,
+          "occupancy": 0.4166666666666667,
+          "averageSpeedOfAnswerSeconds": 13.175462019534821,
+          "percentAnsweredImmediately": 0.8975241842925069,
+          "abandonPercent": 0.043576340052333136,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 4,
+          "minimumHeadcount": 3,
+          "minimumApplied": false
+        },
+        {
+          "monthIndex": 1,
+          "serviceDate": "2026-02-03",
+          "intervalStart": "2026-02-03T09:00:00+04:00",
+          "callsOffered": 50.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 4.166667,
+          "requiredStaffNet": 12,
+          "laborHoursNet": 6.0,
+          "serviceLevel": 0.8621885023646618,
+          "occupancy": 0.6944444444444443,
+          "averageSpeedOfAnswerSeconds": 14.397800447427848,
+          "percentAnsweredImmediately": 0.8240268834203263,
+          "abandonPercent": 0.039174372683822345,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 12,
+          "minimumHeadcount": 3,
+          "minimumApplied": false
+        }
+      ],
+      "dailyPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalCount": 2,
+          "totalLaborHoursNet": 8.0,
+          "peakStaffNet": 12
+        },
+        {
+          "monthIndex": 1,
+          "serviceDate": "2026-02-03",
+          "intervalCount": 1,
+          "totalLaborHoursNet": 6.0,
+          "peakStaffNet": 12
+        }
+      ],
+      "monthlyPlans": [
+        {
+          "monthIndex": 0,
+          "workloadHours": 5.0,
+          "erlangStaffedHours": 8.0,
+          "weightedOccupancyPercent": 62.5,
+          "weightedServiceLevelPercent": 87.0538,
+          "peakIntervalRequiredHeadcount": 12,
+          "openDayCount": 1,
+          "minimumHeadcount": 3,
+          "minimumAppliedIntervalCount": 0
+        },
+        {
+          "monthIndex": 1,
+          "workloadHours": 4.1667,
+          "erlangStaffedHours": 6.0,
+          "weightedOccupancyPercent": 69.4444,
+          "weightedServiceLevelPercent": 86.2189,
+          "peakIntervalRequiredHeadcount": 12,
+          "openDayCount": 1,
+          "minimumHeadcount": 3,
+          "minimumAppliedIntervalCount": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "planner_month_order",
+    "path": "/api/planner/intraday-erlang/calculate",
+    "request": {
+      "rows": [
+        {
+          "monthIndex": 1,
+          "serviceDate": "2026-02-02",
+          "intervalStart": "2026-02-02T09:00:00",
+          "callsOffered": 50,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 3,
+          "averageCustomerPatience": 60
+        },
+        {
+          "monthIndex": 10,
+          "serviceDate": "2026-11-02",
+          "intervalStart": "2026-11-02T09:00:00",
+          "callsOffered": 50,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 3,
+          "averageCustomerPatience": 60
+        },
+        {
+          "monthIndex": 2,
+          "serviceDate": "2026-03-02",
+          "intervalStart": "2026-03-02T09:00:00",
+          "callsOffered": 50,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 3,
+          "averageCustomerPatience": 60
+        },
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:00:00",
+          "callsOffered": 50,
+          "averageHandleTime": 300,
+          "intervalLengthMinutes": 30,
+          "serviceLevelGoal": 80,
+          "serviceLevelThreshold": 20,
+          "maxOccupancy": 85,
+          "minimumHeadcount": 3,
+          "averageCustomerPatience": 60
+        }
+      ]
+    },
+    "response": {
+      "intervalPlans": [
+        {
+          "monthIndex": 1,
+          "serviceDate": "2026-02-02",
+          "intervalStart": "2026-02-02T09:00:00",
+          "callsOffered": 50.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 4.166667,
+          "requiredStaffNet": 12,
+          "laborHoursNet": 6.0,
+          "serviceLevel": 0.8621885023646618,
+          "occupancy": 0.6944444444444443,
+          "averageSpeedOfAnswerSeconds": 14.397800447427848,
+          "percentAnsweredImmediately": 0.8240268834203263,
+          "abandonPercent": 0.039174372683822345,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 12,
+          "minimumHeadcount": 3,
+          "minimumApplied": false
+        },
+        {
+          "monthIndex": 10,
+          "serviceDate": "2026-11-02",
+          "intervalStart": "2026-11-02T09:00:00",
+          "callsOffered": 50.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 4.166667,
+          "requiredStaffNet": 12,
+          "laborHoursNet": 6.0,
+          "serviceLevel": 0.8621885023646618,
+          "occupancy": 0.6944444444444443,
+          "averageSpeedOfAnswerSeconds": 14.397800447427848,
+          "percentAnsweredImmediately": 0.8240268834203263,
+          "abandonPercent": 0.039174372683822345,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 12,
+          "minimumHeadcount": 3,
+          "minimumApplied": false
+        },
+        {
+          "monthIndex": 2,
+          "serviceDate": "2026-03-02",
+          "intervalStart": "2026-03-02T09:00:00",
+          "callsOffered": 50.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 4.166667,
+          "requiredStaffNet": 12,
+          "laborHoursNet": 6.0,
+          "serviceLevel": 0.8621885023646618,
+          "occupancy": 0.6944444444444443,
+          "averageSpeedOfAnswerSeconds": 14.397800447427848,
+          "percentAnsweredImmediately": 0.8240268834203263,
+          "abandonPercent": 0.039174372683822345,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 12,
+          "minimumHeadcount": 3,
+          "minimumApplied": false
+        },
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalStart": "2026-01-02T09:00:00",
+          "callsOffered": 50.0,
+          "averageHandleTimeSeconds": 300.0,
+          "workloadHours": 4.166667,
+          "requiredStaffNet": 12,
+          "laborHoursNet": 6.0,
+          "serviceLevel": 0.8621885023646618,
+          "occupancy": 0.6944444444444443,
+          "averageSpeedOfAnswerSeconds": 14.397800447427848,
+          "percentAnsweredImmediately": 0.8240268834203263,
+          "abandonPercent": 0.039174372683822345,
+          "intervalLengthMinutes": 30.0,
+          "erlangRequiredStaffNet": 12,
+          "minimumHeadcount": 3,
+          "minimumApplied": false
+        }
+      ],
+      "dailyPlans": [
+        {
+          "monthIndex": 0,
+          "serviceDate": "2026-01-02",
+          "intervalCount": 1,
+          "totalLaborHoursNet": 6.0,
+          "peakStaffNet": 12
+        },
+        {
+          "monthIndex": 1,
+          "serviceDate": "2026-02-02",
+          "intervalCount": 1,
+          "totalLaborHoursNet": 6.0,
+          "peakStaffNet": 12
+        },
+        {
+          "monthIndex": 10,
+          "serviceDate": "2026-11-02",
+          "intervalCount": 1,
+          "totalLaborHoursNet": 6.0,
+          "peakStaffNet": 12
+        },
+        {
+          "monthIndex": 2,
+          "serviceDate": "2026-03-02",
+          "intervalCount": 1,
+          "totalLaborHoursNet": 6.0,
+          "peakStaffNet": 12
+        }
+      ],
+      "monthlyPlans": [
+        {
+          "monthIndex": 0,
+          "workloadHours": 4.1667,
+          "erlangStaffedHours": 6.0,
+          "weightedOccupancyPercent": 69.4444,
+          "weightedServiceLevelPercent": 86.2189,
+          "peakIntervalRequiredHeadcount": 12,
+          "openDayCount": 1,
+          "minimumHeadcount": 3,
+          "minimumAppliedIntervalCount": 0
+        },
+        {
+          "monthIndex": 1,
+          "workloadHours": 4.1667,
+          "erlangStaffedHours": 6.0,
+          "weightedOccupancyPercent": 69.4444,
+          "weightedServiceLevelPercent": 86.2189,
+          "peakIntervalRequiredHeadcount": 12,
+          "openDayCount": 1,
+          "minimumHeadcount": 3,
+          "minimumAppliedIntervalCount": 0
+        },
+        {
+          "monthIndex": 2,
+          "workloadHours": 4.1667,
+          "erlangStaffedHours": 6.0,
+          "weightedOccupancyPercent": 69.4444,
+          "weightedServiceLevelPercent": 86.2189,
+          "peakIntervalRequiredHeadcount": 12,
+          "openDayCount": 1,
+          "minimumHeadcount": 3,
+          "minimumAppliedIntervalCount": 0
+        },
+        {
+          "monthIndex": 10,
+          "workloadHours": 4.1667,
+          "erlangStaffedHours": 6.0,
+          "weightedOccupancyPercent": 69.4444,
+          "weightedServiceLevelPercent": 86.2189,
+          "peakIntervalRequiredHeadcount": 12,
+          "openDayCount": 1,
+          "minimumHeadcount": 3,
+          "minimumAppliedIntervalCount": 0
+        }
+      ]
+    }
+  }
+]

@@ -8,6 +8,7 @@ import {
 import {
   PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
   WEEKDAY_FALLBACK,
+  resolvePlanRequirementMethod,
   resolvePlanningYear
 } from './shared'
 import { normalizeRequirementMethodForChannel, normalizeStaffingChannel } from './channels'
@@ -18,7 +19,7 @@ export const buildPlanDemandRecords = (plan, center, planningYear, requirementMe
 
   return computeMonthlyRecords({
     planningYear: resolvedYear,
-    requirementMethod: requirementMethod || plan?.requirementMethod || plan?.summary?.requirementMethod,
+    requirementMethod: requirementMethod || resolvePlanRequirementMethod(plan),
     demandSource: plan?.demandSource,
     operatingWeekdays:
       Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
@@ -80,7 +81,7 @@ export const resolvePlanRequirementRecords = ({ plan, center, group, planningYea
   const resolvedYear = resolvePlanningYear(planningYear, plan?.planningYear)
   const channelType = normalizeStaffingChannel(plan?.channelType || group?.channelType)
   const requirementMethod = normalizeRequirementMethodForChannel(
-    plan?.requirementMethod || plan?.summary?.requirementMethod,
+    resolvePlanRequirementMethod(plan),
     channelType
   )
   const baselineRecords = buildPlanDemandRecords(plan, center, resolvedYear, requirementMethod)

@@ -363,11 +363,11 @@ describe('localDataStore', () => {
     expect(loadedDraft).toBeNull()
   })
 
-  it('preserves an intraday Erlang plan method after Dexie save and reload', async () => {
+  it.each([true, false])('preserves an intraday Erlang plan after Dexie save and reload (explicit method: %s)', async (explicitMethod) => {
     const centers = clonePlain(sampleCenters)
     centers[0].groups[0].plans[0] = {
       ...centers[0].groups[0].plans[0],
-      requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+      requirementMethod: explicitMethod ? PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG : undefined,
       intradayErlangResults: {
         version: 1,
         calculatedAt: '2026-01-15T12:00:00.000Z',

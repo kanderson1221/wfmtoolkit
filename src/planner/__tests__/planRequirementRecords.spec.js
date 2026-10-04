@@ -89,6 +89,17 @@ const attachCurrentResults = (plan, monthlyOutputs = [
 }
 
 describe('planRequirementRecords', () => {
+  it('recovers the Erlang method from legacy results when building requirement records', () => {
+    const plan = attachCurrentResults(buildPlan())
+    delete plan.requirementMethod
+
+    const resolution = resolvePlanRequirementRecords({ plan, center, group, planningYear: 2027 })
+
+    expect(resolution.requirementMethod).toBe('intraday_erlang')
+    expect(resolution.usesIntradayErlang).toBe(true)
+    expect(resolution.records[0].erlangStaffedHours).toBe(160)
+  })
+
   it('never uses Intraday Erlang for a dedicated email plan', () => {
     const resolution = resolvePlanRequirementRecords({
       plan: buildPlan({ channelType: 'email' }),

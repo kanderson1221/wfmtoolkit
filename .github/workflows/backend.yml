@@ -1,0 +1,32 @@
+name: Native Backend
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cargo fmt --manifest-path rust/Cargo.toml --all --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path rust/Cargo.toml --workspace --locked
+      - run: cargo build --manifest-path rust/Cargo.toml --release --locked -p wfm-server
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python rust/server/tools/check_http.py --binary rust/target/release/wfm-server
+      - run: python -m unittest discover -s specs/reference-implementations/erlang/tests -v
+      - run: python -m unittest discover -s specs/reference-implementations/erlang-v2/tests -v
+      - run: pip install -r backend/requirements.txt
+      - run: python -m unittest discover -s backend/tests -v
+      - run: python rust/server/tools/check_http.py --binary rust/target/release/wfm-server --with-forecast-worker --rows 100
+      - run: docker build -t wfmtoolkit-native .

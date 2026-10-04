@@ -23,6 +23,7 @@ import { createPlanDemandSource } from './planner/demandSources'
 import {
   createNextYearOpening,
   getCurrentCalendarYear,
+  resolvePlanRequirementMethod,
   resolvePlanningYear
 } from './planner/shared'
 import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/browserStorage'
@@ -373,7 +374,7 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
     holidayScheduleMode: normalizeHolidayScheduleMode(planSnapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
     channelType,
     serviceGoal,
-    requirementMethod: normalizeRequirementMethodForChannel(planSnapshot.requirementMethod, channelType),
+    requirementMethod: normalizeRequirementMethodForChannel(resolvePlanRequirementMethod(planSnapshot), channelType),
     demandSource: createPlanDemandSource(planSnapshot.demandSource),
     nextYearOpening: createNextYearOpening(planSnapshot.nextYearOpening),
     createdAt: planSnapshot.createdAt || timestamp,

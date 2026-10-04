@@ -73,6 +73,21 @@ const clearPlanningStorage = () => {
 }
 
 describe('planningStorage', () => {
+  it.each([
+    { intradayErlangResults: { version: 1 } },
+    { summary: { requirementMethod: 'intraday_erlang' } }
+  ])('preserves legacy Erlang plans when the top-level method is missing: %j', (legacyFields) => {
+    expect(normalizePlanningPlan({ planningYear: 2026, ...legacyFields }).requirementMethod)
+      .toBe('intraday_erlang')
+  })
+
+  it('honors an explicit workload-ratio method even with old Erlang results', () => {
+    expect(normalizePlanningPlan({
+      requirementMethod: 'workload_ratio',
+      intradayErlangResults: { version: 1 }
+    }).requirementMethod).toBe('workload_ratio')
+  })
+
   it('migrates legacy staffing groups to voice service goals', () => {
     const group = normalizePlanningGroup({
       name: 'Legacy Voice',
