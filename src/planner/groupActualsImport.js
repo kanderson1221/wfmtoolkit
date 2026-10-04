@@ -2,7 +2,18 @@ import { parseCsvText, parseDateValue, parseNumberValue } from '../forecasting/c
 
 const CANDIDATE_HEADERS = {
   dateColumn: ['date', 'service_date', 'day', 'ds'],
-  volumeColumn: ['contacts', 'call_volume', 'volume', 'calls', 'contact_volume', 'daily_calls', 'y'],
+  volumeColumn: [
+    'contacts',
+    'call_volume',
+    'volume',
+    'calls',
+    'contact_volume',
+    'daily_calls',
+    'emails',
+    'email_volume',
+    'daily_emails',
+    'y'
+  ],
   ahtColumn: [
     'aht',
     'aht_seconds',
@@ -13,7 +24,10 @@ const CANDIDATE_HEADERS = {
     'avg_aht_seconds',
     'avg_handle_time',
     'avg_handle_time_seconds',
-    'handle_time_seconds'
+    'handle_time_seconds',
+    'email_handle_time_seconds',
+    'email_handling_time_seconds',
+    'average_email_handle_time_seconds'
   ]
 }
 

@@ -30,10 +30,6 @@ export const buildMonthStartFromDate = (date) =>
 export const buildMonthEndFromDate = (date) =>
   dateToIsoValue(new Date(date.getFullYear(), date.getMonth() + 1, 0, 12))
 
-export const buildYearStart = (year) => `${year}-01-01`
-
-export const buildYearEnd = (year) => `${year}-12-31`
-
 export const maxIsoValue = (left, right) => {
   if (!left) {
     return right || null
@@ -81,6 +77,3 @@ export const buildMatchingIsoDatesInRange = (startIso, endIso, matcher) => {
 
   return matchingDates
 }
-
-export const countMatchingIsoDatesInRange = (startIso, endIso, matcher) =>
-  buildMatchingIsoDatesInRange(startIso, endIso, matcher).length

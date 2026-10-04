@@ -33,7 +33,8 @@ export default [
       'test-results/**',
       '.venv/**',
       'venv/**',
-      'node_modules/**'
+      'node_modules/**',
+      '**/target/**'
     ]
   },
   js.configs.recommended,

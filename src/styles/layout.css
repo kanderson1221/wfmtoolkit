@@ -57,22 +57,11 @@
     @apply grid gap-3 md:grid-cols-2 xl:grid-cols-4;
   }
 
-  .monthly-summary-grid,
-  .results-metrics,
-  .schedule-kpi-grid {
+  .results-metrics {
     @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-3;
   }
 
   .workspace-shell {
     @apply grid gap-4 xl:grid-cols-[minmax(20rem,0.84fr)_minmax(0,1.16fr)];
-  }
-
-  .workspace-pane {
-    @apply grid gap-4 p-5;
-  }
-
-  .workspace-controls,
-  .workspace-output {
-    @apply content-start;
   }
 }

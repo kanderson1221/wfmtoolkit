@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  buildActualsThroughMonthOptions,
   buildPlanUpdateActualsState,
   createUpdatedPlanDraft
 } from '../planUpdates'
@@ -37,7 +36,7 @@ const buildCompleteWeekdayActuals = (year, monthIndex, overridesByDate = {}) => 
 
 describe('planUpdates', () => {
   it('builds actuals-through options from loaded daily actuals', () => {
-    const options = buildActualsThroughMonthOptions({
+    const { options } = buildPlanUpdateActualsState({
       dailyRows: [
         ...buildCompleteWeekdayActuals(2026, 0, {
           '2026-01-02': { contacts: 100, ahtSeconds: 300 }

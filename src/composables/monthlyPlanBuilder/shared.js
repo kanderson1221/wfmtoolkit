@@ -2,12 +2,12 @@ import {
   HOLIDAY_CALENDAR_NONE,
   HOLIDAY_SCHEDULE_CLOSED,
   MONTH_LABELS,
-  PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO,
   buildPlanMonths,
   buildPlanningYearRange,
   buildRandomMonths,
   buildStaffingMonths,
   calculateCalendarOpenDays,
+  calculateDefaultMonthlyPaidHoursPerFte,
   createNextYearOpening,
   createPlanMonth,
   createPresenceMonth,
@@ -22,12 +22,16 @@ import {
   normalizeDisabledHolidayRuleIds,
   normalizeHolidayCalendarId,
   normalizeHolidayScheduleMode,
-  normalizePlanRequirementMethod,
+  normalizeRequirementMethodForChannel,
+  normalizeStaffingChannel,
+  resolveChannelServiceGoal,
   normalizeWeekdays,
   resolveLinkedOpeningPosition,
   toNumber
 } from '../../plannerModel'
 import { createPlanDemandSource } from '../../planner/demandSources'
+import { createPlanningGroupIntraday } from '../../planner/groupIntraday'
+import { resolvePlanRequirementMethod } from '../../planner/shared'
 
 export const WEEKDAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -67,6 +71,50 @@ export const hydrateMonths = (months, fallbackBuilder, factory) =>
     ? months.map((month) => factory(month))
     : fallbackBuilder()
 
+const createNewPresenceMonths = (paidHoursPerDay) => {
+  const monthlyPaidHoursPerFte = calculateDefaultMonthlyPaidHoursPerFte(paidHoursPerDay)
+  return MONTH_LABELS.map(() => createPresenceMonth({ paidHoursPerDay, monthlyPaidHoursPerFte }))
+}
+
+const hasMonthlyPaidHoursPerFte = (month) =>
+  month?.monthlyPaidHoursPerFte !== null &&
+  month?.monthlyPaidHoursPerFte !== '' &&
+  Number.isFinite(Number(month?.monthlyPaidHoursPerFte))
+
+export const hydratePresenceMonths = (months, fallbackBuilder, {
+  planningYear,
+  operatingWeekdays,
+  holidayCalendarId,
+  disabledHolidayRuleIds,
+  customHolidays
+}) => {
+  if (!Array.isArray(months) || months.length !== MONTH_LABELS.length) {
+    return fallbackBuilder()
+  }
+
+  return months.map((month, monthIndex) => {
+    const normalizedMonth = createPresenceMonth(month)
+    if (hasMonthlyPaidHoursPerFte(month)) {
+      return normalizedMonth
+    }
+
+    const openDays = calculateCalendarOpenDays(
+      planningYear,
+      monthIndex,
+      operatingWeekdays,
+      holidayCalendarId,
+      HOLIDAY_SCHEDULE_CLOSED,
+      disabledHolidayRuleIds,
+      customHolidays
+    ).calendarOpenDays
+
+    return createPresenceMonth({
+      ...normalizedMonth,
+      monthlyPaidHoursPerFte: Number((openDays * normalizedMonth.paidHoursPerDay).toFixed(2))
+    })
+  })
+}
+
 export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYear = currentYear) => {
   const planningYear = toNumber(centerDefaults?.planningYear, fallbackPlanningYear)
   const operatingWeekdays = normalizeWeekdays(centerDefaults?.operatingWeekdays)
@@ -78,10 +126,16 @@ export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYe
     toNumber(centerDefaults?.presenceMonths?.[0]?.paidHoursPerDay ?? centerDefaults?.defaultPaidHoursPerDay, 8),
     0
   )
-  const presenceMonths = hydrateMonths(
+  const presenceMonths = hydratePresenceMonths(
     centerDefaults?.presenceMonths,
-    () => MONTH_LABELS.map(() => createPresenceMonth({ paidHoursPerDay })),
-    createPresenceMonth
+    () => createNewPresenceMonths(paidHoursPerDay),
+    {
+      planningYear,
+      operatingWeekdays,
+      holidayCalendarId,
+      disabledHolidayRuleIds,
+      customHolidays
+    }
   )
   const randomDefaults = createRandomMonth(
     centerDefaults?.randomDefaults || {
@@ -94,12 +148,16 @@ export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYe
     startingHeadcount: centerDefaults?.startingHeadcount,
     startingFrontlineHeadcount: centerDefaults?.startingFrontlineHeadcount
   })
+  const channelType = normalizeStaffingChannel(centerDefaults?.channelType)
+  const serviceGoal = resolveChannelServiceGoal(centerDefaults, channelType)
 
   return {
     planningYear,
-    requirementMethod: normalizePlanRequirementMethod(
+    channelType,
+    serviceGoal,
+    requirementMethod: normalizeRequirementMethodForChannel(
       centerDefaults?.requirementMethod,
-      PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+      channelType
     ),
     operatingWeekdays,
     holidayCalendarId,
@@ -108,6 +166,7 @@ export const buildPlannerSeedDefaults = (centerDefaults = {}, fallbackPlanningYe
     holidayScheduleMode,
     presenceMonths,
     randomDefaults,
+    intraday: createPlanningGroupIntraday(centerDefaults),
     startingHeadcount: startingPosition.rosterHeadcount,
     startingFrontlineHeadcount: startingPosition.frontlineHeadcount
   }
@@ -117,6 +176,7 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
   const hasPrefilledYear = Number.isFinite(prefilledYear)
   const seedDefaults = buildPlannerSeedDefaults(centerDefaults, hasPrefilledYear ? prefilledYear : currentYear)
   const basePlan = sourcePlan || {}
+  const channelType = normalizeStaffingChannel(basePlan.channelType || seedDefaults.channelType)
   const planningYear = toNumber(basePlan.planningYear, seedDefaults.planningYear)
   const trainingSettings = createTrainingSettings(basePlan.trainingSettings || {})
   const trainingClasses = Array.isArray(basePlan.trainingClasses)
@@ -136,24 +196,41 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
       seedDefaults.startingFrontlineHeadcount ??
       deriveStartingFrontlineHeadcount(planningYear, startingHeadcount, trainingClasses, trainingSettings, trainingCalendar)
   }).frontlineHeadcount
+  const operatingWeekdays = normalizeWeekdays(basePlan.operatingWeekdays ?? seedDefaults.operatingWeekdays)
+  const holidayCalendarId = normalizeHolidayCalendarId(basePlan.holidayCalendarId, seedDefaults.holidayCalendarId)
+  const disabledHolidayRuleIds = normalizeDisabledHolidayRuleIds(basePlan.disabledHolidayRuleIds ?? seedDefaults.disabledHolidayRuleIds)
+  const customHolidays = normalizeCustomHolidays(basePlan.customHolidays ?? seedDefaults.customHolidays)
+  const presenceMonths = hydratePresenceMonths(
+    basePlan.presenceMonths,
+    () => seedDefaults.presenceMonths.map((month) => createPresenceMonth(month)),
+    {
+      planningYear,
+      operatingWeekdays,
+      holidayCalendarId,
+      disabledHolidayRuleIds,
+      customHolidays
+    }
+  )
 
   return {
     seedDefaults,
     planningYear,
-    requirementMethod: normalizePlanRequirementMethod(basePlan.requirementMethod, seedDefaults.requirementMethod),
-    operatingWeekdays: normalizeWeekdays(basePlan.operatingWeekdays ?? seedDefaults.operatingWeekdays),
-    holidayCalendarId: normalizeHolidayCalendarId(basePlan.holidayCalendarId, seedDefaults.holidayCalendarId),
-    disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(basePlan.disabledHolidayRuleIds ?? seedDefaults.disabledHolidayRuleIds),
-    customHolidays: normalizeCustomHolidays(basePlan.customHolidays ?? seedDefaults.customHolidays),
-    holidayScheduleMode: normalizeHolidayScheduleMode(basePlan.holidayScheduleMode, seedDefaults.holidayScheduleMode),
-    presenceMonths: hydrateMonths(
-      basePlan.presenceMonths,
-      () => seedDefaults.presenceMonths.map((month) => createPresenceMonth(month)),
-      createPresenceMonth
+    channelType,
+    serviceGoal: resolveChannelServiceGoal(basePlan.serviceGoal ? basePlan : centerDefaults, channelType),
+    requirementMethod: normalizeRequirementMethodForChannel(
+      resolvePlanRequirementMethod(basePlan, seedDefaults.requirementMethod),
+      channelType
     ),
+    operatingWeekdays,
+    holidayCalendarId,
+    disabledHolidayRuleIds,
+    customHolidays,
+    holidayScheduleMode: normalizeHolidayScheduleMode(basePlan.holidayScheduleMode, seedDefaults.holidayScheduleMode),
+    presenceMonths,
     randomDefaults: createRandomMonth(basePlan.randomDefaults || seedDefaults.randomDefaults),
     useMonthlyRandomOverrides: Boolean(basePlan.useMonthlyRandomOverrides),
     randomMonths: hydrateMonths(basePlan.randomMonths, buildRandomMonths, createRandomMonth),
+    intraday: createPlanningGroupIntraday(basePlan.intraday || seedDefaults.intraday),
     planMonths: hydrateMonths(basePlan.planMonths, buildPlanMonths, createPlanMonth),
     demandSource: createPlanDemandSource(basePlan.demandSource),
     trainingSettings,
@@ -166,10 +243,8 @@ export const resolvePlannerInitialState = ({ sourcePlan = null, centerDefaults =
 }
 
 export const createPresenceMonthFromProfile = ({
-  year,
-  monthIndex,
-  weekdays,
   paidHoursPerDay = 8,
+  monthlyPaidHoursPerFte = calculateDefaultMonthlyPaidHoursPerFte(paidHoursPerDay),
   plannedTimeOffPercent = 0,
   unplannedTimeOffPercent = 0,
   leaveTimePercent = 0,
@@ -179,12 +254,12 @@ export const createPresenceMonthFromProfile = ({
   paidBreaksHoursPerDay = 0.5,
   otherAwayHoursPerDay = 0.1
 }) => {
-  const openDays = calculateCalendarOpenDays(year, monthIndex, weekdays).calendarOpenDays
-  const paidHoursPerMonth = openDays * paidHoursPerDay
+  const paidHoursPerMonth = Math.max(toNumber(monthlyPaidHoursPerFte, 0), 0)
   const convertPercentToHours = (percent) => Number(((paidHoursPerMonth * percent) / 100).toFixed(1))
 
   return createPresenceMonth({
     paidHoursPerDay,
+    monthlyPaidHoursPerFte: paidHoursPerMonth,
     plannedTimeOffHours: convertPercentToHours(plannedTimeOffPercent),
     unplannedTimeOffHours: convertPercentToHours(unplannedTimeOffPercent),
     leaveTimeHours: convertPercentToHours(leaveTimePercent),

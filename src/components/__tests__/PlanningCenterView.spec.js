@@ -352,6 +352,43 @@ describe('PlanningCenterView', () => {
     vi.restoreAllMocks()
   })
 
+  it('uses the dedicated email workspace and omits Intraday setup', () => {
+    const wrapper = buildWrapper({
+      selectedGroupTab: 'intraday',
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Email Support',
+            channelType: 'email',
+            serviceGoal: {
+              targetPercent: 90,
+              threshold: 24,
+              thresholdUnit: 'business_hours'
+            },
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 85,
+            defaultAdherencePercent: 95,
+            actuals: { dailyRows: [] },
+            plans: []
+          }
+        ]
+      }
+    })
+
+    const tabLabels = wrapper.findAll('button').map((node) => node.text().trim())
+    expect(tabLabels).not.toContain('Intraday')
+    expect(wrapper.text()).toContain('Email requirements use Workload Ratio')
+    expect(wrapper.text()).toContain('Response Target')
+    expect(wrapper.text()).toContain('90% within 24 business hours')
+  })
+
   it('shows a call-center summary before drilling into a staffing group', () => {
     const wrapper = buildWrapper({
       selectedGroupId: ''
@@ -445,14 +482,19 @@ describe('PlanningCenterView', () => {
       selectedGroupId: ''
     })
 
+    const workspace = wrapper.get('[data-test="planning-center-workspace"]')
     const scrollRegion = wrapper.get('[role="region"][aria-label="Call center monthly plan and actuals"]')
     const tableHeader = scrollRegion.get('thead')
     const monthHeader = tableHeader.get('th[scope="col"]')
     const firstMonthToggle = scrollRegion.findAll('button[aria-expanded]')[0]
     const firstMonthRow = scrollRegion.get('tr[data-month-start="2026-01-01"]')
 
+    expect(workspace.classes()).not.toContain('h-[calc(100vh-12.5rem)]')
+    expect(workspace.classes()).not.toContain('min-h-[36rem]')
     expect(scrollRegion.attributes('tabindex')).toBe('0')
-    expect(scrollRegion.classes()).toContain('overflow-auto')
+    expect(scrollRegion.classes()).toContain('overflow-x-auto')
+    expect(scrollRegion.classes()).not.toContain('overflow-auto')
+    expect(scrollRegion.classes().some((className) => className.startsWith('max-h-'))).toBe(false)
     expect(tableHeader.classes()).toContain('sticky')
     expect(tableHeader.classes()).toContain('top-0')
     expect(monthHeader.classes()).toContain('sticky')
@@ -614,6 +656,76 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).toContain('1,200')
     expect(wrapper.text()).not.toContain('Presence %')
     expect(wrapper.text()).not.toContain('Utilization %')
+  })
+
+  it('withholds Plans-table requirements and warns when saved Erlang results are unavailable', async () => {
+    const wrapper = buildWrapper({
+      center: {
+        id: 'center-1',
+        name: 'North America Support',
+        operatingWeekdays: [1, 2, 3, 4, 5],
+        operatingOpenTime: '08:00',
+        operatingCloseTime: '18:00',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Voice Support',
+            operatingWeekdays: [1, 2, 3, 4, 5],
+            defaultPaidHoursPerDay: 8,
+            defaultOccupancyPercent: 90,
+            defaultAdherencePercent: 95,
+            serviceLevelPercent: 80,
+            serviceLevelThresholdSeconds: 20,
+            plans: [
+              {
+                id: 'plan-1',
+                name: '2026 Erlang Plan',
+                planningYear: 2026,
+                planType: 'budget',
+                isCurrent: true,
+                requirementMethod: 'intraday_erlang',
+                operatingOpenTime: '08:00',
+                operatingCloseTime: '09:00',
+                serviceLevelPercent: 80,
+                serviceLevelThresholdSeconds: 20,
+                intraday: {
+                  intervalLengthMinutes: 30,
+                  intervalRatios: [
+                    { startTime: '08:00', ratioPercent: 50 },
+                    { startTime: '08:30', ratioPercent: 50 }
+                  ]
+                },
+                presenceMonths: Array.from({ length: 12 }, () => ({ monthlyPaidHoursPerFte: 160 })),
+                randomDefaults: { occupancyPercent: 90, adherencePercent: 95 },
+                demandSource: {
+                  mode: 'forecast',
+                  forecastDailySnapshot: [
+                    { serviceDate: '2026-01-05', monthIndex: 0, contacts: 100, ahtSeconds: 300 }
+                  ],
+                  forecastMonthSnapshot: [
+                    { monthIndex: 0, monthLabel: 'Jan 2026', contacts: 100, ahtSeconds: 300 }
+                  ]
+                },
+                summary: {
+                  annualContacts: 100,
+                  annualRequiredStaffHours: 9999,
+                  averageRequiredHeadcount: 99,
+                  averageGapToRequirement: -89
+                }
+              }
+            ]
+          }
+        ]
+      }
+    })
+
+    await openTab(wrapper, 'Plans')
+
+    expect(wrapper.text()).toContain('Recalculation required: Run staffing calculations')
+    expect(wrapper.text()).not.toContain('9,999')
+    expect(wrapper.text()).not.toContain('99.0')
+    expect(wrapper.text()).not.toContain('-89.0')
+    expect(wrapper.findAll('span').filter((node) => node.text() === '—').length).toBeGreaterThanOrEqual(3)
   })
 
   it('groups Budget and Update plans by year with current badges, comparison, and update actions', async () => {
@@ -880,15 +992,15 @@ describe('PlanningCenterView', () => {
     expect(wrapper.text()).not.toContain('Create Updated Plan')
   })
 
-  it('uses matching compact xl header heights for the group and plan panes', () => {
+  it('uses matching minimum xl header heights that allow wrapped content', () => {
     const wrapper = buildWrapper()
     const staffingGroupsHeading = findHeadingByText(wrapper, 'Staffing Groups')
     const groupWorkspaceHeading = findHeadingByText(wrapper, 'Voice Support')
     const staffingGroupsHeader = staffingGroupsHeading.element.closest('.border-b')
     const groupWorkspaceHeader = groupWorkspaceHeading.element.closest('.border-b')
 
-    expect(staffingGroupsHeader.className).toContain('xl:h-[6rem]')
-    expect(groupWorkspaceHeader.className).toContain('xl:h-[6rem]')
+    expect(staffingGroupsHeader.className).toContain('xl:min-h-[6rem]')
+    expect(groupWorkspaceHeader.className).toContain('xl:min-h-[6rem]')
   })
 
   it('shows the saved hours of operation in the group defaults summary', () => {

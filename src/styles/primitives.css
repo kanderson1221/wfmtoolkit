@@ -1,17 +1,5 @@
 @layer components {
-  .planner-inputs {
-    @apply grid gap-4;
-  }
 
-  .planner-inputs h3 {
-    @apply text-base font-semibold tracking-[-0.03em] text-slate-950;
-  }
-
-  .planner-grid {
-    @apply grid gap-4 md:grid-cols-2;
-  }
-
-  .monthly-copy-select-input,
   .calculator-section input[type="date"],
   .calculator-section input[type="number"],
   .calculator-section input[type="email"],
@@ -22,7 +10,6 @@
     @apply w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-[#15395f] focus:ring-4 focus:ring-[#d7e3ec];
   }
 
-  .form-actions,
   .monthly-tab-actions,
   .training-class-toolbar {
     @apply flex flex-wrap items-center gap-3;

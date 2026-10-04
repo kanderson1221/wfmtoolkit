@@ -1,0 +1,10 @@
+{
+  "rows": 35041,
+  "api_contract_cases": 16,
+  "json_request_seconds": 0.09898975002579391,
+  "csv_upload_request_seconds": 0.08167270803824067,
+  "json_request_bytes": 8330848,
+  "enriched_csv_bytes": 3322300,
+  "production_supervisor_tested": true,
+  "server_rss_kib_after_requests": 161760
+}

@@ -24,6 +24,11 @@ import {
   PLAN_REQUIREMENT_METHOD_OPTIONS,
   PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
 } from '../../plannerModel'
+import {
+  createChannelServiceGoal,
+  getChannelPlanningTerms,
+  isEmailChannel
+} from '../../planner/channels'
 import { usePlanningCenterForecastLibrary } from '../../composables/planning/usePlanningCenterForecastLibrary'
 import { usePlanningGroupDataActions } from '../../composables/planning/usePlanningGroupDataActions'
 import { usePlanningGroupForecastActions } from '../../composables/planning/usePlanningGroupForecastActions'
@@ -127,6 +132,14 @@ const formatSignedNumber = (value, digits = 1) => {
   const prefix = Number.isFinite(numericValue) && numericValue > 0 ? '+' : ''
   return `${prefix}${formatNumber(value, digits)}`
 }
+const formatOptionalSignedNumber = (value, digits = 1) => {
+  if (value == null || value === '') {
+    return '—'
+  }
+
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? formatSignedNumber(numericValue, digits) : '—'
+}
 const formatOptionalWhole = (value) => {
   if (value == null || value === '') {
     return '—'
@@ -196,9 +209,12 @@ const STAFFING_GROUP_TABS = [
   { id: 'intraday', label: 'Intraday' },
   { id: 'plans', label: 'Plans' }
 ]
-const resolveGroupWorkspaceTab = (value) => {
+const resolveGroupWorkspaceTab = (value, group = null) => {
   const normalizedValue = String(value || '').trim().toLowerCase()
-  return STAFFING_GROUP_TABS.some((item) => item.id === normalizedValue) ? normalizedValue : 'data'
+  const availableTabs = isEmailChannel(group?.channelType)
+    ? STAFFING_GROUP_TABS.filter((item) => item.id !== 'intraday')
+    : STAFFING_GROUP_TABS
+  return availableTabs.some((item) => item.id === normalizedValue) ? normalizedValue : 'data'
 }
 const {
   breadcrumbItems,
@@ -225,6 +241,19 @@ const {
   newPlanYear,
   newPlanRequirementMethod
 })
+
+const staffingGroupTabs = computed(() =>
+  isEmailChannel(selectedGroup.value?.channelType)
+    ? STAFFING_GROUP_TABS.filter((item) => item.id !== 'intraday')
+    : STAFFING_GROUP_TABS
+)
+const planRequirementMethodOptions = computed(() =>
+  isEmailChannel(selectedGroup.value?.channelType)
+    ? PLAN_REQUIREMENT_METHOD_OPTIONS.filter((option) => option.value === PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO)
+    : PLAN_REQUIREMENT_METHOD_OPTIONS
+)
+const selectedChannelTerms = computed(() => getChannelPlanningTerms(selectedGroup.value?.channelType))
+const groupDraftChannelLocked = computed(() => Boolean(groupDraft.value.id))
 
 const centerSummaryHref = computed(() => buildPlanningCenterHash(props.center.id))
 
@@ -336,6 +365,7 @@ const planSettingsStatusTone = computed(() =>
 const openCreateGroup = () => {
   groupDraft.value = createPlanningGroupDraft({
     operatingWeekdays: props.center.operatingWeekdays,
+    operatingScheduleMode: props.center.operatingScheduleMode,
     operatingOpenTime: props.center.operatingOpenTime,
     operatingCloseTime: props.center.operatingCloseTime
   })
@@ -664,7 +694,7 @@ watch(
   ([group, routeTab], previousValue = []) => {
     const previousGroup = previousValue[0]
     const previousRouteTab = previousValue[1]
-    const normalizedRouteTab = resolveGroupWorkspaceTab(routeTab)
+    const normalizedRouteTab = resolveGroupWorkspaceTab(routeTab, group)
 
     if (!group) {
       activeGroupWorkspaceTab.value = 'data'
@@ -700,6 +730,17 @@ watch(
 )
 
 watch(
+  () => groupDraft.value.channelType,
+  (channelType, previousChannelType) => {
+    if (!groupSettingsOpen.value || !previousChannelType || channelType === previousChannelType) {
+      return
+    }
+
+    groupDraft.value.serviceGoal = createChannelServiceGoal(channelType)
+  }
+)
+
+watch(
   [selectedGroup, activeGroupWorkspaceTab],
   () => {
     clearActualsSelection()
@@ -722,9 +763,17 @@ watch(
       </div>
 
       <AppPanel :padded="false">
-        <div class="grid h-[calc(100vh-12.5rem)] min-h-[36rem] xl:grid-cols-[256px_minmax(0,1fr)] 2xl:grid-cols-[272px_minmax(0,1fr)] xl:items-stretch">
+        <div
+          data-test="planning-center-workspace"
+          :class="[
+            'grid xl:grid-cols-[256px_minmax(0,1fr)] xl:items-stretch 2xl:grid-cols-[272px_minmax(0,1fr)]',
+            selectedGroup
+              ? 'h-[calc(100vh-12.5rem)] min-h-[36rem]'
+              : ''
+          ]"
+        >
           <div class="flex min-h-0 flex-col border-b border-slate-200 xl:border-b-0 xl:border-r">
-            <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-4 py-3 xl:h-[6rem]">
+            <div class="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fafc)] px-4 py-3 shrink-0 xl:min-h-[6rem]">
               <div class="flex h-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:items-start">
                 <h2 class="text-lg font-semibold tracking-[-0.04em] text-slate-950">
                   Staffing Groups
@@ -802,6 +851,9 @@ watch(
                       >
                         {{ group.name }}
                       </strong>
+                      <span class="truncate text-[0.72rem] text-slate-500">
+                        {{ getChannelPlanningTerms(group.channelType).channelLabel }}
+                      </span>
                     </span>
                   </div>
 
@@ -822,7 +874,7 @@ watch(
 
           <div class="flex min-h-0 flex-col bg-slate-50/30">
             <div v-if="!selectedGroup" class="flex min-h-0 flex-col">
-              <div class="border-b border-slate-200 px-4 py-3 xl:h-[6rem]">
+              <div class="border-b border-slate-200 px-4 py-3 shrink-0 xl:min-h-[6rem]">
                 <div class="flex h-full flex-col justify-between gap-1.5">
                   <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <div class="grid gap-0.5">
@@ -864,7 +916,7 @@ watch(
                 </div>
               </div>
 
-              <div class="flex-1 min-h-0 overflow-y-auto p-4">
+              <div class="p-4">
                 <div v-if="groupRows.length" class="grid gap-4">
                   <AppStatusMessage v-if="callCenterReportIssues.length">
                     <div class="grid gap-2">
@@ -919,7 +971,7 @@ watch(
 
                     <AppTableShell>
                       <div
-                        class="max-h-[clamp(28rem,calc(100vh-19rem),42rem)] overflow-auto bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#c3d2df]"
+                        class="overflow-x-auto bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#c3d2df]"
                         role="region"
                         aria-label="Call center monthly plan and actuals"
                         tabindex="0"
@@ -1111,7 +1163,7 @@ watch(
             </div>
 
             <div v-else class="flex min-h-0 flex-col">
-              <div class="border-b border-slate-200 px-4 py-3 xl:h-[6rem]">
+              <div class="border-b border-slate-200 px-4 py-3 shrink-0 xl:min-h-[6rem]">
                 <div class="flex h-full flex-col justify-between gap-1.5">
                   <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                     <div class="grid gap-0.5">
@@ -1179,13 +1231,16 @@ watch(
                       <strong class="font-semibold text-slate-950">{{ item.value }}</strong>
                     </div>
                   </div>
+                  <p v-if="isEmailChannel(selectedGroup.channelType)" class="text-xs font-medium text-slate-500">
+                    Email requirements use Workload Ratio. Response targets are informational in Phase 1; backlog aging and SLA attainment are not simulated.
+                  </p>
                 </div>
               </div>
 
               <div class="bg-white pr-5 pt-0">
                 <AppAttachedTabs
                   v-model:active-id="activeGroupWorkspaceTab"
-                  :items="STAFFING_GROUP_TABS"
+                  :items="staffingGroupTabs"
                   aria-label="Staffing group workspace sections"
                   height-class="h-12"
                   button-padding-class="px-4"
@@ -1239,7 +1294,7 @@ watch(
                             Coverage
                           </span>
                           <span :class="planHeaderCellRightClass">
-                            Contacts
+                            {{ selectedChannelTerms.contactLabel }}
                           </span>
                           <span :class="planHeaderCellRightClass">
                             Peak Month
@@ -1433,7 +1488,7 @@ watch(
                         <span class="h-8 w-1" aria-hidden="true" />
                         <div :class="[planRowGridClass, 'px-2']">
                           <span :class="planHeaderCellClass">Plan</span>
-                          <span :class="planHeaderCellRightClass">Contacts</span>
+                          <span :class="planHeaderCellRightClass">{{ selectedChannelTerms.contactLabel }}</span>
                           <span :class="planHeaderCellRightClass">Total Req Hrs</span>
                           <span :class="planHeaderCellRightClass">Avg Req HC</span>
                           <span :class="planHeaderCellRightClass">Avg Opening Gap</span>
@@ -1486,18 +1541,25 @@ watch(
                                 ? `${plan.actualsThroughBadge || 'Update'} · ${plan.decisionReason || 'Decision reason not recorded (legacy plan)'}`
                                 : plan.requirementMethodLabel }}
                             </span>
+                            <span
+                              v-if="plan.requirementWarning"
+                              class="text-xs font-medium leading-4 text-amber-800"
+                              role="status"
+                            >
+                              Recalculation required: {{ plan.requirementWarning }}
+                            </span>
                           </div>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
                             {{ formatWhole(plan.annualContacts) }}
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                            {{ formatWhole(plan.totalRequiredStaffHours) }}
+                            {{ formatOptionalWhole(plan.totalRequiredStaffHours) }}
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                            {{ formatNumber(plan.averageTotalRequiredHeadcount, 1) }}
+                            {{ formatOptionalNumber(plan.averageTotalRequiredHeadcount, 1) }}
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
-                            {{ formatSignedNumber(plan.averageGapToRequirement, 1) }}
+                            {{ formatOptionalSignedNumber(plan.averageGapToRequirement, 1) }}
                           </span>
                           <span class="truncate px-3 text-right font-medium tabular-nums text-slate-700">
                             {{ plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : '—' }}
@@ -1543,12 +1605,14 @@ watch(
     <PlanningGroupSettingsModal
       v-if="groupSettingsOpen"
       v-model:group-name="groupDraft.name"
+      v-model:channel-type="groupDraft.channelType"
+      v-model:service-goal-percent="groupDraft.serviceGoal.targetPercent"
+      v-model:service-goal-threshold="groupDraft.serviceGoal.threshold"
       v-model:default-paid-hours-per-day="groupDraft.defaultPaidHoursPerDay"
       v-model:default-occupancy-percent="groupDraft.defaultOccupancyPercent"
       v-model:default-adherence-percent="groupDraft.defaultAdherencePercent"
-      v-model:service-level-percent="groupDraft.serviceLevelPercent"
-      v-model:service-level-threshold-seconds="groupDraft.serviceLevelThresholdSeconds"
       :title="groupDraft.id ? 'Edit Staffing Group' : 'Create Staffing Group'"
+      :channel-locked="groupDraftChannelLocked"
       :submit-label="groupDraft.id ? 'Save Staffing Group' : 'Create Staffing Group'"
       @close="closeGroupSettings"
       @save="saveGroup"
@@ -1559,7 +1623,7 @@ watch(
       v-model:planning-year="newPlanYear"
       v-model:requirement-method="newPlanRequirementMethod"
       :year-options="availablePlanYearOptions"
-      :requirement-method-options="PLAN_REQUIREMENT_METHOD_OPTIONS"
+      :requirement-method-options="planRequirementMethodOptions"
       :can-close="canCreatePlanDraft"
       :existing-plan-href="existingPlanHref"
       :status-message="planSettingsStatusMessage"
@@ -1605,6 +1669,7 @@ watch(
       v-if="planComparisonSection"
       v-model:visible="planComparisonOpen"
       :center="props.center"
+      :group="selectedGroup"
       :group-name="selectedGroup?.name || 'Staffing Group'"
       :section="planComparisonSection"
     />

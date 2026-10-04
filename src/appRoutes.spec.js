@@ -1,6 +1,5 @@
 import {
   buildPlanningCenterHash,
-  buildPlanningCenterForecastsHash,
   buildPlanningGroupForecastsHash,
   buildPlanningGroupNewForecastHash,
   buildPlanningGroupHash,
@@ -17,7 +16,6 @@ describe('appRoutes', () => {
   it('builds planning hashes through shared helpers', () => {
     expect(buildPlanningHomeHash()).toBe('#planning')
     expect(buildPlanningCenterHash('center-1')).toBe('#planning/center/center-1')
-    expect(buildPlanningCenterForecastsHash('center-1')).toBe('#planning/center/center-1/forecasts')
     expect(buildPlanningGroupHash('center-1', 'group-1')).toBe('#planning/center/center-1/group/group-1')
     expect(buildPlanningGroupHash('center-1', 'group-1', 2027)).toBe('#planning/center/center-1/group/group-1/year/2027')
     expect(buildPlanningGroupHash('center-1', 'group-1', 2027, { tab: 'forecasts' })).toBe('#planning/center/center-1/group/group-1/year/2027/tab/forecasts')

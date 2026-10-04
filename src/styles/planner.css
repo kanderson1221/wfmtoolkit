@@ -1,96 +1,4 @@
 @layer components {
-  .planning-center-shell {
-    @apply grid gap-4;
-  }
-
-  .planning-center-hero {
-    @apply flex flex-col gap-3 p-5 lg:flex-row lg:items-end lg:justify-between;
-  }
-
-  .planning-center-hero-copy {
-    @apply grid gap-1.5;
-  }
-
-  .planning-center-hero-copy h2 {
-    @apply text-[clamp(1.5rem,2vw,2.1rem)] font-semibold tracking-[-0.04em] text-slate-950;
-  }
-
-  .planning-center-overview {
-    @apply grid gap-4 xl:grid-cols-[1.15fr_0.95fr];
-  }
-
-  .planning-center-summary,
-  .planning-center-defaults,
-  .planning-center-plan-list {
-    @apply p-5;
-  }
-
-  .planning-center-setting-list {
-    @apply grid gap-3;
-  }
-
-  .planning-center-setting-row {
-    @apply flex items-center justify-between gap-4 rounded-[20px] border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm;
-  }
-
-  .planning-center-setting-row strong {
-    @apply font-semibold text-slate-800;
-  }
-
-  .planning-center-setting-row span {
-    @apply text-right text-slate-600;
-  }
-
-  .planning-section-header {
-    @apply flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between;
-  }
-
-  .planning-empty-state {
-    @apply mt-4;
-  }
-
-  .planning-plan-list {
-    @apply mt-4 grid gap-3;
-  }
-
-  .planning-plan-list-head {
-    @apply hidden items-center gap-4 border-b border-slate-200 px-4 pb-3 text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500 xl:grid;
-    grid-template-columns: minmax(14rem, 1.4fr) repeat(8, minmax(6rem, 0.7fr)) auto;
-  }
-
-  .planning-plan-row {
-    @apply grid gap-3 px-4 py-3 xl:items-center;
-    grid-template-columns: 1fr;
-  }
-
-  .planning-plan-row h4 {
-    @apply text-base font-semibold tracking-[-0.03em] text-slate-950;
-  }
-
-  .planning-plan-primary,
-  .planning-plan-stat,
-  .planning-plan-actions {
-    @apply grid gap-1 text-sm text-slate-700;
-  }
-
-  .planning-plan-stat::before {
-    content: attr(data-label);
-    @apply text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-slate-500 xl:hidden;
-  }
-
-  .planning-plan-actions {
-    @apply flex flex-wrap items-center gap-2;
-  }
-
-  @media (min-width: 1280px) {
-    .planning-plan-row {
-      grid-template-columns: minmax(14rem, 1.4fr) repeat(8, minmax(6rem, 0.7fr)) auto;
-    }
-
-    .planning-plan-stat::before {
-      content: none;
-    }
-  }
 
   .monthly-flow-card {
     @apply p-3;
@@ -98,30 +6,6 @@
 
   .monthly-tab-panel {
     @apply grid gap-4;
-  }
-
-  .monthly-tab-header {
-    @apply grid gap-2;
-  }
-
-  .monthly-tab-header h3 {
-    @apply text-xl font-semibold tracking-[-0.03em] text-slate-950;
-  }
-
-  .monthly-tab-header p {
-    @apply text-sm leading-6 text-slate-600;
-  }
-
-  .monthly-copy-toolbar {
-    @apply inline-flex items-center gap-2 text-sm font-medium text-slate-700;
-  }
-
-  .monthly-copy-label {
-    @apply whitespace-nowrap text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-slate-500;
-  }
-
-  .monthly-copy-select-input {
-    @apply rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 shadow-sm transition focus:border-[#15395f] focus:ring-2 focus:ring-[#d7e3ec];
   }
 
   .assumption-table-shell {
@@ -385,10 +269,6 @@
     width: 6rem;
   }
 
-  .assumption-table-plan .plan-col-context-daily {
-    width: 6.2rem;
-  }
-
   .assumption-table-plan .plan-col-context-scheduled,
   .assumption-table-plan .plan-col-context-random,
   .assumption-table-plan .plan-col-context-design {
@@ -441,7 +321,7 @@
   }
 
   .staffing-supply-scroll {
-    @apply relative max-h-[clamp(22rem,calc(100vh-27rem),34rem)] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
+    @apply relative overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
   }
 
   .assumption-table-staffing thead th {
@@ -498,7 +378,7 @@
   }
 
   .actuals-coverage-scroll {
-    @apply relative max-h-[clamp(24rem,calc(100vh-24rem),38rem)] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
+    @apply relative overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15395f];
   }
 
   .assumption-table-actuals thead th {
@@ -724,10 +604,6 @@
     stroke-width: 3;
     stroke-linecap: round;
     stroke-linejoin: round;
-  }
-
-  .actuals-chart-line-frontline {
-    stroke: #15395f;
   }
 
   .actuals-chart-line-plan {
@@ -1041,67 +917,5 @@
 
   .monthly-warning-stack {
     @apply grid gap-2;
-  }
-
-  .monthly-chart-panel {
-    @apply grid gap-3;
-  }
-
-  .monthly-bars {
-    @apply grid gap-3 md:grid-cols-3 xl:grid-cols-6;
-  }
-
-  .monthly-bar-column {
-    @apply relative grid gap-2 rounded-[22px] border border-slate-200 bg-white px-3 py-3 text-left shadow-sm;
-  }
-
-  .monthly-bar-column.active {
-    @apply border-[#c3d2df] bg-[#e7eef4];
-  }
-
-  .monthly-bar-month {
-    @apply text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-slate-500;
-  }
-
-  .monthly-bar-cap,
-  .monthly-bar-footer {
-    @apply flex items-end justify-between gap-2 text-sm text-slate-600;
-  }
-
-  .monthly-bar-cap strong,
-  .monthly-bar-footer strong {
-    @apply text-base font-semibold text-slate-950;
-  }
-
-  .monthly-bar-stack {
-    @apply flex h-40 items-end;
-  }
-
-  .monthly-bar-track {
-    @apply flex h-full w-full items-end rounded-2xl bg-slate-100 p-1;
-  }
-
-  .monthly-bar-segment {
-    @apply w-full rounded-xl bg-[#15395f];
-  }
-
-  .monthly-bar-tooltip {
-    @apply pointer-events-none absolute left-3 right-3 top-3 hidden rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-600 shadow-lg;
-  }
-
-  .monthly-bar-column:hover .monthly-bar-tooltip {
-    @apply block;
-  }
-
-  .monthly-bar-tooltip-title {
-    @apply mb-2 text-sm font-semibold text-slate-950;
-  }
-
-  .monthly-bar-tooltip-grid {
-    @apply grid grid-cols-[auto_1fr] gap-x-3 gap-y-1;
-  }
-
-  .monthly-bar-tooltip-grid strong {
-    @apply justify-self-end font-semibold text-slate-900;
   }
 }

@@ -1,0 +1,9 @@
+[workspace]
+members = ["erlang", "server"]
+default-members = ["server"]
+resolver = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+

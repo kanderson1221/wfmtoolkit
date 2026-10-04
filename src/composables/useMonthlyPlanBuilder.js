@@ -47,12 +47,15 @@ import {
   PLAN_TYPE_UPDATE,
   normalizePlanStatus
 } from '../planningStorage'
-import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../planner/shared'
+import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG, resolvePlanRequirementMethod } from '../planner/shared'
+import { normalizeRequirementMethodForChannel, normalizeStaffingChannel, resolveChannelServiceGoal } from '../planner/channels'
+import { normalizeOperatingScheduleMode } from '../planner/operatingSchedule'
 import {
   mergeIntradayErlangMonthlyRecords,
   normalizePlannerIntradayErlangResults
 } from '../planner/intradayErlang'
 import { createPlanOpenDayChecker } from '../planner/planOpenDays'
+import { createPlanningGroupIntraday } from '../planner/groupIntraday'
 import { copyMonthForward, copyMonthToAll, copyQuarterForward } from './monthlyPlanBuilder/copyActions'
 import { buildExamplePlannerState } from './monthlyPlanBuilder/examplePlan'
 import { usePlannerAutosave } from './monthlyPlanBuilder/usePlannerAutosave'
@@ -118,7 +121,14 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const buildBootstrapState = (draftPayload = null) => {
     const sourcePlan =
       draftPayload?.plan
-        ? syncPlanScheduleWithSeed(draftPayload.plan)
+        ? syncPlanScheduleWithSeed({
+            ...draftPayload.plan,
+            // Drafts restore editable inputs; the saved plan owns its requirement method.
+            requirementMethod: resolvePlanRequirementMethod(
+              savedPlan,
+              resolvePlanRequirementMethod(draftPayload.plan, plannerSeedDefaults.value.requirementMethod)
+            )
+          })
         : savedPlan
           ? syncPlanScheduleWithSeed(savedPlan)
           : null
@@ -202,6 +212,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   const applyBootstrapState = (bootstrapState) => {
     planningYear.value = bootstrapState.initialState.planningYear
+    channelType.value = bootstrapState.initialState.channelType
+    serviceGoal.value = bootstrapState.initialState.serviceGoal
     requirementMethod.value = bootstrapState.initialState.requirementMethod
     activeSection.value = bootstrapState.activeSection
     activeForecastStep.value = bootstrapState.activeForecastStep
@@ -215,6 +227,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     randomDefaults.value = createRandomMonth(bootstrapState.initialState.randomDefaults)
     useMonthlyRandomOverrides.value = bootstrapState.initialState.useMonthlyRandomOverrides
     randomMonths.value = bootstrapState.initialState.randomMonths.map((month) => createRandomMonth(month))
+    intraday.value = createPlanningGroupIntraday(bootstrapState.initialState.intraday)
     planMonths.value = bootstrapState.initialState.planMonths.map((month) => createPlanMonth(month))
     intradayErlangResults.value = normalizePlannerIntradayErlangResults(
       bootstrapState.initialState.intradayErlangResults
@@ -264,6 +277,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const readOnlyBudgetMessage = 'Finalized budget plan is locked. Create an updated plan to change future assumptions.'
 
   const planningYear = ref(initialBootstrapState.initialState.planningYear)
+  const channelType = ref(initialBootstrapState.initialState.channelType)
+  const serviceGoal = ref(initialBootstrapState.initialState.serviceGoal)
   const requirementMethod = ref(initialBootstrapState.initialState.requirementMethod)
   const activeSection = ref(initialBootstrapState.activeSection)
   const activeForecastStep = ref(initialBootstrapState.activeForecastStep)
@@ -277,6 +292,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const randomDefaults = ref(createRandomMonth(initialBootstrapState.initialState.randomDefaults))
   const useMonthlyRandomOverrides = ref(initialBootstrapState.initialState.useMonthlyRandomOverrides)
   const randomMonths = ref(initialBootstrapState.initialState.randomMonths.map((month) => createRandomMonth(month)))
+  const intraday = ref(createPlanningGroupIntraday(initialBootstrapState.initialState.intraday))
   const planMonths = ref(initialBootstrapState.initialState.planMonths.map((month) => createPlanMonth(month)))
   const intradayErlangResults = ref(normalizePlannerIntradayErlangResults(initialBootstrapState.initialState.intradayErlangResults))
   const actualsIntradayErlangResults = ref(
@@ -403,7 +419,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     const examplePlan = buildExamplePlannerState(currentYear + 1)
 
     planningYear.value = currentYear + 1
-    requirementMethod.value = examplePlan.requirementMethod || plannerSeedDefaults.value.requirementMethod
     operatingWeekdays.value = examplePlan.operatingWeekdays
     holidayCalendarId.value = normalizeHolidayCalendarId(examplePlan.holidayCalendarId, HOLIDAY_CALENDAR_NONE)
     disabledHolidayRuleIds.value = normalizeDisabledHolidayRuleIds(examplePlan.disabledHolidayRuleIds)
@@ -437,7 +452,6 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
     validationMessage.value = ''
     planningYear.value = plannerSeedDefaults.value.planningYear
-    requirementMethod.value = plannerSeedDefaults.value.requirementMethod
     operatingWeekdays.value = [...plannerSeedDefaults.value.operatingWeekdays]
     holidayCalendarId.value = plannerSeedDefaults.value.holidayCalendarId
     disabledHolidayRuleIds.value = [...plannerSeedDefaults.value.disabledHolidayRuleIds]
@@ -503,7 +517,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const baselineMonthlyRecords = computed(() =>
     computeMonthlyRecords({
       planningYear: planningYear.value,
-      requirementMethod: requirementMethod.value,
+      requirementMethod: normalizeRequirementMethodForChannel(requirementMethod.value, channelType.value),
       demandSource: demandSource.value,
       operatingWeekdays: operatingWeekdays.value,
       holidayCalendarId: holidayCalendarId.value,
@@ -550,17 +564,20 @@ export const useMonthlyPlanBuilder = (props, emit) => {
   const intradayErlangCloseTime = computed(() =>
     String(sourcePlanReference.value?.operatingCloseTime || props.centerDefaults?.operatingCloseTime || '').trim()
   )
+  const intradayErlangScheduleMode = computed(() =>
+    normalizeOperatingScheduleMode(
+      sourcePlanReference.value?.operatingScheduleMode || props.centerDefaults?.operatingScheduleMode,
+      intradayErlangOpenTime.value,
+      intradayErlangCloseTime.value
+    )
+  )
   const intradayErlangProfile = computed(() => {
-    const snapshot =
-      sourcePlanReference.value?.intraday ||
-      props.centerDefaults?.intraday ||
-      {}
+    const snapshot = createPlanningGroupIntraday(intraday.value)
 
     return {
       intervalLengthMinutes: snapshot.intervalLengthMinutes,
-      intervalRatios: Array.isArray(snapshot.intervalRatios)
-        ? snapshot.intervalRatios.map((row) => ({ ...row }))
-        : []
+      minimumHeadcount: snapshot.minimumHeadcount,
+      intervalRatios: snapshot.intervalRatios.map((row) => ({ ...row }))
     }
   })
 
@@ -579,6 +596,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     holidayCalendarId,
     disabledHolidayRuleIds,
     customHolidays,
+    operatingScheduleMode: intradayErlangScheduleMode,
     operatingOpenTime: intradayErlangOpenTime,
     operatingCloseTime: intradayErlangCloseTime,
     serviceLevelPercent: intradayErlangServiceLevelPercent,
@@ -690,6 +708,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     holidayCalendarId,
     disabledHolidayRuleIds,
     customHolidays,
+    operatingScheduleMode: intradayErlangScheduleMode,
     operatingOpenTime: intradayErlangOpenTime,
     operatingCloseTime: intradayErlangCloseTime,
     serviceLevelPercent: intradayErlangServiceLevelPercent,
@@ -800,7 +819,9 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       actualizedAt: planType.value === PLAN_TYPE_UPDATE ? (sourcePlanReference.value?.actualizedAt || '') : '',
       decisionReason: planType.value === PLAN_TYPE_UPDATE ? String(sourcePlanReference.value?.decisionReason || '').trim() : '',
       planningYear: planningYear.value,
-      requirementMethod: requirementMethod.value,
+      channelType: normalizeStaffingChannel(channelType.value),
+      serviceGoal: resolveChannelServiceGoal({ channelType: channelType.value, serviceGoal: serviceGoal.value }),
+      requirementMethod: normalizeRequirementMethodForChannel(requirementMethod.value, channelType.value),
       operatingWeekdays: [...operatingWeekdays.value],
       holidayCalendarId: holidayCalendarId.value,
       disabledHolidayRuleIds: [...disabledHolidayRuleIds.value],
@@ -813,10 +834,12 @@ export const useMonthlyPlanBuilder = (props, emit) => {
       planMonths: planMonths.value.map((month) => createPlanMonth(month)),
       serviceLevelPercent: intradayErlangServiceLevelPercent.value,
       serviceLevelThresholdSeconds: intradayErlangServiceLevelThresholdSeconds.value,
+      operatingScheduleMode: intradayErlangScheduleMode.value,
       operatingOpenTime: intradayErlangOpenTime.value,
       operatingCloseTime: intradayErlangCloseTime.value,
       intraday: {
         intervalLengthMinutes: intradayErlangProfile.value.intervalLengthMinutes,
+        minimumHeadcount: intradayErlangProfile.value.minimumHeadcount,
         intervalRatios: intradayErlangProfile.value.intervalRatios.map((row) => ({ ...row }))
       },
       intradayErlangResults: requirementMethod.value === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
@@ -1127,6 +1150,8 @@ export const useMonthlyPlanBuilder = (props, emit) => {
 
   return {
     planningYear,
+    channelType,
+    serviceGoal,
     requirementMethod,
     activeSection,
     activeForecastStep,
@@ -1189,6 +1214,7 @@ export const useMonthlyPlanBuilder = (props, emit) => {
     actualsSummary,
     intradayErlangServiceLevelPercent,
     intradayErlangServiceLevelThresholdSeconds,
+    intradayErlangScheduleMode,
     intradayErlangOpenTime,
     intradayErlangCloseTime,
     intradayErlangProfile,

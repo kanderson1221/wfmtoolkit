@@ -7,15 +7,7 @@ import {
   createSavedProjectName,
   toNumber
 } from './forecasting/shared'
-import {
-  readJsonFromLocalStorage,
-  readJsonFromLocalStorageResult,
-  writeJsonToLocalStorage
-} from './storage/browserStorage'
-
 export const FORECAST_PROJECTS_STORAGE_KEY = 'wfmtoolkit.forecastProjects.v1'
-
-const buildScopedStorageKey = (baseKey, scope = 'default') => `${baseKey}.${String(scope || 'default')}`
 
 const createEntityId = (prefix) => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -114,38 +106,6 @@ export const normalizeForecastProject = (draftProject = {}, timestamp = new Date
     createdAt: snapshot.createdAt || timestamp,
     updatedAt: timestamp
   })
-}
-
-export const loadForecastProjects = (scope = 'default') => {
-  const parsed = readJsonFromLocalStorage(buildScopedStorageKey(FORECAST_PROJECTS_STORAGE_KEY, scope), [])
-
-  return Array.isArray(parsed)
-    ? sortForecastProjects(parsed.map((project) => normalizeForecastProject(project, project.updatedAt || project.createdAt || new Date().toISOString(), parsed)))
-    : []
-}
-
-export const loadForecastProjectsResult = (scope = 'default') => {
-  const storageKey = buildScopedStorageKey(FORECAST_PROJECTS_STORAGE_KEY, scope)
-  const { value, error } = readJsonFromLocalStorageResult(storageKey, [])
-
-  return {
-    projects: Array.isArray(value)
-      ? sortForecastProjects(value.map((project) =>
-          normalizeForecastProject(project, project.updatedAt || project.createdAt || new Date().toISOString(), value)
-        ))
-      : [],
-    error
-  }
-}
-
-export const persistForecastProjects = (projects, scope = 'default') => {
-  const normalizedProjects = Array.isArray(projects)
-    ? sortForecastProjects(projects.map((project) => normalizeForecastProject(project, project.updatedAt || new Date().toISOString(), projects)))
-    : []
-
-  writeJsonToLocalStorage(buildScopedStorageKey(FORECAST_PROJECTS_STORAGE_KEY, scope), normalizedProjects)
-
-  return normalizedProjects
 }
 
 export const findForecastProject = (projects, projectId) =>

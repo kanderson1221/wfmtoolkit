@@ -913,6 +913,10 @@ describe('ForecastingWorkspace', () => {
     expect(wrapper.text()).toContain('Forecasted demand vs historical volume')
     expect(wrapper.text()).toContain('Test period')
     expect(wrapper.text()).toContain('Forecast accuracy review')
+    expect(wrapper.text()).toContain('Range adjustment rules')
+    expect(wrapper.text().indexOf('Range adjustment rules')).toBeLessThan(
+      wrapper.text().indexOf('Forecast accuracy review')
+    )
     expect(wrapper.text()).toContain('8-week weekday average')
     expect(wrapper.text()).toContain('2.2 percentage points lower WAPE')
     expect(wrapper.text()).toContain('Download Accuracy CSV')

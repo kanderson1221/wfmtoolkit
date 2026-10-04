@@ -30,29 +30,6 @@ export const getAnnualRequiredStaffHours = (plan) => {
   return (summary.averageRequiredStaffHours || 0) * 12
 }
 
-export const getAverageAhtSeconds = (plan) => {
-  const summary = plan.summary || {}
-  if (typeof summary.averageAhtSeconds === 'number') {
-    return summary.averageAhtSeconds
-  }
-
-  const annualContacts = getAnnualContacts(plan)
-  const annualWorkloadHours = getAnnualWorkloadHours(plan)
-
-  if (annualContacts > 0 && annualWorkloadHours > 0) {
-    return (annualWorkloadHours * 3600) / annualContacts
-  }
-
-  if (Array.isArray(plan.planMonths)) {
-    const populatedMonths = plan.planMonths.filter((month) => Number(month.ahtSeconds) > 0)
-    if (populatedMonths.length) {
-      return populatedMonths.reduce((sum, month) => sum + Number(month.ahtSeconds || 0), 0) / populatedMonths.length
-    }
-  }
-
-  return 0
-}
-
 export const getMinRequiredHeadcount = (plan) => {
   const summary = plan.summary || {}
   if (typeof summary.minimumRequiredHeadcount === 'number') {
@@ -151,69 +128,3 @@ export const summarizeCenterForYear = (center, planningYear) => {
     largestGroupPlanCount: groupSummaries.reduce((max, summary) => Math.max(max, summary.planCount), 0)
   }
 }
-
-export const summarizeCenterPortfolio = (centers) => {
-  if (!centers.length) {
-    return {
-      callCenterCount: 0,
-      totalGroupCount: 0,
-      totalPlanCount: 0,
-      annualContacts: 0,
-      averageAhtSeconds: 0,
-      annualWorkloadHours: 0,
-      totalNeededStaffHours: 0,
-      totalAvgRequiredHeadcount: 0,
-      totalPeakHeadcount: 0
-    }
-  }
-
-  const centerSummaries = centers.map((center) => summarizeCenter(center))
-  const annualContacts = centerSummaries.reduce((sum, summary) => sum + summary.annualContacts, 0)
-  const annualWorkloadHours = centerSummaries.reduce((sum, summary) => sum + summary.annualWorkloadHours, 0)
-
-  return {
-    callCenterCount: centers.length,
-    totalGroupCount: centerSummaries.reduce((sum, summary) => sum + summary.groupCount, 0),
-    totalPlanCount: centerSummaries.reduce((sum, summary) => sum + summary.totalPlanCount, 0),
-    annualContacts,
-    averageAhtSeconds: annualContacts > 0 ? (annualWorkloadHours * 3600) / annualContacts : 0,
-    annualWorkloadHours,
-    totalNeededStaffHours: centerSummaries.reduce((sum, summary) => sum + summary.totalNeededStaffHours, 0),
-    totalAvgRequiredHeadcount: centerSummaries.reduce((sum, summary) => sum + summary.totalAvgRequiredHeadcount, 0),
-    totalPeakHeadcount: centerSummaries.reduce((sum, summary) => sum + summary.totalPeakHeadcount, 0)
-  }
-}
-
-export const summarizeCenterPortfolioForYear = (centers, planningYear) => {
-  if (!centers.length) {
-    return {
-      callCenterCount: 0,
-      totalGroupCount: 0,
-      totalPlanCount: 0,
-      annualContacts: 0,
-      averageAhtSeconds: 0,
-      annualWorkloadHours: 0,
-      totalNeededStaffHours: 0,
-      totalAvgRequiredHeadcount: 0,
-      totalPeakHeadcount: 0
-    }
-  }
-
-  const centerSummaries = centers.map((center) => summarizeCenterForYear(center, planningYear))
-  const annualContacts = centerSummaries.reduce((sum, summary) => sum + summary.annualContacts, 0)
-  const annualWorkloadHours = centerSummaries.reduce((sum, summary) => sum + summary.annualWorkloadHours, 0)
-
-  return {
-    callCenterCount: centers.length,
-    totalGroupCount: centerSummaries.reduce((sum, summary) => sum + summary.groupCount, 0),
-    totalPlanCount: centerSummaries.reduce((sum, summary) => sum + summary.totalPlanCount, 0),
-    annualContacts,
-    averageAhtSeconds: annualContacts > 0 ? (annualWorkloadHours * 3600) / annualContacts : 0,
-    annualWorkloadHours,
-    totalNeededStaffHours: centerSummaries.reduce((sum, summary) => sum + summary.totalNeededStaffHours, 0),
-    totalAvgRequiredHeadcount: centerSummaries.reduce((sum, summary) => sum + summary.totalAvgRequiredHeadcount, 0),
-    totalPeakHeadcount: centerSummaries.reduce((sum, summary) => sum + summary.totalPeakHeadcount, 0)
-  }
-}
-
-export const summarizePlanPortfolio = (plans) => summarizePlanList(plans)

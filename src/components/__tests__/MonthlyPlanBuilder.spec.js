@@ -153,6 +153,50 @@ describe('MonthlyPlanBuilder', () => {
     vi.restoreAllMocks()
   })
 
+  it('keeps a saved Erlang method when restoring a conflicting autosaved draft', async () => {
+    plannerDraftStore.set('intraday-plan', {
+      plan: {
+        id: 'intraday-plan',
+        planningYear: 2026,
+        requirementMethod: 'workload_ratio',
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        startingHeadcount: 42
+      }
+    })
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'intraday-plan',
+        planningYear: 2026,
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      }
+    })
+
+    expect(wrapper.vm.builder.startingHeadcount).toBe(42)
+    expect(wrapper.vm.builder.requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+    await wrapper.vm.builder.savePlan()
+    expect(wrapper.emitted('save')?.[0]?.[0].requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+  })
+
+  it('keeps an Erlang method when resetting inputs or loading example inputs', async () => {
+    const wrapper = await mountBuilder({
+      initialPlan: {
+        id: 'intraday-plan',
+        planningYear: 2026,
+        planType: PLAN_TYPE_BUDGET,
+        status: PLAN_STATUS_DRAFT,
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      }
+    })
+
+    wrapper.vm.builder.resetPlanner()
+    expect(wrapper.vm.builder.requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+    wrapper.vm.builder.loadExamplePlan()
+    expect(wrapper.vm.builder.requirementMethod).toBe(PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+  })
+
   it('opens new plans directly in the editor workflow', async () => {
     const wrapper = await mountBuilder({
       draftKey: 'new-plan',
@@ -167,6 +211,40 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.get('[data-section-id="forecast"]').text()).toContain('Forecasts')
     expect(wrapper.get('[data-section-id="variability"]').text()).toContain('Random/Variability')
     expect(wrapper.get('[data-section-id="requirement"]').text()).toContain('Demand Model')
+  })
+
+  it('saves dedicated email context with workload-ratio requirements', async () => {
+    const wrapper = await mountBuilder({
+      draftKey: 'new-email-plan',
+      prefilledYear: 2027,
+      centerDefaults: {
+        ...centerDefaults,
+        channelType: 'email',
+        serviceGoal: {
+          targetPercent: 95,
+          threshold: 8,
+          thresholdUnit: 'business_hours'
+        },
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+      }
+    })
+
+    expect(wrapper.vm.builder.channelType).toBe('email')
+    expect(wrapper.vm.builder.requirementMethod).toBe('workload_ratio')
+    expect(wrapper.text()).toContain('Dedicated email plan')
+
+    await wrapper.vm.builder.savePlan()
+
+    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+      channelType: 'email',
+      serviceGoal: {
+        targetPercent: 95,
+        threshold: 8,
+        thresholdUnit: 'business_hours'
+      },
+      requirementMethod: 'workload_ratio',
+      intradayErlangResults: null
+    })
   })
 
   it('orders the planner nav with forecasts first under the plan section', async () => {
@@ -214,7 +292,15 @@ describe('MonthlyPlanBuilder', () => {
       prefilledYear: 2026,
       centerDefaults: {
         ...centerDefaults,
-        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        intraday: {
+          intervalLengthMinutes: 30,
+          minimumHeadcount: 3,
+          intervalRatios: [
+            { startTime: '08:00', ratioPercent: 50 },
+            { startTime: '08:30', ratioPercent: 50 }
+          ]
+        }
       }
     })
 
@@ -585,7 +671,15 @@ describe('MonthlyPlanBuilder', () => {
       prefilledYear: 2026,
       centerDefaults: {
         ...centerDefaults,
-        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        intraday: {
+          intervalLengthMinutes: 30,
+          minimumHeadcount: 3,
+          intervalRatios: [
+            { startTime: '08:00', ratioPercent: 50 },
+            { startTime: '08:30', ratioPercent: 50 }
+          ]
+        }
       }
     })
 
@@ -603,6 +697,9 @@ describe('MonthlyPlanBuilder', () => {
     expect(wrapper.emitted('save')[0][0]).toMatchObject({
       requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
       status: PLAN_STATUS_DRAFT,
+      intraday: {
+        minimumHeadcount: 3
+      },
       summary: {
         requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
       }

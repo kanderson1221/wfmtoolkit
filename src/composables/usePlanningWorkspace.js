@@ -22,9 +22,13 @@ import {
 import { resolvePlanningGroupActuals } from '../planner/groupActuals'
 import { buildForecastTrainingSeedFromPlanningGroupActuals } from '../planner/groupActualsForecastSeed'
 import {
+  calculateDefaultMonthlyPaidHoursPerFte,
   findLinkedPriorPlan,
   getCurrentCalendarYear,
   normalizePlanRequirementMethod,
+  normalizeRequirementMethodForChannel,
+  normalizeStaffingChannel,
+  resolveChannelServiceGoal,
   resolveLinkedOpeningPosition,
   resolvePlanningYear
 } from '../plannerModel'
@@ -189,6 +193,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
 
     const forecastFallbackScopes = buildForecastFallbackScopes(currentCenter.value.id, currentGroup.value.id)
     const seededRequirementMethod = currentPlan.value?.requirementMethod || currentRoute.value.requirementMethod
+    const channelType = normalizeStaffingChannel(currentPlan.value?.channelType || currentGroup.value.channelType)
+    const serviceGoal = resolveChannelServiceGoal(currentPlan.value || currentGroup.value, channelType)
     const updateSourcePlan = currentRoute.value.planId === 'new' && currentRoute.value.updateSourcePlanId
       ? (currentGroup.value.plans || []).find((plan) => plan.id === currentRoute.value.updateSourcePlanId)
       : null
@@ -229,6 +235,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       centerName: currentCenter.value.name,
       groupId: currentGroup.value.id,
       groupName: currentGroup.value.name,
+      channelType,
+      serviceGoal,
       timezone: currentCenter.value.timezone,
       planningYear: resolvedPlanningYear,
       holidayCalendarId: centerHolidayCalendarId,
@@ -236,25 +244,30 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       customHolidays: centerHolidayProfile.customHolidays.map((holiday) => ({ ...holiday })),
       holidayScheduleMode: normalizeHolidayScheduleMode(HOLIDAY_SCHEDULE_CLOSED),
       operatingWeekdays: [...currentCenter.value.operatingWeekdays],
+      operatingScheduleMode: currentCenter.value.operatingScheduleMode,
       operatingOpenTime: currentCenter.value.operatingOpenTime,
       operatingCloseTime: currentCenter.value.operatingCloseTime,
       defaultPaidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay,
       defaultOccupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
       defaultAdherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent,
-      serviceLevelPercent: currentGroup.value.serviceLevelPercent,
-      serviceLevelThresholdSeconds: currentGroup.value.serviceLevelThresholdSeconds,
+      serviceLevelPercent: serviceGoal.targetPercent,
+      serviceLevelThresholdSeconds: channelType === 'voice' ? serviceGoal.threshold : null,
       intraday: currentGroup.value.intraday ? { ...currentGroup.value.intraday } : null,
       actuals: resolvePlanningGroupActuals(currentGroup.value),
       startingHeadcount: seededStartingPosition.rosterHeadcount,
       startingFrontlineHeadcount: seededStartingPosition.frontlineHeadcount,
-      presenceMonths: Array.from({ length: 12 }, () => ({
-        paidHoursPerDay: currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay
-      })),
+      presenceMonths: Array.from({ length: 12 }, () => {
+        const paidHoursPerDay = currentGroup.value.defaultPaidHoursPerDay ?? currentCenter.value.defaultPaidHoursPerDay
+        return {
+          paidHoursPerDay,
+          monthlyPaidHoursPerFte: calculateDefaultMonthlyPaidHoursPerFte(paidHoursPerDay)
+        }
+      }),
       randomDefaults: {
         occupancyPercent: currentGroup.value.defaultOccupancyPercent ?? currentCenter.value.defaultOccupancyPercent,
         adherencePercent: currentGroup.value.defaultAdherencePercent ?? currentCenter.value.defaultAdherencePercent
       },
-      requirementMethod: normalizePlanRequirementMethod(seededRequirementMethod),
+      requirementMethod: normalizeRequirementMethodForChannel(seededRequirementMethod, channelType),
       updateDraftPlan,
       updateDraftError,
       forecastStorageScope: buildForecastStorageScope(storageScope.value, currentCenter.value.id, currentGroup.value.id),
@@ -272,6 +285,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         ? resolvePlanningYear(currentRoute.value.year, currentPlan.value?.planningYear)
         : null
     const groupName = currentGroup.value?.name || ''
+    const channelType = normalizeStaffingChannel(currentGroup.value?.channelType)
     const holidayProfileYear = resolvedPlanningYear || getCurrentCalendarYear()
     const centerHolidayProfile = resolveCenterHolidayProfile(currentCenter.value, holidayProfileYear)
     const sourceCenterHolidayProfiles = resolveCenterHolidayProfiles(currentCenter.value).map((profile) => ({
@@ -329,6 +343,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
       centerName: currentCenter.value.name,
       groupId: currentGroup.value.id,
       groupName,
+      channelType,
+      seriesLabel: channelType === 'email' ? 'Daily Email Volume' : 'Daily Call Volume',
       planningYear: resolvedPlanningYear,
       planName: forecastPlanVersionName,
       planType: forecastPlanVersion?.planType || '',
@@ -349,7 +365,8 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
         planType: forecastPlanVersion?.planType || '',
         actualsThroughMonth: forecastPlanVersion?.actualsThroughMonth || '',
         planningYear: resolvedPlanningYear,
-        groupName
+        groupName,
+        channelType
       },
       sourceCenterSnapshot: createForecastCenterSnapshot({
         centerId: currentCenter.value.id,
@@ -359,6 +376,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
           Array.isArray(currentGroup.value?.operatingWeekdays) && currentGroup.value.operatingWeekdays.length
             ? currentGroup.value.operatingWeekdays
             : currentCenter.value.operatingWeekdays,
+        operatingScheduleMode: currentCenter.value.operatingScheduleMode,
         operatingOpenTime: currentCenter.value.operatingOpenTime,
         operatingCloseTime: currentCenter.value.operatingCloseTime,
         holidayProfileYear,

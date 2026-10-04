@@ -1,6 +1,5 @@
 import {
   buildForecastTrainingSeedFromPlanningGroupActuals,
-  hasMinimumForecastTrainingHistory,
   MINIMUM_FORECAST_HISTORY_DAYS
 } from '../groupActualsForecastSeed'
 import { createHolidayTemplateHolidays } from '../holidayCalendars'
@@ -28,24 +27,24 @@ describe('groupActualsForecastSeed', () => {
 
   it('checks the minimum shared-history threshold for modeled forecasts', () => {
     expect(
-      hasMinimumForecastTrainingHistory({
+      buildForecastTrainingSeedFromPlanningGroupActuals({
         dailyRows: Array.from({ length: MINIMUM_FORECAST_HISTORY_DAYS - 1 }, (_, index) => ({
           serviceDate: `2025-01-${String(index + 1).padStart(2, '0')}`,
           contacts: 800 + index,
           ahtSeconds: 280
         }))
-      })
-    ).toBe(false)
+      }).historyRows.length
+    ).toBeLessThan(MINIMUM_FORECAST_HISTORY_DAYS)
 
     expect(
-      hasMinimumForecastTrainingHistory({
+      buildForecastTrainingSeedFromPlanningGroupActuals({
         dailyRows: Array.from({ length: MINIMUM_FORECAST_HISTORY_DAYS }, (_, index) => ({
           serviceDate: `2025-01-${String(index + 1).padStart(2, '0')}`,
           contacts: 800 + index,
           ahtSeconds: 280
         }))
-      })
-    ).toBe(true)
+      }).historyRows.length
+    ).toBeGreaterThanOrEqual(MINIMUM_FORECAST_HISTORY_DAYS)
   })
 
   it('excludes closed weekdays and holidays from forecast training history', () => {

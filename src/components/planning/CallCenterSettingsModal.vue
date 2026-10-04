@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 
 import AppButton from '../ui/AppButton.vue'
+import AppCheckbox from '../ui/AppCheckbox.vue'
 import AppConfirmDialog from '../ui/AppConfirmDialog.vue'
 import AppDialog from '../ui/AppDialog.vue'
 import AppFieldGroup from '../ui/AppFieldGroup.vue'
@@ -13,6 +14,11 @@ import AppWorkspaceSection from '../ui/AppWorkspaceSection.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { buildPlanningYearRange, getCurrentCalendarYear, resolvePlanningYear } from '../../planner/shared'
 import { createPlanningHolidayProfile } from '../../planningStorage'
+import {
+  OPERATING_SCHEDULE_ALWAYS_OPEN,
+  OPERATING_SCHEDULE_CONFIGURED_HOURS,
+  validateConfiguredOperatingWindow
+} from '../../planner/operatingSchedule'
 import {
   HOLIDAY_CALENDAR_US_FEDERAL,
   createHolidayTemplateHolidays,
@@ -69,6 +75,20 @@ const operatingOpenTime = defineModel('operatingOpenTime', {
 const operatingCloseTime = defineModel('operatingCloseTime', {
   type: String,
   default: ''
+})
+
+const operatingScheduleMode = defineModel('operatingScheduleMode', {
+  type: String,
+  default: OPERATING_SCHEDULE_CONFIGURED_HOURS
+})
+
+const alwaysOpen = computed({
+  get: () => operatingScheduleMode.value === OPERATING_SCHEDULE_ALWAYS_OPEN,
+  set: (value) => {
+    operatingScheduleMode.value = value
+      ? OPERATING_SCHEDULE_ALWAYS_OPEN
+      : OPERATING_SCHEDULE_CONFIGURED_HOURS
+  }
 })
 
 const operatingWeekdays = defineModel('operatingWeekdays', {
@@ -215,35 +235,17 @@ watch(
 const selectedHolidayYearMinDate = computed(() => `${selectedHolidayYear.value}-01-01`)
 const selectedHolidayYearMaxDate = computed(() => `${selectedHolidayYear.value}-12-31`)
 
-const parseClockValueToMinutes = (value) => {
-  const [hoursText, minutesText] = String(value || '').split(':')
-  const hours = Number(hoursText)
-  const minutes = Number(minutesText)
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return null
-  }
-
-  return hours * 60 + minutes
-}
-
 const operatingHoursError = computed(() => {
-  if (!operatingOpenTime.value || !operatingCloseTime.value) {
+  if (alwaysOpen.value) {
     return ''
   }
 
-  const openMinutes = parseClockValueToMinutes(operatingOpenTime.value)
-  const closeMinutes = parseClockValueToMinutes(operatingCloseTime.value)
-
-  if (openMinutes == null || closeMinutes == null) {
-    return 'Enter valid opening and closing times.'
-  }
-
-  if (openMinutes >= closeMinutes) {
-    return 'Closing time must be later than opening time.'
-  }
-
-  return ''
+  return validateConfiguredOperatingWindow({
+    openTime: operatingOpenTime.value,
+    closeTime: operatingCloseTime.value,
+    intervalLengthMinutes: 30,
+    allowBlank: true
+  }).message
 })
 
 const setHolidayProfilesForYear = (nextCustomHolidays) => {
@@ -405,6 +407,11 @@ const holidayYearStatusMessage = computed(() => {
           />
         </AppFieldGroup>
 
+        <AppCheckbox v-model="alwaysOpen" input-id="call-center-always-open">
+          <span class="font-medium text-slate-800">Open 24 hours</span>
+          <span class="mt-0.5 block text-xs text-slate-500">Use a complete midnight-to-midnight operating window for every selected operating day.</span>
+        </AppCheckbox>
+
         <div class="grid gap-4 md:grid-cols-2">
           <AppFieldGroup
             label="Open Time"
@@ -414,6 +421,8 @@ const holidayYearStatusMessage = computed(() => {
               id="call-center-open-time"
               v-model="operatingOpenTime"
               type="time"
+              :disabled="alwaysOpen"
+              step="1800"
             />
           </AppFieldGroup>
 
@@ -426,6 +435,8 @@ const holidayYearStatusMessage = computed(() => {
               id="call-center-close-time"
               v-model="operatingCloseTime"
               type="time"
+              :disabled="alwaysOpen"
+              step="1800"
             />
           </AppFieldGroup>
         </div>

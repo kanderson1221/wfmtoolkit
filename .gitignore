@@ -10,6 +10,9 @@ Thumbs.db
 # Node / frontend
 node_modules/
 dist/
+coverage/
+playwright-report/
+test-results/
 .npm/
 npm-debug.log*
 yarn-debug.log*
@@ -35,6 +38,7 @@ htmlcov/
 
 # Build / temp / local outputs
 build/
+**/target/
 tmp/
 temp/
 *.log

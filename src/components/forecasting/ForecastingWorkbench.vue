@@ -372,7 +372,46 @@ watch(
                 v-model:active-result-tab="activeResultTab"
                 v-model:active-contacts-subview="activeContactsSubview"
                 :run-error="props.runError"
-              />
+              >
+                <template #before-accuracy>
+                  <section
+                    v-if="canAdjustForecast && activeResultTab === 'daily' && activeContactsSubview === 'forecast'"
+                    class="overflow-visible border border-slate-200 bg-white shadow-sm"
+                  >
+                    <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div class="grid gap-1">
+                        <h3 class="text-base font-semibold tracking-[-0.02em] text-slate-950">
+                          Range adjustment rules
+                        </h3>
+                        <p class="text-sm text-slate-600">
+                          All rules apply to the baseline forecast and require a recorded planning reason.
+                        </p>
+                      </div>
+
+                      <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+                        <p v-if="manualAdjustmentSummary" class="text-[0.82rem] text-slate-500">
+                          {{ manualAdjustmentSummary }}
+                        </p>
+                        <AppButton
+                          v-if="manualAdjustments.length"
+                          size="sm"
+                          variant="secondary"
+                          @click="clearManualAdjustments"
+                        >
+                          Clear Rules
+                        </AppButton>
+                      </div>
+                    </div>
+
+                    <div class="p-5">
+                      <ForecastingManualAdjustmentsDock
+                        v-model:project="project"
+                        :results-stale="resultsStale"
+                      />
+                    </div>
+                  </section>
+                </template>
+              </ForecastingResultsPanel>
             </div>
 
             <div v-else class="p-5">
@@ -414,42 +453,6 @@ watch(
         </button>
       </div>
 
-      <section
-        v-if="canAdjustForecast && hasHistory && activeResultTab === 'daily' && activeContactsSubview === 'forecast'"
-        class="overflow-visible border border-slate-200 bg-white shadow-sm"
-      >
-        <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3 xl:flex-row xl:items-start xl:justify-between">
-          <div class="grid gap-1">
-            <h3 class="text-base font-semibold tracking-[-0.02em] text-slate-950">
-              Range adjustment rules
-            </h3>
-            <p class="text-sm text-slate-600">
-              All rules apply to the baseline forecast and require a recorded planning reason.
-            </p>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2 xl:justify-end">
-            <p v-if="manualAdjustmentSummary" class="text-[0.82rem] text-slate-500">
-              {{ manualAdjustmentSummary }}
-            </p>
-            <AppButton
-              v-if="manualAdjustments.length"
-              size="sm"
-              variant="secondary"
-              @click="clearManualAdjustments"
-            >
-              Clear Rules
-            </AppButton>
-          </div>
-        </div>
-
-        <div class="p-5">
-          <ForecastingManualAdjustmentsDock
-            v-model:project="project"
-            :results-stale="resultsStale"
-          />
-        </div>
-      </section>
     </div>
 
     <AppDrawer

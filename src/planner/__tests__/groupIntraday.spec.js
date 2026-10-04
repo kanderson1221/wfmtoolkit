@@ -1,11 +1,37 @@
 import {
+  buildPlanningGroupIntradayIntervals,
   createPlanningGroupIntraday,
   normalizePlanningGroupIntradayRatios,
   resolvePlanningGroupIntraday,
   summarizePlanningGroupIntraday
 } from '../groupIntraday'
+import {
+  OPERATING_SCHEDULE_ALWAYS_OPEN,
+  OPERATING_SCHEDULE_CONFIGURED_HOURS
+} from '../operatingSchedule'
 
 describe('groupIntraday', () => {
+  it('builds exactly 48 unique intervals for an explicit always-open schedule', () => {
+    const intervals = buildPlanningGroupIntradayIntervals(
+      '',
+      '',
+      30,
+      OPERATING_SCHEDULE_ALWAYS_OPEN
+    )
+
+    expect(intervals).toHaveLength(48)
+    expect(new Set(intervals.map((row) => row.startTime)).size).toBe(48)
+    expect(intervals[0].label).toBe('00:00 - 00:30')
+    expect(intervals.at(-1).label).toBe('23:30 - 00:00')
+  })
+
+  it('rejects missing, equal, overnight, and interval-misaligned configured windows', () => {
+    expect(buildPlanningGroupIntradayIntervals('', '', 30, OPERATING_SCHEDULE_CONFIGURED_HOURS)).toEqual([])
+    expect(buildPlanningGroupIntradayIntervals('00:00', '00:00', 30, OPERATING_SCHEDULE_CONFIGURED_HOURS)).toEqual([])
+    expect(buildPlanningGroupIntradayIntervals('22:00', '06:00', 30, OPERATING_SCHEDULE_CONFIGURED_HOURS)).toEqual([])
+    expect(buildPlanningGroupIntradayIntervals('00:00', '23:59', 30, OPERATING_SCHEDULE_CONFIGURED_HOURS)).toEqual([])
+  })
+
   it('builds an even 30-minute profile across the configured operating window by default', () => {
     const intraday = resolvePlanningGroupIntraday(
       {},
@@ -23,6 +49,7 @@ describe('groupIntraday', () => {
       { startTime: '09:00', endTime: '09:30', label: '09:00 - 09:30', ratioPercent: 25 },
       { startTime: '09:30', endTime: '10:00', label: '09:30 - 10:00', ratioPercent: 25 }
     ])
+    expect(intraday.minimumHeadcount).toBe(0)
   })
 
   it('preserves saved ratios for matching intervals', () => {
@@ -67,6 +94,7 @@ describe('groupIntraday', () => {
   it('strips UI-only interval metadata when saving the intraday profile', () => {
     expect(
       createPlanningGroupIntraday({
+        minimumHeadcount: 3,
         intervalRatios: [
           {
             startTime: '08:00',
@@ -78,12 +106,22 @@ describe('groupIntraday', () => {
       })
     ).toEqual({
       intervalLengthMinutes: 30,
+      minimumHeadcount: 3,
       intervalRatios: [
         {
           startTime: '08:00',
           ratioPercent: 30
         }
       ]
+    })
+  })
+
+  it('normalizes the shared minimum headcount to a non-negative whole number', () => {
+    expect(createPlanningGroupIntraday({ minimumHeadcount: 2.6 })).toMatchObject({
+      minimumHeadcount: 3
+    })
+    expect(createPlanningGroupIntraday({ minimumHeadcount: -4 })).toMatchObject({
+      minimumHeadcount: 0
     })
   })
 })

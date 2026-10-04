@@ -7,7 +7,7 @@ import {
   normalizePlanningCenter,
   sortPlanningCenters
 } from '../planningStorage'
-import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../planner/shared'
+import { resolvePlanRequirementMethod } from '../planner/shared'
 import {
   FORECAST_PROJECTS_STORAGE_KEY,
   normalizeForecastProject,
@@ -106,9 +106,6 @@ const buildForecastRunRowId = (runId, kind, rowIndex) => `${runId}:${kind}:${row
 const buildForecastComponentRowId = (runId, componentType, rowIndex) => `${runId}:${componentType}:${rowIndex}`
 
 const getScopeRows = async (table, scope) => table.where('scope').equals(scope).toArray()
-const resolveStoredPlanRequirementMethod = (plan = {}) =>
-  plan.requirementMethod ||
-  (plan.intradayErlangResults ? PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG : '')
 
 const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
   const normalizedScope = normalizeScope(scope)
@@ -130,6 +127,7 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
       name: center.name,
       timezone: center.timezone,
       operatingWeekdays: [...(center.operatingWeekdays || [])],
+      operatingScheduleMode: center.operatingScheduleMode || '',
       operatingOpenTime: center.operatingOpenTime || '',
       operatingCloseTime: center.operatingCloseTime || '',
       defaultPaidHoursPerDay: center.defaultPaidHoursPerDay,
@@ -160,6 +158,8 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
           holidayProfileId,
           year: Number(profile.year) || 0,
           rowIndex,
+          holidayId: holiday.id || '',
+          sourceRuleId: holiday.sourceRuleId || null,
           label: holiday.label || '',
           date: holiday.date || ''
         })
@@ -172,6 +172,8 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
         id: group.id,
         centerId: center.id,
         name: group.name,
+        channelType: group.channelType || '',
+        serviceGoal: clonePlain(group.serviceGoal || {}),
         operatingWeekdays: [...(group.operatingWeekdays || [])],
         defaultPaidHoursPerDay: group.defaultPaidHoursPerDay,
         defaultOccupancyPercent: group.defaultOccupancyPercent,
@@ -201,7 +203,9 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
           actualizedAt: plan.actualizedAt || '',
           decisionReason: plan.decisionReason || '',
           planningYear: plan.planningYear,
-          requirementMethod: resolveStoredPlanRequirementMethod(plan),
+          channelType: plan.channelType || '',
+          serviceGoal: clonePlain(plan.serviceGoal || {}),
+          requirementMethod: resolvePlanRequirementMethod(plan),
           operatingWeekdays: [...(plan.operatingWeekdays || [])],
           holidayCalendarId: plan.holidayCalendarId || '',
           disabledHolidayRuleIds: [...(plan.disabledHolidayRuleIds || [])],
@@ -211,6 +215,7 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
           useMonthlyRandomOverrides: Boolean(plan.useMonthlyRandomOverrides),
           serviceLevelPercent: plan.serviceLevelPercent ?? null,
           serviceLevelThresholdSeconds: plan.serviceLevelThresholdSeconds ?? null,
+          operatingScheduleMode: plan.operatingScheduleMode || '',
           operatingOpenTime: plan.operatingOpenTime || '',
           operatingCloseTime: plan.operatingCloseTime || '',
           intraday: clonePlain(plan.intraday || {}),
@@ -300,6 +305,8 @@ const hydratePlanningWorkspace = (scope, rows) => {
     const holidays = (holidayRowsByProfileId.get(row.id) || [])
       .sort((left, right) => left.rowIndex - right.rowIndex)
       .map((holidayRow) => ({
+        id: holidayRow.holidayId || holidayRow.id,
+        sourceRuleId: holidayRow.sourceRuleId || null,
         label: holidayRow.label,
         date: holidayRow.date
       }))
@@ -346,7 +353,9 @@ const hydratePlanningWorkspace = (scope, rows) => {
         actualizedAt: row.actualizedAt || '',
         decisionReason: row.decisionReason || '',
         planningYear: row.planningYear,
-        requirementMethod: resolveStoredPlanRequirementMethod(row),
+        channelType: row.channelType || '',
+        serviceGoal: clonePlain(row.serviceGoal || {}),
+        requirementMethod: resolvePlanRequirementMethod(row),
         operatingWeekdays: [...(row.operatingWeekdays || [])],
         holidayCalendarId: row.holidayCalendarId,
         disabledHolidayRuleIds: [...(row.disabledHolidayRuleIds || [])],
@@ -356,6 +365,7 @@ const hydratePlanningWorkspace = (scope, rows) => {
         useMonthlyRandomOverrides: Boolean(row.useMonthlyRandomOverrides),
         serviceLevelPercent: row.serviceLevelPercent,
         serviceLevelThresholdSeconds: row.serviceLevelThresholdSeconds,
+        operatingScheduleMode: row.operatingScheduleMode,
         operatingOpenTime: row.operatingOpenTime,
         operatingCloseTime: row.operatingCloseTime,
         intraday: clonePlain(row.intraday || {}),
@@ -395,6 +405,8 @@ const hydratePlanningWorkspace = (scope, rows) => {
       {
         id: row.id,
         name: row.name,
+        channelType: row.channelType || '',
+        serviceGoal: clonePlain(row.serviceGoal || {}),
         operatingWeekdays: [...(row.operatingWeekdays || [])],
         defaultPaidHoursPerDay: row.defaultPaidHoursPerDay,
         defaultOccupancyPercent: row.defaultOccupancyPercent,
@@ -421,6 +433,7 @@ const hydratePlanningWorkspace = (scope, rows) => {
           name: row.name,
           timezone: row.timezone,
           operatingWeekdays: [...(row.operatingWeekdays || [])],
+          operatingScheduleMode: row.operatingScheduleMode,
           operatingOpenTime: row.operatingOpenTime,
           operatingCloseTime: row.operatingCloseTime,
           defaultPaidHoursPerDay: row.defaultPaidHoursPerDay,

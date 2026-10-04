@@ -16,6 +16,9 @@ export const FULL_MONTH_LABELS = [
 ]
 
 export const WEEKDAY_FALLBACK = [1, 2, 3, 4, 5]
+export const DEFAULT_FTE_WORKDAYS_PER_WEEK = 5
+export const WEEKS_PER_YEAR = 52
+export const MONTHS_PER_YEAR = 12
 export const PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO = 'workload_ratio'
 export const PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG = 'intraday_erlang'
 export const PLAN_REQUIREMENT_METHOD_OPTIONS = [
@@ -67,6 +70,9 @@ export const average = (values) => {
   return values.reduce((sum, value) => sum + value, 0) / values.length
 }
 
+export const calculateDefaultMonthlyPaidHoursPerFte = (paidHoursPerDay = 8) =>
+  Number((Math.max(toNumber(paidHoursPerDay, 8), 0) * DEFAULT_FTE_WORKDAYS_PER_WEEK * WEEKS_PER_YEAR / MONTHS_PER_YEAR).toFixed(2))
+
 export const normalizeWeekdays = (weekdays) =>
   Array.isArray(weekdays) && weekdays.length
     ? [...new Set(weekdays.map((value) => toNumber(value, 0)))].sort((left, right) => left - right)
@@ -85,6 +91,16 @@ export const normalizePlanRequirementMethod = (
       : fallback
 }
 
+// Recover legacy metadata before applying defaults. Explicit methods take precedence
+// over old result snapshots, which may remain after an intentional method change.
+export const resolvePlanRequirementMethod = (
+  plan,
+  fallback = PLAN_REQUIREMENT_METHOD_WORKLOAD_RATIO
+) =>
+  normalizePlanRequirementMethod(plan?.requirementMethod, null) ||
+  normalizePlanRequirementMethod(plan?.summary?.requirementMethod, null) ||
+  (plan?.intradayErlangResults ? PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG : fallback)
+
 export const getPlanRequirementMethodLabel = (value) =>
   normalizePlanRequirementMethod(value) === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
     ? 'Intraday Erlang'
@@ -92,6 +108,7 @@ export const getPlanRequirementMethodLabel = (value) =>
 
 export const createPresenceMonth = (overrides = {}) => ({
   paidHoursPerDay: 8,
+  monthlyPaidHoursPerFte: null,
   plannedTimeOffHours: 0,
   unplannedTimeOffHours: 0,
   leaveTimeHours: 0,
@@ -181,7 +198,6 @@ export const createNextYearOpening = (overrides = {}) => {
   }
 }
 
-export const buildPresenceMonths = () => MONTH_LABELS.map(() => createPresenceMonth())
 export const buildRandomMonths = () => MONTH_LABELS.map(() => createRandomMonth())
 export const buildPlanMonths = () => MONTH_LABELS.map(() => createPlanMonth())
 export const buildStaffingMonths = () => MONTH_LABELS.map(() => createStaffingMonth())

@@ -13,8 +13,13 @@ import { DEMAND_SOURCE_FORECAST, derivePeakDayUpliftPercent } from '../../planne
 import {
   PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG
 } from '../../plannerModel'
+import { getChannelPlanningTerms } from '../../planner/channels'
 
 const props = defineProps({
+  channelType: {
+    type: String,
+    default: 'voice'
+  },
   monthlyRecords: {
     type: Array,
     required: true
@@ -101,6 +106,7 @@ const selectedMonth = computed(
 )
 
 const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+const channelTerms = computed(() => getChannelPlanningTerms(props.channelType))
 const requirementTitle = computed(() => 'Demand Model')
 const previousLabel = computed(() => isIntradayErlang.value ? 'Back to Erlang Inputs' : 'Back to Random/Variability')
 const appliedDailyForecastRowCount = computed(() =>
@@ -350,7 +356,8 @@ const standardMonthlyExportColumns = computed(() => [
   },
   { header: 'aht_seconds', value: (record) => formatCsvNumber(resolveWorkloadRatioAht(record.monthIndex), 6) },
   { header: 'peak_day_percent', value: (record) => formatCsvNumber(resolveWorkloadRatioPeakDayUplift(record.monthIndex), 6) },
-  { header: 'business_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'open_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'fte_paid_hours', value: (record) => formatCsvNumber(record.paidHoursPerMonth, 6) },
   { header: 'scheduled_percent', value: (record) => formatCsvNumber(record.scheduledPercent, 6) },
   { header: 'random_percent', value: (record) => formatCsvNumber(record.randomLossPercent, 6) },
   { header: 'design_percent', value: (record) => formatCsvNumber(record.designFactorPercent, 6) },
@@ -380,9 +387,12 @@ const intradayErlangMonthlyExportColumns = computed(() => [
     value: (record) => formatCsvNumber(planMonths.value?.[record.monthIndex]?.contacts ?? record.contacts, 6)
   },
   { header: 'aht_seconds', value: (record) => formatCsvNumber(resolveWorkloadRatioAht(record.monthIndex), 6) },
-  { header: 'business_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'open_days', value: (record) => formatCsvNumber(record.openDays, 6) },
+  { header: 'fte_paid_hours', value: (record) => formatCsvNumber(record.paidHoursPerMonth, 6) },
   { header: 'workload_hours', value: (record) => formatCsvNumber(record.workloadHours, 6) },
   { header: 'erlang_hours', value: (record) => formatCsvNumber(record.erlangStaffedHours, 6) },
+  { header: 'minimum_headcount', value: (record) => formatCsvNumber(record.minimumHeadcount, 0) },
+  { header: 'minimum_applied_intervals', value: (record) => formatCsvNumber(record.minimumAppliedIntervalCount, 0) },
   { header: 'base_headcount', value: (record) => formatCsvNumber(resolveBaseHeadcount(record), 6) },
   { header: 'occupancy_percent', value: (record) => formatCsvNumber(record.weightedOccupancyPercent, 6) },
   { header: 'service_level_percent', value: (record) => formatCsvNumber(record.weightedServiceLevelPercent, 6) },
@@ -410,7 +420,10 @@ const intervalExportColumns = computed(() => [
   { header: 'calls_offered', value: (record) => formatCsvNumber(record.callsOffered, 6) },
   { header: 'average_handle_time_seconds', value: (record) => formatCsvNumber(record.averageHandleTimeSeconds, 6) },
   { header: 'workload_hours', value: (record) => formatCsvNumber(record.workloadHours, 6) },
+  { header: 'erlang_required_staff_net', value: (record) => formatCsvNumber(record.erlangRequiredStaffNet, 6) },
+  { header: 'minimum_headcount', value: (record) => formatCsvNumber(record.minimumHeadcount, 0) },
   { header: 'required_staff_net', value: (record) => formatCsvNumber(record.requiredStaffNet, 6) },
+  { header: 'minimum_applied', value: (record) => record.minimumApplied ? 'true' : 'false' },
   { header: 'labor_hours_net', value: (record) => formatCsvNumber(record.laborHoursNet, 6) },
   { header: 'wfm_staffing_ratio', value: (record) => formatCsvNumber(resolveIntervalStaffingRatio(record), 6) },
   { header: 'wfm_labor_hours_gross', value: (record) => formatCsvNumber(resolveIntervalWfmLaborHoursGross(record), 6) },
@@ -447,7 +460,7 @@ const summaryItems = computed(() => {
   if (isIntradayErlang.value) {
     return [
       {
-        label: 'Annual Contacts',
+        label: `Annual ${channelTerms.value.contactLabel}`,
         value: props.formatWhole(props.planSummary?.annualContacts)
       },
       {
@@ -471,7 +484,7 @@ const summaryItems = computed(() => {
 
   return [
     {
-      label: 'Annual Contacts',
+      label: `Annual ${channelTerms.value.contactLabel}`,
       value: props.formatWhole(props.planSummary?.annualContacts)
     },
     {
@@ -751,16 +764,16 @@ const erlangRunButtonLabel = computed(() => {
           </tr>
           <tr>
             <th title="Planning month. Click a month name to highlight that row.">Month</th>
-            <th :title="isIntradayErlang ? 'Daily forecast-owned contacts are flattened into monthly workload context in Intraday Erlang mode.' : 'Monthly contact demand used to create workload hours.'">Contacts</th>
-            <th :title="isIntradayErlang ? 'Monthly AHT assumptions come from the applied forecast and stay read-only in Intraday Erlang mode.' : 'Average handle time in seconds used to create workload hours.'">AHT</th>
+            <th :title="isIntradayErlang ? 'Daily forecast-owned contacts are flattened into monthly workload context in Intraday Erlang mode.' : `Monthly ${channelTerms.contactPlural} used to create workload hours.`">{{ channelTerms.contactLabel }}</th>
+            <th :title="isIntradayErlang ? 'Monthly AHT assumptions come from the applied forecast and stay read-only in Intraday Erlang mode.' : 'Average handling time in seconds used to create workload hours.'">{{ channelTerms.handleTimeLabel }}</th>
             <th
               v-if="!isIntradayErlang"
               title="Peak Day Uplift % increases average open-day contacts to represent the busiest day of the month."
             >
               <span class="plan-head-label">Peak Day<br />%</span>
             </th>
-            <th title="Business days flowing in from the call-center operating days and holiday closures.">
-              <span class="plan-head-label">Bus. Days</span>
+            <th title="Open days flowing in from the call-center operating days and holiday closures.">
+              <span class="plan-head-label">Open Days</span>
             </th>
             <th v-if="isIntradayErlang" title="Monthly workload hours calculated from contacts and AHT.">
               <span class="plan-head-label plan-output-head-label">Wkld Hrs</span>

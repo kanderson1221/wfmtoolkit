@@ -9,6 +9,8 @@ const npmCommand = isWindows ? 'npm.cmd' : 'npm'
 const pythonCommand = isWindows ? 'python' : 'python3'
 const venvPython = isWindows ? '.venv\\Scripts\\python.exe' : '.venv/bin/python'
 const uvicornCommand = isWindows ? '.venv\\Scripts\\uvicorn.exe' : '.venv/bin/uvicorn'
+const cargoCommand = process.env.CARGO || (isWindows ? 'cargo.exe' : 'cargo')
+const rustServer = isWindows ? 'rust\\target\\debug\\wfm-server.exe' : 'rust/target/debug/wfm-server'
 
 let shuttingDown = false
 const processes = []
@@ -49,10 +51,11 @@ function shutdown(code = 0) {
   setTimeout(() => process.exit(code), 200)
 }
 
-function start(command, args, label) {
+function start(command, args, label, options = {}) {
   const child = spawn(command, args, {
     stdio: 'inherit',
-    shell: false
+    shell: false,
+    ...options
   })
 
   child.on('error', (error) => {
@@ -93,10 +96,14 @@ async function ensureDependencies() {
 }
 
 await ensureDependencies()
+await run(cargoCommand, ['build', '--manifest-path', 'rust/Cargo.toml', '--locked', '-p', 'wfm-server'])
 
 console.log('Starting WFM Toolkit...')
 console.log('Backend:  http://127.0.0.1:8000')
 console.log('Frontend: http://127.0.0.1:5173')
 
-start(uvicornCommand, ['backend.app.main:app', '--reload', '--host', '127.0.0.1', '--port', '8000'], 'backend')
+start(uvicornCommand, ['backend.app.forecast_service:app', '--reload', '--host', '127.0.0.1', '--port', '8001'], 'forecasting')
+start(rustServer, [], 'backend', {
+  env: { ...process.env, HOST: '127.0.0.1', PORT: '8000' }
+})
 start(npmCommand, ['run', 'dev', '--', '--host', '127.0.0.1'], 'frontend')

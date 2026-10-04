@@ -138,9 +138,6 @@ export const buildPlanUpdateActualsState = (
   }
 }
 
-export const buildActualsThroughMonthOptions = (actuals = {}, planningYear, calendarContext = {}) =>
-  buildPlanUpdateActualsState(actuals, planningYear, calendarContext).options
-
 const assertActualsSupportCutoff = ({
   monthlyActuals,
   completenessByMonth,

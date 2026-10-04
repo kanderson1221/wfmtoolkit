@@ -129,6 +129,7 @@ describe('PlannerRandomTab', () => {
         operatingCloseTime: '20:00',
         intraday: {
           intervalLengthMinutes: 30,
+          minimumHeadcount: 2,
           intervalRatios: [
             { intervalStart: '08:00', ratioPercent: 50 },
             { intervalStart: '08:30', ratioPercent: 50 }
@@ -159,8 +160,36 @@ describe('PlannerRandomTab', () => {
     expect(wrapper.text()).toContain('adherence overhead applied afterward')
     expect(wrapper.text()).toContain('08:00 to 20:00')
     expect(wrapper.text()).toContain('2 intervals @ 30 min')
+    expect(wrapper.text()).toContain('Minimum HC / Open Interval')
     expect(wrapper.text()).toContain('FY26 Budget Forecast')
     expect(wrapper.text()).toContain('Continue to Demand Model')
     expect(wrapper.text()).not.toContain('Monthly Overrides')
+  })
+
+  it('labels an always-open Erlang schedule without relying on equal clock times', () => {
+    const wrapper = mount(PlannerRandomTab, {
+      props: buildProps({
+        requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+        operatingScheduleMode: 'always_open',
+        operatingOpenTime: '',
+        operatingCloseTime: ''
+      }),
+      global: {
+        stubs: {
+          AppButton: AppButtonStub,
+          AppCheckbox: true,
+          AppFieldGroup: true,
+          AppNumberField: true,
+          AppSectionHeader: AppSectionHeaderStub,
+          AppStatStrip: true,
+          AppStatusMessage: AppStatusMessageStub,
+          AppTableNumberField: AppTableNumberFieldStub,
+          PlannerCopyMenu: true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Open 24 hours')
+    expect(wrapper.text()).not.toContain('Needs call center hours')
   })
 })

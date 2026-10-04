@@ -304,3 +304,64 @@ describe('computeMonthlyRecords invalid capacity', () => {
     })
   })
 })
+
+describe('computeMonthlyRecords FTE capacity', () => {
+  const buildPayload = (operatingWeekdays, presenceMonth = {}) => ({
+    planningYear: 2026,
+    operatingWeekdays,
+    holidayCalendarId: 'none',
+    customHolidays: [],
+    presenceMonths: Array.from({ length: 12 }, () => ({
+      paidHoursPerDay: 8,
+      monthlyPaidHoursPerFte: 176,
+      paidBreaksHoursPerDay: 0.5,
+      ...presenceMonth
+    })),
+    randomDefaults: {
+      occupancyPercent: 100,
+      adherencePercent: 100
+    },
+    useMonthlyRandomOverrides: false,
+    randomMonths: [],
+    planMonths: Array.from({ length: 12 }, () => ({
+      contacts: 12000,
+      ahtSeconds: 300,
+      peakDayUpliftPercent: 0
+    }))
+  })
+
+  it('uses monthly FTE paid hours instead of center open days for roster capacity and daily losses', () => {
+    const january = computeMonthlyRecords(buildPayload([0, 1, 2, 3, 4, 5, 6]))[0]
+
+    expect(january.openDays).toBe(31)
+    expect(january.paidHoursPerMonth).toBe(176)
+    expect(january.monthlyPaidHoursPerFte).toBe(176)
+    expect(january.fteWorkdays).toBe(22)
+    expect(january.rawPaidBreaksHours).toBe(11)
+    expect(january.requiredHeadcount).toBeCloseTo(january.requiredStaffHours / 176, 8)
+  })
+
+  it('keeps monthly roster capacity independent from the center operating-day calendar', () => {
+    const sevenDayJanuary = computeMonthlyRecords(buildPayload([0, 1, 2, 3, 4, 5, 6]))[0]
+    const fiveDayJanuary = computeMonthlyRecords(buildPayload([1, 2, 3, 4, 5]))[0]
+
+    expect(sevenDayJanuary.openDays).toBe(31)
+    expect(fiveDayJanuary.openDays).toBe(22)
+    expect(sevenDayJanuary.paidHoursPerMonth).toBe(176)
+    expect(fiveDayJanuary.paidHoursPerMonth).toBe(176)
+    expect(sevenDayJanuary.requiredHeadcount).toBeCloseTo(fiveDayJanuary.requiredHeadcount, 8)
+    expect(sevenDayJanuary.peakDayRequiredHeadcount).toBeLessThan(fiveDayJanuary.peakDayRequiredHeadcount)
+  })
+
+  it('preserves the legacy open-days capacity fallback when the new monthly field is absent', () => {
+    const january = computeMonthlyRecords(buildPayload(
+      [0, 1, 2, 3, 4, 5, 6],
+      { monthlyPaidHoursPerFte: null }
+    ))[0]
+
+    expect(january.openDays).toBe(31)
+    expect(january.paidHoursPerMonth).toBe(248)
+    expect(january.fteWorkdays).toBe(31)
+    expect(january.rawPaidBreaksHours).toBe(15.5)
+  })
+})

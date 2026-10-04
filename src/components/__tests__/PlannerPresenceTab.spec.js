@@ -14,6 +14,7 @@ describe('PlannerPresenceTab', () => {
         presenceMonths: [
           {
             paidHoursPerDay: 8,
+            monthlyPaidHoursPerFte: 160,
             plannedTimeOffHours: 6,
             unplannedTimeOffHours: 4,
             leaveTimeHours: 3,
@@ -31,6 +32,7 @@ describe('PlannerPresenceTab', () => {
             fullLabel: 'January',
             openDays: 20,
             paidHoursPerMonth: 160,
+            fteWorkdays: 20,
             totalLossHours: 24,
             presencePercent: 85,
             utilizationPercent: 80,
@@ -38,7 +40,8 @@ describe('PlannerPresenceTab', () => {
           }
         ],
         summary: {
-          totalOpenDays: 240,
+          averageMonthlyPaidHoursPerFte: 160,
+          averageFteWorkdays: 20,
           averageAbsenceLossHours: 12,
           averageScheduledLossHours: 8,
           averageOtherLossHours: 4,
@@ -61,10 +64,13 @@ describe('PlannerPresenceTab', () => {
     expect(wrapper.findAll('th.presence-detail-presence')).toHaveLength(3)
     expect(wrapper.findAll('th.presence-detail-utilization')).toHaveLength(5)
     expect(wrapper.findAll('th.presence-detail-results')).toHaveLength(5)
-    expect(wrapper.text()).toContain('Calendar')
+    expect(wrapper.text()).toContain('FTE Capacity')
     expect(wrapper.text()).toContain('Presence Loss')
     expect(wrapper.text()).toContain('Utilization Loss')
     expect(wrapper.text()).toContain('Results')
     expect(wrapper.text()).toContain('Agent Availability Assumptions')
+    expect(wrapper.text()).toContain('FTE Paid')
+    expect(wrapper.text()).toContain('Shift Paid')
+    expect(wrapper.text()).not.toContain('Business Days')
   })
 })

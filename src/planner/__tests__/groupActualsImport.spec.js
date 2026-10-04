@@ -88,4 +88,22 @@ describe('groupActualsImport', () => {
       }
     ])
   })
+
+  it('guesses email-specific volume and handling-time headers', () => {
+    const importState = buildGroupActualsImportStateFromText({
+      fileName: 'email-actuals.csv',
+      text: 'service_date,email_volume,email_handling_time_seconds\n2026-01-01,150,720\n'
+    })
+
+    expect(importState.columnMapping).toEqual({
+      dateColumn: 'service_date',
+      volumeColumn: 'email_volume',
+      ahtColumn: 'email_handling_time_seconds'
+    })
+    expect(importState.dailyRows[0]).toMatchObject({
+      serviceDate: '2026-01-01',
+      contacts: 150,
+      ahtSeconds: 720
+    })
+  })
 })

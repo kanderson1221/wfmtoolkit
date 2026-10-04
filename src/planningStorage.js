@@ -12,14 +12,20 @@ import {
 } from './planner/holidayCalendars'
 import { createPlanningGroupActuals, resolvePlanningGroupActuals } from './planner/groupActuals'
 import { createPlanningGroupIntraday, resolvePlanningGroupIntraday } from './planner/groupIntraday'
+import { normalizeOperatingScheduleMode } from './planner/operatingSchedule'
+import {
+  STAFFING_CHANNEL_VOICE,
+  normalizeRequirementMethodForChannel,
+  normalizeStaffingChannel,
+  resolveChannelServiceGoal
+} from './planner/channels'
 import { createPlanDemandSource } from './planner/demandSources'
 import {
   createNextYearOpening,
   getCurrentCalendarYear,
-  normalizePlanRequirementMethod,
+  resolvePlanRequirementMethod,
   resolvePlanningYear
 } from './planner/shared'
-import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/browserStorage'
 
 export const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
 export const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
@@ -27,8 +33,6 @@ export const PLAN_TYPE_BUDGET = 'budget'
 export const PLAN_TYPE_UPDATE = 'update'
 export const PLAN_STATUS_DRAFT = 'draft'
 export const PLAN_STATUS_FINALIZED = 'finalized'
-
-const buildScopedStorageKey = (baseKey, scope = 'default') => `${baseKey}.${String(scope || 'default')}`
 
 const clonePlain = (value) => JSON.parse(JSON.stringify(value))
 const DEFAULT_GROUP_SERVICE_LEVEL_PERCENT = 80
@@ -201,12 +205,6 @@ export const normalizePlanStatus = (value, planType = PLAN_TYPE_BUDGET) => {
     ? PLAN_STATUS_DRAFT
     : PLAN_STATUS_FINALIZED
 }
-export const isDraftBudgetPlan = (plan) =>
-  normalizePlanType(plan?.planType) === PLAN_TYPE_BUDGET &&
-  normalizePlanStatus(plan?.status, PLAN_TYPE_BUDGET) === PLAN_STATUS_DRAFT
-export const isFinalizedBudgetPlan = (plan) =>
-  normalizePlanType(plan?.planType) === PLAN_TYPE_BUDGET &&
-  normalizePlanStatus(plan?.status, PLAN_TYPE_BUDGET) === PLAN_STATUS_FINALIZED
 const normalizeMonthStart = (value) => {
   const normalizedValue = String(value || '').trim()
   return /^\d{4}-\d{2}-01$/.test(normalizedValue) ? normalizedValue : ''
@@ -328,6 +326,13 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
   const status = normalizePlanStatus(planSnapshot.status, planType)
   const id = planSnapshot.id || createEntityId('plan')
   const name = String(planSnapshot.name || '').trim() || buildPlanName(resolvedYear, planType)
+  const operatingOpenTime = normalizeOperatingTime(planSnapshot.operatingOpenTime)
+  const operatingCloseTime = normalizeOperatingTime(planSnapshot.operatingCloseTime)
+  const hasOperatingScheduleSnapshot = Boolean(
+    String(planSnapshot.operatingScheduleMode || '').trim() || operatingOpenTime || operatingCloseTime
+  )
+  const channelType = normalizeStaffingChannel(planSnapshot.channelType, STAFFING_CHANNEL_VOICE)
+  const serviceGoal = resolveChannelServiceGoal(planSnapshot, channelType)
 
   return {
     ...planSnapshot,
@@ -345,11 +350,22 @@ export const normalizePlanningPlan = (draftPlan, timestamp = new Date().toISOStr
     actualizedAt: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.actualizedAt || '').trim() : '',
     decisionReason: planType === PLAN_TYPE_UPDATE ? String(planSnapshot.decisionReason || '').trim() : '',
     planningYear: resolvedYear,
+    operatingScheduleMode: hasOperatingScheduleSnapshot
+      ? normalizeOperatingScheduleMode(
+          planSnapshot.operatingScheduleMode,
+          operatingOpenTime,
+          operatingCloseTime
+        )
+      : '',
+    operatingOpenTime,
+    operatingCloseTime,
     holidayCalendarId: normalizeHolidayCalendarId(planSnapshot.holidayCalendarId, HOLIDAY_CALENDAR_NONE),
     disabledHolidayRuleIds: normalizeDisabledHolidayRuleIds(planSnapshot.disabledHolidayRuleIds),
     customHolidays: normalizeCustomHolidays(planSnapshot.customHolidays),
     holidayScheduleMode: normalizeHolidayScheduleMode(planSnapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
-    requirementMethod: normalizePlanRequirementMethod(planSnapshot.requirementMethod),
+    channelType,
+    serviceGoal,
+    requirementMethod: normalizeRequirementMethodForChannel(resolvePlanRequirementMethod(planSnapshot), channelType),
     demandSource: createPlanDemandSource(planSnapshot.demandSource),
     nextYearOpening: createNextYearOpening(planSnapshot.nextYearOpening),
     createdAt: planSnapshot.createdAt || timestamp,
@@ -368,25 +384,33 @@ export const normalizePlanningGroup = (draftGroup, timestamp = new Date().toISOS
     Math.round(toNumber(defaults.serviceLevelThresholdSeconds, DEFAULT_GROUP_SERVICE_LEVEL_THRESHOLD_SECONDS)),
     1
   )
+  const channelType = normalizeStaffingChannel(snapshot.channelType, STAFFING_CHANNEL_VOICE)
+  const serviceGoal = resolveChannelServiceGoal({
+    ...snapshot,
+    serviceLevelPercent: snapshot.serviceLevelPercent ?? defaultServiceLevelPercent,
+    serviceLevelThresholdSeconds: snapshot.serviceLevelThresholdSeconds ?? defaultServiceLevelThresholdSeconds
+  }, channelType)
 
   return {
     id: snapshot.id || createEntityId('group'),
     name: snapshot.name?.trim() || 'Staffing Group',
+    channelType,
+    serviceGoal,
     operatingWeekdays: normalizeWeekdays(snapshot.operatingWeekdays ?? defaultOperatingWeekdays),
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, defaultPaidHoursPerDay), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, defaultOccupancyPercent), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, defaultAdherencePercent), 1)),
-    serviceLevelPercent: Math.min(100, Math.max(toNumber(snapshot.serviceLevelPercent, defaultServiceLevelPercent), 1)),
-    serviceLevelThresholdSeconds: Math.max(
-      Math.round(toNumber(snapshot.serviceLevelThresholdSeconds, defaultServiceLevelThresholdSeconds)),
-      1
-    ),
+    serviceLevelPercent: serviceGoal.targetPercent,
+    serviceLevelThresholdSeconds: channelType === STAFFING_CHANNEL_VOICE
+      ? Math.max(Math.round(serviceGoal.threshold), 1)
+      : defaultServiceLevelThresholdSeconds,
     holidayCalendarId: normalizeGroupHolidayCalendarId(snapshot.holidayCalendarId, GROUP_HOLIDAY_CALENDAR_INHERIT),
     holidayScheduleMode: normalizeHolidayScheduleMode(snapshot.holidayScheduleMode, HOLIDAY_SCHEDULE_CLOSED),
     actuals: resolvePlanningGroupActuals(snapshot),
     intraday: createPlanningGroupIntraday(
       resolvePlanningGroupIntraday(snapshot, {
         center: {
+          operatingScheduleMode: defaults.operatingScheduleMode,
           operatingOpenTime: defaults.operatingOpenTime,
           operatingCloseTime: defaults.operatingCloseTime
         }
@@ -455,12 +479,20 @@ export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toIS
   const normalizedHolidayProfiles = Array.isArray(holidayProfiles) && holidayProfiles.length
     ? normalizeCenterHolidayProfiles(holidayProfiles)
     : migrateLegacyHolidayProfiles(snapshot)
+  const operatingOpenTime = normalizeOperatingTime(snapshot.operatingOpenTime)
+  const operatingCloseTime = normalizeOperatingTime(snapshot.operatingCloseTime)
+  const operatingScheduleMode = normalizeOperatingScheduleMode(
+    snapshot.operatingScheduleMode,
+    operatingOpenTime,
+    operatingCloseTime
+  )
   const normalizedGroups = Array.isArray(groups)
     ? groups.map((group) =>
         normalizePlanningGroup(group, timestamp, {
           operatingWeekdays: snapshot.operatingWeekdays,
-          operatingOpenTime: snapshot.operatingOpenTime,
-          operatingCloseTime: snapshot.operatingCloseTime,
+          operatingScheduleMode,
+          operatingOpenTime,
+          operatingCloseTime,
           defaultPaidHoursPerDay: snapshot.defaultPaidHoursPerDay,
           defaultOccupancyPercent: snapshot.defaultOccupancyPercent,
           defaultAdherencePercent: snapshot.defaultAdherencePercent,
@@ -479,8 +511,9 @@ export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toIS
     timezone: snapshot.timezone?.trim() || getDefaultTimeZone(),
     holidayProfiles: normalizedHolidayProfiles,
     operatingWeekdays: normalizeWeekdays(snapshot.operatingWeekdays),
-    operatingOpenTime: normalizeOperatingTime(snapshot.operatingOpenTime),
-    operatingCloseTime: normalizeOperatingTime(snapshot.operatingCloseTime),
+    operatingScheduleMode,
+    operatingOpenTime,
+    operatingCloseTime,
     defaultPaidHoursPerDay: Math.max(toNumber(snapshot.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(snapshot.defaultOccupancyPercent, 90), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(snapshot.defaultAdherencePercent, 95), 1)),
@@ -490,14 +523,6 @@ export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toIS
     updatedAt: snapshot.updatedAt || timestamp,
     groups: sortPlanningGroups(normalizedGroups)
   }
-}
-
-const readStorage = (storageKey) => {
-  return readJsonFromLocalStorage(storageKey, null)
-}
-
-const writeCenters = (centers, scope = 'default') => {
-  writeJsonToLocalStorage(buildScopedStorageKey(CENTERS_STORAGE_KEY, scope), sortPlanningCenters(centers))
 }
 
 export const migrateLegacyPlansToCenters = (legacyPlans) => {
@@ -536,6 +561,8 @@ export const createPlanningCenterDraft = (overrides = {}) => {
     holidayProfiles,
     ...centerSnapshot
   } = snapshot
+  const operatingOpenTime = normalizeOperatingTime(overrides?.operatingOpenTime)
+  const operatingCloseTime = normalizeOperatingTime(overrides?.operatingCloseTime)
 
   return {
     ...centerSnapshot,
@@ -543,8 +570,13 @@ export const createPlanningCenterDraft = (overrides = {}) => {
     timezone: overrides?.timezone ?? getDefaultTimeZone(),
     holidayProfiles: normalizeCenterHolidayProfiles(holidayProfiles),
     operatingWeekdays: normalizeWeekdays(overrides?.operatingWeekdays),
-    operatingOpenTime: normalizeOperatingTime(overrides?.operatingOpenTime),
-    operatingCloseTime: normalizeOperatingTime(overrides?.operatingCloseTime),
+    operatingScheduleMode: normalizeOperatingScheduleMode(
+      overrides?.operatingScheduleMode,
+      operatingOpenTime,
+      operatingCloseTime
+    ),
+    operatingOpenTime,
+    operatingCloseTime,
     defaultPaidHoursPerDay: Math.max(toNumber(overrides?.defaultPaidHoursPerDay, 8), 0),
     defaultOccupancyPercent: Math.min(100, Math.max(toNumber(overrides?.defaultOccupancyPercent, 90), 1)),
     defaultAdherencePercent: Math.min(100, Math.max(toNumber(overrides?.defaultAdherencePercent, 95), 1)),
@@ -561,10 +593,13 @@ export const createPlanningGroupDraft = (overrides = {}) => {
   const { actualsYears: _legacyActualsYears, ...groupSnapshot } = snapshot
   const intraday = resolvePlanningGroupIntraday(snapshot, {
     center: {
+      operatingScheduleMode: snapshot.operatingScheduleMode,
       operatingOpenTime: snapshot.operatingOpenTime,
       operatingCloseTime: snapshot.operatingCloseTime
     }
   })
+  const channelType = normalizeStaffingChannel(snapshot.channelType, STAFFING_CHANNEL_VOICE)
+  const serviceGoal = resolveChannelServiceGoal(snapshot, channelType)
 
   return {
     name: '',
@@ -578,61 +613,10 @@ export const createPlanningGroupDraft = (overrides = {}) => {
     holidayScheduleMode: HOLIDAY_SCHEDULE_CLOSED,
     actuals: resolvePlanningGroupActuals(snapshot),
     intraday: createPlanningGroupIntraday(intraday),
-    ...groupSnapshot
+    ...groupSnapshot,
+    channelType,
+    serviceGoal
   }
-}
-
-export const loadPlanningCenters = (scope = 'default') => {
-  const scopedStorageKey = buildScopedStorageKey(CENTERS_STORAGE_KEY, scope)
-  const storedCenters = readStorage(scopedStorageKey)
-
-  if (Array.isArray(storedCenters)) {
-    const normalizedCenters = sortPlanningCenters(
-      storedCenters.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
-    )
-    try {
-      writeCenters(normalizedCenters, scope)
-    } catch {
-      // Keep the workspace readable even if we cannot rewrite the normalized local copy.
-    }
-    return normalizedCenters
-  }
-
-  const sharedCenters = scope !== 'default' ? readStorage(CENTERS_STORAGE_KEY) : null
-
-  if (Array.isArray(sharedCenters) && sharedCenters.length) {
-    const normalizedCenters = sortPlanningCenters(
-      sharedCenters.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
-    )
-    try {
-      writeCenters(normalizedCenters, scope)
-    } catch {
-      // Keep the workspace readable even if we cannot copy shared data into the scoped key.
-    }
-    return normalizedCenters
-  }
-
-  const legacyPlans = readStorage(LEGACY_PLANS_STORAGE_KEY)
-  const migratedCenters = migrateLegacyPlansToCenters(legacyPlans)
-
-  if (migratedCenters.length) {
-    try {
-      writeCenters(migratedCenters, scope)
-    } catch {
-      // Keep migrated centers available in memory even if persistence is unavailable.
-    }
-  }
-
-  return migratedCenters
-}
-
-export const persistPlanningCenters = (centers, scope = 'default') => {
-  const normalizedCenters = sortPlanningCenters(
-    centers.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
-  )
-
-  writeCenters(normalizedCenters, scope)
-  return normalizedCenters
 }
 
 export const findPlanningCenter = (centers, centerId) =>
@@ -712,9 +696,15 @@ export const upsertPlanningGroup = (centers, centerId, draftGroup) => {
       const nextGroups = existingIndex >= 0 ? [...center.groups] : [...center.groups, nextGroup]
 
       if (existingIndex >= 0) {
+        const existingChannelType = normalizeStaffingChannel(nextGroups[existingIndex].channelType)
+        const channelChanged = nextGroup.channelType !== existingChannelType
         nextGroups[existingIndex] = {
           ...nextGroups[existingIndex],
           ...nextGroup,
+          channelType: existingChannelType,
+          serviceGoal: channelChanged
+            ? resolveChannelServiceGoal(nextGroups[existingIndex], existingChannelType)
+            : nextGroup.serviceGoal,
           actuals: nextGroup.actuals || nextGroups[existingIndex].actuals || createPlanningGroupActuals(),
           plans: nextGroups[existingIndex].plans || nextGroup.plans || []
         }

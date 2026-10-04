@@ -21,15 +21,19 @@ import {
   getGroupPlans,
   summarizeGroup
 } from '../../planningSummary'
-import { computeMonthlyRecords, summarizePlanRecords } from '../../planner/demandModel'
+import { summarizePlanRecords } from '../../planner/demandModel'
 import { buildAnnualPlanningRollup } from '../../planner/annualPlanningRollup'
 import { resolvePlanningGroupActuals } from '../../planner/groupActuals'
+import { describeOperatingWindow } from '../../planner/operatingSchedule'
+import { resolvePlanRequirementRecords } from '../../planner/planRequirementRecords'
 import { computeStaffingRecords, summarizeStaffingRecords } from '../../planner/staffingModel'
 import { buildPlanUpdateActualsState, buildPlanUpdateName } from '../../planner/planUpdates'
+import { getPlanRequirementMethodLabel } from '../../planner/shared'
 import {
-  getPlanRequirementMethodLabel,
-  normalizePlanRequirementMethod
-} from '../../planner/shared'
+  describeChannelServiceGoal,
+  getStaffingChannelLabel,
+  isEmailChannel
+} from '../../planner/channels'
 import { currentYear, yearOptions } from '../monthlyPlanBuilder/shared'
 
 const formatWhole = (value) =>
@@ -44,6 +48,10 @@ const formatNumber = (value, digits = 1) =>
   }).format(value || 0)
 
 const toFiniteNumberOrNull = (value) => {
+  if (value == null || value === '') {
+    return null
+  }
+
   const number = Number(value)
   return Number.isFinite(number) ? number : null
 }
@@ -82,37 +90,17 @@ const formatMonthStartLabel = (value) => {
   }).format(new Date(Number(match[1]), Number(match[2]) - 1, 1))
 }
 
-const buildComputedMonthlyRecords = (plan, center) => {
-  const planningYear = Number(plan?.planningYear) || currentYear
-  const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
-
-  return computeMonthlyRecords({
-    planningYear,
-    requirementMethod: plan?.requirementMethod || plan?.summary?.requirementMethod,
-    demandSource: plan?.demandSource,
-    operatingWeekdays:
-      Array.isArray(plan?.operatingWeekdays) && plan.operatingWeekdays.length
-        ? plan.operatingWeekdays
-        : Array.isArray(center?.operatingWeekdays) && center.operatingWeekdays.length
-          ? center.operatingWeekdays
-          : [1, 2, 3, 4, 5],
-    holidayCalendarId: holidaySnapshot.holidayCalendarId,
-    disabledHolidayRuleIds: holidaySnapshot.disabledHolidayRuleIds,
-    customHolidays: holidaySnapshot.customHolidays,
-    holidayScheduleMode: plan?.holidayScheduleMode,
-    presenceMonths: Array.isArray(plan?.presenceMonths) ? plan.presenceMonths : [],
-    randomDefaults: plan?.randomDefaults || {},
-    useMonthlyRandomOverrides: Boolean(plan?.useMonthlyRandomOverrides),
-    randomMonths: Array.isArray(plan?.randomMonths) ? plan.randomMonths : [],
-    planMonths: Array.isArray(plan?.planMonths) ? plan.planMonths : []
-  })
-}
-
-const buildPlanRowMetrics = (plan, center) => {
+const buildPlanRowMetrics = (plan, center, group) => {
   const summary = plan?.summary || {}
-  const monthlyRecords = buildComputedMonthlyRecords(plan, center)
-  const computedPlanSummary = monthlyRecords.length ? summarizePlanRecords(monthlyRecords) : {}
   const planningYear = Number(plan?.planningYear) || currentYear
+  const requirementState = resolvePlanRequirementRecords({
+    plan,
+    center,
+    group,
+    planningYear
+  })
+  const monthlyRecords = requirementState.records
+  const computedPlanSummary = monthlyRecords.length ? summarizePlanRecords(monthlyRecords) : {}
   const holidaySnapshot = resolvePlanHolidaySnapshot(plan, center, planningYear)
   const staffingRecords = monthlyRecords.length
     ? computeStaffingRecords(
@@ -131,12 +119,16 @@ const buildPlanRowMetrics = (plan, center) => {
       )
     : []
   const computedStaffingSummary = staffingRecords.length ? summarizeStaffingRecords(staffingRecords) : {}
-  const requirementMethod = normalizePlanRequirementMethod(summary.requirementMethod || plan?.requirementMethod)
-  const peakDayRequiredHeadcount = chooseDemandMetric(
+  const requirementMethod = requirementState.requirementMethod
+  const useResolvedRequirementMetric = (savedValue, resolvedValue) =>
+    requirementState.usesIntradayErlang
+      ? toFiniteNumberOrNull(resolvedValue)
+      : chooseDemandMetric(savedValue, resolvedValue)
+  const peakDayRequiredHeadcount = useResolvedRequirementMetric(
     summary.peakDayRequiredHeadcount,
     computedPlanSummary.peakDayMonth?.peakDayRequiredHeadcount
   )
-  const peakRequiredHeadcount = chooseDemandMetric(
+  const peakRequiredHeadcount = useResolvedRequirementMetric(
     summary.peakRequiredHeadcount,
     computedPlanSummary.peakMonth?.requiredHeadcount
   )
@@ -144,13 +136,16 @@ const buildPlanRowMetrics = (plan, center) => {
   return {
     requirementMethod,
     requirementMethodLabel: getPlanRequirementMethodLabel(requirementMethod),
+    requirementStatus: requirementState.status,
+    requirementWarning: requirementState.requirementsAvailable ? '' : requirementState.message,
+    requirementsAvailable: requirementState.requirementsAvailable,
     annualContacts: chooseDemandMetric(summary.annualContacts, computedPlanSummary.annualContacts),
     annualWorkloadHours: chooseDemandMetric(summary.annualWorkloadHours, computedPlanSummary.annualWorkloadHours),
-    totalRequiredStaffHours: chooseDemandMetric(
+    totalRequiredStaffHours: useResolvedRequirementMetric(
       summary.annualRequiredStaffHours,
       computedPlanSummary.annualRequiredStaffHours
     ),
-    averageTotalRequiredHeadcount: chooseDemandMetric(
+    averageTotalRequiredHeadcount: useResolvedRequirementMetric(
       summary.averageRequiredHeadcount,
       computedPlanSummary.averageRequiredHeadcount
     ),
@@ -159,10 +154,12 @@ const buildPlanRowMetrics = (plan, center) => {
       summary.endingFrontlineHeadcount,
       computedStaffingSummary.endingFrontlineHeadcount
     ),
-    averageGapToRequirement: chooseSummaryMetric(
-      summary.averageGapToRequirement,
-      computedStaffingSummary.averageGapToRequirement
-    )
+    averageGapToRequirement: requirementState.usesIntradayErlang
+      ? toFiniteNumberOrNull(computedStaffingSummary.averageGapToRequirement)
+      : chooseSummaryMetric(
+          summary.averageGapToRequirement,
+          computedStaffingSummary.averageGapToRequirement
+        )
   }
 }
 
@@ -356,7 +353,7 @@ export function usePlanningCenterWorkspace({
   )
 
   const buildPlanRow = (plan) => {
-      const rowMetrics = buildPlanRowMetrics(plan, center.value)
+      const rowMetrics = buildPlanRowMetrics(plan, center.value, selectedGroup.value)
       const planType = plan.planType === PLAN_TYPE_UPDATE ? PLAN_TYPE_UPDATE : PLAN_TYPE_BUDGET
       const planStatus = normalizePlanStatus(plan.status, planType)
       const isDraftBudget = planType === PLAN_TYPE_BUDGET && planStatus === PLAN_STATUS_DRAFT
@@ -374,6 +371,9 @@ export function usePlanningCenterWorkspace({
         actualsThroughBadge: actualsThroughLabel ? `Actuals through ${actualsThroughLabel}` : '',
         annualContacts: rowMetrics.annualContacts || getAnnualContacts(plan),
         requirementMethodLabel: rowMetrics.requirementMethodLabel,
+        requirementStatus: rowMetrics.requirementStatus,
+        requirementWarning: rowMetrics.requirementWarning,
+        requirementsAvailable: rowMetrics.requirementsAvailable,
         annualWorkloadHours: rowMetrics.annualWorkloadHours,
         totalRequiredStaffHours: rowMetrics.totalRequiredStaffHours,
         averageTotalRequiredHeadcount: rowMetrics.averageTotalRequiredHeadcount,
@@ -453,11 +453,7 @@ export function usePlanningCenterWorkspace({
       .join(', ') || 'No operating days selected'
   )
 
-  const operatingHoursLabel = computed(() =>
-    center.value?.operatingOpenTime && center.value?.operatingCloseTime
-      ? `${center.value.operatingOpenTime} to ${center.value.operatingCloseTime}`
-      : 'Hours not set'
-  )
+  const operatingHoursLabel = computed(() => describeOperatingWindow(center.value))
 
   const selectedGroupDefaults = computed(() => {
     if (!selectedGroup.value) {
@@ -465,14 +461,18 @@ export function usePlanningCenterWorkspace({
     }
 
     return [
+      { label: 'Channel', value: getStaffingChannelLabel(selectedGroup.value.channelType) },
       { label: 'Operating Days', value: operatingDayLabel.value },
       { label: 'Hours of Operation', value: operatingHoursLabel.value },
       { label: 'Paid Hours / Day', value: formatNumber(selectedGroup.value.defaultPaidHoursPerDay, 1) },
-      { label: 'Default Occupancy', value: `${formatNumber(selectedGroup.value.defaultOccupancyPercent, 1)}%` },
+      {
+        label: isEmailChannel(selectedGroup.value.channelType) ? 'Productive Utilization' : 'Default Occupancy',
+        value: `${formatNumber(selectedGroup.value.defaultOccupancyPercent, 1)}%`
+      },
       { label: 'Default Adherence', value: `${formatNumber(selectedGroup.value.defaultAdherencePercent, 1)}%` },
       {
-        label: 'Service Level',
-        value: `${formatNumber(selectedGroup.value.serviceLevelPercent, 1)}% in ${formatWhole(selectedGroup.value.serviceLevelThresholdSeconds)}s`
+        label: isEmailChannel(selectedGroup.value.channelType) ? 'Response Target' : 'Service Level',
+        value: describeChannelServiceGoal(selectedGroup.value)
       }
     ]
   })

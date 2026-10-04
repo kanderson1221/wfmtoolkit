@@ -358,12 +358,12 @@ of those two `depends_on` lists.
 - actuals lifecycle, variances, actualization, update creation, and current-plan
   lineage
 
-## Phase 7: Scenario Comparison, Call-Center Reporting, And Recovery
+## Phase 7: Reporting, Scenario Comparison, Intraday Floors, And Recovery
 
-- `PLAN-012` through `PLAN-013`
+- `PLAN-012` through `PLAN-014`
 - `DATA-003` through `DATA-005`
-- call-center reporting, transactional autosave, backup, restore, clear, and
-  migration
+- call-center reporting, intraday staffing floors, transactional autosave,
+  backup, restore, clear, and migration
 
 # Required Supporting Artifacts
 
@@ -482,6 +482,7 @@ and the unverified risk.
 
 - `PLAN-012` Call-center annual rollup and reporting
 - `PLAN-013` Saved annual plan scenario comparison
+- `PLAN-014` Minimum headcount per open interval
 
 ## Data Persistence
 

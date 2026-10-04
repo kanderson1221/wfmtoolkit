@@ -4,9 +4,14 @@ import {
 } from './groupIntraday'
 import { createPlanningGroupActuals } from './groupActuals'
 import { createPlanOpenDayChecker } from './planOpenDays'
+import {
+  OPERATING_SCHEDULE_ALWAYS_OPEN,
+  normalizeOperatingScheduleMode,
+  validateConfiguredOperatingWindow
+} from './operatingSchedule'
 import { MONTH_LABELS, toNumber } from './shared'
 
-const ERLANG_RESULTS_VERSION = 1
+const ERLANG_RESULTS_VERSION = 2
 
 const hashText = (text) => {
   let hash = 2166136261
@@ -33,6 +38,7 @@ export const buildPlannerIntradayErlangInputSignature = (rows = []) => {
     serviceLevelGoal: row.serviceLevelGoal,
     serviceLevelThreshold: row.serviceLevelThreshold,
     maxOccupancy: row.maxOccupancy,
+    minimumHeadcount: row.minimumHeadcount,
     averageCustomerPatience: row.averageCustomerPatience ?? null
   }))
   const serialized = JSON.stringify(signatureRows)
@@ -161,6 +167,7 @@ export const buildPlannerIntradayErlangPayload = ({
   holidayCalendarId,
   disabledHolidayRuleIds,
   customHolidays,
+  operatingScheduleMode,
   operatingOpenTime,
   operatingCloseTime,
   serviceLevelPercent,
@@ -179,11 +186,24 @@ export const buildPlannerIntradayErlangPayload = ({
     }
   }
 
-  if (!/^\d{2}:\d{2}$/.test(String(operatingOpenTime || '').trim()) || !/^\d{2}:\d{2}$/.test(String(operatingCloseTime || '').trim())) {
+  const resolvedOperatingScheduleMode = normalizeOperatingScheduleMode(
+    operatingScheduleMode,
+    operatingOpenTime,
+    operatingCloseTime
+  )
+  const configuredWindowValidation = resolvedOperatingScheduleMode === OPERATING_SCHEDULE_ALWAYS_OPEN
+    ? { valid: true, message: '' }
+    : validateConfiguredOperatingWindow({
+        openTime: operatingOpenTime,
+        closeTime: operatingCloseTime,
+        intervalLengthMinutes: 30
+      })
+
+  if (!configuredWindowValidation.valid) {
     return {
       rows: [],
       status: 'schedule_required',
-      message: 'Set the staffing group operating hours before running intraday Erlang.'
+      message: configuredWindowValidation.message || 'Set the staffing group operating hours before running intraday Erlang.'
     }
   }
 
@@ -202,6 +222,7 @@ export const buildPlannerIntradayErlangPayload = ({
     intraday || {},
     {
       center: {
+        operatingScheduleMode: resolvedOperatingScheduleMode,
         operatingOpenTime,
         operatingCloseTime
       }
@@ -288,9 +309,19 @@ export const buildPlannerIntradayErlangPayload = ({
         intervalLengthMinutes: intervalProfile.intervalLengthMinutes || 30,
         serviceLevelGoal: resolvedServiceLevelPercent,
         serviceLevelThreshold: resolvedServiceLevelThresholdSeconds,
-        maxOccupancy: maxOccupancyPercent
+        maxOccupancy: maxOccupancyPercent,
+        minimumHeadcount: intervalProfile.minimumHeadcount
       }))
     })
+
+  const uniqueIntervalStarts = new Set(payloadRows.map((row) => row.intervalStart))
+  if (uniqueIntervalStarts.size !== payloadRows.length) {
+    return {
+      rows: [],
+      status: 'invalid_intervals',
+      message: 'The operating window generated duplicate interval timestamps. Review the call center hours and intraday profile.'
+    }
+  }
 
   if (!payloadRows.length) {
     return {
@@ -454,6 +485,11 @@ export const mergeIntradayErlangMonthlyRecords = (
         ? record.workloadHours
         : Math.max(toNumber(monthlyOutput.workloadHours, 0), 0),
       erlangStaffedHours,
+      minimumHeadcount: Math.max(toNumber(monthlyOutput.minimumHeadcount, 0), 0),
+      minimumAppliedIntervalCount: Math.max(
+        Math.round(toNumber(monthlyOutput.minimumAppliedIntervalCount, 0)),
+        0
+      ),
       weightedOccupancyPercent: monthlyOutput.weightedOccupancyPercent == null
         ? null
         : toNumber(monthlyOutput.weightedOccupancyPercent, null),

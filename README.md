@@ -1,12 +1,15 @@
 # WFMToolkit
 
-Vue 3 + Vite frontend with a FastAPI backend that runs Erlang C/Erlang A staffing calculations.
+Vue 3 + Vite frontend with a native Rust backend for Erlang C/Erlang A,
+batch processing, and staffing planning. A private Python worker retains Prophet
+forecasting during its separate migration.
 
 ## Requirements
 
 - Node.js 20+
 - npm 10+
-- Python 3.11+
+- Rust 1.99+ (Cargo on PATH)
+- Python 3.11+ for the forecasting worker
 
 ## Run locally
 
@@ -16,7 +19,10 @@ For the usual local development path, run:
 npm run dev:app
 ```
 
-This command installs missing frontend dependencies, creates the backend virtual environment when needed, installs missing backend dependencies, and starts both FastAPI and Vite.
+This command installs missing frontend dependencies, prepares the forecasting
+virtual environment, builds the Rust server, and starts Rust on port 8000,
+the private forecasting worker on port 8001, and Vite on port 5173.
+Restart it after Rust source changes.
 
 Manual setup is still available when you want to run each service separately:
 
@@ -34,19 +40,25 @@ source .venv/bin/activate
 pip install -r backend/requirements.txt
 ```
 
-3. Start the FastAPI server:
+3. Start the private forecasting worker:
 
 ```bash
-uvicorn backend.app.main:app --reload
+uvicorn backend.app.forecast_service:app --host 127.0.0.1 --port 8001
 ```
 
-4. In a second terminal, start the Vue dev server:
+4. In a second terminal, start the Rust API:
+
+```bash
+HOST=127.0.0.1 PORT=8000 cargo run --manifest-path rust/Cargo.toml --locked -p wfm-server
+```
+
+5. In a third terminal, start the Vue dev server:
 
 ```bash
 npm run dev
 ```
 
-5. Open the local URL shown in your terminal (typically `http://localhost:5173`).
+6. Open the local URL shown in your terminal (typically `http://localhost:5173`).
 
 ## Build for production
 
@@ -69,26 +81,32 @@ This repo includes a Render Blueprint config in `render.yaml` and a multi-stage 
 
 ### Runtime behavior
 
-- FastAPI serves API routes under `/api/*`.
+- The Rust executable serves API routes under `/api/*`.
 - The built Vue app is served from the same service/domain.
 - Health check endpoint: `/api/health`.
+- The container supervisor starts the private Python forecasting worker on
+  loopback, waits for readiness, then starts Rust. It stops both processes if
+  either exits. Python does not receive Erlang or planner requests.
+- Server configuration and migration details: [Rust backend](rust/server/README.md).
 
 ## Current scope
 
-- Frontend (Vue 3) + backend API (FastAPI)
+- Frontend (Vue 3) + backend API (Rust/Axum)
 - Hash-routed pages:
   - `#erlang-c` single-interval calculator
   - `#csv-batch` CSV Staffing File Processor
 - Form posts input values to the calculation API endpoint
 - API returns calculated staffing summary and scenario rows
 - Batch API validates the full CSV and only processes when all rows are valid
-- Planning and forecasting data currently stay in local browser storage. A future iteration will move that local storage into Dexie/IndexedDB.
+- Planning, forecasting, and drafts use Dexie/IndexedDB in the browser. Legacy localStorage data is migrated once; backups preserve import compatibility.
 
 ## CSV Staffing File Processor
 
 The CSV Staffing File Processor (`#csv-batch`) validates a demand file and returns an enriched export with required agents, required headcount, and core service metrics for every interval row.
 
-The workflow is all-or-nothing: if any row fails validation, no rows are processed.
+An enriched export is available only when every row is valid. JSON batch
+responses are all-or-nothing. Uploaded CSVs report successful-row summary totals
+and return an error-report download if any row is invalid.
 
 ### CSV contract
 
@@ -190,6 +208,25 @@ Value handling:
 ## Run backend tests
 
 ```bash
+cargo test --manifest-path rust/Cargo.toml --workspace --locked
+cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --locked -- -D warnings
+cargo fmt --manifest-path rust/Cargo.toml --all --check
 source .venv/bin/activate
 python -m unittest discover -s backend/tests -p "test_*.py" -v
 ```
+
+The Rust suite exercises native API contracts, numerical invariants, uploads,
+downloads, and the forecasting proxy. Python tests retain forecasting coverage
+for the private forecasting worker. Frozen Erlang reference packages retain historical numerical conformance coverage; retired Python calculator/API modules are no longer included.
+
+## Repository maintenance
+
+Rust is the only implementation of the public calculator, batch, and planner APIs.
+Historical Python numerical comparisons use the frozen reference package in
+`specs/reference-implementations/erlang`; its snapshots and the v2 contract remain intact.
+
+Landing-page screenshots and the favicon have one canonical copy in `public/`.
+Frontend tests use `fake-indexeddb` as a development dependency; Sass is not required.
+Generated Rust targets, frontend builds, Python caches, and test reports are ignored.
+These outputs can be removed and rebuilt; retain `node_modules/` and `.venv/` while
+running the local app. No dependency reinstall or Git-history rewrite is needed.

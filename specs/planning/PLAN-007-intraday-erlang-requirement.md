@@ -4,7 +4,7 @@ title: Intraday Erlang Staffing Requirement
 status: draft
 owners: []
 depends_on: [PLAN-003, PLAN-004, PLAN-005, ORG-004]
-last_reviewed: 2026-07-19
+last_reviewed: 2026-08-09
 ---
 
 # Purpose
@@ -47,6 +47,7 @@ Each calculated interval shall include:
 - service-level target and threshold
 - max occupancy
 - caller patience default or approved input
+- minimum headcount per open interval
 
 # Model Contract
 
@@ -69,8 +70,11 @@ Each calculated interval shall include:
 - Each planning interval shall calculate net required agents with Erlang C.
 - Required agents shall be the lowest whole number that satisfies both the
   service-level target and the max-occupancy constraint.
-- An interval with zero contacts shall require zero agents, have zero
-  occupancy, and have a service level of one.
+- Before an operational floor, an interval with zero contacts shall have an
+  Erlang requirement of zero agents, zero occupancy, and a service level of one.
+- When a saved minimum is greater than the Erlang requirement, final required
+  agents shall equal the minimum and queue metrics shall be recalculated at
+  that staffing level as defined by `PLAN-014`.
 - Monthly Erlang staffed hours shall equal the sum of `required agents * interval hours`.
 - Monthly workload hours shall equal source contacts times AHT.
 - Weighted occupancy and service level shall use documented weighting.
@@ -81,18 +85,21 @@ Each calculated interval shall include:
 # Normative Reference Implementation
 
 The executable numerical contract is
-[Erlang Staffing Reference Implementation](../reference-implementations/erlang/README.md),
-version `1.0.0`.
+[Native Erlang Reference Contract](../reference-implementations/erlang-v2/README.md),
+version `2.0.0`. The original
+[Python version 1.0.0](../reference-implementations/erlang/README.md) remains
+unchanged for historical comparisons.
 
-- The four source snapshots listed in `SOURCE_SHA256SUMS` shall remain
+- The source snapshots and vectors listed in `SOURCE_SHA256SUMS` shall remain
   byte-for-byte unchanged for this reference version.
-- `reference_erlang.staff_for_interval` defines Erlang C and Erlang A interval
+- `reference_erlang/` defines Erlang C and Erlang A interval
   behavior.
-- `reference_erlang.plan_intraday_monthly_rows` defines the planning adapter and
+- `reference_adapter/planner.rs` defines the planning adapter and
   interval, daily, and monthly output behavior.
 - `test_vectors.json` defines representative golden results.
-- `tests/test_reference_erlang.py` defines executable conformance and source
-  integrity checks.
+- The frozen Rust engine tests, native server API tests against
+  `api_vectors.json`, and `tests/test_integrity.py` define executable conformance
+  and source integrity checks.
 - An implementation may import the package, vendor it, or port it.
 - A port shall pass all supplied vectors within the tolerance enforced by the
   conformance suite.
@@ -101,6 +108,14 @@ version `1.0.0`.
   normative.
 - A numerical change requires a new reference package version, updated vectors,
   and review of this specification.
+
+Version 2 adopts analytical Erlang A waiting probabilities, overflow-safe
+stationary distributions, unit-scale-invariant Erlang C stability, consistent
+finite-input validation, and explicit convergence/resource errors. Default
+limits are 100,000 agents and 1,000,000 stationary states. Erlang C's abandonment
+metric intentionally remains a separate Erlang A estimate at the same demand
+and staffing. The planner continues to use Erlang C. Metric denominators,
+minimum feasible staffing, staffing floors, and weighting are unchanged.
 
 # Execution Behavior
 
@@ -185,5 +200,6 @@ results.
 # Implementation Traceability
 
 - `src/planner/intradayErlang.js`
-- `backend/app/planner.py`
+- `rust/server/src/planner.rs`
 - `src/composables/monthlyPlanBuilder/usePlannerIntradayErlang.js`
+- `PLAN-014` Minimum headcount per open interval

@@ -349,7 +349,11 @@ const clearAhtMonthOverrides = () => {
         :component-sections="componentSections"
         :embedded-insight-cards="embeddedInsightCards"
         :format-number="formatNumber"
-      />
+      >
+        <template #before-accuracy>
+          <slot name="before-accuracy" />
+        </template>
+      </ForecastContactsResultsView>
     </template>
 
     <template v-else-if="activeResultTab === 'aht'">

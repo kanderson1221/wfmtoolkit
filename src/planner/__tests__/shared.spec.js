@@ -3,6 +3,7 @@ import {
   createTrainingClass,
   getCurrentCalendarYear,
   isValidTrainingClassHireCount,
+  resolvePlanRequirementMethod,
   resolvePlanningYear
 } from '../shared'
 
@@ -33,5 +34,22 @@ describe('planner shared year helpers', () => {
     expect(isValidTrainingClassHireCount('')).toBe(false)
     expect(isValidTrainingClassHireCount(null)).toBe(false)
     expect(isValidTrainingClassHireCount(Number.NaN)).toBe(false)
+  })
+})
+
+describe('plan requirement method recovery', () => {
+  it.each([
+    [{ requirementMethod: ' INTRADAY_ERLANG ' }, 'intraday_erlang'],
+    [{ requirementMethod: 'unknown', summary: { requirementMethod: 'intraday_erlang' } }, 'intraday_erlang'],
+    [{ intradayErlangResults: { version: 1 } }, 'intraday_erlang'],
+    [{ requirementMethod: 'workload_ratio', intradayErlangResults: { version: 1 } }, 'workload_ratio'],
+    [{ intraday: { intervalLengthMinutes: 30 } }, 'workload_ratio'],
+    [{}, 'workload_ratio']
+  ])('resolves %j as %s', (plan, expected) => {
+    expect(resolvePlanRequirementMethod(plan)).toBe(expected)
+  })
+
+  it('allows callers to distinguish missing metadata from an explicit method', () => {
+    expect(resolvePlanRequirementMethod({}, null)).toBeNull()
   })
 })

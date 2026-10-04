@@ -41,6 +41,7 @@ const sampleCenters = [
       }
     ],
     operatingWeekdays: [1, 2, 3, 4, 5],
+    operatingScheduleMode: 'configured_hours',
     operatingOpenTime: '08:00',
     operatingCloseTime: '17:00',
     defaultPaidHoursPerDay: 8,
@@ -62,6 +63,7 @@ const sampleCenters = [
         holidayScheduleMode: 'closed',
         intraday: {
           intervalLengthMinutes: 30,
+          minimumHeadcount: 2,
           intervalRatios: [
             { startTime: '08:00', ratioPercent: 30 },
             { startTime: '08:30', ratioPercent: 20 },
@@ -89,12 +91,16 @@ const sampleCenters = [
             id: 'plan-1',
             name: '2026 Plan',
             planningYear: 2026,
+            operatingScheduleMode: 'configured_hours',
             operatingWeekdays: [1, 2, 3, 4, 5],
             holidayCalendarId: 'none',
             disabledHolidayRuleIds: [],
             customHolidays: [],
             holidayScheduleMode: 'closed',
-            presenceMonths: Array.from({ length: 12 }, () => ({ paidHoursPerDay: 8 })),
+            presenceMonths: Array.from({ length: 12 }, () => ({
+              paidHoursPerDay: 8,
+              monthlyPaidHoursPerFte: 173.33
+            })),
             randomDefaults: {
               occupancyPercent: 90,
               adherencePercent: 95
@@ -282,6 +288,9 @@ describe('localDataStore', () => {
     const loadedDraft = await loadPlannerDraftFromDexie('user-1:plan:plan-1')
 
     expect(loadedCenters[0].groups[0].plans[0].planningYear).toBe(2026)
+    expect(loadedCenters[0].operatingScheduleMode).toBe('configured_hours')
+    expect(loadedCenters[0].groups[0].plans[0].operatingScheduleMode).toBe('configured_hours')
+    expect(loadedCenters[0].groups[0].plans[0].presenceMonths[0].monthlyPaidHoursPerFte).toBe(173.33)
     expect(loadedCenters[0].groups[0].actuals).toMatchObject({
       sourceMode: 'daily_upload',
       uploadedFileName: 'group-actuals.csv'
@@ -296,7 +305,8 @@ describe('localDataStore', () => {
       serviceLevelThresholdSeconds: 20
     })
     expect(loadedCenters[0].groups[0].intraday).toMatchObject({
-      intervalLengthMinutes: 30
+      intervalLengthMinutes: 30,
+      minimumHeadcount: 2
     })
     expect(loadedCenters[0].groups[0].intraday.intervalRatios.slice(0, 4)).toEqual([
       { startTime: '08:00', ratioPercent: 30 },
@@ -353,11 +363,11 @@ describe('localDataStore', () => {
     expect(loadedDraft).toBeNull()
   })
 
-  it('preserves an intraday Erlang plan method after Dexie save and reload', async () => {
+  it.each([true, false])('preserves an intraday Erlang plan after Dexie save and reload (explicit method: %s)', async (explicitMethod) => {
     const centers = clonePlain(sampleCenters)
     centers[0].groups[0].plans[0] = {
       ...centers[0].groups[0].plans[0],
-      requirementMethod: PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG,
+      requirementMethod: explicitMethod ? PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG : undefined,
       intradayErlangResults: {
         version: 1,
         calculatedAt: '2026-01-15T12:00:00.000Z',

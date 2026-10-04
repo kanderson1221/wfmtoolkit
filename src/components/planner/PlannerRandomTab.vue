@@ -10,9 +10,15 @@ import AppStatStrip from '../ui/AppStatStrip.vue'
 import AppStatusMessage from '../ui/AppStatusMessage.vue'
 import AppTableNumberField from '../ui/AppTableNumberField.vue'
 import { PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG } from '../../plannerModel'
+import { describeOperatingWindow } from '../../planner/operatingSchedule'
 import PlannerCopyMenu from './PlannerCopyMenu.vue'
+import { getChannelPlanningTerms } from '../../planner/channels'
 
 const props = defineProps({
+  channelType: {
+    type: String,
+    default: 'voice'
+  },
   monthlyRecords: {
     type: Array,
     required: true
@@ -38,6 +44,10 @@ const props = defineProps({
     default: 0
   },
   operatingOpenTime: {
+    type: String,
+    default: ''
+  },
+  operatingScheduleMode: {
     type: String,
     default: ''
   },
@@ -97,6 +107,7 @@ const handleOverrideModeChange = (value) => {
 }
 
 const isIntradayErlang = computed(() => props.requirementMethod === PLAN_REQUIREMENT_METHOD_INTRADAY_ERLANG)
+const channelTerms = computed(() => getChannelPlanningTerms(props.channelType))
 const sectionTitle = computed(() => isIntradayErlang.value ? 'Erlang Inputs' : 'Random/Variability')
 const continueLabel = computed(() => 'Continue to Demand Model')
 const shellMessage = computed(() =>
@@ -123,13 +134,20 @@ const operatingWindowLabel = computed(() => {
     return ''
   }
 
-  const open = String(props.operatingOpenTime || '').trim()
-  const close = String(props.operatingCloseTime || '').trim()
-  return open && close ? `${open} to ${close}` : 'Needs call center hours'
+  const label = describeOperatingWindow({
+    operatingScheduleMode: props.operatingScheduleMode,
+    operatingOpenTime: props.operatingOpenTime,
+    operatingCloseTime: props.operatingCloseTime
+  })
+  return label === 'Hours not set' ? 'Needs call center hours' : label
 })
 const intervalProfileRows = computed(() =>
   Array.isArray(props.intraday?.intervalRatios) ? props.intraday.intervalRatios : []
 )
+const minimumHeadcountLabel = computed(() => {
+  const minimumHeadcount = Math.max(Math.round(Number(props.intraday?.minimumHeadcount) || 0), 0)
+  return minimumHeadcount > 0 ? props.formatWhole(minimumHeadcount) : 'No floor'
+})
 const intradayForecastSourceLabel = computed(() => {
   if (!isIntradayErlang.value) {
     return ''
@@ -172,6 +190,11 @@ const intradaySummaryItems = computed(() => [
     meta: 'Inherited from staffing group setup'
   },
   {
+    label: 'Minimum HC / Open Interval',
+    value: minimumHeadcountLabel.value,
+    meta: 'Inherited from staffing group setup'
+  },
+  {
     label: 'Forecast Input',
     value: intradayForecastSourceLabel.value,
     meta: 'Daily contacts and monthly AHT apply in Demand Model'
@@ -180,7 +203,7 @@ const intradaySummaryItems = computed(() => [
 
 const workloadRatioSummaryItems = computed(() => [
   {
-    label: 'Occupancy',
+    label: channelTerms.value.utilizationLabel,
     value: props.formatPercent(
       props.summary.usesMonthlyOverrides
         ? props.summary.averageOccupancyPercent
@@ -215,7 +238,7 @@ const summaryItems = computed(() =>
   isIntradayErlang.value ? intradaySummaryItems.value : workloadRatioSummaryItems.value
 )
 const summaryColumns = computed(() =>
-  isIntradayErlang.value ? 'md:grid-cols-2 xl:grid-cols-6' : 'md:grid-cols-2 xl:grid-cols-5'
+  isIntradayErlang.value ? 'md:grid-cols-2 xl:grid-cols-7' : 'md:grid-cols-2 xl:grid-cols-5'
 )
 </script>
 
@@ -277,7 +300,7 @@ const summaryColumns = computed(() =>
               Staffing Group Inputs
             </strong>
             <p class="text-sm leading-6 text-slate-600">
-              Service goal, operating window, and interval mix are inherited from staffing-group setup and stay read-only here.
+              Service goal, operating window, interval mix, and minimum interval headcount are inherited from staffing-group setup and stay read-only here.
             </p>
           </div>
 
@@ -297,6 +320,10 @@ const summaryColumns = computed(() =>
               </dd>
             </div>
             <div class="grid gap-1 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5">
+              <dt class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Minimum HC / Open Interval</dt>
+              <dd class="text-sm font-semibold text-slate-900">{{ minimumHeadcountLabel }}</dd>
+            </div>
+            <div class="grid gap-1 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5">
               <dt class="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Forecast Input</dt>
               <dd class="text-sm font-semibold text-slate-900">{{ intradayForecastSourceLabel }}</dd>
             </div>
@@ -310,7 +337,7 @@ const summaryColumns = computed(() =>
 
       <div class="grid gap-3 xl:grid-cols-[minmax(0,12rem)_minmax(0,12rem)_minmax(0,1fr)] xl:items-start">
         <AppFieldGroup
-          :label="useMonthlyRandomOverrides ? 'Default Occupancy %' : 'Occupancy %'"
+          :label="useMonthlyRandomOverrides ? `Default ${channelTerms.utilizationLabel} %` : `${channelTerms.utilizationLabel} %`"
           input-id="global-occupancy"
           :help-text="useMonthlyRandomOverrides ? 'Seeds the monthly override table.' : 'Applies across the full plan year.'"
           class="xl:max-w-[12rem]"
@@ -378,7 +405,7 @@ const summaryColumns = computed(() =>
               <tr>
                 <th title="Planning month for the worksheet row.">Month</th>
                 <th title="Scheduled percentage flowing in from Step 1.">Scheduled %</th>
-                <th title="Expected monthly occupancy assumption used in the random loss build.">Occupancy %</th>
+                <th title="Expected monthly productive utilization assumption used in the random loss build.">{{ channelTerms.utilizationLabel }} %</th>
                 <th title="Expected monthly adherence assumption used in the random loss build.">Adherence %</th>
                 <th title="Adherence loss calculated as (1 - Adherence %) x Scheduled %.">Adherence Loss</th>
                 <th title="Occupancy loss calculated as (1 - Occupancy %) x (Scheduled % - Adherence Loss).">Occupancy Loss</th>
@@ -412,7 +439,7 @@ const summaryColumns = computed(() =>
                     step="0.1"
                     :min-fraction-digits="1"
                     :max-fraction-digits="1"
-                    aria-label="Occupancy percent"
+                    :aria-label="`${channelTerms.utilizationLabel} percent`"
                   />
                 </td>
                 <td>

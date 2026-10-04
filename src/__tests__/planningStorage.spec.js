@@ -1,7 +1,13 @@
+import { ensureLegacyLocalStorageMigrated, loadPlanningWorkspaceFromDexie } from '../storage/localDataStore'
 import { getCurrentCalendarYear } from '../planner/shared'
 import {
+  OPERATING_SCHEDULE_ALWAYS_OPEN,
+  OPERATING_SCHEDULE_CONFIGURED_HOURS
+} from '../planner/operatingSchedule'
+import {
   createPlanningCenterDraft,
-  loadPlanningCenters,
+  normalizePlanningGroup,
+  normalizePlanningPlan,
   PLAN_STATUS_DRAFT,
   PLAN_STATUS_FINALIZED,
   PLAN_TYPE_BUDGET,
@@ -10,6 +16,7 @@ import {
   resolveCenterHolidayProfile,
   resolvePlanHolidaySnapshot,
   setCurrentPlanningPlan,
+  upsertPlanningGroup,
   upsertPlanningPlan
 } from '../planningStorage'
 
@@ -34,6 +41,12 @@ const ensurePlanningStorageApi = () => {
     },
     removeItem(key) {
       delete backingStore[key]
+    },
+    key(index) {
+      return Object.keys(backingStore)[index] ?? null
+    },
+    get length() {
+      return Object.keys(backingStore).length
     },
     clear() {
       Object.keys(backingStore).forEach((key) => {
@@ -66,6 +79,84 @@ const clearPlanningStorage = () => {
 }
 
 describe('planningStorage', () => {
+  it.each([
+    { intradayErlangResults: { version: 1 } },
+    { summary: { requirementMethod: 'intraday_erlang' } }
+  ])('preserves legacy Erlang plans when the top-level method is missing: %j', (legacyFields) => {
+    expect(normalizePlanningPlan({ planningYear: 2026, ...legacyFields }).requirementMethod)
+      .toBe('intraday_erlang')
+  })
+
+  it('honors an explicit workload-ratio method even with old Erlang results', () => {
+    expect(normalizePlanningPlan({
+      requirementMethod: 'workload_ratio',
+      intradayErlangResults: { version: 1 }
+    }).requirementMethod).toBe('workload_ratio')
+  })
+
+  it('migrates legacy staffing groups to voice service goals', () => {
+    const group = normalizePlanningGroup({
+      name: 'Legacy Voice',
+      serviceLevelPercent: 85,
+      serviceLevelThresholdSeconds: 30
+    })
+
+    expect(group.channelType).toBe('voice')
+    expect(group.serviceGoal).toEqual({
+      targetPercent: 85,
+      threshold: 30,
+      thresholdUnit: 'seconds'
+    })
+  })
+
+  it('snapshots email channel context and rejects an Erlang requirement method', () => {
+    const plan = normalizePlanningPlan({
+      planningYear: 2027,
+      channelType: 'email',
+      serviceGoal: {
+        targetPercent: 95,
+        threshold: 8
+      },
+      requirementMethod: 'intraday_erlang'
+    })
+
+    expect(plan.channelType).toBe('email')
+    expect(plan.serviceGoal).toEqual({
+      targetPercent: 95,
+      threshold: 8,
+      thresholdUnit: 'business_hours'
+    })
+    expect(plan.requirementMethod).toBe('workload_ratio')
+  })
+
+  it('does not reinterpret an existing staffing group as another channel', () => {
+    const centers = [{
+      id: 'center-1',
+      name: 'Operations',
+      operatingWeekdays: [1, 2, 3, 4, 5],
+      groups: [{
+        id: 'group-1',
+        name: 'Voice Support',
+        channelType: 'voice',
+        serviceGoal: { targetPercent: 80, threshold: 20 },
+        plans: []
+      }]
+    }]
+
+    const nextCenters = upsertPlanningGroup(centers, 'center-1', {
+      ...centers[0].groups[0],
+      channelType: 'email',
+      serviceGoal: { targetPercent: 90, threshold: 24 }
+    })
+
+    expect(nextCenters[0].groups[0].channelType).toBe('voice')
+    expect(nextCenters[0].groups[0].serviceGoal).toEqual({
+      targetPercent: 80,
+      threshold: 20,
+      thresholdUnit: 'seconds'
+    })
+  })
+
   beforeEach(() => {
     clearPlanningStorage()
   })
@@ -157,7 +248,7 @@ describe('planningStorage', () => {
     })
   })
 
-  it('normalizes legacy saved plans as current Budget baselines', () => {
+  it('normalizes legacy saved plans as current Budget baselines', async () => {
     ensurePlanningStorageApi().setItem(
       'wfmtoolkit.callCenters.v1.default',
       JSON.stringify([
@@ -185,7 +276,8 @@ describe('planningStorage', () => {
       ])
     )
 
-    const centers = loadPlanningCenters('default')
+    await ensureLegacyLocalStorageMigrated()
+    const centers = await loadPlanningWorkspaceFromDexie('default')
     const plan = centers[0].groups[0].plans[0]
 
     expect(plan).toMatchObject({
@@ -199,6 +291,7 @@ describe('planningStorage', () => {
       sourcePlanId: '',
       actualsThroughMonth: ''
     })
+    expect(plan.operatingScheduleMode).toBe('')
   })
 
   it('persists draft budgets without converting them to finalized baselines', () => {
@@ -408,7 +501,7 @@ describe('planningStorage', () => {
     expect(nextPlans.find((plan) => plan.isCurrent)?.id).toBe('update-2')
   })
 
-  it('migrates legacy federal template centers to manual holiday rows', () => {
+  it('migrates legacy federal template centers to manual holiday rows', async () => {
     ensurePlanningStorageApi().setItem(
       'wfmtoolkit.callCenters.v1.default',
       JSON.stringify([
@@ -427,7 +520,8 @@ describe('planningStorage', () => {
       ])
     )
 
-    const centers = loadPlanningCenters('default')
+    await ensureLegacyLocalStorageMigrated()
+    const centers = await loadPlanningWorkspaceFromDexie('default')
     const activeHolidayProfile = resolveCenterHolidayProfile(centers[0], getCurrentCalendarYear())
 
     expect(centers[0]).not.toHaveProperty('defaultHolidayCalendarId')
@@ -442,9 +536,19 @@ describe('planningStorage', () => {
   it('defaults new call center drafts to Monday through Friday operating days', () => {
     expect(createPlanningCenterDraft().operatingWeekdays).toEqual([1, 2, 3, 4, 5])
     expect(createPlanningCenterDraft({ operatingWeekdays: undefined }).operatingWeekdays).toEqual([1, 2, 3, 4, 5])
+    expect(createPlanningCenterDraft().operatingScheduleMode).toBe(OPERATING_SCHEDULE_CONFIGURED_HOURS)
   })
 
-  it('migrates legacy staffing-group actuals years into one shared actuals history', () => {
+  it('migrates legacy equal operating times to explicit always-open mode', () => {
+    const draft = createPlanningCenterDraft({
+      operatingOpenTime: '00:00',
+      operatingCloseTime: '00:00'
+    })
+
+    expect(draft.operatingScheduleMode).toBe(OPERATING_SCHEDULE_ALWAYS_OPEN)
+  })
+
+  it('migrates legacy staffing-group actuals years into one shared actuals history', async () => {
     ensurePlanningStorageApi().setItem(
       'wfmtoolkit.callCenters.v1.default',
       JSON.stringify([
@@ -482,7 +586,8 @@ describe('planningStorage', () => {
       ])
     )
 
-    const centers = loadPlanningCenters('default')
+    await ensureLegacyLocalStorageMigrated()
+    const centers = await loadPlanningWorkspaceFromDexie('default')
 
     expect(centers[0].groups[0].actuals).toMatchObject({
       uploadedFileName: 'latest.csv'
