@@ -195,7 +195,6 @@ Value handling:
 ### CSV templates
 
 - `public/erlang_file_processor_template.csv`
-- (legacy) `public/erlang_batch_template.csv`
 
 ## Manual test checklist (frontend)
 

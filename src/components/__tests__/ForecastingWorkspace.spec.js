@@ -371,7 +371,7 @@ describe('ForecastingWorkspace', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows the sample template download link', async () => {
+  it('shows history upload and column mapping guidance', async () => {
     const wrapper = mount(ForecastingWorkspace, {
       props: {
         storageScope: 'forecast-download-spec'
@@ -382,15 +382,8 @@ describe('ForecastingWorkspace', () => {
     await flushUi()
     await flushUi()
 
-    const downloadLinks = [...document.body.querySelectorAll('a')]
-    expect(downloadLinks.some((link) => (link.textContent || '').includes('Download Sample Template'))).toBe(true)
-    expect(
-      downloadLinks.some(
-        (link) => link.getAttribute('href') === '/forecasting_daily_volume_sample_2022_2024.csv'
-      )
-    ).toBe(true)
-    expect(downloadLinks.some((link) => link.getAttribute('href') === '/forecasting_daily_volume_template.csv')).toBe(false)
     expect(document.body.textContent || '').toContain('Upload Daily History')
+    expect(document.body.textContent || '').toContain('Map the service date and call volume columns')
     expect(wrapper.text()).not.toContain('No historical CSV loaded yet.')
     expect(wrapper.text()).not.toContain('Time Zone')
     expect(wrapper.text()).not.toContain('Series')
@@ -1264,7 +1257,7 @@ describe('ForecastingWorkspace', () => {
             planningYear: 2027,
             groupName: 'Consumer Voice'
           },
-          uploadedFileName: 'forecasting_daily_volume_sample_2022_2024.csv',
+          uploadedFileName: 'history-2022-2024.csv',
           uploadedHeaders: ['service_date', 'call_volume'],
           uploadedRows: staleHistoryRows.map((row) => ({
             service_date: row.ds,

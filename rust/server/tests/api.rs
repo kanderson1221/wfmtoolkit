@@ -12,13 +12,9 @@ use wfm_server::{app, Config};
 fn setup() -> (Router, TempDir) {
     let directory = TempDir::new().unwrap();
     let dist = directory.path().join("dist");
-    std::fs::create_dir_all(dist.join("planning-workspace")).unwrap();
+    std::fs::create_dir_all(dist.join("terms")).unwrap();
     std::fs::write(dist.join("index.html"), "<html>spa</html>").unwrap();
-    std::fs::write(
-        dist.join("planning-workspace/index.html"),
-        "<html>planning</html>",
-    )
-    .unwrap();
+    std::fs::write(dist.join("terms/index.html"), "<html>terms</html>").unwrap();
     std::fs::write(dist.join("asset.js"), "export default 1").unwrap();
     let router = app(Config {
         dist,
@@ -348,7 +344,7 @@ async fn frontend_seo_unknown_api_and_path_traversal() {
     let (router, directory) = setup();
     for (path, expected) in [
         ("/", "<html>spa</html>"),
-        ("/planning-workspace", "<html>planning</html>"),
+        ("/terms", "<html>terms</html>"),
         ("/other-route", "<html>spa</html>"),
         ("/asset.js", "export default 1"),
     ] {
@@ -419,10 +415,10 @@ async fn frontend_seo_unknown_api_and_path_traversal() {
             .to_vec(),
     )
     .unwrap();
-    assert!(xml.contains("<loc>https://example.com/planning-workspace/</loc>"));
-    for path in ["/", "/erlang-tools/", "/terms/"] {
+    for path in ["/", "/terms/"] {
         assert!(xml.contains(&format!("<loc>https://example.com{path}</loc>")));
     }
+    assert_eq!(xml.matches("<url>").count(), 2);
     assert!(xml.contains("<lastmod>"));
 }
 

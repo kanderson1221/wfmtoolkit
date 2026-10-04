@@ -8,7 +8,7 @@ import {
 describe('forecast source artifacts', () => {
   it('rejects imported daily forecasts that do not match the selected planning window', () => {
     const state = buildImportedDailySourceStateFromText({
-      fileName: 'forecasting_daily_volume_sample_2022_2024.csv',
+      fileName: 'history-2022-2024.csv',
       text: [
         'date,forecast,aht_seconds',
         '2022-01-01,100,300',

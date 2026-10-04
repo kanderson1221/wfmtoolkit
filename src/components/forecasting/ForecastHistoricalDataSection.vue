@@ -1,7 +1,6 @@
 <script setup>
 import { computed } from 'vue'
 
-import AppButton from '../ui/AppButton.vue'
 import AppFileDropzone from '../ui/AppFileDropzone.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import AppTableShell from '../ui/AppTableShell.vue'
@@ -74,14 +73,6 @@ const definitionRows = computed(() => [
             Upload a replacement CSV to change the mapped columns.
           </p>
         </div>
-        <AppButton
-          size="sm"
-          variant="primary"
-          href="/forecasting_daily_volume_sample_2022_2024.csv"
-          download
-        >
-          Download Sample Template
-        </AppButton>
       </div>
 
       <div class="overflow-x-auto">

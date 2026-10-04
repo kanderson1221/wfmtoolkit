@@ -415,7 +415,7 @@ fn xml(value: &str) -> String {
 
 async fn sitemap(State(state): State<AppState>) -> Response {
     let mut entries = String::new();
-    for path in ["/", "/planning-workspace/", "/erlang-tools/", "/terms/"] {
+    for path in ["/", "/terms/"] {
         let relative = if path == "/" {
             "index.html".into()
         } else {
