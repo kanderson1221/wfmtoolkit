@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { onScopeDispose, ref, watch } from 'vue'
 
 import { forecastingRepository } from '../../forecastingRepository'
 import {
@@ -24,6 +24,8 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
   const saveError = ref('')
   const saveStatusMessage = ref('')
   const activeScope = ref('default')
+  let loadVersion = 0
+  onScopeDispose(() => { loadVersion += 1 })
 
   const resolveProjectSeed = () => clonePlain(resolveMaybeRef(options.projectSeed) || {})
   const resolveFallbackScopes = () => {
@@ -51,6 +53,7 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
   }
 
   const loadProjectsForScope = async (scope = 'default', scopeOptions = {}) => {
+    const version = ++loadVersion
     activeScope.value = String(scope || 'default')
     isLoadingProjects.value = true
     loadError.value = ''
@@ -67,6 +70,8 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
         ...(await forecastingRepository.loadWorkspaceResult(fallbackScope))
       }))
     )
+
+    if (version !== loadVersion) return
 
     workspaceProjects.value = Array.isArray(workspaceResult.projects) ? workspaceResult.projects : []
     fallbackProjects.value = mergeForecastProjectCollections(
@@ -106,6 +111,9 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
   }
 
   const saveProjectSnapshot = async (projectSnapshot, successMessage = 'Forecast saved.') => {
+    if (isLoadingProjects.value) return false
+    const scope = activeScope.value
+    const version = loadVersion
     saveError.value = ''
     saveStatusMessage.value = ''
 
@@ -117,7 +125,8 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
         })
       }
       const nextProjects = forecastingRepository.saveProject(workspaceProjects.value, projectToSave)
-      const persistedProjects = await forecastingRepository.persistWorkspace(nextProjects, activeScope.value)
+      const persistedProjects = await forecastingRepository.persistWorkspace(nextProjects, scope, workspaceProjects.value)
+      if (version !== loadVersion) return false
       workspaceProjects.value = Array.isArray(persistedProjects) ? persistedProjects : nextProjects
       savedProjects.value = mergeForecastProjectCollections(workspaceProjects.value, fallbackProjects.value)
       const savedProject = forecastingRepository.findProject(savedProjects.value, projectToSave.id)
@@ -125,6 +134,7 @@ export const useForecastProjectLibrary = (storageScope, options = {}) => {
       saveStatusMessage.value = successMessage
       return true
     } catch (error) {
+      if (version !== loadVersion) return false
       console.error('Unable to save forecasting project.', error)
       saveError.value = `Unable to save the forecast. ${describeBrowserStorageError(
         error,

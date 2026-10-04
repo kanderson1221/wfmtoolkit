@@ -102,7 +102,7 @@ console.log('Starting WFM Toolkit...')
 console.log('Backend:  http://127.0.0.1:8000')
 console.log('Frontend: http://127.0.0.1:5173')
 
-start(uvicornCommand, ['backend.app.forecast_service:app', '--reload', '--host', '127.0.0.1', '--port', '8001'], 'forecasting')
+start(uvicornCommand, ['backend.app.forecast_service:app', '--reload', '--host', '127.0.0.1', '--port', '8001', '--timeout-graceful-shutdown', '5'], 'forecasting')
 start(rustServer, [], 'backend', {
   env: { ...process.env, HOST: '127.0.0.1', PORT: '8000' }
 })

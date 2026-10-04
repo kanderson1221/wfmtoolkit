@@ -421,7 +421,7 @@ describe('usePlanningWorkspace', () => {
     await workspace.handleSaveCenter({ name: 'North America Operations' })
 
     expect(planningRepository.saveCenter).toHaveBeenCalled()
-    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
+    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1', expect.any(Array))
     expect(window.location.hash).toBe(buildPlanningCenterHash('center-1'))
   })
 
@@ -451,7 +451,7 @@ describe('usePlanningWorkspace', () => {
     await workspace.handleSaveGroup({ name: 'Consumer Voice' })
 
     expect(planningRepository.saveGroup).toHaveBeenCalledWith(centers, 'center-1', { name: 'Consumer Voice' })
-    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
+    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1', expect.any(Array))
     expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', getCurrentCalendarYear()))
   })
 
@@ -484,7 +484,7 @@ describe('usePlanningWorkspace', () => {
 
     expect(didSave).toBe(true)
     expect(planningRepository.savePlan).toHaveBeenCalledWith(centers, 'center-1', 'group-1', { planningYear: 2026 })
-    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1')
+    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'user-1', expect.any(Array))
     expect(window.location.hash).toBe(buildPlanningGroupHash('center-1', 'group-1', 2026, { tab: 'plans' }))
   })
 
@@ -726,7 +726,7 @@ describe('usePlanningWorkspace', () => {
     await workspace.loadCentersForScope()
     await workspace.handleSaveCenter({ name: 'North America Operations' })
 
-    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'default')
+    expect(planningRepository.persistWorkspace).toHaveBeenCalledWith(centers, 'default', expect.any(Array))
     expect(workspace.plannerDraftKey.value).toBe('guest:plan:new')
   })
 

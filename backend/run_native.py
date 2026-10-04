@@ -18,7 +18,7 @@ def main() -> int:
     try:
         worker = subprocess.Popen([
             sys.executable, "-m", "uvicorn", "backend.app.forecast_service:app",
-            "--host", "127.0.0.1", "--port", "8001", "--workers", "1",
+            "--host", "127.0.0.1", "--port", "8001", "--workers", "1", "--timeout-graceful-shutdown", "5",
         ])
         processes.append(worker)
         deadline = time.monotonic() + 90

@@ -53,7 +53,9 @@ to temporary files. Downloads expire after one hour; cleanup occurs on uploads
 and downloads. Failed uploads and abandoned temporary uploads are removed by
 RAII. Files are local to one service instance, as in the previous backend.
 
-Admission limits apply before JSON parsing, and calculation limits apply until
+Admission limits apply before JSON parsing. Upload admission is separate from
+calculation capacity, and uploads have a deadline for receiving and writing bytes.
+The calculation slot is acquired after the file has arrived. Calculation limits apply until
 the blocking worker actually finishes, even if the client disconnects. Busy
 requests return 503. Health and downloads remain independent of calculation
 capacity. Rows execute sequentially within each job; independent requests may
@@ -68,6 +70,8 @@ execute concurrently up to the configured limit.
 | `WFM_DOWNLOAD_DIR` | system temp + `wfmtoolkit_file_processor` | Local download files |
 | `WFMTOOLKIT_SITE_URL` | `https://www.wfmtoolkit.com` | Canonical SEO URLs |
 | `WFM_COMPUTE_JOBS` | `1` | Concurrent calculation jobs, 1–64 |
+| `WFM_UPLOAD_JOBS` | `1` | Concurrent upload requests, 1–8; independent of compute slots |
+| `WFM_UPLOAD_TIMEOUT_SECONDS` | `60` | Upload receive/write deadline, 1–600 seconds; exceeded uploads return 408 |
 | `WFM_MAX_UPLOAD_ROWS` | `25000` | Existing CSV row limit; configurable for larger datasets |
 | `WFM_FORECAST_URL` | `http://127.0.0.1:8001` | Private forecasting worker |
 | `RUST_LOG` | server and HTTP logs | Rust logging filter |
@@ -78,13 +82,35 @@ stationary states per calculation; see the engine README for numerical bounds.
 The single-job default keeps memory predictable on the current small hosting
 plan. Raise it only after measuring concurrent workloads on the target host.
 
-## Forecasting migration boundary
+## Private forecasting boundary
 
 `backend.app.forecast_service` exposes only forecasting and readiness. It binds
 to loopback in the container. Prophet/pandas remain there; Rust forwards the
 forecasting request and preserves its status and JSON. Forecast fits are limited
 to one at a time in both the proxy and worker, with a 600-second proxy timeout.
-The Python guard remains held if the proxy disconnects during a fit.
+The API process loads only lightweight request validation; each Prophet fit runs
+in a separate process. On POSIX hosts, timeout/cancellation stops its whole process
+group, including CmdStan children. The guard remains held until job cleanup finishes.
+Private job input/output files are deleted after each request. A fit includes
+model fitting, prediction, holdout evaluation, and result serialization in its deadline.
+
+| Forecast variable | Default | Limit |
+| --- | --- | --- |
+| `WFM_FORECAST_TIMEOUT_SECONDS` | `540` | Job deadline, 1–540 seconds; timeout returns 503 |
+| `WFM_FORECAST_MAX_HISTORY_ROWS` | `10000` | Daily history rows |
+| `WFM_FORECAST_MAX_FOURIER_ORDER` | `30` | Order for each seasonality |
+| `WFM_FORECAST_MAX_TOTAL_FOURIER_ORDER` | `100` | Sum of enabled seasonality orders |
+| `WFM_FORECAST_MAX_MODEL_CELLS` | `2000000` | Estimated history/future rows times feature columns |
+| `WFM_FORECAST_MAX_MCMC_SAMPLES` | `1000` | Sampling count |
+| `WFM_FORECAST_MAX_CHANGEPOINTS` | `100` | Automatic/manual changepoints |
+
+Complexity limits are positive integer settings, enforced before a fit starts.
+The feature budget includes seasonality, holiday windows, changepoints, and a
+conservative built-in holiday allowance. Custom seasonalities are limited to 10,
+custom holidays to 1,000, and holiday windows to 30 days in each direction.
+Nonfinite numerical inputs are rejected. Raise resource limits only after
+measuring the target host's memory and compute capacity.
+
 Unavailability returns 503. The retired Python public API, batch, and planner
 modules have been removed. Regression coverage for the public API runs against
 Rust using recorded expected responses.

@@ -498,7 +498,7 @@ export const usePlannerForecastDemandSource = ({
       name: createSavedForecastName(workspaceProjects, baseProject)
     }
     const nextProjects = forecastingRepository.saveProject(workspaceProjects, projectToSave)
-    await forecastingRepository.persistWorkspace(nextProjects, forecastStorageScope.value)
+    await forecastingRepository.persistWorkspace(nextProjects, forecastStorageScope.value, workspaceProjects)
     await loadForecastProjects()
 
     const savedProject = nextProjects.find((project) => project.id === projectToSave.id) || projectToSave

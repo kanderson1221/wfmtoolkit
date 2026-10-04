@@ -81,7 +81,7 @@ export const usePlanningWorkspace = ({ currentRoute, currentUser, storageScope }
 
   const persistAndSetCenters = async (centers) => {
     try {
-      const nextCenters = (await planningRepository.persistWorkspace(centers, storageScope.value)) || centers
+      const nextCenters = (await planningRepository.persistWorkspace(centers, storageScope.value, planningCenters.value)) || centers
       planningCenters.value = Array.isArray(nextCenters) ? nextCenters : centers
       workspaceSaveError.value = ''
       return true

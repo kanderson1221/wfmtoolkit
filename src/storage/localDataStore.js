@@ -1,4 +1,6 @@
+import Dexie from 'dexie'
 import { BrowserStorageError } from './browserStorage'
+import { mergeWorkspaceChanges } from './workspaceChanges'
 import { wfmDexie, WFM_LOCAL_DATA_SCHEMA_VERSION } from './wfmDexie'
 import {
   CENTERS_STORAGE_KEY,
@@ -62,7 +64,7 @@ const emitLocalDataChanged = () => {
 }
 
 const createStorageError = (message, cause, code = 'storage_write_failed', storageKey = '') =>
-  new BrowserStorageError(message, {
+  cause instanceof BrowserStorageError ? cause : new BrowserStorageError(message, {
     code,
     storageKey,
     cause
@@ -106,6 +108,31 @@ const buildForecastRunRowId = (runId, kind, rowIndex) => `${runId}:${kind}:${row
 const buildForecastComponentRowId = (runId, componentType, rowIndex) => `${runId}:${componentType}:${rowIndex}`
 
 const getScopeRows = async (table, scope) => table.where('scope').equals(scope).toArray()
+
+const PLANNING_TABLES = {
+  centerRows: 'centers', centerHolidayProfileRows: 'centerHolidayProfiles',
+  centerCustomHolidayRows: 'centerCustomHolidays', staffingGroupRows: 'staffingGroups',
+  planRows: 'plans', planPresenceMonthRows: 'planPresenceMonths',
+  planRandomMonthRows: 'planRandomMonths', planDemandMonthRows: 'planDemandMonths',
+  planStaffingMonthRows: 'planStaffingMonths', planTrainingClassRows: 'planTrainingClasses'
+}
+const FORECAST_TABLES = {
+  forecastRows: 'forecasts', customSeasonalityRows: 'forecastCustomSeasonalities',
+  customHolidayRows: 'forecastCustomHolidays', historyRows: 'forecastHistoryRows',
+  forecastRunRows: 'forecastRuns', forecastRunDailyRows: 'forecastRunDailyRows',
+  forecastRunMonthlyRows: 'forecastRunMonthlyRows', forecastRunComponentRows: 'forecastRunComponentRows'
+}
+
+const writeChangedRows = async (before, after, tables) => {
+  for (const [key, tableName] of Object.entries(tables)) {
+    const oldRows = new Map(before[key].map((row) => [row.id, JSON.stringify(row)]))
+    const newIds = new Set(after[key].map((row) => row.id))
+    const deleted = before[key].filter((row) => !newIds.has(row.id)).map((row) => [row.scope, row.id])
+    const changed = after[key].filter((row) => oldRows.get(row.id) !== JSON.stringify(row))
+    if (deleted.length) await wfmDexie.table(tableName).bulkDelete(deleted)
+    if (changed.length) await wfmDexie.table(tableName).bulkPut(changed)
+  }
+}
 
 const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
   const normalizedScope = normalizeScope(scope)
@@ -1198,7 +1225,10 @@ export const loadPlanningWorkspaceFromDexie = async (scope = DEFAULT_SCOPE) => {
   const normalizedScope = normalizeScope(scope)
 
   try {
-    await ensureLocalDataReady()
+    if (!Dexie.currentTransaction) {
+      await ensureLocalDataReady()
+      return await wfmDexie.transaction('r', Object.values(PLANNING_TABLES).map((name) => wfmDexie.table(name)), () => loadPlanningWorkspaceFromDexie(normalizedScope))
+    }
     const [
       centerRows,
       centerHolidayProfileRows,
@@ -1240,8 +1270,9 @@ export const loadPlanningWorkspaceFromDexie = async (scope = DEFAULT_SCOPE) => {
   }
 }
 
-export const persistPlanningWorkspaceToDexie = async (centers, scope = DEFAULT_SCOPE) => {
+export const persistPlanningWorkspaceToDexie = async (centers, scope = DEFAULT_SCOPE, baseline = []) => {
   const normalizedScope = normalizeScope(scope)
+  const expected = clonePlain(baseline)
   const normalizedCenters = sortPlanningCenters(
     (Array.isArray(centers) ? centers : []).map((center) =>
       normalizePlanningCenter(center, center.updatedAt || center.createdAt || nowIso())
@@ -1250,7 +1281,7 @@ export const persistPlanningWorkspaceToDexie = async (centers, scope = DEFAULT_S
 
   try {
     await ensureLocalDataReady()
-    await wfmDexie.transaction(
+    const saved = await wfmDexie.transaction(
       'rw',
       wfmDexie.centers,
       wfmDexie.centerHolidayProfiles,
@@ -1264,11 +1295,24 @@ export const persistPlanningWorkspaceToDexie = async (centers, scope = DEFAULT_S
       wfmDexie.planStaffingMonths,
       wfmDexie.planTrainingClasses,
       async () => {
-        await writePlanningWorkspaceRows(normalizedCenters, normalizedScope)
+        const current = await loadPlanningWorkspaceFromDexie(normalizedScope)
+        const merged = mergeWorkspaceChanges(normalizedCenters, expected, current, ['groups', 'plans'])
+        await writeChangedRows(flattenPlanningWorkspace(current, normalizedScope), flattenPlanningWorkspace(merged, normalizedScope), PLANNING_TABLES)
+        const retainedPlans = new Set(merged.flatMap((center) => center.groups.flatMap((group) => group.plans.map((plan) => plan.id))))
+        for (const center of current) {
+          for (const group of center.groups) {
+            for (const plan of group.plans) {
+              if (!retainedPlans.has(plan.id)) {
+                await wfmDexie.planActualMonths.where('[scope+planId]').equals([normalizedScope, plan.id]).delete()
+              }
+            }
+          }
+        }
+        return loadPlanningWorkspaceFromDexie(normalizedScope)
       }
     )
     emitLocalDataChanged()
-    return normalizedCenters
+    return saved
   } catch (error) {
     throw createStorageError('Unable to save planning data in this browser.', error)
   }
@@ -1278,7 +1322,10 @@ export const loadForecastWorkspaceFromDexie = async (scope = DEFAULT_SCOPE) => {
   const normalizedScope = normalizeScope(scope)
 
   try {
-    await ensureLocalDataReady()
+    if (!Dexie.currentTransaction) {
+      await ensureLocalDataReady()
+      return await wfmDexie.transaction('r', Object.values(FORECAST_TABLES).map((name) => wfmDexie.table(name)), () => loadForecastWorkspaceFromDexie(normalizedScope))
+    }
     const [
       forecastRows,
       customSeasonalityRows,
@@ -1314,8 +1361,9 @@ export const loadForecastWorkspaceFromDexie = async (scope = DEFAULT_SCOPE) => {
   }
 }
 
-export const persistForecastWorkspaceToDexie = async (projects, scope = DEFAULT_SCOPE) => {
+export const persistForecastWorkspaceToDexie = async (projects, scope = DEFAULT_SCOPE, baseline = []) => {
   const normalizedScope = normalizeScope(scope)
+  const expected = clonePlain(baseline)
   const normalizedProjects = sortForecastProjects(
     (Array.isArray(projects) ? projects : []).map((project) =>
       normalizeForecastProject(project, project.updatedAt || project.createdAt || nowIso(), projects)
@@ -1324,7 +1372,7 @@ export const persistForecastWorkspaceToDexie = async (projects, scope = DEFAULT_
 
   try {
     await ensureLocalDataReady()
-    await wfmDexie.transaction(
+    const saved = await wfmDexie.transaction(
       'rw',
       wfmDexie.forecasts,
       wfmDexie.forecastCustomSeasonalities,
@@ -1335,11 +1383,14 @@ export const persistForecastWorkspaceToDexie = async (projects, scope = DEFAULT_
       wfmDexie.forecastRunMonthlyRows,
       wfmDexie.forecastRunComponentRows,
       async () => {
-        await writeForecastWorkspaceRows(normalizedProjects, normalizedScope)
+        const current = await loadForecastWorkspaceFromDexie(normalizedScope)
+        const merged = mergeWorkspaceChanges(normalizedProjects, expected, current)
+        await writeChangedRows(flattenForecastWorkspace(current, normalizedScope), flattenForecastWorkspace(merged, normalizedScope), FORECAST_TABLES)
+        return loadForecastWorkspaceFromDexie(normalizedScope)
       }
     )
     emitLocalDataChanged()
-    return normalizedProjects
+    return saved
   } catch (error) {
     throw createStorageError('Unable to save forecasts in this browser.', error)
   }

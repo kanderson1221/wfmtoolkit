@@ -1,8 +1,8 @@
 # WFMToolkit
 
 Vue 3 + Vite frontend with a native Rust backend for Erlang C/Erlang A,
-batch processing, and staffing planning. A private Python worker retains Prophet
-forecasting during its separate migration.
+batch processing, and staffing planning. A private Python worker runs Prophet
+forecasting in isolated jobs with resource limits and an execution deadline.
 
 ## Requirements
 

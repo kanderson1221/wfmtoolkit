@@ -4,85 +4,15 @@ from dataclasses import dataclass
 from importlib import resources
 import math
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import pandas as pd
-from pydantic import BaseModel, Field
+from .forecast_models import ForecastModelConfig, ForecastRunRequest
 
 try:
     from prophet import Prophet
 except Exception:  # pragma: no cover - exercised via runtime environment checks
     Prophet = None
-
-
-class ForecastHistoryRow(BaseModel):
-    ds: str = Field(min_length=1)
-    y: float = Field(ge=0)
-    cap: float | None = Field(default=None, ge=0)
-    floor: float | None = Field(default=None, ge=0)
-    holidayLabel: str = ""
-
-
-class SeasonalityConfig(BaseModel):
-    enabled: bool = True
-    fourierOrder: int = Field(default=3, ge=1)
-    priorScale: float = Field(default=10, gt=0)
-
-
-class MonthlySeasonalityConfig(SeasonalityConfig):
-    periodDays: float = Field(default=30.5, gt=0)
-
-
-class CustomSeasonalityConfig(BaseModel):
-    name: str = Field(min_length=1)
-    periodDays: float = Field(gt=0)
-    fourierOrder: int = Field(ge=1)
-    priorScale: float = Field(gt=0)
-    mode: Literal["additive", "multiplicative"] = "additive"
-
-
-class CustomHolidayConfig(BaseModel):
-    name: str = Field(min_length=1)
-    date: str = Field(min_length=1)
-    lowerWindow: int = 0
-    upperWindow: int = 0
-    priorScale: float = Field(default=10, gt=0)
-
-
-class ForecastModelConfig(BaseModel):
-    growth: Literal["linear", "logistic", "flat"] = "linear"
-    defaultCap: float | None = Field(default=None, ge=0)
-    defaultFloor: float | None = Field(default=0, ge=0)
-    changepointPriorScale: float = Field(default=0.05, gt=0)
-    changepointRange: float = Field(default=0.8, gt=0, le=1)
-    changepointCount: int = Field(default=25, ge=0)
-    manualChangepoints: list[str] = Field(default_factory=list)
-    seasonalityMode: Literal["additive", "multiplicative"] = "additive"
-    weeklySeasonality: SeasonalityConfig = Field(default_factory=SeasonalityConfig)
-    yearlySeasonality: SeasonalityConfig = Field(
-        default_factory=lambda: SeasonalityConfig(enabled=True, fourierOrder=10, priorScale=10)
-    )
-    monthlySeasonality: MonthlySeasonalityConfig = Field(
-        default_factory=lambda: MonthlySeasonalityConfig(enabled=False, periodDays=30.5, fourierOrder=5, priorScale=10)
-    )
-    builtInHolidayCountry: str = ""
-    holidaysPriorScale: float = Field(default=10, gt=0)
-    customSeasonalities: list[CustomSeasonalityConfig] = Field(default_factory=list)
-    customHolidays: list[CustomHolidayConfig] = Field(default_factory=list)
-    intervalWidth: float = Field(default=0.8, gt=0, lt=1)
-    mcmcSamples: int = Field(default=0, ge=0)
-    holdoutDays: int = Field(default=60, ge=0)
-
-
-class ForecastRunRequest(BaseModel):
-    timezone: str = "America/New_York"
-    forecastHorizonDays: int = Field(default=365, ge=0, le=730)
-    planningYear: int | None = Field(default=None, ge=2000, le=2100)
-    forecastType: Literal["budget"] | None = None
-    coverageStartDate: str = ""
-    coverageEndDate: str = ""
-    history: list[ForecastHistoryRow] = Field(min_length=1)
-    modelConfig: ForecastModelConfig = Field(default_factory=ForecastModelConfig)
 
 
 @dataclass

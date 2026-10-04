@@ -31,8 +31,8 @@ For user-facing terminology, follow [DATA_LABELING.md](DATA_LABELING.md).
 When making frontend decisions, use this priority order:
 1. User request
 2. This `AGENTS.md`
-3. [FRONTEND_STANDARDS.md](/Users/kevinanderson/Desktop/wfmtoolkit/FRONTEND_STANDARDS.md)
-4. Existing shared wrapper layer in [src/components/ui](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/ui)
+3. [FRONTEND_STANDARDS.md](FRONTEND_STANDARDS.md)
+4. Existing shared wrapper layer in [src/components/ui](src/components/ui)
 5. Existing app patterns already used on current pages
 
 If those sources conflict, prefer the higher item.
@@ -42,8 +42,8 @@ If those sources conflict, prefer the higher item.
 - Vue 3 with `<script setup>`
 - PrimeVue in `unstyled` mode only
 - Tailwind CSS v4
-- Shared styling entrypoint: [src/tailwind.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/tailwind.css)
-- Shared UI wrappers: [src/components/ui](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/ui)
+- Shared styling entrypoint: [src/tailwind.css](src/tailwind.css)
+- Shared UI wrappers: [src/components/ui](src/components/ui)
 
 PrimeVue is used for behavior and accessibility primitives.
 Tailwind is used for layout and visual styling.
@@ -54,7 +54,7 @@ Feature pages should compose wrappers instead of styling PrimeVue components ad 
 ### 1. Do not import PrimeVue directly in feature pages
 
 Allowed:
-- files in [src/components/ui](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/ui)
+- files in [src/components/ui](src/components/ui)
 
 Not allowed:
 - feature pages under `src/components/`
@@ -109,7 +109,7 @@ Do not create or reintroduce classes like:
 Shared styling should come from:
 - Tailwind utilities in the component
 - wrapper components
-- focused shared CSS layers in [src/styles](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles)
+- focused shared CSS layers in [src/styles](src/styles)
 
 ### 4. Use native tables for planner worksheets
 
@@ -147,25 +147,25 @@ Every new or changed screen should keep:
 
 Use these directories intentionally:
 
-- [src/components/ui](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/ui)
+- [src/components/ui](src/components/ui)
   Shared UI primitives only
 
-- [src/components/planning](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/planning)
+- [src/components/planning](src/components/planning)
   Call-center and staffing-group list/detail pages
 
-- [src/components/planner](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/planner)
+- [src/components/planner](src/components/planner)
   Planner-specific shell pieces, tables, dialogs, and charts
 
-- [src/components/calculators](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/calculators)
+- [src/components/calculators](src/components/calculators)
   Calculator-specific feature components
 
-- [src/composables](/Users/kevinanderson/Desktop/wfmtoolkit/src/composables)
+- [src/composables](src/composables)
   UI orchestration and page-level state management
 
-- [src/planner](/Users/kevinanderson/Desktop/wfmtoolkit/src/planner)
+- [src/planner](src/planner)
   Pure planner/business logic modules
 
-- [src/styles](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles)
+- [src/styles](src/styles)
   Focused shared style layers only
 
 ## Preferred Change Strategy
@@ -177,6 +177,17 @@ When implementing new work:
 4. Push non-UI logic into composables or pure modules when a file starts doing too much
 
 Do not solve a system problem with a one-off page patch if a shared primitive is the right fix.
+
+## Architecture And Data Safety
+
+- Rust owns public HTTP, Erlang, CSV processing, and staffing calculations. Keep numerical logic in `rust/erlang` independent of HTTP and filesystem operations; adapters and file handling belong in `rust/server`.
+- Python owns private Prophet forecasting. Keep it on loopback and run fits in isolated processes with an execution deadline that stops the process and its children. A proxy timeout alone is insufficient.
+- Ordinary saves update changed records, not an entire stored workspace. Pass the unmodified loaded baseline to repository saves; compare it with current records inside the same transaction. Reject conflicting edits and preserve unrelated changes. Whole-workspace replacement is for explicit backup restore or legacy migration.
+- Load related database rows in one read transaction so a workspace is a consistent snapshot.
+- Async work must capture its scope, record identity, and input snapshot before starting. Apply results only to that context and input version. Cancel requests when their context ends, ignore late responses, and never automatically retry a computation POST.
+- Bound input sizes, model complexity, execution duration, upload duration, concurrency, and temporary-file retention. Receiving uploads must use capacity separate from calculation workers. Describe configurable limits in the current runtime README.
+- Split modules by responsibility when a change becomes difficult to reason about. Avoid arbitrary line limits, generic frameworks, and abstractions added solely to shorten files.
+- Prefer browser scrolling for dense worksheets. Fixed-height panes are appropriate for compact selectors; do not trap large worksheets in nested scroll areas.
 
 ## Specific Guidance For New Features
 
@@ -237,6 +248,10 @@ Also run this when navigation, dialogs, or major flows changed:
 - `npm run test:e2e`
 
 If one of those cannot be run, say so clearly in the final response.
+
+For backend changes, run Rust formatting, Clippy, and relevant workspace tests; run Python forecasting tests when that boundary changes. Check executable startup when process supervision or deployment changes.
+
+Keep focused numerical, API contract, persistence/conflict, and critical browser-flow coverage. Add a regression for a concrete defect; avoid duplicate assertions across layers and permanent one-time benchmarks. Documentation-only changes need link/content checks, not a full application test run.
 
 ## Anti-Patterns To Avoid
 

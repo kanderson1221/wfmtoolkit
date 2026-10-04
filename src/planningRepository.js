@@ -28,8 +28,8 @@ export const createPlanningRepository = () => ({
   findGroupByPlanId: findPlanningGroupByPlanId,
   findPlan: findPlanningPlan,
   loadWorkspace: async (scope = GUEST_WORKSPACE_SCOPE) => loadPlanningWorkspaceFromDexie(normalizeScope(scope)),
-  persistWorkspace: async (centers, scope = GUEST_WORKSPACE_SCOPE) =>
-    persistPlanningWorkspaceToDexie(centers, normalizeScope(scope)),
+  persistWorkspace: async (centers, scope = GUEST_WORKSPACE_SCOPE, baseline = []) =>
+    persistPlanningWorkspaceToDexie(centers, normalizeScope(scope), baseline),
   saveCenter: upsertPlanningCenter,
   deleteCenter: removePlanningCenter,
   saveGroup: upsertPlanningGroup,

@@ -480,6 +480,7 @@ watch(
       </AppStatusMessage>
 
       <ForecastingWorkbench
+        v-if="!isLoadingProjects"
         v-model:project="currentProject"
         v-model:active-result-tab="activeResultTab"
         :validation-messages="validationMessages"
@@ -511,13 +512,14 @@ watch(
     </div>
 
     <ForecastCreateDialog
-      v-if="props.enableSourceKindCreation"
+      v-if="!isLoadingProjects && props.enableSourceKindCreation"
       v-model:visible="createDialogOpen"
       @close="createDialogOpen = false"
       @select="handleCreateProjectFromSourceKind"
     />
 
     <ForecastProjectDialog
+      v-if="!isLoadingProjects"
       v-model:visible="projectDialogOpen"
       :projects="projectSummaries"
       :current-project-id="projectDialogCurrentId"
@@ -527,6 +529,7 @@ watch(
     />
 
     <ForecastCandidateComparisonDialog
+      v-if="!isLoadingProjects"
       v-model:visible="comparisonDialogOpen"
       :projects="savedProjects"
       :current-project-id="projectDialogCurrentId"
@@ -534,6 +537,7 @@ watch(
     />
 
     <ForecastHistoryModal
+      v-if="!isLoadingProjects"
       v-model:visible="historyModalOpen"
       :project="currentProject"
       @apply="handleApplyHistoryImport"
@@ -541,6 +545,7 @@ watch(
     />
 
     <ForecastImportDailyModal
+      v-if="!isLoadingProjects"
       v-model:visible="importedDailyModalOpen"
       :project="getForecastProjectSourceKind(currentProject) === FORECAST_SOURCE_IMPORTED_DAILY ? currentProject : buildProjectSeedForSourceKind(FORECAST_SOURCE_IMPORTED_DAILY)"
       :replacement-dependencies="importedDailyReplacementDependencies"
@@ -550,6 +555,7 @@ watch(
     />
 
     <ForecastMonthlyEntryModal
+      v-if="!isLoadingProjects"
       v-model:visible="monthlyForecastModalOpen"
       :project="getForecastProjectSourceKind(currentProject) === FORECAST_SOURCE_MANUAL_MONTHLY ? currentProject : buildProjectSeedForSourceKind(FORECAST_SOURCE_MANUAL_MONTHLY)"
       @apply="handleApplyManualMonthly"

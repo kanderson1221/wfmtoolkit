@@ -1,7 +1,8 @@
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import {
   canForecastProjectRun,
+  clonePlain,
   FORECAST_HORIZON_PRESETS,
   createEmptyForecastResults,
   createForecastHoliday,
@@ -24,7 +25,8 @@ import {
 } from '../forecasting/shared'
 import {
   buildForecastRunInputSignature,
-  buildForecastPayload
+  buildForecastPayload,
+  resolveMaybeRef
 } from './forecasting/forecastWorkspaceHelpers'
 import { useForecastProjectLibrary } from './forecasting/useForecastProjectLibrary'
 import {
@@ -153,6 +155,13 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
   const isRunningForecast = ref(false)
   const runError = ref('')
   const activeResultTab = ref('daily')
+  let activeRun = null
+
+  const cancelRun = () => {
+    activeRun?.controller.abort()
+    activeRun = null
+    isRunningForecast.value = false
+  }
 
   const {
     savedProjects,
@@ -176,6 +185,9 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       activeResultTab.value = 'daily'
     }
   })
+
+  watch([() => currentProject.value, () => resolveMaybeRef(storageScope), isLoadingProjects], cancelRun, { flush: 'sync' })
+  onBeforeUnmount(cancelRun)
 
   const handleHistoryFileSelect = async (event) => {
     const input = event?.target
@@ -243,6 +255,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
   }
 
   const runForecast = async () => {
+    if (activeRun || isLoadingProjects.value) return false
     runError.value = ''
     saveStatusMessage.value = ''
     saveError.value = ''
@@ -257,6 +270,13 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       return false
     }
 
+    const snapshot = clonePlain(currentProject.value)
+    const run = {
+      project: currentProject.value,
+      signature: buildForecastRunInputSignature(snapshot),
+      controller: new AbortController()
+    }
+    activeRun = run
     isRunningForecast.value = true
     try {
       const response = await fetch('/api/forecasting/daily-volume/run', {
@@ -264,7 +284,8 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(buildForecastPayload(currentProject.value))
+        body: JSON.stringify(buildForecastPayload(snapshot)),
+        signal: run.controller.signal
       })
 
       if (!response.ok) {
@@ -272,10 +293,15 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       }
 
       const forecastResults = await response.json()
+      if (activeRun !== run || currentProject.value !== run.project) return false
+      if (buildForecastRunInputSignature(currentProject.value) !== run.signature) {
+        runError.value = 'Forecast settings changed while the calculation was running. Run the forecast again.'
+        return false
+      }
       const normalizedResults = createEmptyForecastResults({
         ...forecastResults,
         runAt: forecastResults.runAt || new Date().toISOString(),
-        inputSignature: buildForecastRunInputSignature(currentProject.value)
+        inputSignature: run.signature
       })
       currentProject.value.lastRun = normalizedResults
       currentProject.value.planningYear = forecastResults.summary?.planningYear || currentProject.value.planningYear
@@ -290,6 +316,7 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       activeResultTab.value = 'daily'
       return true
     } catch (error) {
+      if (activeRun !== run || error?.name === 'AbortError') return false
       if (error instanceof TypeError && /fetch/i.test(error.message || '')) {
         runError.value = 'Unable to reach the forecasting API. If you are running locally, make sure the backend is running on 127.0.0.1:8000.'
         return false
@@ -298,7 +325,10 @@ export const useForecastingWorkspace = (storageScope, options = {}) => {
       runError.value = error instanceof Error ? error.message : 'Unable to run forecast.'
       return false
     } finally {
-      isRunningForecast.value = false
+      if (activeRun === run) {
+        activeRun = null
+        isRunningForecast.value = false
+      }
     }
   }
 

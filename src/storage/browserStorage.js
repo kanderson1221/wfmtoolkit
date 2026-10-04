@@ -23,6 +23,8 @@ export const describeBrowserStorageError = (error, fallback = 'Unable to save lo
   }
 
   switch (error.code) {
+    case 'storage_conflict':
+      return 'Saved data changed in another tab or operation. Reload the workspace before saving again.'
     case STORAGE_ERROR_CODE_UNAVAILABLE:
       return 'Browser data storage is unavailable.'
     case STORAGE_ERROR_CODE_SERIALIZE:

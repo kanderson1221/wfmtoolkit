@@ -35,8 +35,8 @@ export const createForecastingRepository = () => ({
       return { projects: [], error }
     }
   },
-  persistWorkspace: async (projects, scope = GUEST_WORKSPACE_SCOPE) =>
-    persistForecastWorkspaceToDexie(projects, normalizeScope(scope)),
+  persistWorkspace: async (projects, scope = GUEST_WORKSPACE_SCOPE, baseline = []) =>
+    persistForecastWorkspaceToDexie(projects, normalizeScope(scope), baseline),
   saveProject: upsertForecastProject
 })
 

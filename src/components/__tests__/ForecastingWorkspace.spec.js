@@ -24,6 +24,11 @@ const flushPromises = async () => {
 const flushUi = async () => {
   await flushPromises()
   await flushPromises()
+  await vi.waitFor(() => {
+    for (const wrapper of mountedWrappers) {
+      if (wrapper.exists()) expect(wrapper.text()).not.toContain('Loading saved forecasts from this device.')
+    }
+  })
 }
 
 const mountedWrappers = []
@@ -369,6 +374,59 @@ describe('ForecastingWorkspace', () => {
   afterEach(() => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
     vi.restoreAllMocks()
+  })
+
+  it('discards a forecast when settings change while it is running', async () => {
+    let finish
+    global.fetch.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const wrapper = mount(ForecastingWorkspace, { props: { storageScope: 'stale-run', projectSeed: createLoadedProject() } })
+    mountedWrappers.push(wrapper)
+    await flushUi()
+    const workbench = wrapper.findComponent(ForecastingWorkbench)
+    await vi.waitFor(() => expect(workbench.props('project').historyRows).toHaveLength(14))
+    workbench.vm.$emit('run-forecast')
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+    workbench.props('project').modelConfig.changepointPriorScale = 0.25
+    finish({ ok: true, json: async () => createForecastRunResults() })
+    await flushUi()
+    expect(workbench.props('runError')).toContain('settings changed')
+    expect(workbench.props('project').lastRun.runAt).toBeFalsy()
+  })
+
+  it('ignores an older workspace load that finishes after a scope change', async () => {
+    const pending = new Map()
+    vi.spyOn(forecastingRepository, 'loadWorkspaceResult').mockImplementation((scope) =>
+      new Promise((resolve) => { pending.set(scope, resolve) })
+    )
+    const wrapper = mount(ForecastingWorkspace, { props: { storageScope: 'first-scope' } })
+    mountedWrappers.push(wrapper)
+    await vi.waitFor(() => expect(pending.has('first-scope')).toBe(true))
+    await wrapper.setProps({ storageScope: 'second-scope' })
+    await vi.waitFor(() => expect(pending.has('second-scope')).toBe(true))
+    pending.get('second-scope')({ projects: [{ ...createLoadedProject('second.csv'), id: 'second-project' }], error: null })
+    await flushUi()
+    findButtonByText(wrapper, 'Open Forecast').trigger('click')
+    await flushUi()
+    const latestProjects = wrapper.findComponent({ name: 'ForecastProjectDialog' }).props('projects')
+    pending.get('first-scope')({ projects: [], error: null })
+    await flushUi()
+    expect(wrapper.findComponent({ name: 'ForecastProjectDialog' }).props('projects')).toEqual(latestProjects)
+    expect(latestProjects).toHaveLength(1)
+  })
+
+  it('aborts an in-flight forecast on unmount', async () => {
+    let finish
+    global.fetch.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const wrapper = mount(ForecastingWorkspace, { props: { storageScope: 'unmounted-run', projectSeed: createLoadedProject() } })
+    await flushUi()
+    await vi.waitFor(() => expect(wrapper.findComponent(ForecastingWorkbench).props('project').historyRows).toHaveLength(14))
+    wrapper.findComponent(ForecastingWorkbench).vm.$emit('run-forecast')
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+    const signal = global.fetch.mock.calls[0][1].signal
+    wrapper.unmount()
+    expect(signal.aborted).toBe(true)
+    finish({ ok: true, json: async () => createForecastRunResults() })
+    await flushUi()
   })
 
   it('shows history upload and column mapping guidance', async () => {
@@ -725,6 +783,7 @@ describe('ForecastingWorkspace', () => {
       }
     })
     mountedWrappers.push(wrapper)
+    await flushUi()
 
     expect(wrapper.text()).not.toContain('Duplicate Forecast')
     expect(wrapper.text()).toContain('Save Forecast')
@@ -741,6 +800,7 @@ describe('ForecastingWorkspace', () => {
       }
     })
     mountedWrappers.push(wrapper)
+    await flushUi()
 
     await findButtonByText(wrapper, 'Open Forecast').trigger('click')
     await flushUi()

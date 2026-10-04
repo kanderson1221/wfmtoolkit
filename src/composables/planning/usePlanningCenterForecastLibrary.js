@@ -210,7 +210,7 @@ export function usePlanningCenterForecastLibrary({
         targetScopes.map(async (scope) => {
           const workspaceProjects = await forecastingRepository.loadWorkspace(scope)
           const remainingProjects = workspaceProjects.filter((project) => String(project?.id || '').trim() !== forecastId)
-          await forecastingRepository.persistWorkspace(remainingProjects, scope)
+          await forecastingRepository.persistWorkspace(remainingProjects, scope, workspaceProjects)
         })
       )
     } catch (error) {

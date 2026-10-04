@@ -340,6 +340,65 @@ async fn upload_limits_and_empty_files() {
 }
 
 #[tokio::test]
+async fn stalled_upload_does_not_block_compute_and_times_out() {
+    let directory = TempDir::new().unwrap();
+    let router = app(Config {
+        downloads: directory.path().join("downloads"),
+        upload_timeout_seconds: 1,
+        ..Config::default()
+    })
+    .unwrap();
+    let pending_body = Body::from_stream(futures_util::stream::pending::<
+        Result<String, std::io::Error>,
+    >());
+    let stalled_router = router.clone();
+    let stalled = tokio::spawn(async move {
+        stalled_router
+            .oneshot(
+                Request::post("/api/erlang-c/batch/file-processor/upload")
+                    .header("x-upload-filename", "slow.csv")
+                    .body(pending_body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    let (status, _) = json_request(&router, "/api/erlang-c/calculate", json!({})).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(Request::get("/api/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let response = router
+        .clone()
+        .oneshot(
+            Request::post("/api/erlang-c/batch/file-processor/upload")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(stalled.await.unwrap().status(), StatusCode::REQUEST_TIMEOUT);
+    assert_eq!(
+        std::fs::read_dir(directory.path().join("downloads"))
+            .unwrap()
+            .count(),
+        0
+    );
+    assert_eq!(
+        upload(&router, "invalid headers".into()).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+}
+
+#[tokio::test]
 async fn frontend_seo_unknown_api_and_path_traversal() {
     let (router, directory) = setup();
     for (path, expected) in [

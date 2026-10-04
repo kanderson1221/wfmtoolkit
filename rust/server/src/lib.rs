@@ -32,6 +32,8 @@ pub struct Config {
     pub site_url: String,
     pub forecast_url: String,
     pub compute_jobs: usize,
+    pub upload_jobs: usize,
+    pub upload_timeout_seconds: u64,
     pub max_upload_rows: usize,
 }
 
@@ -60,6 +62,12 @@ impl Config {
         if let Ok(value) = std::env::var("WFM_COMPUTE_JOBS") {
             config.compute_jobs = value.parse()?;
         }
+        if let Ok(value) = std::env::var("WFM_UPLOAD_JOBS") {
+            config.upload_jobs = value.parse()?;
+        }
+        if let Ok(value) = std::env::var("WFM_UPLOAD_TIMEOUT_SECONDS") {
+            config.upload_timeout_seconds = value.parse()?;
+        }
         if let Ok(value) = std::env::var("WFM_MAX_UPLOAD_ROWS") {
             config.max_upload_rows = value.parse()?;
         }
@@ -71,6 +79,12 @@ impl Config {
         if self.compute_jobs == 0 || self.compute_jobs > 64 || self.max_upload_rows == 0 {
             return Err(ApiError::invalid(
                 "WFM_COMPUTE_JOBS must be 1..64 and WFM_MAX_UPLOAD_ROWS must be positive",
+            ));
+        }
+        if !(1..=8).contains(&self.upload_jobs) || !(1..=600).contains(&self.upload_timeout_seconds)
+        {
+            return Err(ApiError::invalid(
+                "WFM_UPLOAD_JOBS must be 1..8 and WFM_UPLOAD_TIMEOUT_SECONDS must be 1..600",
             ));
         }
         for url in [&self.forecast_url, &self.site_url] {
@@ -93,6 +107,8 @@ impl Default for Config {
             site_url: "https://www.wfmtoolkit.com".into(),
             forecast_url: "http://127.0.0.1:8001".into(),
             compute_jobs: 1,
+            upload_jobs: 1,
+            upload_timeout_seconds: 60,
             max_upload_rows: uploads::MAX_UPLOAD_ROWS,
         }
     }
@@ -112,6 +128,7 @@ struct AppState {
     forecasts: Arc<Semaphore>,
     admissions: Arc<Semaphore>,
     forecast_admissions: Arc<Semaphore>,
+    uploads: Arc<Semaphore>,
     client: reqwest::Client,
 }
 
@@ -130,6 +147,7 @@ pub fn app(config: Config) -> Result<Router, ApiError> {
         forecasts: Arc::new(Semaphore::new(1)),
         admissions: Arc::new(Semaphore::new(config.compute_jobs)),
         forecast_admissions: Arc::new(Semaphore::new(1)),
+        uploads: Arc::new(Semaphore::new(config.upload_jobs)),
         config: Arc::new(config),
         client,
     };
@@ -169,7 +187,11 @@ async fn admission(
     next: axum::middleware::Next,
 ) -> Response {
     let path = request.uri().path();
-    let gates = if path == "/api/forecasting/daily-volume/run" {
+    let gates = if request.method() != axum::http::Method::POST {
+        None
+    } else if path == "/api/erlang-c/batch/file-processor/upload" {
+        Some((&state.uploads, &state.uploads))
+    } else if path == "/api/forecasting/daily-volume/run" {
         Some((&state.forecast_admissions, &state.forecasts))
     } else if request.method() == axum::http::Method::POST
         && (path.starts_with("/api/erlang-c/") || path == "/api/planner/intraday-erlang/calculate")
@@ -269,7 +291,6 @@ async fn compute_json(
 }
 
 async fn upload(State(state): State<AppState>, request: Request) -> Result<Json<Value>, ApiError> {
-    let _permit = permit(&state.jobs)?;
     let filename = request
         .headers()
         .get("x-upload-filename")
@@ -305,19 +326,34 @@ async fn upload(State(state): State<AppState>, request: Request) -> Result<Json<
     let mut file = tokio::fs::File::from_std(temporary.reopen()?);
     let mut body = request.into_body().into_data_stream();
     let mut length = 0;
-    while let Some(chunk) = body.next().await {
-        let chunk = chunk.map_err(|_| ApiError::invalid("Unable to read CSV upload."))?;
-        length += chunk.len();
-        if length > uploads::MAX_UPLOAD_BYTES {
-            return Err(ApiError(
-                StatusCode::PAYLOAD_TOO_LARGE,
-                "CSV exceeds the 50 MB upload limit.".into(),
-            ));
-        }
-        file.write_all(&chunk).await?;
-    }
-    file.flush().await?;
+    tokio::time::timeout(
+        Duration::from_secs(state.config.upload_timeout_seconds),
+        async {
+            while let Some(chunk) = body.next().await {
+                let chunk = chunk.map_err(|_| ApiError::invalid("Unable to read CSV upload."))?;
+                length += chunk.len();
+                if length > uploads::MAX_UPLOAD_BYTES {
+                    return Err(ApiError(
+                        StatusCode::PAYLOAD_TOO_LARGE,
+                        "CSV exceeds the 50 MB upload limit.".into(),
+                    ));
+                }
+                file.write_all(&chunk).await?;
+            }
+            file.flush().await?;
+            Ok::<(), ApiError>(())
+        },
+    )
+    .await
+    .map_err(|_| {
+        ApiError(
+            StatusCode::REQUEST_TIMEOUT,
+            "CSV upload exceeded its time limit. Please retry.".into(),
+        )
+    })??;
     drop(file);
+    // Receiving bytes must not occupy a calculation worker.
+    let _permit = permit(&state.jobs)?;
     let directory = state.config.downloads.clone();
     let max_rows = state.config.max_upload_rows;
     // The permit moves into the worker so a disconnected client cannot free capacity early.
@@ -501,6 +537,7 @@ mod tests {
             forecasts: Arc::new(Semaphore::new(1)),
             admissions: Arc::new(Semaphore::new(1)),
             forecast_admissions: Arc::new(Semaphore::new(1)),
+            uploads: Arc::new(Semaphore::new(1)),
             client: reqwest::Client::new(),
         };
         let (started, waiting) = tokio::sync::oneshot::channel();

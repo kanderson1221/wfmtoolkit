@@ -271,6 +271,54 @@ describe('localDataStore', () => {
     clearLegacyLocalStorage()
   })
 
+  it('preserves unrelated edits from stale tabs and only writes changed rows', async () => {
+    await persistPlanningWorkspaceToDexie(sampleCenters)
+    const first = await loadPlanningWorkspaceFromDexie()
+    const second = await loadPlanningWorkspaceFromDexie()
+    const renamed = clonePlain(first)
+    renamed[0].name = 'New center name'
+    await persistPlanningWorkspaceToDexie(renamed, 'default', first)
+    const editedPlan = clonePlain(second)
+    editedPlan[0].groups[0].plans[0].name = 'New plan name'
+    const writes = vi.spyOn(wfmDexie.planDemandMonths, 'bulkPut')
+    const saved = await persistPlanningWorkspaceToDexie(editedPlan, 'default', second)
+    expect(saved[0].name).toBe('New center name')
+    expect(saved[0].groups[0].plans[0].name).toBe('New plan name')
+    expect(writes).not.toHaveBeenCalled()
+    writes.mockRestore()
+  })
+
+  it('rejects stale edits and parent deletion without committing partial changes', async () => {
+    await persistPlanningWorkspaceToDexie(sampleCenters)
+    const baseline = await loadPlanningWorkspaceFromDexie()
+    const newer = clonePlain(baseline)
+    newer[0].groups[0].plans[0].name = 'Saved in another tab'
+    await persistPlanningWorkspaceToDexie(newer, 'default', baseline)
+    const stale = clonePlain(baseline)
+    stale[0].name = 'Must not be partially saved'
+    stale[0].groups[0].plans[0].name = 'Stale change'
+    await expect(persistPlanningWorkspaceToDexie(stale, 'default', baseline)).rejects.toMatchObject({ code: 'storage_conflict' })
+    await expect(persistPlanningWorkspaceToDexie([], 'default', baseline)).rejects.toMatchObject({ code: 'storage_conflict' })
+    const saved = await loadPlanningWorkspaceFromDexie()
+    expect(saved[0].name).toBe(baseline[0].name)
+    expect(saved[0].groups[0].plans[0].name).toBe('Saved in another tab')
+  })
+
+  it('merges new forecasts without deleting newer projects and rejects stale updates', async () => {
+    await persistForecastWorkspaceToDexie(sampleForecasts)
+    const baseline = await loadForecastWorkspaceFromDexie()
+    const edited = clonePlain(baseline)
+    edited[0].name = 'Saved elsewhere'
+    await persistForecastWorkspaceToDexie(edited, 'default', baseline)
+    const withNew = [...baseline, { ...clonePlain(baseline[0]), id: 'forecast-2', name: 'Another forecast' }]
+    const saved = await persistForecastWorkspaceToDexie(withNew, 'default', baseline)
+    expect(saved).toHaveLength(2)
+    expect(saved.find((p) => p.id === baseline[0].id).name).toBe('Saved elsewhere')
+    const stale = clonePlain(baseline)
+    stale[0].name = 'Outdated edit'
+    await expect(persistForecastWorkspaceToDexie(stale, 'default', baseline)).rejects.toMatchObject({ code: 'storage_conflict' })
+  })
+
   it('round-trips planning data, forecasts, and planner drafts through Dexie', async () => {
     await persistPlanningWorkspaceToDexie(sampleCenters, 'default')
     await persistForecastWorkspaceToDexie(sampleForecasts, 'default:center:center-1:group:group-1:forecasts')

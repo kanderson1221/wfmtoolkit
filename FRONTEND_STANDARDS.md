@@ -4,7 +4,7 @@ This document explains how the frontend should be built and maintained in WFM To
 
 It is meant to help both human contributors and AI coding agents make consistent design and implementation decisions over time.
 
-Use [AGENTS.md](/Users/kevinanderson/Desktop/wfmtoolkit/AGENTS.md) for the short operational rules.
+Use [AGENTS.md](AGENTS.md) for the short operational rules.
 Use this document for the deeper rationale, patterns, and examples.
 
 ## 1. Product Character
@@ -44,8 +44,8 @@ PrimeVue is **not** the visual design system.
 We run it in `unstyled` mode and control appearance ourselves.
 
 Relevant files:
-- [src/plugins/primevue.js](/Users/kevinanderson/Desktop/wfmtoolkit/src/plugins/primevue.js)
-- [src/components/ui](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/ui)
+- [src/plugins/primevue.js](src/plugins/primevue.js)
+- [src/components/ui](src/components/ui)
 
 ### Tailwind
 
@@ -60,16 +60,16 @@ Tailwind is used for:
 Tailwind should describe composition directly in components, while repeated patterns move into wrappers or focused CSS layers.
 
 Relevant files:
-- [src/tailwind.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/tailwind.css)
-- [src/styles/base.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/base.css)
-- [src/styles/layout.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/layout.css)
-- [src/styles/primitives.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/primitives.css)
-- [src/styles/calculators.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/calculators.css)
-- [src/styles/planner.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/planner.css)
+- [src/tailwind.css](src/tailwind.css)
+- [src/styles/base.css](src/styles/base.css)
+- [src/styles/layout.css](src/styles/layout.css)
+- [src/styles/primitives.css](src/styles/primitives.css)
+- [src/styles/calculators.css](src/styles/calculators.css)
+- [src/styles/planner.css](src/styles/planner.css)
 
 ## 3. Core Rule: Shared UI Layer First
 
-Most frontend work should be composed from the shared UI layer in [src/components/ui](/Users/kevinanderson/Desktop/wfmtoolkit/src/components/ui).
+Most frontend work should be composed from the shared UI layer in [src/components/ui](src/components/ui).
 
 ### Current shared primitives
 
@@ -149,8 +149,8 @@ This pattern is a strong fit for:
 
 Master/detail pages should prefer:
 - one compact title row above the workspace
-- a fixed-height split workspace on desktop
-- independent vertical scrolling inside each pane
+- fixed-height panes for compact desktop selectors when useful
+- browser scrolling for dense worksheets and long reports; avoid nested vertical scroll areas around these
 - aligned pane headers and first-row starting lines when practical
 - one clear purpose per pane
 
@@ -432,19 +432,19 @@ Avoid:
 
 ### Shared style layers
 
-- [src/styles/base.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/base.css)
+- [src/styles/base.css](src/styles/base.css)
   low-level baseline rules
 
-- [src/styles/layout.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/layout.css)
+- [src/styles/layout.css](src/styles/layout.css)
   app frame, surfaces, layout bands, shared section mechanics
 
-- [src/styles/primitives.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/primitives.css)
+- [src/styles/primitives.css](src/styles/primitives.css)
   supporting primitive and reusable interaction styles
 
-- [src/styles/calculators.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/calculators.css)
+- [src/styles/calculators.css](src/styles/calculators.css)
   calculator-specific shared visuals
 
-- [src/styles/planner.css](/Users/kevinanderson/Desktop/wfmtoolkit/src/styles/planner.css)
+- [src/styles/planner.css](src/styles/planner.css)
   planner-specific shared visuals
 
 ## 13. Architecture Expectations
@@ -465,17 +465,31 @@ Composables should own:
 - interactions between UI and storage/API
 
 Current examples:
-- [src/composables/useMonthlyPlanBuilder.js](/Users/kevinanderson/Desktop/wfmtoolkit/src/composables/useMonthlyPlanBuilder.js)
-- [src/composables/useCsvBatchCalculator.js](/Users/kevinanderson/Desktop/wfmtoolkit/src/composables/useCsvBatchCalculator.js)
-- [src/composables/usePlanningWorkspace.js](/Users/kevinanderson/Desktop/wfmtoolkit/src/composables/usePlanningWorkspace.js)
-- [src/composables/useHashNavigation.js](/Users/kevinanderson/Desktop/wfmtoolkit/src/composables/useHashNavigation.js)
+- [src/composables/useMonthlyPlanBuilder.js](src/composables/useMonthlyPlanBuilder.js)
+- [src/composables/useCsvBatchCalculator.js](src/composables/useCsvBatchCalculator.js)
+- [src/composables/usePlanningWorkspace.js](src/composables/usePlanningWorkspace.js)
+- [src/composables/useHashNavigation.js](src/composables/useHashNavigation.js)
+
+### Async result ownership
+
+Capture the scope, project identity, and immutable input snapshot before sending a request. Store the signature of those captured inputs with the result. If the record or inputs change while work runs, discard the response and allow an explicit rerun. Abort requests on context replacement/unmount, and use a generation check for database loads that can finish out of order. Do not automatically retry computation POSTs.
+
+### Persistence ownership
+
+Repository saves receive the unmodified loaded baseline as well as the proposed changes. Check the expected revision or loaded record contents inside a write transaction, update only changed records, preserve unrelated edits, and surface conflicts as text. Read related rows in a single transaction. Whole-workspace replacement is reserved for explicit backup restore and legacy migration.
+
+The current `persistWorkspace(next, scope, baseline)` API accepts collection snapshots but writes record changes. An omitted baseline means new records only; it must not be used to overwrite previously saved records. Keep persistence and conflict handling outside feature templates.
+
+### Module boundaries
+
+Split modules by coherent responsibility when they become difficult to change safely. Prefer a focused existing helper or composable over a generic framework. File length is a review signal, not a mandatory threshold. Keep UI composition, orchestration, storage, and pure calculations separate.
 
 ### Pure planner logic
 
 Planner/business logic belongs in:
-- [src/planner/shared.js](/Users/kevinanderson/Desktop/wfmtoolkit/src/planner/shared.js)
-- [src/planner/demandModel.js](/Users/kevinanderson/Desktop/wfmtoolkit/src/planner/demandModel.js)
-- [src/planner/staffingModel.js](/Users/kevinanderson/Desktop/wfmtoolkit/src/planner/staffingModel.js)
+- [src/planner/shared.js](src/planner/shared.js)
+- [src/planner/demandModel.js](src/planner/demandModel.js)
+- [src/planner/staffingModel.js](src/planner/staffingModel.js)
 
 Do not push business logic back into page templates or large feature components unless there is a compelling reason.
 
@@ -520,6 +534,8 @@ Use Playwright for:
 - key create/edit/save paths
 
 Do not leave major frontend refactors unverified.
+
+Prioritize numerical correctness, persistence conflicts, API boundaries, and critical user flows. Reproduce concrete defects with focused regressions rather than duplicating coverage at every layer. Retain no permanent one-time benchmarks. Scale verification to the changed behavior; documentation-only edits need content/link checks.
 
 ## 16. Anti-Patterns
 
