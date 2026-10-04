@@ -15,11 +15,6 @@ export const holidayCalendarOptions = [
   { label: HOLIDAY_CALENDAR_LABELS[HOLIDAY_CALENDAR_US_FEDERAL], value: HOLIDAY_CALENDAR_US_FEDERAL }
 ]
 
-export const groupHolidayCalendarOptions = [
-  { label: 'Use Call Center Default', value: GROUP_HOLIDAY_CALENDAR_INHERIT },
-  ...holidayCalendarOptions
-]
-
 export const usFederalHolidayDefinitions = [
   { id: 'new_years_day', label: "New Year's Day", type: 'observed_fixed', month: 1, day: 1 },
   { id: 'martin_luther_king_jr_day', label: 'Martin Luther King Jr. Day', type: 'nth_weekday', month: 1, weekday: 1, occurrence: 3 },
@@ -297,14 +292,6 @@ export const normalizeGroupHolidayCalendarId = (value, fallback = GROUP_HOLIDAY_
 }
 
 export const normalizeHolidayScheduleMode = () => HOLIDAY_SCHEDULE_CLOSED
-
-export const getHolidayCalendarLabel = (calendarId) => {
-  if (calendarId === GROUP_HOLIDAY_CALENDAR_INHERIT) {
-    return 'Use Call Center Default'
-  }
-
-  return HOLIDAY_CALENDAR_LABELS[normalizeHolidayCalendarId(calendarId)] || HOLIDAY_CALENDAR_LABELS[HOLIDAY_CALENDAR_NONE]
-}
 
 export const calculateHolidayImpactDays = ({
   year,

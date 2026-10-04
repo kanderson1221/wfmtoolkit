@@ -68,9 +68,3 @@ export const buildForecastTrainingSeedFromPlanningGroupActuals = (
     ahtHistoryRows
   }
 }
-
-export const hasMinimumForecastTrainingHistory = (
-  actuals = {},
-  minimumDays = MINIMUM_FORECAST_HISTORY_DAYS,
-  options = {}
-) => buildForecastTrainingSeedFromPlanningGroupActuals(actuals, options).historyRows.length >= minimumDays

@@ -2,9 +2,6 @@ import {
   buildMonthlyRollupFromDailyForecastRows,
   buildForecastCoverageMonthStarts,
   createEmptyForecastResults,
-  FORECAST_SOURCE_IMPORTED_DAILY,
-  FORECAST_SOURCE_MANUAL_MONTHLY,
-  formatWhole,
   getForecastTypeLabel,
   resolveForecastCoverageWindow,
   resolveForecastType
@@ -522,30 +519,3 @@ export const createManualMonthlyForecastResults = ({
     }
   })
 }
-
-export const buildSourceDataForResults = ({
-  sourceKind = FORECAST_SOURCE_IMPORTED_DAILY,
-  fileName = '',
-  headers = [],
-  rows = [],
-  mapping = {},
-  issues = []
-} = {}) => ({
-  sourceKind,
-  fileName,
-  headers: Array.isArray(headers) ? [...headers] : [],
-  rows: Array.isArray(rows) ? rows.map((row) => ({ ...row })) : [],
-  mapping: mapping && typeof mapping === 'object' ? { ...mapping } : {},
-  issues: Array.isArray(issues) ? [...issues] : []
-})
-
-export const describeReadOnlyForecastSource = (sourceKind) => {
-  if (sourceKind === FORECAST_SOURCE_MANUAL_MONTHLY) {
-    return 'Monthly contacts'
-  }
-
-  return 'Imported daily forecast'
-}
-
-export const formatImportedDailyRowCountLabel = (dailyForecast = []) =>
-  `${formatWhole((Array.isArray(dailyForecast) ? dailyForecast : []).length)} daily rows`

@@ -26,7 +26,6 @@ import {
   resolvePlanRequirementMethod,
   resolvePlanningYear
 } from './planner/shared'
-import { readJsonFromLocalStorage, writeJsonToLocalStorage } from './storage/browserStorage'
 
 export const CENTERS_STORAGE_KEY = 'wfmtoolkit.callCenters.v1'
 export const LEGACY_PLANS_STORAGE_KEY = 'wfmtoolkit.monthlyPlans.v1'
@@ -34,8 +33,6 @@ export const PLAN_TYPE_BUDGET = 'budget'
 export const PLAN_TYPE_UPDATE = 'update'
 export const PLAN_STATUS_DRAFT = 'draft'
 export const PLAN_STATUS_FINALIZED = 'finalized'
-
-const buildScopedStorageKey = (baseKey, scope = 'default') => `${baseKey}.${String(scope || 'default')}`
 
 const clonePlain = (value) => JSON.parse(JSON.stringify(value))
 const DEFAULT_GROUP_SERVICE_LEVEL_PERCENT = 80
@@ -208,12 +205,6 @@ export const normalizePlanStatus = (value, planType = PLAN_TYPE_BUDGET) => {
     ? PLAN_STATUS_DRAFT
     : PLAN_STATUS_FINALIZED
 }
-export const isDraftBudgetPlan = (plan) =>
-  normalizePlanType(plan?.planType) === PLAN_TYPE_BUDGET &&
-  normalizePlanStatus(plan?.status, PLAN_TYPE_BUDGET) === PLAN_STATUS_DRAFT
-export const isFinalizedBudgetPlan = (plan) =>
-  normalizePlanType(plan?.planType) === PLAN_TYPE_BUDGET &&
-  normalizePlanStatus(plan?.status, PLAN_TYPE_BUDGET) === PLAN_STATUS_FINALIZED
 const normalizeMonthStart = (value) => {
   const normalizedValue = String(value || '').trim()
   return /^\d{4}-\d{2}-01$/.test(normalizedValue) ? normalizedValue : ''
@@ -534,14 +525,6 @@ export const normalizePlanningCenter = (draftCenter, timestamp = new Date().toIS
   }
 }
 
-const readStorage = (storageKey) => {
-  return readJsonFromLocalStorage(storageKey, null)
-}
-
-const writeCenters = (centers, scope = 'default') => {
-  writeJsonToLocalStorage(buildScopedStorageKey(CENTERS_STORAGE_KEY, scope), sortPlanningCenters(centers))
-}
-
 export const migrateLegacyPlansToCenters = (legacyPlans) => {
   if (!Array.isArray(legacyPlans) || !legacyPlans.length) {
     return []
@@ -634,59 +617,6 @@ export const createPlanningGroupDraft = (overrides = {}) => {
     channelType,
     serviceGoal
   }
-}
-
-export const loadPlanningCenters = (scope = 'default') => {
-  const scopedStorageKey = buildScopedStorageKey(CENTERS_STORAGE_KEY, scope)
-  const storedCenters = readStorage(scopedStorageKey)
-
-  if (Array.isArray(storedCenters)) {
-    const normalizedCenters = sortPlanningCenters(
-      storedCenters.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
-    )
-    try {
-      writeCenters(normalizedCenters, scope)
-    } catch {
-      // Keep the workspace readable even if we cannot rewrite the normalized local copy.
-    }
-    return normalizedCenters
-  }
-
-  const sharedCenters = scope !== 'default' ? readStorage(CENTERS_STORAGE_KEY) : null
-
-  if (Array.isArray(sharedCenters) && sharedCenters.length) {
-    const normalizedCenters = sortPlanningCenters(
-      sharedCenters.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
-    )
-    try {
-      writeCenters(normalizedCenters, scope)
-    } catch {
-      // Keep the workspace readable even if we cannot copy shared data into the scoped key.
-    }
-    return normalizedCenters
-  }
-
-  const legacyPlans = readStorage(LEGACY_PLANS_STORAGE_KEY)
-  const migratedCenters = migrateLegacyPlansToCenters(legacyPlans)
-
-  if (migratedCenters.length) {
-    try {
-      writeCenters(migratedCenters, scope)
-    } catch {
-      // Keep migrated centers available in memory even if persistence is unavailable.
-    }
-  }
-
-  return migratedCenters
-}
-
-export const persistPlanningCenters = (centers, scope = 'default') => {
-  const normalizedCenters = sortPlanningCenters(
-    centers.map((center) => normalizePlanningCenter(center, center.updatedAt || center.createdAt || new Date().toISOString()))
-  )
-
-  writeCenters(normalizedCenters, scope)
-  return normalizedCenters
 }
 
 export const findPlanningCenter = (centers, centerId) =>

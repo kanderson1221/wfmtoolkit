@@ -98,7 +98,7 @@ This repo includes a Render Blueprint config in `render.yaml` and a multi-stage 
 - Form posts input values to the calculation API endpoint
 - API returns calculated staffing summary and scenario rows
 - Batch API validates the full CSV and only processes when all rows are valid
-- Planning and forecasting data currently stay in local browser storage. A future iteration will move that local storage into Dexie/IndexedDB.
+- Planning, forecasting, and drafts use Dexie/IndexedDB in the browser. Legacy localStorage data is migrated once; backups preserve import compatibility.
 
 ## CSV Staffing File Processor
 
@@ -217,4 +217,16 @@ python -m unittest discover -s backend/tests -p "test_*.py" -v
 
 The Rust suite exercises native API contracts, numerical invariants, uploads,
 downloads, and the forecasting proxy. Python tests retain forecasting coverage
-and regression coverage for the old implementation.
+for the private forecasting worker. Frozen Erlang reference packages retain historical numerical conformance coverage; retired Python calculator/API modules are no longer included.
+
+## Repository maintenance
+
+Rust is the only implementation of the public calculator, batch, and planner APIs.
+Historical Python numerical comparisons use the frozen reference package in
+`specs/reference-implementations/erlang`; its snapshots and the v2 contract remain intact.
+
+Landing-page screenshots and the favicon have one canonical copy in `public/`.
+Frontend tests use `fake-indexeddb` as a development dependency; Sass is not required.
+Generated Rust targets, frontend builds, Python caches, and test reports are ignored.
+These outputs can be removed and rebuilt; retain `node_modules/` and `.venv/` while
+running the local app. No dependency reinstall or Git-history rewrite is needed.

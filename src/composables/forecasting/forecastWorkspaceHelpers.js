@@ -101,15 +101,6 @@ export const normalizeProjectForEditor = (projects = [], overrides = {}) => {
   })
 }
 
-export const sanitizeColumnMapping = (headers = [], mapping = {}, guessed = {}) => {
-  const availableHeaders = new Set(headers)
-
-  return {
-    dateColumn: availableHeaders.has(mapping.dateColumn) ? mapping.dateColumn : guessed.dateColumn || '',
-    volumeColumn: availableHeaders.has(mapping.volumeColumn) ? mapping.volumeColumn : guessed.volumeColumn || ''
-  }
-}
-
 const DAY_IN_MS = 1000 * 60 * 60 * 24
 const resolveCustomHolidayYears = ({ project, coverageWindow, adHocForecastHorizonDays }) => {
   const historyDates = getForecastTrainingHistoryRows(project)

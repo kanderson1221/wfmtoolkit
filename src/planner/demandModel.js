@@ -510,13 +510,3 @@ export const summarizePlanRecords = (monthlyRecords) => {
     )
   }
 }
-
-export const collectPlannerWarnings = (monthlyRecords) =>
-  monthlyRecords.flatMap((row) =>
-    [...row.presenceWarnings, ...row.utilizationWarnings, ...row.randomWarnings, ...row.planWarnings].map(
-      (message) => `${row.label}: ${message}`
-    )
-  )
-
-export const getMonthlyChartMax = (monthlyRecords) =>
-  Math.max(...monthlyRecords.flatMap((row) => [row.workloadHours, row.requiredStaffHours]), 1)

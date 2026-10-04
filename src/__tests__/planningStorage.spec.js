@@ -1,3 +1,4 @@
+import { ensureLegacyLocalStorageMigrated, loadPlanningWorkspaceFromDexie } from '../storage/localDataStore'
 import { getCurrentCalendarYear } from '../planner/shared'
 import {
   OPERATING_SCHEDULE_ALWAYS_OPEN,
@@ -5,7 +6,6 @@ import {
 } from '../planner/operatingSchedule'
 import {
   createPlanningCenterDraft,
-  loadPlanningCenters,
   normalizePlanningGroup,
   normalizePlanningPlan,
   PLAN_STATUS_DRAFT,
@@ -41,6 +41,12 @@ const ensurePlanningStorageApi = () => {
     },
     removeItem(key) {
       delete backingStore[key]
+    },
+    key(index) {
+      return Object.keys(backingStore)[index] ?? null
+    },
+    get length() {
+      return Object.keys(backingStore).length
     },
     clear() {
       Object.keys(backingStore).forEach((key) => {
@@ -242,7 +248,7 @@ describe('planningStorage', () => {
     })
   })
 
-  it('normalizes legacy saved plans as current Budget baselines', () => {
+  it('normalizes legacy saved plans as current Budget baselines', async () => {
     ensurePlanningStorageApi().setItem(
       'wfmtoolkit.callCenters.v1.default',
       JSON.stringify([
@@ -270,7 +276,8 @@ describe('planningStorage', () => {
       ])
     )
 
-    const centers = loadPlanningCenters('default')
+    await ensureLegacyLocalStorageMigrated()
+    const centers = await loadPlanningWorkspaceFromDexie('default')
     const plan = centers[0].groups[0].plans[0]
 
     expect(plan).toMatchObject({
@@ -494,7 +501,7 @@ describe('planningStorage', () => {
     expect(nextPlans.find((plan) => plan.isCurrent)?.id).toBe('update-2')
   })
 
-  it('migrates legacy federal template centers to manual holiday rows', () => {
+  it('migrates legacy federal template centers to manual holiday rows', async () => {
     ensurePlanningStorageApi().setItem(
       'wfmtoolkit.callCenters.v1.default',
       JSON.stringify([
@@ -513,7 +520,8 @@ describe('planningStorage', () => {
       ])
     )
 
-    const centers = loadPlanningCenters('default')
+    await ensureLegacyLocalStorageMigrated()
+    const centers = await loadPlanningWorkspaceFromDexie('default')
     const activeHolidayProfile = resolveCenterHolidayProfile(centers[0], getCurrentCalendarYear())
 
     expect(centers[0]).not.toHaveProperty('defaultHolidayCalendarId')
@@ -540,7 +548,7 @@ describe('planningStorage', () => {
     expect(draft.operatingScheduleMode).toBe(OPERATING_SCHEDULE_ALWAYS_OPEN)
   })
 
-  it('migrates legacy staffing-group actuals years into one shared actuals history', () => {
+  it('migrates legacy staffing-group actuals years into one shared actuals history', async () => {
     ensurePlanningStorageApi().setItem(
       'wfmtoolkit.callCenters.v1.default',
       JSON.stringify([
@@ -578,7 +586,8 @@ describe('planningStorage', () => {
       ])
     )
 
-    const centers = loadPlanningCenters('default')
+    await ensureLegacyLocalStorageMigrated()
+    const centers = await loadPlanningWorkspaceFromDexie('default')
 
     expect(centers[0].groups[0].actuals).toMatchObject({
       uploadedFileName: 'latest.csv'

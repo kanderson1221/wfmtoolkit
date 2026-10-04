@@ -85,8 +85,9 @@ to loopback in the container. Prophet/pandas remain there; Rust forwards the
 forecasting request and preserves its status and JSON. Forecast fits are limited
 to one at a time in both the proxy and worker, with a 600-second proxy timeout.
 The Python guard remains held if the proxy disconnects during a fit.
-Unavailability returns 503. The legacy `backend.app.main` is retained solely
-for historical tests/comparisons and is not the deployment entrypoint.
+Unavailability returns 503. The retired Python public API, batch, and planner
+modules have been removed. Historical numerical comparisons use the frozen
+reference package; regression coverage for the public API runs against Rust.
 
 ## Verification
 

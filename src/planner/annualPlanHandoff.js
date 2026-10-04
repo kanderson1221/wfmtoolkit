@@ -59,17 +59,6 @@ export const findLinkedPriorPlan = (plans, planOrContext) => {
   )[0] || null
 }
 
-export const findLinkedNextPlan = (plans, planOrContext) => {
-  const currentPlanId = planOrContext?.id || null
-  const targetYear = getPlanYear(planOrContext) + 1
-
-  return sortPlansByFreshness(
-    (Array.isArray(plans) ? plans : []).filter(
-      (plan) => plan?.id !== currentPlanId && getPlanYear(plan) === targetYear
-    )
-  )[0] || null
-}
-
 export const resolveLinkedOpeningPosition = ({
   priorPlan,
   startingHeadcount,
@@ -181,24 +170,3 @@ export const persistTrainingClassOutcomes = (trainingClass, planningYear, traini
       : metrics.trainingFalloutHeadcount
   }
 }
-
-export const buildHandoffPlanSnapshot = ({
-  plan,
-  planningYear,
-  trainingSettings,
-  trainingClasses,
-  nextYearOpening,
-  summary
-}) => ({
-  ...plan,
-  planningYear: getPlanYear({ planningYear: planningYear ?? plan?.planningYear }),
-  trainingSettings: createTrainingSettings(trainingSettings || plan?.trainingSettings || {}),
-  trainingClasses: (Array.isArray(trainingClasses) ? trainingClasses : []).map((trainingClass) =>
-    createTrainingClass(trainingClass)
-  ),
-  nextYearOpening: createNextYearOpening(nextYearOpening || plan?.nextYearOpening || {}),
-  summary: {
-    ...(plan?.summary || {}),
-    ...(summary || {})
-  }
-})

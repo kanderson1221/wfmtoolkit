@@ -200,6 +200,6 @@ results.
 # Implementation Traceability
 
 - `src/planner/intradayErlang.js`
-- `backend/app/planner.py`
+- `rust/server/src/planner.rs`
 - `src/composables/monthlyPlanBuilder/usePlannerIntradayErlang.js`
 - `PLAN-014` Minimum headcount per open interval

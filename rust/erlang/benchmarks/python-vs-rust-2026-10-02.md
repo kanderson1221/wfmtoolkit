@@ -1,6 +1,6 @@
 # Python vs Rust calculation speed — 2026-10-02
 
-Compared the current standalone Rust library with the original application engine in `backend/app/erlang.py`.
+Compared the current standalone Rust library with the original application engine in `backend/app/erlang.py` at the time of measurement (now retired; the historical Python engine is preserved in `specs/reference-implementations/erlang/reference_erlang/erlang.py`).
 
 ## Method
 

@@ -38,12 +38,6 @@ export const buildPlanningCenterHash = (centerId) => (
     : buildPlanningHomeHash()
 )
 
-export const buildPlanningCenterForecastsHash = (centerId) => (
-  centerId
-    ? `${PLANNING_HOME_HASH}/center/${centerId}/forecasts`
-    : buildPlanningHomeHash()
-)
-
 export const buildPlanningGroupForecastsHash = (centerId, groupId, year = null, forecastId = null) => {
   if (!centerId) {
     return buildPlanningHomeHash()

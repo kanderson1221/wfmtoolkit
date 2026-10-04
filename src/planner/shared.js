@@ -198,7 +198,6 @@ export const createNextYearOpening = (overrides = {}) => {
   }
 }
 
-export const buildPresenceMonths = () => MONTH_LABELS.map(() => createPresenceMonth())
 export const buildRandomMonths = () => MONTH_LABELS.map(() => createRandomMonth())
 export const buildPlanMonths = () => MONTH_LABELS.map(() => createPlanMonth())
 export const buildStaffingMonths = () => MONTH_LABELS.map(() => createStaffingMonth())

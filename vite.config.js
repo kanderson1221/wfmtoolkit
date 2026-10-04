@@ -31,9 +31,6 @@ export default defineConfig({
             return 'echarts-vendor'
           }
 
-          if (id.includes('@supabase')) {
-            return 'auth-vendor'
-          }
         }
       }
     }

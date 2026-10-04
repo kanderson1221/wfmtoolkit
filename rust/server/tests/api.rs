@@ -420,6 +420,9 @@ async fn frontend_seo_unknown_api_and_path_traversal() {
     )
     .unwrap();
     assert!(xml.contains("<loc>https://example.com/planning-workspace/</loc>"));
+    for path in ["/", "/erlang-tools/", "/terms/"] {
+        assert!(xml.contains(&format!("<loc>https://example.com{path}</loc>")));
+    }
     assert!(xml.contains("<lastmod>"));
 }
 
@@ -596,4 +599,185 @@ async fn version_two_staffing_and_unit_scale_vectors() {
             .unwrap();
         assert_close(&value(m), &case["expected"], case["name"].as_str().unwrap());
     }
+}
+
+// Cases formerly covered only by the retired Python API tests.
+#[tokio::test]
+async fn batch_weighting_extreme_load_and_shrinkage_units() {
+    let (router, _directory) = setup();
+    let mut high = batch_row();
+    high["calls_offered"] = json!(5000);
+    high["aht_seconds"] = json!(360);
+    let mut low = batch_row();
+    low["calls_offered"] = json!(10);
+    low["aht_seconds"] = json!(600);
+    low["mean_patience_seconds"] = json!(30);
+    low["shrinkage"] = json!(0.3);
+    let (_, result) = json_request(
+        &router,
+        "/api/erlang-c/batch-calculate",
+        json!({"rows": [high.clone(), low]}),
+    )
+    .await;
+    assert_eq!(result["summary"]["successfulRows"], 2);
+    let rows = result["results"].as_array().unwrap();
+    for (metric, summary) in [
+        ("serviceLevel", "avgServiceLevel"),
+        ("asaSeconds", "avgAsaSeconds"),
+    ] {
+        let expected = (rows[0][metric].as_f64().unwrap() * 5000.0
+            + rows[1][metric].as_f64().unwrap() * 10.0)
+            / 5010.0;
+        assert_close(&result["summary"][summary], &json!(expected), summary);
+    }
+    for row in rows {
+        for key in [
+            "serviceLevel",
+            "asaSeconds",
+            "percentAnsweredImmediately",
+            "expectedOccupancy",
+            "abandonPercent",
+        ] {
+            assert!(row[key].as_f64().unwrap().is_finite(), "{key}: {row}");
+        }
+        assert!(
+            row["requiredStaffGross"].as_u64().unwrap() > row["requiredStaffNet"].as_u64().unwrap()
+        );
+    }
+    let (_, percent) = json_request(
+        &router,
+        "/api/erlang-c/batch-calculate",
+        json!({"rows": [high.clone()]}),
+    )
+    .await;
+    high["shrinkage"] = json!(0.3);
+    let (_, ratio) = json_request(
+        &router,
+        "/api/erlang-c/batch-calculate",
+        json!({"rows": [high]}),
+    )
+    .await;
+    assert_eq!(percent, ratio);
+}
+
+#[tokio::test]
+async fn file_processor_rejects_missing_fields_and_invalid_ranges() {
+    let (router, _directory) = setup();
+    let mut missing = batch_row();
+    missing.as_object_mut().unwrap().remove("aht_seconds");
+    let mut bad = batch_row();
+    bad["max_occupancy"] = json!(120);
+    let (_, result) = json_request(
+        &router,
+        "/api/erlang-c/batch/file-processor",
+        json!({"rows": [missing, bad]}),
+    )
+    .await;
+    assert_eq!(result["summary"]["successfulRows"], 0);
+    assert_eq!(result["summary"]["failedRows"], 2);
+    assert_eq!(result["results"], json!([]));
+    assert_eq!(result["export"]["enrichedFile"]["rows"], json!([]));
+    assert_eq!(result["errors"].as_array().unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn calculator_models_goals_and_invalid_shrinkage() {
+    let (router, _directory) = setup();
+    let fixtures: Value =
+        serde_json::from_str(include_str!("fixtures/python_contract.json")).unwrap();
+    let mut request = fixtures
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "erlang_a_25")
+        .unwrap()["request"]
+        .clone();
+    let (status, baseline) =
+        json_request(&router, "/api/erlang-c/calculate", request.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{baseline}");
+    assert_eq!(baseline["scenarios"].as_array().unwrap().len(), 7);
+    let recommended = baseline["scenarios"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["isRecommended"] == true)
+        .unwrap();
+    assert_eq!(recommended["agents"], baseline["summary"]["requiredAgents"]);
+    assert_eq!(
+        recommended["requiredHeadcount"],
+        baseline["summary"]["requiredHeadcount"]
+    );
+    request["serviceLevelGoal"] = json!(90);
+    let (status, strict) = json_request(&router, "/api/erlang-c/calculate", request.clone()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        strict["summary"]["requiredAgents"]
+            .as_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap()
+            >= baseline["summary"]["requiredAgents"]
+                .as_str()
+                .unwrap()
+                .parse::<usize>()
+                .unwrap()
+    );
+    for (key, value) in [
+        ("model", json!("invalid-model")),
+        ("shrinkageAssumption", json!(100)),
+    ] {
+        let mut bad = request.clone();
+        bad[key] = value;
+        assert_eq!(
+            json_request(&router, "/api/erlang-c/calculate", bad)
+                .await
+                .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+}
+
+#[tokio::test]
+async fn planner_floor_does_not_reduce_an_erlang_requirement() {
+    let (router, _directory) = setup();
+    let fixtures: Value =
+        serde_json::from_str(include_str!("fixtures/python_contract.json")).unwrap();
+    let mut request = fixtures
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "planner_floor")
+        .unwrap()["request"]
+        .clone();
+    request["rows"][0]["callsOffered"] = json!(100);
+    request["rows"][0]["minimumHeadcount"] = json!(0);
+    let (status, baseline) = json_request(
+        &router,
+        "/api/planner/intraday-erlang/calculate",
+        request.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{baseline}");
+    request["rows"][0]["minimumHeadcount"] = json!(1);
+    let (status, floored) =
+        json_request(&router, "/api/planner/intraday-erlang/calculate", request).await;
+    assert_eq!(status, StatusCode::OK, "{floored}");
+    assert!(
+        baseline["intervalPlans"][0]["requiredStaffNet"]
+            .as_u64()
+            .unwrap()
+            > 1
+    );
+    for key in [
+        "requiredStaffNet",
+        "erlangRequiredStaffNet",
+        "serviceLevel",
+        "occupancy",
+    ] {
+        assert_eq!(
+            baseline["intervalPlans"][0][key], floored["intervalPlans"][0][key],
+            "{key}"
+        );
+    }
+    assert_eq!(floored["intervalPlans"][0]["minimumApplied"], false);
 }

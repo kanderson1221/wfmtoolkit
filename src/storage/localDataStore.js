@@ -158,6 +158,8 @@ const flattenPlanningWorkspace = (centers, scope = DEFAULT_SCOPE) => {
           holidayProfileId,
           year: Number(profile.year) || 0,
           rowIndex,
+          holidayId: holiday.id || '',
+          sourceRuleId: holiday.sourceRuleId || null,
           label: holiday.label || '',
           date: holiday.date || ''
         })
@@ -303,6 +305,8 @@ const hydratePlanningWorkspace = (scope, rows) => {
     const holidays = (holidayRowsByProfileId.get(row.id) || [])
       .sort((left, right) => left.rowIndex - right.rowIndex)
       .map((holidayRow) => ({
+        id: holidayRow.holidayId || holidayRow.id,
+        sourceRuleId: holidayRow.sourceRuleId || null,
         label: holidayRow.label,
         date: holidayRow.date
       }))

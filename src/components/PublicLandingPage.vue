@@ -1,10 +1,11 @@
 <script setup>
 import { mdiArrowRight } from '@mdi/js'
 
-import erlangToolImageUrl from '../assets/landing-erlang-tool.png'
-import planningToolImageUrl from '../assets/landing-planning-tool.png'
 import logoUrl from '../assets/logo.svg'
 import AppButton from './ui/AppButton.vue'
+
+const erlangToolImageUrl = '/landing-erlang-tool.png'
+const planningToolImageUrl = '/landing-planning-tool.png'
 
 const topNavLinks = [
   { id: 'workflow', label: 'How It Works' },

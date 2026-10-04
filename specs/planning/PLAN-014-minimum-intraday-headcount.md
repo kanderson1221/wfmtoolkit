@@ -148,7 +148,7 @@ Interval results shall retain:
 - `src/planner/intradayErlang.js`
 - `src/composables/monthlyPlanBuilder/usePlannerIntradayErlang.js`
 - `src/composables/monthlyPlanBuilder/usePlannerActualsIntradayErlang.js`
-- `backend/app/main.py`
-- `backend/app/planner.py`
+- `rust/server/src/lib.rs`
+- `rust/server/src/planner.rs`
 - `src/components/planner/PlannerMonthlyPlanTab.vue`
 
