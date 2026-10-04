@@ -3,8 +3,7 @@
 Version `0.1.0` of the Erlang C/A engine. This is a self-contained,
 dependency-free Rust library called directly by the native API in
 [`../server`](../server/README.md). The library has no HTTP, Python, or UI
-dependencies. The legacy Python implementation remains available for regression
-comparisons; production calculation routes use Rust.
+dependencies. Production calculation routes use Rust.
 
 ## Use and verification
 
@@ -17,15 +16,7 @@ cargo test --manifest-path rust/erlang/Cargo.toml --offline --release
 cargo fmt --manifest-path rust/erlang/Cargo.toml --check
 cargo clippy --manifest-path rust/erlang/Cargo.toml --all-targets --offline -- -D warnings
 cargo doc --manifest-path rust/erlang/Cargo.toml --no-deps --offline
-python3 rust/erlang/tools/compare_python.py
-cargo run --manifest-path rust/erlang/Cargo.toml --release --offline --example benchmark -- 1000
-cargo run --manifest-path rust/erlang/Cargo.toml --release --offline --example dataset
 ```
-
-The Python comparison helper uses only the standard library and the frozen
-reference implementation. Its CSV example is a manually invoked diagnostic,
-not an application endpoint. Compilation and process startup are excluded from
-its calculation timings. Benchmark timings are machine dependent.
 
 ```rust
 use wfm_erlang::{Model, Solver, StaffingInput};
@@ -70,10 +61,7 @@ for row in rows {
 
 Each row retains its numeric result or error, in input order; an invalid row does
 not stop later rows. There is no calendar, fixed row count, or fixed interval
-duration assumption. `examples/dataset.rs` is a complete executable example with
-mixed models/durations and one clearly labeled invalid demonstration row. Replace
-its sample vector with rows from your data source. It adds no streaming, worker
-pool, or data-source dependency to the library.
+duration assumption. The loop adds no streaming, worker-pool, or data-source dependency to the library.
 
 For supplied staffing, call
 `solver.staffing_metrics_for_agents(&row.input, agents, row.model)` in the same
@@ -170,10 +158,9 @@ This port follows the existing models and metric definitions, with deliberate
 corrections to numerical behavior:
 
 - A's analytic solver removes RK4 discretization error. It need not reproduce
-  Python's integration or overflow artifacts bit for bit. All five supplied
-  staffing cases satisfy the reference's `1e-12` absolute/relative tolerance;
-  broader Python comparisons allow RK4 error. Independent closed-form and
-  high-precision tests check the Rust calculation separately.
+  Python's integration or overflow artifacts bit for bit. Recorded staffing
+  results use a `1e-12` absolute/relative tolerance; independent closed-form
+  and high-precision tests check the Rust calculation separately.
 - C stability is determined by `agents > offered_load`, rather than an absolute
   `1e-9` cutoff on departure rate. This preserves results under changes in time
   scale and correctly handles stable systems very close to capacity.
@@ -191,10 +178,10 @@ corrections to numerical behavior:
   that every arrival receives service. No finite-staff stochastic model can
   provide that guarantee for positive demand and a finite target time.
 
-This crate does not port planning/monthly aggregation or replace the normative
-`specs/reference-implementations/erlang` package. Any future integration must
-explicitly review these numerical differences and the PLAN-007 versioning
-contract. The frozen source snapshots and their hashes remain unchanged.
+Planning and monthly aggregation live in the native server. Recorded expected
+values, analytical identities, and model invariants are checked against the
+active engine. Keep one live implementation and one test suite; numerical
+changes must be checked against independently recorded results.
 
 ## Files
 
@@ -208,36 +195,3 @@ contract. The frozen source snapshots and their hashes remain unchanged.
 | `src/payload.rs` | Shrinkage and optional display adapter |
 | `tests/staffing.rs` | Reference, analytical, invariant, and regression tests |
 | `tests/reuse.rs` | Reused buffers, abandonment-only parity, and dataset error handling |
-| `examples/dataset.rs` | Plain loop over supplied rows with numeric results and errors |
-| `examples/benchmark.rs` | Manual performance benchmark |
-| `tools/compare_python.py` | Differential check against the frozen Python engine |
-
-## Validation recorded on 2026-10-02
-
-Validated with Rust 1.99.0 on Apple arm64: 44 Rust tests (including the doc test),
-Clippy with warnings denied, formatting, and documentation generation passed.
-The unchanged Python reference's four conformance/integrity tests also passed.
-The 17-case Python/Rust comparison had no mismatches; maximum service-level
-difference was `1.92e-13` and maximum ASA difference was `4.65e-13` seconds.
-The buffer-reuse/selective-calculation update was additionally compared with
-the prior Rust release executable on 1,024 deterministic mixed-model,
-mixed-duration search/fixed-staff rows: every returned metric was identical.
-Tests verify allocation reuse, skipped waiting buffers for abandonment-only
-and occupancy-rejected trials, recovery after failed rows, and buffer release.
-
-A local release benchmark over 5,000 iterations with a reused solver measured the following mean
-times. These are observations on this machine, not throughput guarantees.
-
-| Calculation | Mean time |
-| --- | ---: |
-| Standard C staffing search, load 5 | 0.227 µs |
-| Standard A staffing search, load 5 | 2.658 µs |
-| High-load C staffing search, load 1,200 | 74.205 µs |
-| High-load A staffing search, load 1,200 | 61.635 µs |
-| Overloaded A full metrics, load 5 / 2 agents | 0.601 µs |
-| Abandonment only, load 5 / 2 agents | 0.111 µs |
-| A full metrics, load 1,200 / 1,200 agents | 8.052 µs |
-| Abandonment only, load 1,200 / 1,200 agents | 2.531 µs |
-
-No frontend code or navigation changed, so frontend build/unit/e2e suites were
-not run for this isolated library.

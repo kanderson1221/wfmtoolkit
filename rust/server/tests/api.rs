@@ -78,7 +78,7 @@ fn assert_close(actual: &Value, expected: &Value, path: &str) {
 }
 
 #[tokio::test]
-async fn python_api_contract_fixtures() {
+async fn api_contract_fixtures() {
     let (router, _directory) = setup();
     let fixtures: Value =
         serde_json::from_str(include_str!("fixtures/python_contract.json")).unwrap();
@@ -556,49 +556,6 @@ async fn planner_rejects_inconsistent_fractional_and_negative_floors() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(result["detail"].as_str().unwrap().contains("consistent"));
-}
-
-#[tokio::test]
-async fn version_two_staffing_and_unit_scale_vectors() {
-    let vectors: Value = serde_json::from_str(include_str!(
-        "../../../specs/reference-implementations/erlang-v2/test_vectors.json"
-    ))
-    .unwrap();
-    let input = |v: &Value| wfm_erlang::StaffingInput {
-        calls_offered: v["calls_offered"].as_f64().unwrap(),
-        interval_duration_seconds: v["interval_duration_seconds"].as_f64().unwrap(),
-        avg_handle_time_seconds: v["avg_handle_time_seconds"].as_f64().unwrap(),
-        target_service_level: v["target_service_level"].as_f64().unwrap(),
-        service_level_answer_time_seconds: v["service_level_answer_time_seconds"].as_f64().unwrap(),
-        max_occupancy: v["max_occupancy"].as_f64().unwrap(),
-        avg_caller_patience_seconds: v["avg_caller_patience_seconds"].as_f64().unwrap(),
-    };
-    let value = |m: wfm_erlang::StaffingMetrics| {
-        json!({"required_staff": m.required_staff,
-        "service_level": m.service_level, "occupancy": m.occupancy,
-        "average_speed_of_answer_seconds": m.average_speed_of_answer_seconds,
-        "percent_answered_immediately": m.percent_answered_immediately, "abandon_percent": m.abandon_percent})
-    };
-    let mut solver = wfm_erlang::Solver::default();
-    for case in vectors["staffingCases"].as_array().unwrap() {
-        let m = solver
-            .staff_for_interval(
-                &input(&case["input"]),
-                case["model"].as_str().unwrap().parse().unwrap(),
-            )
-            .unwrap();
-        assert_close(&value(m), &case["expected"], case["name"].as_str().unwrap());
-    }
-    for case in vectors["fixedAgentCases"].as_array().unwrap() {
-        let m = solver
-            .staffing_metrics_for_agents(
-                &input(&case["input"]),
-                case["agents"].as_u64().unwrap() as usize,
-                case["model"].as_str().unwrap().parse().unwrap(),
-            )
-            .unwrap();
-        assert_close(&value(m), &case["expected"], case["name"].as_str().unwrap());
-    }
 }
 
 // Cases formerly covered only by the retired Python API tests.

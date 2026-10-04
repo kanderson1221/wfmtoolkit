@@ -217,13 +217,17 @@ python -m unittest discover -s backend/tests -p "test_*.py" -v
 
 The Rust suite exercises native API contracts, numerical invariants, uploads,
 downloads, and the forecasting proxy. Python tests retain forecasting coverage
-for the private forecasting worker. Frozen Erlang reference packages retain historical numerical conformance coverage; retired Python calculator/API modules are no longer included.
+for the private forecasting worker. Recorded numerical results and analytical
+checks live in the active Rust suite; retired Python calculator/API modules are
+no longer included.
 
 ## Repository maintenance
 
 Rust is the only implementation of the public calculator, batch, and planner APIs.
-Historical Python numerical comparisons use the frozen reference package in
-`specs/reference-implementations/erlang`; its snapshots and the v2 contract remain intact.
+The active Rust tests retain recorded expected results and mathematical invariants.
+Historical engine copies and one-time speed-test tools/reports were removed; prior
+versions remain available in Git history. Dependency lockfiles stay to make builds
+reproducible.
 
 Landing-page screenshots and the favicon have one canonical copy in `public/`.
 Frontend tests use `fake-indexeddb` as a development dependency; Sass is not required.

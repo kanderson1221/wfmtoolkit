@@ -86,8 +86,8 @@ forecasting request and preserves its status and JSON. Forecast fits are limited
 to one at a time in both the proxy and worker, with a 600-second proxy timeout.
 The Python guard remains held if the proxy disconnects during a fit.
 Unavailability returns 503. The retired Python public API, batch, and planner
-modules have been removed. Historical numerical comparisons use the frozen
-reference package; regression coverage for the public API runs against Rust.
+modules have been removed. Regression coverage for the public API runs against
+Rust using recorded expected responses.
 
 ## Verification
 
@@ -98,9 +98,9 @@ cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --locked 
 python3 rust/server/tools/check_http.py --binary rust/target/release/wfm-server
 ```
 
-The HTTP check starts a temporary server, tests frozen Python API fixtures over
-HTTP, and processes a configurable dataset through JSON and CSV paths. It
-reports request times including parsing and serialization, not just engine
-time. Unit tests also cover HTTP errors, upload limits, download expiration,
-path containment, and forecasting proxy behavior. The numerical contract is
-versioned separately in `specs/reference-implementations/erlang-v2`.
+The Rust tests check recorded API responses, numerical results, HTTP errors,
+upload limits, download expiration, path containment, and forecasting proxy
+behavior. Expected API responses have one canonical copy in
+`tests/fixtures/python_contract.json`. The small HTTP smoke check verifies executable
+startup and static serving; add `--with-forecast-worker` to check the production
+supervisor and forecasting proxy. It does not benchmark datasets.

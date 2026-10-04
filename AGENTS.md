@@ -16,6 +16,16 @@ The UI should feel like:
 
 The app is no longer in a mixed-style transition. New work should extend the current `PrimeVue unstyled + Tailwind + shared wrapper` system rather than inventing new patterns.
 
+## Repository Documentation
+
+Maintain documentation that helps contributors and AI agents run, test, and change
+this application: this guide, frontend/labeling conventions, and current READMEs.
+Do not recreate retrospective specs, roadmaps, interview logs, audit reports, or
+concept mockups unless the user requests them. Use the live code and focused tests
+to establish current behavior.
+
+For user-facing terminology, follow [DATA_LABELING.md](DATA_LABELING.md).
+
 ## Source Of Truth
 
 When making frontend decisions, use this priority order:

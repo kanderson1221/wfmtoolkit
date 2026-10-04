@@ -35,9 +35,8 @@ fn probabilities_are_valid(metrics: &StaffingMetrics) {
     assert!(metrics.average_speed_of_answer_seconds >= 0.0);
 }
 
-// Source: specs/reference-implementations/erlang/test_vectors.json.
-// These supplied vectors meet the reference's 1e-12 absolute/relative contract.
-// Wider exploratory comparisons allow for the Python solver's RK4 error.
+// Expected values were recorded from the original Python engine.
+// Keep these independent of the live solver, with 1e-12 absolute/relative tolerance.
 #[test]
 fn supplied_reference_staffing_vectors() {
     let cases = [
@@ -562,6 +561,22 @@ fn stable_near_capacity_c_is_independent_of_absolute_time_scale() {
     let result = staffing_metrics_for_agents(&input, 1, Model::ErlangC).unwrap();
     assert!(result.average_speed_of_answer_seconds.is_finite());
     assert!(result.service_level > 0.0);
+
+    // Preserve the corrected small-rate case formerly held in the v2 reference.
+    let scaled = StaffingInput {
+        calls_offered: 0.5,
+        interval_duration_seconds: 1e12,
+        avg_handle_time_seconds: 1e12,
+        service_level_answer_time_seconds: 0.0,
+        avg_caller_patience_seconds: 1e12,
+        ..input
+    };
+    let result = staffing_metrics_for_agents(&scaled, 1, Model::ErlangC).unwrap();
+    close(result.service_level, 0.5, 1e-12);
+    close(result.occupancy, 0.5, 1e-12);
+    close(result.percent_answered_immediately, 0.5, 1e-12);
+    close(result.average_speed_of_answer_seconds, 1e12, 1.0);
+    close(result.abandon_percent, 0.21306131942526685, 1e-12);
 }
 
 #[test]
